@@ -1,0 +1,219 @@
+/**
+ * AvatarSystem — everybody else on the floor.
+ *
+ * Groupies (bots) dance: they bob on the kick, wave glowsticks, and when a
+ * telegraph blooms on their deck they MOVE — to the safe ground if their
+ * seeded roll says they'll live, square into the fire if it says they won't.
+ * The roll here is the exact roll ChoreoSystem judges with, so what you see
+ * a groupie do across the ring always matches what the leaderboard says
+ * happened. Remote humans stream their real head/hands into the same rigs.
+ *
+ * Rigs live in platform-local space under each seat's platform root — rank
+ * lifts and eliminations carry them automatically.
+ */
+
+import { createSystem } from '@iwsdk/core';
+import type { MeshStandardMaterial } from 'three';
+import { BOTS, OCTAGON_HALF_DEPTH, OCTAGON_HALF_WIDTH } from '../config.js';
+import { platformRoot } from '../arena/arena.js';
+import { choreoView } from './ChoreoSystem.js';
+import type { Zone } from '../choreo/setlist.js';
+import { buildDancer, type DancerRig } from '../game/avatars.js';
+import { roll } from '../game/rng.js';
+import { seatBearing } from '../game/ring.js';
+import { match, type Dancer } from '../game/state.js';
+import { remotePoses } from '../net/poses.js';
+
+interface Puppet {
+  rig: DancerRig;
+  seat: number;
+  phase: number;
+  /** Current dance/dodge target in platform-local space. */
+  tx: number;
+  tz: number;
+  duck: boolean;
+  lastLives: number;
+  flash: number;
+  slump: number;
+}
+
+const CLAMP_X = OCTAGON_HALF_WIDTH - 0.18;
+const CLAMP_Z = OCTAGON_HALF_DEPTH - 0.15;
+
+export class AvatarSystem extends createSystem({}) {
+  private generation = -1;
+  private puppets: Puppet[] = [];
+
+  private rebuild(): void {
+    this.generation = match.generation;
+    for (const p of this.puppets) p.rig.dispose();
+    this.puppets = [];
+    for (const d of match.players) {
+      if (d.kind === 'local') continue;
+      const parent = platformRoot(d.seat);
+      if (!parent) continue;
+      const rig = buildDancer(d.hue);
+      parent.add(rig.root);
+      this.puppets.push({
+        rig,
+        seat: d.seat,
+        phase: (d.seat * 1.7) % (Math.PI * 2),
+        tx: 0,
+        tz: 0,
+        duck: false,
+        lastLives: d.lives,
+        flash: 0,
+        slump: 0,
+      });
+    }
+  }
+
+  update(delta: number): void {
+    if (this.generation !== match.generation) this.rebuild();
+    const beat = Number.isFinite(match.beat) ? match.beat : 0;
+
+    for (const p of this.puppets) {
+      const d = match.players.find((x) => x.seat === p.seat);
+      if (!d) continue;
+
+      // Hit flash: lives dropped since last frame.
+      if (d.lives < p.lastLives) p.flash = 0.45;
+      p.lastLives = d.lives;
+      p.flash = Math.max(0, p.flash - delta);
+
+      // Slump on elimination (and recover if a new match resurrects the rig).
+      const slumpTarget = d.alive ? 0 : 1;
+      p.slump += (slumpTarget - p.slump) * Math.min(1, delta * 3);
+
+      for (const m of p.rig.accents) {
+        const std = m as MeshStandardMaterial;
+        if (std.emissive) {
+          std.emissiveIntensity = d.alive ? 0.9 + (p.flash > 0 ? 1.4 : 0) : 0.12;
+          if (p.flash > 0) std.emissive.setHex(0xff4033);
+          else std.emissive.setHex(p.rig.baseColor);
+        }
+      }
+
+      if (d.kind === 'remote') {
+        this.driveRemote(p, delta);
+      } else {
+        this.driveBot(p, d, beat, delta);
+      }
+
+      // The slump: the whole rig melts floorward.
+      p.rig.torso.scale.y = 1 - p.slump * 0.72;
+      p.rig.torso.position.y = 1.02 * (1 - p.slump * 0.72);
+      if (p.slump > 0.01) {
+        p.rig.head.position.y = Math.min(p.rig.head.position.y, 1.45 - p.slump * 0.9);
+      }
+    }
+  }
+
+  private driveRemote(p: Puppet, delta: number): void {
+    const pose = remotePoses.get(p.seat);
+    if (!pose) return;
+    const k = Math.min(1, delta * 14);
+    const r = p.rig;
+    r.head.position.x += (pose.hx - r.head.position.x) * k;
+    r.head.position.y += (pose.hy - r.head.position.y) * k;
+    r.head.position.z += (pose.hz - r.head.position.z) * k;
+    r.head.rotation.y += (pose.hyaw - r.head.rotation.y) * k;
+    r.handL.position.x += (pose.lx - r.handL.position.x) * k;
+    r.handL.position.y += (pose.ly - r.handL.position.y) * k;
+    r.handL.position.z += (pose.lz - r.handL.position.z) * k;
+    r.handR.position.x += (pose.rx - r.handR.position.x) * k;
+    r.handR.position.y += (pose.ry - r.handR.position.y) * k;
+    r.handR.position.z += (pose.rz - r.handR.position.z) * k;
+    r.torso.position.x = r.head.position.x * 0.92;
+    r.torso.position.z = r.head.position.z * 0.92;
+    r.torso.position.y = Math.max(0.55, r.head.position.y - 0.45);
+  }
+
+  private driveBot(p: Puppet, d: Dancer, beat: number, delta: number): void {
+    const r = p.rig;
+
+    // What's coming for this seat? Mirror the judgement roll so the body
+    // language always matches the outcome.
+    p.duck = false;
+    let want: { x: number; z: number } | null = null;
+    if (d.alive && match.playing) {
+      let soonest: (typeof choreoView.zones)[number] | null = null;
+      for (const z of choreoView.zones) {
+        if (z.seat !== p.seat || z.resolved) continue;
+        if (!soonest || z.dueBeat < soonest.dueBeat) soonest = z;
+      }
+      if (soonest) {
+        // The judge's exact formula and exact roll — body language never lies.
+        const chance = Math.max(0.25, d.skill - soonest.act * BOTS.actPenalty);
+        const willDodge = roll(match.seed, 0xb0b, soonest.seat, soonest.moveIdx, soonest.landingIdx) < chance;
+        want = this.spotFor(soonest.zone, p, willDodge);
+      }
+    }
+    if (!want) {
+      // Idle wander: a lazy seeded orbit around the deck centre.
+      want = {
+        x: Math.sin(beat * 0.22 + p.phase) * 0.28,
+        z: Math.cos(beat * 0.17 + p.phase * 1.3) * 0.22,
+      };
+    }
+    p.tx = Math.max(-CLAMP_X, Math.min(CLAMP_X, want.x));
+    p.tz = Math.max(-CLAMP_Z, Math.min(CLAMP_Z, want.z));
+
+    // Move the whole rig (head leads, torso follows).
+    const speed = 2.3;
+    const dx = p.tx - r.head.position.x;
+    const dz = p.tz - r.head.position.z;
+    const dist = Math.hypot(dx, dz);
+    if (dist > 0.01) {
+      const step = Math.min(dist, speed * delta);
+      r.head.position.x += (dx / dist) * step;
+      r.head.position.z += (dz / dist) * step;
+    }
+
+    // The bob: down ON the kick, up off it — plus the duck when needed.
+    const bounce = d.alive ? Math.abs(Math.sin(beat * Math.PI + p.phase)) * 0.055 : 0;
+    const standY = p.duck ? 0.98 : 1.45;
+    r.head.position.y += (standY - bounce - r.head.position.y) * Math.min(1, delta * 8);
+
+    r.torso.position.x = r.head.position.x * 0.92;
+    r.torso.position.z = r.head.position.z * 0.92;
+    if (p.slump < 0.01) r.torso.position.y = Math.max(0.55, r.head.position.y - 0.43);
+
+    // Glowsticks up: alternate arms per beat, both up on phrase downbeats.
+    const wave = Math.sin(beat * Math.PI + p.phase);
+    r.handL.position.set(r.head.position.x - 0.3, r.head.position.y - 0.32 + Math.max(0, wave) * 0.38, r.head.position.z - 0.06);
+    r.handR.position.set(r.head.position.x + 0.3, r.head.position.y - 0.32 + Math.max(0, -wave) * 0.38, r.head.position.z - 0.06);
+    r.handL.rotation.z = 0.3 - Math.max(0, wave) * 0.5;
+    r.handR.rotation.z = -0.3 + Math.max(0, -wave) * 0.5;
+  }
+
+  /** Where a groupie stands for a zone, given whether it intends to live. */
+  private spotFor(zone: Zone, p: Puppet, dodge: boolean): { x: number; z: number } {
+    switch (zone.kind) {
+      case 'circle': {
+        if (!dodge) return { x: zone.x, z: zone.z };
+        // Step to the far side of the deck from the disc.
+        const away = Math.hypot(zone.x, zone.z) > 0.01 ? -1 : 1;
+        return { x: Math.sign(zone.x || 0.3) * away * 0.45, z: Math.sign(zone.z || 0.3) * away * 0.35 };
+      }
+      case 'lane': {
+        if (!dodge) return { x: zone.x, z: p.tz };
+        const clear = zone.x > 0 ? zone.x - zone.halfW - 0.38 : zone.x + zone.halfW + 0.38;
+        return { x: clear, z: p.tz };
+      }
+      case 'sweep': {
+        p.duck = dodge;
+        return { x: p.tx, z: p.tz };
+      }
+      case 'half': {
+        const target = dodge ? -zone.side * 0.42 : zone.side * 0.42;
+        return zone.axis === 1 ? { x: p.tx, z: target } : { x: target, z: p.tz };
+      }
+      case 'nova': {
+        const local = zone.bearing - seatBearing(p.seat, match.seats);
+        const r = dodge ? 0.55 : -0.55;
+        return { x: Math.sin(local) * r, z: Math.cos(local) * r };
+      }
+    }
+  }
+}
