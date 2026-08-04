@@ -112,6 +112,7 @@ World.create(container, {
 import { startRaid, startTutorial, toLobby, toMap } from './game/flow.js';
 import { match } from './game/state.js';
 import { arena } from './arena/arena.js';
+import { choreoView } from './systems/ChoreoSystem.js';
 
 declare global {
   interface Window {
@@ -122,7 +123,8 @@ declare global {
       toMap: typeof toMap;
       match: typeof match;
       arena: typeof arena;
+      choreo: typeof choreoView;
     };
   }
 }
-window.__gdr = { startRaid, startTutorial, toLobby, toMap, match, arena };
+window.__gdr = { startRaid, startTutorial, toLobby, toMap, match, arena, choreo: choreoView };

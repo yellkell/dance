@@ -20,7 +20,6 @@ import {
   PlaneGeometry,
   ShaderMaterial,
 } from 'three';
-import { DECAL_Y } from '../config.js';
 
 export interface Telegraph {
   /** Position/rotate this; the shapes live inside. */
@@ -180,6 +179,26 @@ const GATE_FRAG = /* glsl */ `
 `;
 
 /**
+ * Danger roof: a horizontal pane hung at the sweep line — the threat reads
+ * as a CEILING over the whole deck, never as a wall about to bisect it.
+ * Faint bands drift along +u (mirror the mesh so they run entry → exit).
+ */
+const ROOF_FRAG = /* glsl */ `
+  ${COMMON}
+  void main(){
+    vec3 col = warnColor();
+    float a = 0.10 + 0.40 * uFill;
+    // Drift bands carry the swing's travel direction across the roof.
+    float band = step(0.72, fract(vUv.x * 5.0 - uTime * 1.4));
+    a += band * 0.13;
+    a *= smoothstep(0.0, 0.07, vUv.x) * smoothstep(1.0, 0.93, vUv.x);
+    a *= smoothstep(0.0, 0.10, vUv.y) * smoothstep(1.0, 0.90, vUv.y);
+    a *= pulse();
+    gl_FragColor = vec4(col, a);
+  }
+`;
+
+/**
  * Duck cascade: rows of downward-pointing chevrons pouring toward the floor
  * beneath a sweep blade — the shape ITSELF says "get under". Drawn on a
  * vertical plane; v = 0 is the floor end.
@@ -304,26 +323,61 @@ export function beamTelegraph(halfWidth: number, length: number): Telegraph {
 }
 
 /**
- * A horizontal sweep slice: a glowing blade plane hanging at the strike
- * height `bladeY` (duck under it!), a cascade of DOWNWARD chevrons pouring
- * off it toward the floor (the shape says "get under"), plus a dimmer band
- * on the floor beneath so the platform itself carries the warning. Place
- * the group at the platform centre on the floor; `width` spans the
- * endangered lane, `depth` the floor band's front-to-back reach.
+ * The sweep: danger lives IN THE AIR, never on the floor. Three parts, all
+ * hung off the limbo line at `bladeY`:
+ *  - a DANGER ROOF — a horizontal pane at bladeY covering the deck, so the
+ *    doomed volume reads as a ceiling (a wall-like pane here is exactly what
+ *    made it look like the deck was about to be cut in half);
+ *  - the LINE itself — a thin blazing pane whose charge-fill runs from the
+ *    side the blade will enter (`fromSide`), so veterans read the direction;
+ *  - a SHORT chevron fringe dripping under the line — "get under HERE".
+ * The floor is deliberately unpainted: ground-paint means "move your feet"
+ * in every other move, and the sweep's answer is stay put and DROP. Place
+ * the group at the platform centre on the floor.
  */
-export function sweepTelegraph(width: number, depth: number, bladeY: number, thickness: number): Telegraph {
-  const bladeMat = warnMat(BLADE_FRAG);
-  const blade = new Mesh(new PlaneGeometry(width, thickness * 2), bladeMat);
-  blade.position.y = bladeY;
-  const duckMat = warnMat(DUCK_FRAG);
-  const duckH = bladeY - 0.25;
-  const duck = new Mesh(new PlaneGeometry(width * 0.7, duckH), duckMat);
-  duck.position.y = 0.2 + duckH / 2;
-  const bandMat = warnMat(BLADE_FRAG);
-  const band = new Mesh(new PlaneGeometry(width, depth), bandMat);
-  band.rotation.x = -Math.PI / 2;
-  band.position.y = DECAL_Y;
-  return makeTelegraph([blade, duck, band], [bladeMat, duckMat, bandMat]);
+export function sweepTelegraph(
+  width: number,
+  depth: number,
+  bladeY: number,
+  thickness: number,
+  fromSide: 1 | -1,
+): Telegraph {
+  const meshes: Mesh[] = [];
+  const mats: ShaderMaterial[] = [];
+  // The danger volume drawn as a SANDWICH: one roof at the line and one
+  // above head height. Standing, the upper layer hangs over your eyes and
+  // the lower shimmers at your chest — you are visibly INSIDE the amber;
+  // duck and the whole stack is overhead. A single pane at the line is
+  // edge-on from standing eye height and carries nothing.
+  for (const dy of [0, 0.55]) {
+    const roofMat = warnMat(ROOF_FRAG);
+    const roof = new Mesh(new PlaneGeometry(width, depth), roofMat);
+    roof.rotation.x = -Math.PI / 2;
+    roof.position.y = bladeY + dy;
+    // u runs +x unmirrored; flip so fill/bands originate at the entry side.
+    roof.scale.x = -fromSide;
+    meshes.push(roof);
+    mats.push(roofMat);
+  }
+  // TWO limbo rails, pushed to the deck's front and back thirds — never
+  // through the dancer's own head: a pane at deck centre sits edge-on in
+  // the owner's eyes and renders as nothing. From your spot you always have
+  // one rail ACROSS your view (plus its chevron fringe dripping under it);
+  // from across the ring the pair reads as a horizontal danger layer.
+  const zOff = depth * 0.28;
+  const duckH = 0.42;
+  for (const dz of [-zOff, zOff]) {
+    const bladeMat = warnMat(BLADE_FRAG);
+    const blade = new Mesh(new PlaneGeometry(width, thickness * 2), bladeMat);
+    blade.position.set(0, bladeY, dz);
+    blade.scale.x = -fromSide;
+    const duckMat = warnMat(DUCK_FRAG);
+    const duck = new Mesh(new PlaneGeometry(width * 0.85, duckH), duckMat);
+    duck.position.set(0, bladeY - duckH / 2, dz);
+    meshes.push(blade, duck);
+    mats.push(bladeMat, duckMat);
+  }
+  return makeTelegraph(meshes, mats);
 }
 
 /**

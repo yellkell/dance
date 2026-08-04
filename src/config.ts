@@ -142,8 +142,11 @@ export const GOOP = {
  *
  *  slam   : discs fill on the deck — STEP off them.
  *  beam   : a strip fills down the deck — SIDESTEP off the lane.
- *  sweep  : a blade hangs at chest height, chevrons cascade DOWNWARD
- *           beneath it — get UNDER it (duck).
+ *  sweep  : the AIR burns, never the floor — a danger roof overhead with a
+ *           blazing limbo line as its underside, a short chevron fringe
+ *           dripping off it — get UNDER the line (duck). The deck stays
+ *           unpainted on purpose: floor paint means "move your feet"
+ *           everywhere else, and the sweep's answer is the opposite.
  *  seesaw : one half floods, chevrons march at the centreline — CROSS.
  *  surge  : the seesaw's cousin, front/back.
  *  gate   : the WHOLE deck fills except one clear column, doorposts + both
@@ -187,10 +190,13 @@ export const CHOREO = {
   slamStepBeats: 1,
   /** Beam lane half-width. */
   beamHalfWidth: 0.24,
-  /** The sweep blade's rendered height (judgement is duck-state, not metres,
-   *  so every body height plays the same game). */
-  sweepY: 1.42,
-  sweepThickness: 0.19,
+  /** The sweep's LIMBO LINE: the rendered underside of the danger. Sits a
+   *  touch BELOW the average duck threshold (judgement is duck-state, not
+   *  metres) so "visibly under the line" is never a hit — the picture may
+   *  demand slightly more crouch than the judge, never less. */
+  sweepY: 1.26,
+  /** Half-height of the glowing line pane at sweepY. */
+  sweepThickness: 0.12,
   /** Head below this fraction of your calibrated standing height = ducked. */
   duckFrac: 0.78,
   /** Seesaw/surge: beats between half-floods per act. Whole bars early,

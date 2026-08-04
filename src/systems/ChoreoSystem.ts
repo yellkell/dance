@@ -75,6 +75,14 @@ function angDist(a: number, b: number): number {
   return Math.abs(((a - b + Math.PI * 3) % (Math.PI * 2)) - Math.PI);
 }
 
+/** Which local-x side a sweep enters from — alternates deterministically so
+ *  every client cuts the same way and back-to-back sweeps cross over. The
+ *  TELEGRAPH mirrors to this too (its fill runs from the entry side), so the
+ *  charge already tells a veteran which way the blade will travel. */
+function sweepSide(moveIdx: number, landingIdx: number): 1 | -1 {
+  return (moveIdx + landingIdx) % 2 === 0 ? 1 : -1;
+}
+
 export class ChoreoSystem extends createSystem({}) {
   private generation = -1;
   private setlist: SetMove[] = [];
@@ -220,7 +228,7 @@ export class ChoreoSystem extends createSystem({}) {
       const parent = platformRoot(dancer.seat);
       if (!parent) continue;
       move.landings.forEach((landing, landingIdx) => {
-        const tg = this.buildTelegraph(landing.zone, dancer.seat);
+        const tg = this.buildTelegraph(landing.zone, dancer.seat, move.index, landingIdx);
         if (tg) parent.add(tg.group);
         // A chase disc opens on its dancer's current spot (per-seat state —
         // the Zone object itself is shared across all seats).
@@ -249,7 +257,7 @@ export class ChoreoSystem extends createSystem({}) {
     }
   }
 
-  private buildTelegraph(zone: Zone, seat: number): Telegraph | null {
+  private buildTelegraph(zone: Zone, seat: number, moveIdx: number, landingIdx: number): Telegraph | null {
     switch (zone.kind) {
       case 'circle': {
         const tg = circleTelegraph(zone.r);
@@ -268,6 +276,7 @@ export class ChoreoSystem extends createSystem({}) {
           OCTAGON_HALF_DEPTH * 2 + 0.3,
           CHOREO.sweepY,
           CHOREO.sweepThickness,
+          sweepSide(moveIdx, landingIdx),
         );
         return tg;
       }
@@ -395,13 +404,9 @@ export class ChoreoSystem extends createSystem({}) {
       case 'lane':
         this.strikes.beam(parent, z.zone.x);
         break;
-      case 'sweep': {
-        // Which side the blade enters from alternates deterministically —
-        // same cut on every client, and back-to-back sweeps cross over.
-        const fromSide: 1 | -1 = (z.moveIdx + z.landingIdx) % 2 === 0 ? 1 : -1;
-        this.strikes.sweep(parent, fromSide);
+      case 'sweep':
+        this.strikes.sweep(parent, sweepSide(z.moveIdx, z.landingIdx));
         break;
-      }
       case 'half':
         this.strikes.halfFlood(parent, z.zone.side, z.zone.axis);
         break;

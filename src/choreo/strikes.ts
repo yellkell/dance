@@ -173,12 +173,14 @@ export class StrikeFx {
     );
   }
 
-  /** PORTED: the slice — a tall goo blade scythes across the whole deck at
-   *  the marked height, edge glow riding it, sparks shedding along the cut.
-   *  A cut you can WATCH travel, not a flicker. `fromSide` = which local-x
-   *  side the swing enters from. */
+  /** The swing — a hanging goo CURTAIN travels the deck: all its mass is
+   *  ABOVE the limbo line, its bottom edge is a white-hot lip, and it never
+   *  touches the floor — so up close it reads "danger overhead, air below",
+   *  not "the deck is about to be cut in half". Sparks shed off the lip.
+   *  `fromSide` = which local-x side the swing enters from. */
   sweep(parent: Object3D, fromSide: 1 | -1): void {
     const span = OCTAGON_HALF_WIDTH + 0.7;
+    const curtainH = 0.8;
     const sparks = new Sparks(26, GOO);
     let emberClock = 0;
     this.spawn(
@@ -187,26 +189,28 @@ export class StrikeFx {
       (k, g) => {
         const travel = Math.min(1, k / 0.81); // done travelling at age 0.34
         const bx = fromSide * span * (1 - 2 * travel);
-        const blade = g.children[0] as Mesh;
-        blade.position.set(bx, CHOREO.sweepY, 0);
-        (blade.material as MeshBasicMaterial).opacity = 0.9 * (1 - k * k * k);
-        const edge = g.children[1] as Mesh;
-        edge.position.set(bx, CHOREO.sweepY, 0);
-        // Sparks shed along the cut.
+        const curtain = g.children[0] as Mesh;
+        curtain.position.x = bx;
+        (curtain.material as MeshBasicMaterial).opacity = 0.75 * (1 - k * k * k);
+        const lip = g.children[1] as Mesh;
+        lip.position.x = bx;
+        (lip.material as MeshBasicMaterial).opacity = 0.95 * (1 - k * k);
+        // Sparks shed off the lip.
         const age = k * 0.42;
         if (age > emberClock) {
           emberClock = age + 0.045;
           const zr = (Math.random() * 2 - 1) * OCTAGON_HALF_DEPTH;
-          sparks.emit(bx, CHOREO.sweepY - 0.1, zr, 4, 1.2);
+          sparks.emit(bx, CHOREO.sweepY + 0.04, zr, 4, 1.2);
         }
       },
       (g) => {
-        const blade = new Mesh(new BoxGeometry(0.09, 0.5, OCTAGON_HALF_DEPTH * 2 + 0.7), basic(GOO, 0.9));
-        blade.position.set(fromSide * span, CHOREO.sweepY, 0);
-        g.add(blade);
-        const edge = glowSprite(HOT, 0.55, 0.85);
-        edge.position.copy(blade.position);
-        g.add(edge);
+        const depth = OCTAGON_HALF_DEPTH * 2 + 0.7;
+        const curtain = new Mesh(new BoxGeometry(0.12, curtainH, depth), basic(GOO, 0.75));
+        curtain.position.set(fromSide * span, CHOREO.sweepY + curtainH / 2, 0);
+        g.add(curtain);
+        const lip = new Mesh(new BoxGeometry(0.2, 0.045, depth), basic(HOT, 0.95));
+        lip.position.set(fromSide * span, CHOREO.sweepY + 0.02, 0);
+        g.add(lip);
         g.add(sparks.points);
       },
       (dt) => sparks.step(dt),
