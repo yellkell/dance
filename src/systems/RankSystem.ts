@@ -15,7 +15,7 @@
 import { createSystem, Vector3 } from '@iwsdk/core';
 import { PLATFORM, PODIUM, RANK, hueToColor } from '../config.js';
 import { arena } from '../arena/arena.js';
-import { toLobby } from '../game/flow.js';
+import { toLobby, toTour } from '../game/flow.js';
 import { match, type Dancer } from '../game/state.js';
 import { HoloBoard, type BoardRow } from '../ui/board.js';
 import { discoRig } from './DiscoSystem.js';
@@ -108,7 +108,10 @@ export class RankSystem extends createSystem({}) {
       this.podiumT += delta;
       if (this.podiumT > PODIUM.holdSeconds) {
         this.podiumDone = false;
-        toLobby();
+        // A tour night walks you back to the MAP (your new ✓ is waiting);
+        // free-play walks back to the green room's PLAY board.
+        if (match.tour) toTour();
+        else toLobby();
       }
     } else {
       this.podiumDone = false;

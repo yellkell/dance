@@ -26,6 +26,9 @@ export interface PanelButton {
   h: number;
   /** Smaller type for dense rows. */
   small?: boolean;
+  /** Hit-testable but NOT drawn — the body paints its own visual (map
+   *  nodes, custom widgets); label/sub are ignored. */
+  ghost?: boolean;
 }
 
 export const UI = {
@@ -100,6 +103,7 @@ export class Panel {
     body(g);
 
     for (const b of buttons) {
+      if (b.ghost) continue; // the body drew it; we only hit-test it
       const accent = b.disabled ? 'rgba(120,124,138,0.5)' : (b.accent ?? UI.magenta);
       const isHover = hover === b.id && !b.disabled;
       g.fillStyle = isHover ? 'rgba(255,42,213,0.22)' : 'rgba(20,16,30,0.85)';

@@ -136,7 +136,8 @@ export interface MatchState {
 }
 
 export const match: MatchState = {
-  screen: 'lobby',
+  // The TOUR MAP is the main attraction — it's the first thing you see.
+  screen: 'tour',
   after: 'raid',
   generation: 0,
   seats: RING.defaultSeats,

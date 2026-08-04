@@ -81,6 +81,26 @@ const CONTENT_W = 1300;
 
 const SET_COLORS = ['#8cff70', '#ff6ee0', '#ffd24a'];
 
+/** The treasure trail: nine stops, (set, night) → canvas centre + radius.
+ *  Winds bottom-left → right → back left → up to the golden X. */
+const MAP_NODES: { x: number; y: number; r: number }[][] = [
+  [
+    { x: 470, y: 802, r: 46 },
+    { x: 728, y: 848, r: 46 },
+    { x: 988, y: 788, r: 58 },
+  ],
+  [
+    { x: 1238, y: 676, r: 46 },
+    { x: 1014, y: 566, r: 46 },
+    { x: 742, y: 606, r: 58 },
+  ],
+  [
+    { x: 512, y: 462, r: 46 },
+    { x: 802, y: 368, r: 46 },
+    { x: 1156, y: 300, r: 64 },
+  ],
+];
+
 type Tab = 'play' | 'tour' | 'map' | 'sys';
 
 interface Pointer {
@@ -338,6 +358,7 @@ export class MenuSystem extends createSystem({}) {
       startTutorial(Number(id.slice(4)));
     } else if (id === 'exit') {
       if (match.screen === 'tutorial') finishTutorial(false);
+      else if (match.tour) toTour(); // tour podium → back to the map
       else toLobby();
     }
     this.lastKey = ''; // force repaint
@@ -397,10 +418,10 @@ export class MenuSystem extends createSystem({}) {
     const tab = this.activeTab();
     const buttons: PanelButton[] = [];
 
-    // The rail.
+    // The rail — the TOUR leads: the map is the main attraction.
     const tabs: { id: string; tab: Tab; label: string; sub?: string }[] = [
-      { id: 'tab-play', tab: 'play', label: '▶ PLAY' },
       { id: 'tab-tour', tab: 'tour', label: '🗺 THE TOUR', sub: this.tourProgressSub() },
+      { id: 'tab-play', tab: 'play', label: '▶ QUICK RAID' },
       { id: 'tab-map', tab: 'map', label: '🎓 REHEARSAL', sub: this.rehearsalSub() },
       { id: 'tab-sys', tab: 'sys', label: '⚙ SYSTEM' },
     ];
@@ -477,7 +498,7 @@ export class MenuSystem extends createSystem({}) {
     g.beginPath();
     g.roundRect(RAIL_X, 136, RAIL_W, 500, 22);
     g.fill();
-    const tabIndex = { play: 0, tour: 1, map: 2, sys: 3 }[tab];
+    const tabIndex = { tour: 0, play: 1, map: 2, sys: 3 }[tab];
     g.fillStyle = UI.goop;
     g.beginPath();
     g.roundRect(RAIL_X + 2, 158 + tabIndex * 118, 6, 90, 3);
@@ -488,7 +509,7 @@ export class MenuSystem extends createSystem({}) {
     g.fillRect(28, 130, W - 56, 2);
 
     // Tab-specific body decoration.
-    if (tab === 'tour') this.drawTourCards(g);
+    if (tab === 'tour') this.drawTreasureMap(g);
     if (tab === 'map') {
       g.textAlign = 'left';
       g.font = "700 24px 'Arial Black', system-ui, sans-serif";
@@ -527,11 +548,17 @@ export class MenuSystem extends createSystem({}) {
       );
     }
 
-    // Footer.
+    // Footer — the tour swaps the controls hint for the edge-of-the-map tease.
     g.textAlign = 'center';
     g.font = "700 21px 'Arial Black', system-ui, sans-serif";
     g.fillStyle = 'rgba(232,236,242,0.4)';
-    g.fillText('point · pull the trigger — mid-set the board packs away, right Ⓐ bails', W / 2, 992);
+    g.fillText(
+      tab === 'tour'
+        ? '🔒 MORE TREASURE PAST THE EDGE OF THE MAP — new sets on the way ⟶'
+        : 'point · pull the trigger — mid-set the board packs away, right Ⓐ bails',
+      W / 2,
+      992,
+    );
   }
 
   /* ── PLAY ── */
@@ -640,60 +667,271 @@ export class MenuSystem extends createSystem({}) {
     buttons.push({ id: 'back', label: 'BACK', accent: UI.danger, x: 560, y: 690, w: 360, h: 88, small: true });
   }
 
-  /* ── THE TOUR ── */
+  /* ── THE TOUR: the treasure map ───────────────────────────────────────
+   * Nine nights as stops on a winding neon trail — bottom-left start,
+   * golden X at the top. The body paints everything (trail, nodes, compass,
+   * the HERE-BE-GOOP doodle); the buttons are GHOSTS: pure hit-areas over
+   * the nodes. */
 
-  private drawTourCards(g: CanvasRenderingContext2D): void {
-    TOUR.sets.forEach((set, s) => {
-      const y = 152 + s * 250;
-      g.fillStyle = 'rgba(14,10,24,0.7)';
+  private mapNodeState(s: number, i: number): { cleared: boolean; unlocked: boolean; next: boolean } {
+    const done = clearedTourNights();
+    const cleared = done.has(`${s}:${i}`);
+    const unlocked = tourNightUnlocked(s, i);
+    return { cleared, unlocked, next: unlocked && !cleared };
+  }
+
+  private drawTreasureMap(g: CanvasRenderingContext2D): void {
+    // Heading.
+    g.textAlign = 'left';
+    g.textBaseline = 'middle';
+    g.font = "900 34px 'Arial Black', system-ui, sans-serif";
+    g.fillStyle = UI.goop;
+    g.fillText('THE TOUR', CONTENT_X, 158);
+    g.font = "700 21px 'Arial Black', system-ui, sans-serif";
+    g.fillStyle = UI.dim;
+    g.fillText('follow the trail · survive a night to book the next · the goop guards every third', CONTENT_X + 224, 160);
+
+    // Map frame: a dashed chart border with bright corner ticks.
+    g.setLineDash([10, 14]);
+    g.strokeStyle = 'rgba(244,246,251,0.14)';
+    g.lineWidth = 3;
+    g.beginPath();
+    g.roundRect(CONTENT_X, 186, CONTENT_W, 746, 26);
+    g.stroke();
+    g.setLineDash([]);
+    g.strokeStyle = 'rgba(255,42,213,0.5)';
+    g.lineWidth = 4;
+    for (const [cx, cy, dx, dy] of [
+      [CONTENT_X + 4, 190, 1, 1],
+      [CONTENT_X + CONTENT_W - 4, 190, -1, 1],
+      [CONTENT_X + 4, 928, 1, -1],
+      [CONTENT_X + CONTENT_W - 4, 928, -1, -1],
+    ] as const) {
       g.beginPath();
-      g.roundRect(CONTENT_X, y, CONTENT_W, 232, 20);
-      g.fill();
-      g.strokeStyle = SET_COLORS[s % SET_COLORS.length];
-      g.globalAlpha = 0.55;
-      g.lineWidth = 2;
+      g.moveTo(cx, cy + dy * 34);
+      g.lineTo(cx, cy);
+      g.lineTo(cx + dx * 34, cy);
       g.stroke();
-      g.globalAlpha = 1;
-      g.textAlign = 'left';
-      g.textBaseline = 'middle';
-      g.font = "900 30px 'Arial Black', system-ui, sans-serif";
-      g.fillStyle = SET_COLORS[s % SET_COLORS.length];
-      g.fillText(`SET ${s + 1} — ${set.name}`, CONTENT_X + 28, y + 38);
+    }
+
+    // Set regions: a soft tinted pool of light behind each trio.
+    TOUR.sets.forEach((_set, s) => {
+      const mid = MAP_NODES[s][1];
+      const grad = g.createRadialGradient(mid.x, mid.y, 20, mid.x, mid.y, 300);
+      const c = SET_COLORS[s % SET_COLORS.length];
+      grad.addColorStop(0, `${c}1f`);
+      grad.addColorStop(1, `${c}00`);
+      g.fillStyle = grad;
+      g.fillRect(mid.x - 300, mid.y - 300, 600, 600);
     });
+
+    // The trail — one dashed route through all nine stops, smoothed through
+    // midpoints; the cleared stretch re-inked in goop green.
+    const pts = MAP_NODES.flat();
+    const trail = (upto: number, style: string, width: number): void => {
+      if (upto < 1) return;
+      g.strokeStyle = style;
+      g.lineWidth = width;
+      g.setLineDash([13, 17]);
+      g.beginPath();
+      g.moveTo(pts[0].x, pts[0].y);
+      for (let k = 1; k <= upto; k++) {
+        const prev = pts[k - 1];
+        const cur = pts[k];
+        const mx = (prev.x + cur.x) / 2;
+        const my = (prev.y + cur.y) / 2 + (k % 2 ? 26 : -26); // hand-drawn wobble
+        g.quadraticCurveTo(mx, my, cur.x, cur.y);
+      }
+      g.stroke();
+      g.setLineDash([]);
+    };
+    trail(8, 'rgba(244,246,251,0.34)', 6);
+    let frontier = 0;
+    for (let k = 0; k < 9; k++) {
+      const { cleared } = this.mapNodeState(Math.floor(k / 3), k % 3);
+      if (cleared) frontier = k + 1;
+      else break;
+    }
+    trail(Math.min(frontier, 8), 'rgba(140,255,112,0.6)', 6);
+
+    // Set banners — anchored in open water, clear of every stop label.
+    const banners: { x: number; y: number; rot: number }[] = [
+      { x: 1188, y: 856, rot: 0.03 },
+      { x: 985, y: 474, rot: -0.03 },
+      { x: 352, y: 316, rot: -0.04 },
+    ];
+    TOUR.sets.forEach((set, s) => {
+      const b = banners[s];
+      g.save();
+      g.translate(b.x, b.y);
+      g.rotate(b.rot);
+      g.textAlign = 'left';
+      g.font = "900 27px 'Arial Black', system-ui, sans-serif";
+      g.fillStyle = SET_COLORS[s % SET_COLORS.length];
+      g.fillText(`SET ${s + 1} · ${set.name}`, 0, 0);
+      g.restore();
+    });
+
+    // The stops.
+    TOUR.sets.forEach((set, s) => {
+      set.songs.forEach((songId, i) => {
+        const n = MAP_NODES[s][i];
+        const { cleared, unlocked, next } = this.mapNodeState(s, i);
+        const finale = i === 2;
+        const treasure = s === TOUR.sets.length - 1 && finale;
+        const setColor = SET_COLORS[s % SET_COLORS.length];
+        const hovered = this.hover === `night${s}-${i}`;
+        const track = trackById(songId);
+
+        // Node disc.
+        g.beginPath();
+        g.arc(n.x, n.y, n.r, 0, Math.PI * 2);
+        g.fillStyle = cleared ? 'rgba(24,50,26,0.92)' : 'rgba(10,8,22,0.92)';
+        g.fill();
+        g.lineWidth = hovered ? 9 : finale ? 7 : 5;
+        g.strokeStyle = !unlocked ? 'rgba(150,154,168,0.35)' : cleared ? UI.goop : setColor;
+        if (hovered && unlocked) {
+          g.shadowColor = setColor;
+          g.shadowBlur = 24;
+        }
+        g.stroke();
+        g.shadowBlur = 0;
+
+        // Finale garnish: the goop's eyes peer out of the stop.
+        if (finale && !treasure) {
+          for (const side of [-1, 1]) {
+            g.beginPath();
+            g.arc(n.x + side * 14, n.y - 12, 8, 0, Math.PI * 2);
+            g.fillStyle = '#f4fff2';
+            g.fill();
+            g.beginPath();
+            g.arc(n.x + side * 14, n.y - 10, 3.5, 0, Math.PI * 2);
+            g.fillStyle = '#101b10';
+            g.fill();
+          }
+        }
+
+        // Centre glyph.
+        g.textAlign = 'center';
+        g.textBaseline = 'middle';
+        if (treasure) {
+          // X marks the drop.
+          g.lineWidth = 11;
+          g.lineCap = 'round';
+          g.strokeStyle = cleared ? UI.goop : '#ffd24a';
+          if (!unlocked) g.strokeStyle = 'rgba(150,154,168,0.4)';
+          const a = n.r * 0.42;
+          g.beginPath();
+          g.moveTo(n.x - a, n.y - a);
+          g.lineTo(n.x + a, n.y + a);
+          g.moveTo(n.x + a, n.y - a);
+          g.lineTo(n.x - a, n.y + a);
+          g.stroke();
+          g.lineCap = 'butt';
+          // Radiating treasure ticks.
+          g.lineWidth = 3;
+          for (let t = 0; t < 8; t++) {
+            const ang = (t / 8) * Math.PI * 2 + 0.39;
+            g.beginPath();
+            g.moveTo(n.x + Math.cos(ang) * (n.r + 8), n.y + Math.sin(ang) * (n.r + 8));
+            g.lineTo(n.x + Math.cos(ang) * (n.r + 20), n.y + Math.sin(ang) * (n.r + 20));
+            g.stroke();
+          }
+        } else if (cleared) {
+          g.font = "900 40px 'Arial Black', system-ui, sans-serif";
+          g.fillStyle = UI.goop;
+          g.fillText('✓', n.x, n.y + (finale ? 8 : 2));
+        } else if (!unlocked) {
+          g.font = "900 30px 'Arial Black', system-ui, sans-serif";
+          g.fillStyle = 'rgba(180,184,198,0.6)';
+          g.fillText('🔒', n.x, n.y + (finale ? 10 : 2));
+        } else {
+          g.font = "900 34px 'Arial Black', system-ui, sans-serif";
+          g.fillStyle = UI.text;
+          g.fillText(String(i + 1), n.x, n.y + (finale ? 10 : 2));
+        }
+
+        // NEXT beacon over the frontier stop.
+        if (next) {
+          g.font = "900 24px 'Arial Black', system-ui, sans-serif";
+          g.fillStyle = UI.cyan;
+          g.fillText('▼ NEXT', n.x, n.y - n.r - 30);
+        }
+
+        // Stop labels.
+        g.font = "900 23px 'Arial Black', system-ui, sans-serif";
+        g.fillStyle = unlocked ? UI.text : 'rgba(200,204,216,0.45)';
+        g.fillText(track?.title ?? songId, n.x, n.y + n.r + 26);
+        g.font = "700 18px 'Arial Black', system-ui, sans-serif";
+        g.fillStyle = finale ? setColor : UI.dim;
+        g.fillText(finale ? (treasure ? 'THE TREASURE · GOOP FINALE' : 'GOOP FINALE') : `night ${i + 1} · ${Math.round(track?.bpm ?? 0)} BPM`, n.x, n.y + n.r + 52);
+      });
+    });
+
+    // Compass rose (a disco one) — top-right corner, off the trail.
+    const cx = 1520;
+    const cy = 268;
+    g.strokeStyle = 'rgba(244,246,251,0.35)';
+    g.lineWidth = 3;
+    g.beginPath();
+    g.arc(cx, cy, 34, 0, Math.PI * 2);
+    g.stroke();
+    for (let t = 0; t < 8; t++) {
+      const ang = (t / 8) * Math.PI * 2;
+      const inner = t % 2 ? 12 : 6;
+      g.beginPath();
+      g.moveTo(cx + Math.cos(ang) * inner, cy + Math.sin(ang) * inner);
+      g.lineTo(cx + Math.cos(ang) * (t % 2 ? 26 : 44), cy + Math.sin(ang) * (t % 2 ? 26 : 44));
+      g.stroke();
+    }
+    g.fillStyle = UI.magenta;
+    g.beginPath();
+    g.arc(cx, cy, 5, 0, Math.PI * 2);
+    g.fill();
+    g.font = "900 22px 'Arial Black', system-ui, sans-serif";
+    g.textAlign = 'center';
+    g.fillStyle = UI.dim;
+    g.fillText('N', cx, cy - 58);
+
+    // HERE BE GOOP — the sea monster of this chart.
+    const gx = 1372;
+    const gy = 452;
+    g.fillStyle = 'rgba(54,224,90,0.5)';
+    g.beginPath();
+    g.moveTo(gx - 34, gy + 12);
+    g.bezierCurveTo(gx - 40, gy - 26, gx - 6, gy - 38, gx + 8, gy - 22);
+    g.bezierCurveTo(gx + 34, gy - 30, gx + 44, gy + 2, gx + 26, gy + 14);
+    g.closePath();
+    g.fill();
+    for (const side of [-1, 1]) {
+      g.beginPath();
+      g.arc(gx - 6 + side * 10, gy - 18, 5, 0, Math.PI * 2);
+      g.fillStyle = '#f4fff2';
+      g.fill();
+    }
+    g.font = "italic 700 19px Arial, system-ui, sans-serif";
+    g.fillStyle = UI.dim;
+    g.fillText('here be goop', gx, gy + 40);
+
   }
 
   private tourContent(buttons: PanelButton[]): void {
-    const done = clearedTourNights();
+    // Pure hit-areas over the map stops — the map itself is the visual.
     TOUR.sets.forEach((set, s) => {
-      const cardY = 152 + s * 250;
       set.songs.forEach((songId, i) => {
-        const track = trackById(songId);
-        const unlocked = tourNightUnlocked(s, i);
-        const cleared = done.has(`${s}:${i}`);
-        const finale = i === 2;
+        const n = MAP_NODES[s][i];
+        const pad = 10;
         buttons.push({
           id: `night${s}-${i}`,
-          label: `${cleared ? '✓ ' : unlocked ? '' : '🔒 '}${track?.title ?? songId}`,
-          sub: finale ? 'GOOP FINALE 👁' : `night ${i + 1} · ${Math.round(track?.bpm ?? 0)} BPM`,
-          accent: cleared ? UI.goop : finale ? UI.magenta : UI.cyan,
-          disabled: !unlocked,
-          x: CONTENT_X + 28 + i * 424,
-          y: cardY + 66,
-          w: 400,
-          h: 142,
-          small: true,
+          label: trackById(songId)?.title ?? songId,
+          disabled: !tourNightUnlocked(s, i),
+          ghost: true,
+          x: n.x - n.r - pad,
+          y: n.y - n.r - pad,
+          w: (n.r + pad) * 2,
+          h: (n.r + pad) * 2,
         });
       });
-    });
-    buttons.push({
-      id: 'more',
-      label: '🔒 MORE SETS ON THE WAY — the tour keeps growing',
-      disabled: true,
-      x: CONTENT_X,
-      y: 912,
-      w: CONTENT_W,
-      h: 56,
-      small: true,
     });
   }
 
