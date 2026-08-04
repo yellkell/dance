@@ -111,6 +111,7 @@ World.create(container, {
 // without controllers — e.g. __gdr.startRaid({ seats: 8 }).
 import { startRaid, startTutorial, toLobby, toMap } from './game/flow.js';
 import { match } from './game/state.js';
+import { arena } from './arena/arena.js';
 
 declare global {
   interface Window {
@@ -120,7 +121,8 @@ declare global {
       toLobby: typeof toLobby;
       toMap: typeof toMap;
       match: typeof match;
+      arena: typeof arena;
     };
   }
 }
-window.__gdr = { startRaid, startTutorial, toLobby, toMap, match };
+window.__gdr = { startRaid, startTutorial, toLobby, toMap, match, arena };

@@ -65,9 +65,12 @@ export const RING = {
   seatSpacing: 2.7,
   /** The ring never tightens below this radius even with 4 dancers. */
   minRadius: 4.6,
-  /** The boss stage: a round podium in the middle. */
+  /** The boss stage: a round dance floor in the middle. */
   stageRadius: 2.6,
-  stageHeight: 0.35,
+  /** Deliberately LOW: the goop dances ON the common floor, not a riser —
+   *  so the stage top reads as the experience-floor plane, and rank sinks
+   *  (RankSystem) read true instead of the podium height eating them. */
+  stageHeight: 0.06,
 };
 
 /** Ring radius for a seat count: keep neighbour spacing honest. */
@@ -235,8 +238,15 @@ export const GROOVE = {
   perStreak: 0.5,
   /** Streak stops growing here (base + 50 = 56 a swap at full groove). */
   streakCap: 100,
-  /** A swap must land this many beats after the last to stay in the groove. */
-  minBeats: 0.4,
+  /**
+   * PAY-RATE CAP: rewarded swaps can never come faster than the music.
+   * A swap pays only if ~a full beat has passed since the last PAID one —
+   * flailing at light speed is silently absorbed (no reward, no reset) and
+   * earns exactly the same as dancing on the beat. Slightly under 1.0 so an
+   * honest on-beat alternation with human timing slop always lands.
+   */
+  minBeats: 0.95,
+  /** Stop swapping for this long and the streak lets go. */
   maxBeats: 2.6,
 };
 

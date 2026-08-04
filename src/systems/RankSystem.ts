@@ -13,7 +13,7 @@
  */
 
 import { createSystem, Vector3 } from '@iwsdk/core';
-import { PODIUM, RANK, hueToColor } from '../config.js';
+import { PLATFORM, PODIUM, RANK, hueToColor } from '../config.js';
 import { arena } from '../arena/arena.js';
 import { toLobby } from '../game/flow.js';
 import { match, type Dancer } from '../game/state.js';
@@ -83,6 +83,18 @@ export class RankSystem extends createSystem({}) {
       const rimTarget = d && !d.alive ? 0.12 : 0.9;
       handle.rimMat.opacity += (rimTarget - handle.rimMat.opacity) * Math.min(1, delta * 3);
       handle.nameSprite.material.opacity = d && !d.alive ? 0.25 : 1;
+
+      // MY pedestal (only my handle carries one): stretch the column from my
+      // slab's underside down to the common floor — the plane the stage base
+      // eases to — so looking over the rim SHOWS the climb. Its base lands
+      // flush with the unraised decks' slab bottoms.
+      if (handle.pedestal) {
+        const drop = Math.max(0, -a.stage.position.y);
+        handle.pedestal.visible = drop > 0.06;
+        const s = Math.max(0.02, drop);
+        handle.pedestal.scale.y = s;
+        handle.pedestal.position.y = -PLATFORM.thickness - s;
+      }
     }
 
     // Podium choreography.

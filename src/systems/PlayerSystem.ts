@@ -61,7 +61,10 @@ const FLOATERS = 4;
 export class PlayerSystem extends createSystem({}) {
   /** Which hand is currently "up": 1 = left, −1 = right, 0 = undecided. */
   private grooveSide = 0;
-  private lastSwapBeat = -Infinity;
+  /** Last physical flip (streak-hold detection). */
+  private lastFlipBeat = -Infinity;
+  /** Last PAID flip — the pay-rate cap gate. */
+  private lastRewardBeat = -Infinity;
   private streak = 0;
 
   private sticks!: Record<'left' | 'right', Stick>;
@@ -216,44 +219,49 @@ export class PlayerSystem extends createSystem({}) {
     const side = diff > GROOVE.split ? 1 : diff < -GROOVE.split ? -1 : 0;
     if (side === 0 || side === this.grooveSide) {
       // Held too long without a swap → the groove lets go.
-      if (this.streak > 0 && match.beat - this.lastSwapBeat > GROOVE.maxBeats) {
+      if (this.streak > 0 && match.beat - this.lastFlipBeat > GROOVE.maxBeats) {
         this.streak = 0;
         match.grooveStreak = 0;
       }
       return;
     }
 
-    // A swap. Rhythmic (not too soon, not too late) keeps the streak alive.
-    const gap = match.beat - this.lastSwapBeat;
+    // A physical flip. Every flip keeps the hold-timer alive, but PAY is
+    // rate-capped to the music: at most one rewarded swap per ~beat since
+    // the last PAID one. Spamming faster than the BPM is silently absorbed —
+    // no reward, no reset — so light-speed flailing earns exactly what
+    // dancing on the beat earns, and no more.
     const first = this.grooveSide === 0;
     this.grooveSide = side;
-    this.lastSwapBeat = match.beat;
-    if (first) return; // the opening pose sets the metronome, pays nothing
+    this.lastFlipBeat = match.beat;
+    if (first) {
+      this.lastRewardBeat = match.beat; // the opening pose sets the metronome
+      return;
+    }
 
-    if (gap >= GROOVE.minBeats && gap <= GROOVE.maxBeats) {
-      this.streak = Math.min(GROOVE.streakCap, this.streak + 1);
-      const award = Math.round(GROOVE.base + this.streak * GROOVE.perStreak);
-      d.score += award;
-      match.grooveStreak = this.streak;
+    const paidGap = match.beat - this.lastRewardBeat;
+    if (paidGap < GROOVE.minBeats) return; // faster than the music — absorbed
 
-      // The quiet answer from the hand that went up: the stick pops and a
-      // small +N drifts off it.
-      const hand = side === 1 ? 'left' : 'right';
-      const stick = this.sticks[hand];
-      stick.pulse = 1;
-      if (stick.attachedTo) {
-        stick.group.getWorldPosition(_hand);
-        _hand.y += 0.12;
-        this.popFloater(`+${award}`, _hand);
-      }
+    this.lastRewardBeat = match.beat;
+    this.streak = Math.min(GROOVE.streakCap, this.streak + 1);
+    const award = Math.round(GROOVE.base + this.streak * GROOVE.perStreak);
+    d.score += award;
+    match.grooveStreak = this.streak;
 
-      if (this.streak === 8 || this.streak === 32 || this.streak === GROOVE.streakCap) {
-        pushFlair(this.streak === GROOVE.streakCap ? 'MAX GROOVE!!' : 'IN THE GROOVE!', 'milestone');
-        sfx.uiClick();
-      }
-    } else {
-      this.streak = 0;
-      match.grooveStreak = 0;
+    // The quiet answer from the hand that went up: the stick pops and a
+    // small +N drifts off it.
+    const hand = side === 1 ? 'left' : 'right';
+    const stick = this.sticks[hand];
+    stick.pulse = 1;
+    if (stick.attachedTo) {
+      stick.group.getWorldPosition(_hand);
+      _hand.y += 0.12;
+      this.popFloater(`+${award}`, _hand);
+    }
+
+    if (this.streak === 8 || this.streak === 32 || this.streak === GROOVE.streakCap) {
+      pushFlair(this.streak === GROOVE.streakCap ? 'MAX GROOVE!!' : 'IN THE GROOVE!', 'milestone');
+      sfx.uiClick();
     }
   }
 }

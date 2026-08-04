@@ -48,6 +48,11 @@ export interface PlatformHandle {
   rimMat: MeshBasicMaterial;
   slabMat: MeshStandardMaterial;
   nameSprite: Sprite;
+  /** MY platform only: the column under the deck that makes the climb
+   *  VISIBLE — its top hugs the slab, its base reaches the common floor
+   *  (where the stage sits), so looking over your rim you SEE you're up.
+   *  RankSystem stretches it to the live stage drop. */
+  pedestal: Group | null;
   /** Current eased lift (RankSystem's scratch). */
   lift: number;
 }
@@ -137,7 +142,36 @@ function buildPlatform(seat: number, name: string, isMine: boolean): PlatformHan
   nameSprite.visible = !isMine;
   root.add(nameSprite);
 
-  return { seat, root, rimMat, slabMat, nameSprite, lift: 0 };
+  // MY pedestal: a unit-height octagonal column (slightly inset) with a
+  // neon foot ring, hidden until the ranks raise me. RankSystem stretches
+  // it from the slab's underside down to the common floor each frame.
+  let pedestal: Group | null = null;
+  if (isMine) {
+    pedestal = new Group();
+    pedestal.name = 'my-pedestal';
+    const column = new Mesh(
+      octagonSlab(OCTAGON_VERTICES, 1),
+      new MeshStandardMaterial({ color: 0x14181f, metalness: 0.85, roughness: 0.4 }),
+    );
+    column.scale.set(0.88, 1, 0.88);
+    pedestal.add(column);
+    const foot = new Mesh(
+      octagonSlab(OCTAGON_VERTICES, 0.035),
+      new MeshBasicMaterial({
+        color: accent,
+        transparent: true,
+        opacity: 0.7,
+        blending: AdditiveBlending,
+        depthWrite: false,
+      }),
+    );
+    foot.scale.set(0.95, 1, 0.95);
+    pedestal.add(foot);
+    pedestal.visible = false;
+    root.add(pedestal);
+  }
+
+  return { seat, root, rimMat, slabMat, nameSprite, pedestal, lift: 0 };
 }
 
 function buildStage(): { stage: Group; ringMat: MeshBasicMaterial; topY: number } {
