@@ -1,29 +1,43 @@
 /**
- * GoopliathSystem — the star of the show. The vendored gel creature stands
- * on the centre stage at titan scale and NEVER STOPS DANCING:
+ * GoopliathSystem — the star of the show, and he knows it.
  *
- *  - he two-steps: his whole mass lurches side to side ON the beat, dipping
- *    hard on downbeats (the sim's agitation is the body-jiggle),
- *  - every four bars he re-pours himself into a new fighting-style
- *    silhouette (the FIRE FIGHT styles, repurposed as dance stances),
- *  - his gaze grooves too — he watches YOU but sways off you with the bar,
- *    and rides a full spin out of every second phrase,
- *  - and the ATTACKS are his big moves: the amber-eyed wind-up gestures are
- *    reserved for real telegraphs, so when he rears up you KNOW. Multi-part
- *    moves keep him swinging — every seesaw half and drumline step gets its
- *    own quick strike, cued from the choreography.
+ * The gel creature on the centre stage runs a full dance kit, all of it on
+ * the clock:
  *
- * In the lobby he's an idle glob nodding to the room loop; in a tutorial he
- * shrinks to the goopling's scale — same creature, smaller pour.
+ *  - THE POSES: a disco stance vocabulary (goopliath/dancePoses.ts) hit
+ *    bar by bar — point-up, rave-Y, floor-stomp, vogue, strut — with the
+ *    body SNAPPING between silhouettes (styleEase cranked) instead of the
+ *    old boxing ooze. Every 4-bar block picks a new opposing pair.
+ *  - THE HOP: his whole tonnage bounces, landing ON each kick, bigger out
+ *    of phrase turns — plus the two-step that lurches him across the stage
+ *    every beat and the agitation jiggle that keeps the surface alive.
+ *  - THE MELT: on quiet phrase turns he collapses into the glob and pours
+ *    himself back up — the show-off move, guarded so it never eats a real
+ *    telegraph (only fires with no landing due within six beats).
+ *  - THE GAZE: he watches YOU, swaying off you with the bar, riding a full
+ *    spin out of every second phrase.
+ *  - THE ATTACKS stay his big moves: amber-eyed wind-up gestures fire only
+ *    for real telegraphs (with follow-up strikes riding every cascade
+ *    landing), and while he swings he PLANTS — no hop, no step, dead-on
+ *    facing. A gesture that can't start (mid-melt, mid-swing) retries
+ *    until its landing is imminent, so the body tell is never silently
+ *    dropped.
+ *
+ * His stage rides RankSystem's sink: as you rise, he stays at the bottom
+ * with the floor. In the lobby he's an idle glob nodding to the room loop;
+ * in a tutorial he shrinks to the goopling's scale.
  */
 
 import { createSystem, Group, Vector3 } from '@iwsdk/core';
 import { GOOP, MUSIC, RING, ringRadius, type MoveKind } from '../config.js';
+import { arena } from '../arena/arena.js';
 import { GelCreature } from '../goopliath/GelCreature.js';
 import { CREATURE, ATTACKS, type AttackName } from '../goopliath/goopConfig.js';
+import { DANCE_COMBOS, LESSON_COMBO } from '../goopliath/dancePoses.js';
 import { GooFx } from '../goopliath/splats.js';
-import { FIGHT_STYLES } from '../goopliath/styles.js';
-import { match, phraseBeats } from '../game/state.js';
+import { roll } from '../game/rng.js';
+import { match, phraseBeats, type GestureCue } from '../game/state.js';
+import { choreoView } from './ChoreoSystem.js';
 
 const GESTURE: Record<MoveKind, AttackName> = {
   slam: 'overhand',
@@ -45,8 +59,7 @@ const STEP_GESTURE: Record<MoveKind, AttackName> = {
 };
 
 /** The two-step floor pattern, one target per beat of the bar (sim units):
- *  step left, gather, step right, gather — with a little push-back on the
- *  gathers so the mass visibly rocks. */
+ *  step left, gather, step right, gather — the mass visibly rocks. */
 const STEPS: ReadonlyArray<readonly [number, number]> = [
   [-0.34, 0.06],
   [-0.08, -0.12],
@@ -54,9 +67,14 @@ const STEPS: ReadonlyArray<readonly [number, number]> = [
   [0.08, -0.12],
 ];
 
+/** Melt length in beats and the clearance a melt needs before any landing. */
+const MELT_BEATS = 1.4;
+const MELT_CLEARANCE = 6;
+
 const _head = new Vector3();
 const _target = new Vector3();
 const _local = new Vector3();
+const _up = new Vector3(0, 1, 0);
 
 export class GoopliathSystem extends createSystem({}) {
   private goop?: GelCreature;
@@ -64,9 +82,13 @@ export class GoopliathSystem extends createSystem({}) {
   private root?: Group;
   private generation = -1;
   private lastKick = -1;
-  private lastStance = -1;
+  private lastBar = -1;
+  private lastPhrase = -1;
+  private meltUntilBeat = -Infinity;
   private hand: 'left' | 'right' = 'left';
-  private styleOrder = [...FIGHT_STYLES];
+  /** A gesture that couldn't start (mid-melt/mid-swing): retried with its
+   *  remaining charge until the landing is imminent. */
+  private pending: { cue: GestureCue; dueBeat: number } | null = null;
 
   private rebuild(): void {
     this.generation = match.generation;
@@ -85,7 +107,10 @@ export class GoopliathSystem extends createSystem({}) {
     // Parent scale converts the man-sized sim into the boss (or a goopling).
     this.root!.scale.setScalar((scale * 1.78) / CREATURE.height);
     this.root!.position.set(0, RING.stageHeight, z);
-    this.lastStance = -1;
+    this.lastBar = -1;
+    this.lastPhrase = -1;
+    this.meltUntilBeat = -Infinity;
+    this.pending = null;
   }
 
   update(delta: number): void {
@@ -96,19 +121,144 @@ export class GoopliathSystem extends createSystem({}) {
 
     this.fx?.update(delta);
 
-    // He bounces to whatever is playing — including the lobby loop, so he's
-    // already nodding along on his stage before anyone starts a set.
+    // He dances to whatever is playing — the set or the lobby loop.
     const inSet = Number.isFinite(match.beat) && match.screen !== 'podium';
     const beat = Number.isFinite(match.beat) ? match.beat : 0;
+    const dancing = inSet && beat >= 0;
+    const melting = beat < this.meltUntilBeat;
 
-    // Form: a chilled glob in the lobby, up on his feet for the set.
-    goop.setFormTarget(match.screen === 'lobby' || match.screen === 'map' ? 0 : 1);
+    // Form: a chilled glob in the lobby, up on his feet for the show —
+    // except mid-melt, when he deliberately lets himself go.
+    const lounging = match.screen === 'lobby' || match.screen === 'map';
+    goop.setFormTarget(lounging || melting ? 0 : 1);
 
-    // Gestures queued by the choreography. Big wind-ups open a move; the
-    // quick step-strikes ride every later landing of a cascade.
-    for (const cue of match.gestures.splice(0)) {
-      const name = cue.step ? STEP_GESTURE[cue.kind] : GESTURE[cue.kind];
-      const chargeSeconds = Math.max(0.25, cue.chargeBeats * match.beatLen);
+    this.runGestures(goop, root, beat);
+
+    /* ── the dance ─────────────────────────────────────────────────────── */
+    const punching = goop.isPunching;
+    goop.styleEase = dancing ? 6 : 1.6;
+
+    // The stage floor under him can sink as the ranks rise — he stays with
+    // it, at the bottom, where the floor show belongs.
+    const stageY = arena()?.stage.position.y ?? 0;
+    let hop = 0;
+
+    if (dancing) {
+      const beatInBar = ((Math.floor(beat) % 4) + 4) % 4;
+      const bar = Math.floor(beat / MUSIC.beatsPerBar);
+      const phrase = Math.floor(beat / phraseBeats());
+      const kick = Math.floor(beat);
+
+      if (kick !== this.lastKick) {
+        this.lastKick = kick;
+        const phraseTurn = kick % phraseBeats() === 0;
+        const bounce = phraseTurn ? 0.85 : beatInBar === 0 ? 0.55 : GOOP.danceBounce;
+        goop.sim.agitation = Math.min(1, goop.sim.agitation + bounce);
+      }
+
+      // THE POSES: a new silhouette every bar, pairs swapped per 4-bar
+      // block. Rehearsal gooplings keep to the readable point-up pair.
+      if (bar !== this.lastBar && !melting) {
+        this.lastBar = bar;
+        const block = Math.floor(bar / 4);
+        const combo =
+          match.screen === 'tutorial'
+            ? LESSON_COMBO
+            : DANCE_COMBOS[Math.floor(roll(match.seed, 0xda9ce, block) * DANCE_COMBOS.length)];
+        goop.setFightStyle(combo[((bar % 2) + 2) % 2].pose);
+      }
+
+      // THE MELT: on a quiet even-phrase turn he collapses and re-pours.
+      if (phrase !== this.lastPhrase) {
+        const phraseWasOdd = this.lastPhrase % 2 === 1;
+        this.lastPhrase = phrase;
+        if (
+          match.screen === 'raid' &&
+          phrase > 0 && // he only just poured himself up — let him arrive
+          !phraseWasOdd && // odd phrases end in the gaze spin — don't stack
+          !punching &&
+          this.landingClearance(beat) > MELT_CLEARANCE
+        ) {
+          this.meltUntilBeat = beat + MELT_BEATS;
+        }
+        // Phrase turn: the mass slams and sprays.
+        if (this.fx && phrase > 0) {
+          _target.copy(root.position);
+          _target.y += 0.3 * root.scale.x;
+          this.fx.burst(_target, _up, 9, 2.6);
+        }
+      }
+
+      // THE TWO-STEP + THE HOP. Attacks plant him; the melt puddles him.
+      if (punching || melting) {
+        goop.moveSpeedScale = 1;
+        goop.moveTo(_local.set(0, 0, 0));
+      } else {
+        goop.moveSpeedScale = 2.4; // lurch ON the beat, not toward it
+        const step = STEPS[beatInBar];
+        goop.moveTo(_local.set(step[0], 0, step[1]));
+        // Land ON every kick: peak mid-beat, floor at the beat line.
+        const phrasePop = beat % phraseBeats() < 1 ? 1.8 : 1;
+        hop = Math.abs(Math.sin(beat * Math.PI)) * 0.045 * root.scale.x * phrasePop;
+      }
+    } else {
+      goop.moveSpeedScale = 1;
+      goop.moveTo(_local.set(0, 0, 0));
+      this.lastKick = -1;
+    }
+    root.position.y = RING.stageHeight + stageY + hop;
+
+    /* ── the gaze ──────────────────────────────────────────────────────── */
+    // He watches YOU — but the watching grooves: the gaze sways off you
+    // with the bar and rides a full spin out of every second phrase.
+    // Mid-attack the sway dies and he squares up dead-on (that's the tell).
+    _head.set(match.headX, match.headY, match.headZ);
+    _local.copy(_head).sub(root.position).divideScalar(root.scale.x || 1);
+    if (dancing && !punching) {
+      const pb = phraseBeats();
+      const inPhrase = beat % pb;
+      const oddPhrase = Math.floor(beat / pb) % 2 === 1;
+      let sway = Math.sin(beat * Math.PI * 0.5) * 0.5;
+      if (oddPhrase && inPhrase > pb - 8) {
+        sway += ((inPhrase - (pb - 8)) / 8) * Math.PI * 2;
+      }
+      const dist = Math.hypot(_local.x, _local.z) || 1;
+      const ang = Math.atan2(_local.x, _local.z) + sway;
+      _local.set(Math.sin(ang) * dist, _local.y, Math.cos(ang) * dist);
+    }
+    goop.faceToward(_local);
+
+    // A mid-swing limb balloons the raymarch bounds — shed steps exactly then.
+    goop.qualityOverride = punching ? GOOP.attackQuality : GOOP.quality;
+
+    goop.update(delta * GOOP.timeScale, _head);
+  }
+
+  /** Beats until the next unresolved landing anywhere (∞ if none). */
+  private landingClearance(beat: number): number {
+    let soonest = Infinity;
+    for (const z of choreoView.zones) {
+      if (!z.resolved && z.dueBeat - beat < soonest) soonest = z.dueBeat - beat;
+    }
+    return soonest;
+  }
+
+  /** Fire queued gesture cues; keep the latest refused one alive and retry
+   *  it with its remaining charge until the landing is on top of us. */
+  private runGestures(goop: GelCreature, root: Group, beat: number): void {
+    const fresh = match.gestures.splice(0);
+    const attempts: { cue: GestureCue; dueBeat: number }[] = fresh.map((cue) => ({
+      cue,
+      dueBeat: beat + cue.chargeBeats,
+    }));
+    if (this.pending) attempts.unshift(this.pending);
+    this.pending = null;
+
+    for (const attempt of attempts) {
+      const remaining = attempt.dueBeat - beat;
+      if (remaining < 0.5) continue; // too late — the floor tell carries it
+      const name = attempt.cue.step ? STEP_GESTURE[attempt.cue.kind] : GESTURE[attempt.cue.kind];
+      const chargeSeconds = Math.max(0.25, remaining * match.beatLen);
       goop.tempoScale = Math.max(0.35, (chargeSeconds * GOOP.timeScale) / ATTACKS[name].telegraph);
       this.hand = this.hand === 'left' ? 'right' : 'left';
       // Swing at head height toward my seat — a SHORT lunge; the floor
@@ -119,72 +269,13 @@ export class GoopliathSystem extends createSystem({}) {
       const len = _target.length() || 1;
       _target.multiplyScalar((root.scale.x * GOOP.gestureReach) / len).add(root.position);
       _target.y = 1.6;
-      goop.throwAttack(name, this.hand, _target);
+      if (!goop.throwAttack(name, this.hand, _target)) {
+        // Busy (melting or mid-swing): keep the most urgent refusal alive.
+        if (!this.pending || attempt.dueBeat < this.pending.dueBeat) this.pending = attempt;
+      } else if (beat < this.meltUntilBeat) {
+        // A real telegraph outranks the show-off move — stand back up.
+        this.meltUntilBeat = -Infinity;
+      }
     }
-
-    /* ── the dance ─────────────────────────────────────────────────────── */
-    const punching = goop.isPunching;
-    if (inSet && beat >= 0) {
-      const beatInBar = ((Math.floor(beat) % 4) + 4) % 4;
-      const kick = Math.floor(beat);
-      if (kick !== this.lastKick) {
-        this.lastKick = kick;
-        // Jiggle every beat, HIT the downbeat, slam the phrase turn.
-        const phraseTurn = kick % phraseBeats() === 0;
-        const bounce = phraseTurn ? 0.85 : beatInBar === 0 ? 0.55 : GOOP.danceBounce;
-        goop.sim.agitation = Math.min(1, goop.sim.agitation + bounce);
-      }
-
-      // A new stance every four bars — he re-pours himself mid-groove.
-      const stance = Math.floor(beat / (MUSIC.beatsPerBar * 4));
-      if (stance !== this.lastStance) {
-        this.lastStance = stance;
-        const style = this.styleOrder[stance % this.styleOrder.length];
-        goop.setFightStyle(match.screen === 'tutorial' ? null : style.pose);
-      }
-
-      // THE TWO-STEP: a discrete floor target per beat — the whole tonnage
-      // lurches onto it and gathers for the next. Attacks plant his feet
-      // (mid-swing steps read as stumbling, and the swing must aim true).
-      if (punching) {
-        goop.moveSpeedScale = 1;
-        goop.moveTo(_local.set(0, 0, 0));
-      } else {
-        goop.moveSpeedScale = 2.4; // lurch ON the beat, not toward it
-        const step = STEPS[beatInBar];
-        _local.set(step[0], 0, step[1]);
-        goop.moveTo(_local);
-      }
-    } else {
-      goop.moveSpeedScale = 1;
-      goop.moveTo(_local.set(0, 0, 0));
-      this.lastKick = -1;
-    }
-
-    /* ── the gaze ──────────────────────────────────────────────────────── */
-    // He watches YOU — but the watching grooves: his gaze sways off you with
-    // the bar, and out of every second phrase he throws a full spin. Mid-
-    // attack the sway dies and he squares up dead-on (that's the tell).
-    _head.set(match.headX, match.headY, match.headZ);
-    _local.copy(_head).sub(root.position).divideScalar(root.scale.x || 1);
-    if (inSet && beat >= 0 && !punching) {
-      const pb = phraseBeats();
-      const inPhrase = beat % pb;
-      const oddPhrase = Math.floor(beat / pb) % 2 === 1;
-      let sway = Math.sin(beat * Math.PI * 0.5) * 0.5;
-      if (oddPhrase && inPhrase > pb - 8) {
-        // The spin: the gaze point orbits him once across the last two bars.
-        sway += ((inPhrase - (pb - 8)) / 8) * Math.PI * 2;
-      }
-      const dist = Math.hypot(_local.x, _local.z) || 1;
-      const ang = Math.atan2(_local.x, _local.z) + sway;
-      _local.set(Math.sin(ang) * dist, _local.y, Math.cos(ang) * dist);
-    }
-    goop.faceToward(_local);
-
-    // A mid-swing limb balloons the raymarch bounds — shed steps exactly then.
-    goop.qualityOverride = goop.isPunching ? GOOP.attackQuality : GOOP.quality;
-
-    goop.update(delta * GOOP.timeScale, _head);
   }
 }

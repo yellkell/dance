@@ -53,8 +53,9 @@ export class RankSystem extends createSystem({}) {
     if (!a) return;
 
     // The board floats over the stage — above the giant, under the ball —
-    // and faces me (every client's board faces its own dancer: holo conceit).
-    this.board.group.position.set(a.stage.position.x, 5.6, a.stage.position.z);
+    // riding the stage's rank-sink, facing me (every client's board faces
+    // its own dancer: the holo conceit).
+    this.board.group.position.set(a.stage.position.x, 5.6 + a.stage.position.y, a.stage.position.z);
     this.board.group.lookAt(_head.set(match.headX, match.headY, match.headZ));
 
     const inShow = match.screen === 'raid' || match.screen === 'podium';
@@ -66,8 +67,13 @@ export class RankSystem extends createSystem({}) {
       this.recompute();
     }
 
-    // Platform lifts — eased, relative to my own tier.
+    // Platform lifts — eased, relative to my own tier. The GOOPLIATH's
+    // stage does NOT rise with you: as you climb, it sinks by your tier,
+    // staying down at floor level with the rest of the ring — the champion
+    // looks DOWN on the show. (Boss, disco rig and board all ride it.)
     const meTier = tierOf(match.players.find((p) => p.kind === 'local'));
+    const stageTarget = inShow ? -meTier : 0;
+    a.stage.position.y += (stageTarget - a.stage.position.y) * Math.min(1, delta * RANK.lerp);
     for (const handle of a.platforms) {
       const d = match.players.find((p) => p.seat === handle.seat);
       const target = inShow ? tierOf(d) - meTier : 0;

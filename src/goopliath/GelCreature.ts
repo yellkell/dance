@@ -107,6 +107,9 @@ export class GelCreature {
 
   /** Difficulty tempo: scales the telegraph + recovery (1 = SCRAP). */
   tempoScale = 1;
+  /** How fast the body eases into a new style/dance pose (per second).
+   *  1.6 = the original slow re-pour; ~6 = hitting poses on the bar. */
+  styleEase = 1.6;
   /** Boss-scale hosts set this to bypass the man-sized distance LOD: the
    *  heuristic below reads group-local distance, which is meaningless inside
    *  a scaled parent — and a giant that fills the view is never "far". */
@@ -409,9 +412,11 @@ export class GelCreature {
     this.group.worldToLocal(this.playerLocal);
 
     // --- fighting-style silhouette: ooze toward the active stance ---
-    // Slow ease (~1.5 s) so a round-start style change reads as the gel
-    // visibly re-pouring itself into a new fighter — that IS the tell.
-    const sk = Math.min(1, dt * 1.6);
+    // The ease rate is a public knob (DANCE RAID patch): the boxing game
+    // wanted a slow ~1.5 s re-pour as a round tell; a dancer hitting a pose
+    // per bar wants a SNAP. Everything else about the style system is
+    // untouched.
+    const sk = Math.min(1, dt * this.styleEase);
     for (let i = 0; i < this.styleO.length; i++) {
       this.sim.styleOffsets[i] += (this.styleO[i] - this.sim.styleOffsets[i]) * sk;
     }

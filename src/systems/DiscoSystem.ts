@@ -18,8 +18,6 @@ export function discoRig(): DiscoRig | null {
 }
 
 export class DiscoSystem extends createSystem({}) {
-  private generation = -1;
-
   init(): void {
     rig = new DiscoRig();
     this.scene.add(rig.root);
@@ -28,10 +26,9 @@ export class DiscoSystem extends createSystem({}) {
   update(delta: number): void {
     if (!rig) return;
     const a = arena();
-    if (a && this.generation !== match.generation) {
-      this.generation = match.generation;
-      rig.root.position.copy(a.stage.position);
-    }
+    // Follow every frame — the stage sinks as the ranks rise, and the
+    // whole light rig (ball, shafts, fans, confetti) stays with the show.
+    if (a) rig.root.position.copy(a.stage.position);
 
     const live = match.playing && (match.screen === 'raid' || match.screen === 'tutorial');
     // The lobby loop publishes a beat too, so the room grooves between sets.
