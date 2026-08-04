@@ -19,6 +19,7 @@ import { arena } from '../arena/arena.js';
 import { DiscoRig } from '../arena/disco.js';
 import { actOfBeat } from '../choreo/setlist.js';
 import { match } from '../game/state.js';
+import { choreoView } from './ChoreoSystem.js';
 
 let rig: DiscoRig | null = null;
 
@@ -56,6 +57,8 @@ export function cycleRoomDim(): void {
 
 export class DiscoSystem extends createSystem({}) {
   private dimMat!: MeshBasicMaterial;
+  /** 0..1 — how far the party stands back while a telegraph owns MY deck. */
+  private duck = 0;
 
   init(): void {
     rig = new DiscoRig();
@@ -88,9 +91,17 @@ export class DiscoSystem extends createSystem({}) {
     const live = match.playing && (match.screen === 'raid' || match.screen === 'tutorial');
     // The lobby loop publishes a beat too, so the room grooves between sets.
     const onBeat = Number.isFinite(match.beat);
-    const energy = live ? 1 : match.screen === 'countdown' ? 0.6 : onBeat ? 0.45 : 0.25;
+    let energy = live ? 1 : match.screen === 'countdown' ? 0.6 : onBeat ? 0.45 : 0.25;
     const beat = onBeat ? match.beat : performance.now() / 1000 / match.beatLen / 4;
     const act = match.screen === 'raid' ? actOfBeat(beat, match.phrases) : 0;
+
+    // THE DUCK: while a telegraph charges on MY deck the disco stands back —
+    // lasers and shafts drop to a quarter so the hazard shapes own the room,
+    // then the party slams back in the moment the landing resolves.
+    const danger = live && choreoView.zones.some((z) => !z.resolved && z.seat === match.mySeat);
+    this.duck += ((danger ? 1 : 0) - this.duck) * Math.min(1, delta * 6);
+    energy *= 1 - this.duck * 0.75;
+
     rig.update(delta, beat, act, energy);
 
     const pulse = Math.max(0, 1 - (beat - Math.floor(beat)) * 2.2);

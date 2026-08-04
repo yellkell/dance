@@ -336,9 +336,13 @@ export class ChoreoSystem extends createSystem({}) {
       case 'lane':
         this.strikes.beam(parent, z.zone.x);
         break;
-      case 'sweep':
-        this.strikes.sweep(parent);
+      case 'sweep': {
+        // Which side the blade enters from alternates deterministically —
+        // same cut on every client, and back-to-back sweeps cross over.
+        const fromSide: 1 | -1 = (z.moveIdx + z.landingIdx) % 2 === 0 ? 1 : -1;
+        this.strikes.sweep(parent, fromSide);
         break;
+      }
       case 'half':
         this.strikes.halfFlood(parent, z.zone.side, z.zone.axis);
         break;

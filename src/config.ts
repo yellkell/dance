@@ -367,9 +367,19 @@ export const PALETTE = {
   violet: 0xb06bff,
   amber: 0xffb000,
   danger: 0xe8352a,
+  whiteHot: 0xfff3cf,
   white: 0xf4f6fb,
   mirror: 0xcfd8e6,
 };
+
+/**
+ * PALETTE DISCIPLINE — how you tell an attack from the party:
+ * danger speaks ONLY hazard amber→red (telegraphs, beams, novas) and goo
+ * green (the gel itself arriving); the disco speaks magenta/cyan/violet.
+ * The two vocabularies never share a colour, and while a telegraph charges
+ * on YOUR deck the disco DUCKS (lasers and shafts fade to a quarter) so the
+ * warning owns the room.
+ */
 
 /**
  * ROOM DIM — the Laser Dance move: darken the passthrough so the neon owns
