@@ -10,7 +10,7 @@
  * boundaries are fractions of the set) stretches to fit whatever is on.
  */
 
-import { GOOPLINGS, MUSIC, RING } from '../config.js';
+import { GOOPLINGS, MUSIC, RING, countInBeatsFor } from '../config.js';
 import { pickRaidTrack, trackById, trackPhrases, tracksFor, type Track } from '../audio/tracks.js';
 import { freshSeed } from './rng.js';
 import { buildRoster, markGooplingCleared, match, pushFlair } from './state.js';
@@ -22,7 +22,8 @@ function mountTrack(track: Track): void {
   match.trackId = track.id;
   match.bpm = track.bpm;
   match.beatLen = 60 / track.bpm;
-  match.phrases = trackPhrases(track, MUSIC.countInBeats, phraseBeats);
+  match.phrases = trackPhrases(track, countInBeatsFor(track.bpm), phraseBeats);
+  match.grooveStreak = 0;
 }
 
 export interface RaidOptions {

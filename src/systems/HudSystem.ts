@@ -1,8 +1,12 @@
 /**
- * HudSystem — your own numbers, floating just past your platform's front
- * rim: score, combo multiplier, lives, the count-in, and the flair pops
- * (PERFECT! / 20 COMBO / HIT). In a rehearsal it doubles as the goopling's
- * lesson card. Canvas-drawn, redrawn only when something changes.
+ * HudSystem — your own numbers, floating free just past your platform's
+ * front rim: score, combo multiplier, groove streak, lives, the count-in,
+ * and the flair pops (PERFECT! / 20 COMBO / HIT).
+ *
+ * NO PANELS. No smoked glass, no frames — menus get panels, gameplay gets
+ * ink: every glyph wears a thick black outline so it reads against a bright
+ * real room, a dark real room, and the gel creature behind it all at once.
+ * In a rehearsal the same free-floating text carries the goopling's lesson.
  */
 
 import { createSystem } from '@iwsdk/core';
@@ -21,6 +25,28 @@ import { match, me } from '../game/state.js';
 
 const W = 768;
 const H = 384;
+
+/** Heavy club lettering: a thick near-black casing, then the colour. */
+function ink(
+  g: CanvasRenderingContext2D,
+  text: string,
+  x: number,
+  y: number,
+  px: number,
+  fill: string,
+  maxWidth?: number,
+): void {
+  g.font = `900 ${px}px 'Arial Black', system-ui, sans-serif`;
+  g.lineJoin = 'round';
+  g.lineCap = 'round';
+  g.lineWidth = Math.max(6, px * 0.22);
+  g.strokeStyle = 'rgba(0,2,6,0.96)';
+  if (maxWidth) g.strokeText(text, x, y, maxWidth);
+  else g.strokeText(text, x, y);
+  g.fillStyle = fill;
+  if (maxWidth) g.fillText(text, x, y, maxWidth);
+  else g.fillText(text, x, y);
+}
 
 export class HudSystem extends createSystem({}) {
   private canvas = document.createElement('canvas');
@@ -88,6 +114,7 @@ export class HudSystem extends createSystem({}) {
       d?.combo,
       d?.lives,
       d?.alive,
+      match.grooveStreak,
       match.tutorialClears,
       match.goopling?.id,
     ].join(':');
@@ -100,41 +127,20 @@ export class HudSystem extends createSystem({}) {
   private draw(count: number, mult: number): void {
     const g = this.canvas.getContext('2d')!;
     g.clearRect(0, 0, W, H);
-    g.fillStyle = 'rgba(6,4,12,0.62)';
-    g.beginPath();
-    g.roundRect(4, 4, W - 8, H - 8, 22);
-    g.fill();
-    g.lineWidth = 4;
-    g.strokeStyle = 'rgba(255,42,213,0.8)';
-    g.shadowColor = '#ff2ad5';
-    g.shadowBlur = 16;
-    g.stroke();
-    g.shadowBlur = 0;
     g.textAlign = 'center';
     g.textBaseline = 'middle';
 
     const d = me();
 
     if (match.goopling) {
-      // Lesson card.
+      // The lesson, free-floating.
       const gp = match.goopling;
-      g.fillStyle = '#b9ffc4';
-      g.font = "900 54px 'Arial Black', system-ui, sans-serif";
-      g.shadowColor = '#36e05a';
-      g.shadowBlur = 14;
-      g.fillText(gp.name, W / 2, 58);
-      g.shadowBlur = 0;
-      g.fillStyle = 'rgba(232,236,242,0.7)';
-      g.font = "700 26px 'Arial Black', system-ui, sans-serif";
-      g.fillText(gp.epithet, W / 2, 104);
-      g.fillStyle = '#f4f6fb';
-      g.font = "700 30px 'Arial Black', system-ui, sans-serif";
+      ink(g, gp.name, W / 2, 52, 54, '#b9ffc4');
+      ink(g, gp.epithet, W / 2, 102, 24, 'rgba(232,236,242,0.85)');
       gp.lesson.split('\n').forEach((line, i) => {
-        g.fillText(line, W / 2, 168 + i * 44);
+        ink(g, line, W / 2, 168 + i * 46, 30, '#f4f6fb', W - 60);
       });
-      g.fillStyle = '#ffb000';
-      g.font = "900 44px 'Arial Black', system-ui, sans-serif";
-      g.fillText(`${match.tutorialClears} / ${gp.clears}`, W / 2, H - 62);
+      ink(g, `${match.tutorialClears} / ${gp.clears}`, W / 2, H - 58, 46, '#ffb000');
       this.tex.needsUpdate = true;
       return;
     }
@@ -142,50 +148,51 @@ export class HudSystem extends createSystem({}) {
     if (match.screen === 'countdown' && !Number.isFinite(match.beat)) {
       // The record is still decoding — the clock stays parked until it's
       // ready, so nothing can land early.
-      g.fillStyle = '#ffd9f6';
-      g.font = "900 46px 'Arial Black', system-ui, sans-serif";
-      g.fillText('CUEING THE RECORD…', W / 2, H / 2);
+      ink(g, 'CUEING THE RECORD…', W / 2, H / 2, 46, '#ffd9f6', W - 60);
       this.tex.needsUpdate = true;
       return;
     }
 
     if (count > 0) {
       const cued = trackById(match.trackId);
-      g.fillStyle = '#ffd9f6';
-      g.font = "900 40px 'Arial Black', system-ui, sans-serif";
-      g.fillText('THE SET DROPS IN', W / 2, 78);
-      g.fillStyle = '#ff2ad5';
-      g.shadowColor = '#ff2ad5';
-      g.shadowBlur = 24;
-      g.font = "900 150px 'Arial Black', system-ui, sans-serif";
-      g.fillText(`${count}`, W / 2, H / 2 + 24);
-      g.shadowBlur = 0;
-      if (cued) {
-        g.fillStyle = '#b9ffc4';
-        g.font = "900 38px 'Arial Black', system-ui, sans-serif";
-        g.fillText(`♪ ${cued.title}`, W / 2, H - 54);
-      }
+      ink(g, 'THE SET DROPS IN', W / 2, 70, 40, '#ffd9f6');
+      ink(g, `${count}`, W / 2, H / 2 + 18, 150, '#ff2ad5');
+      if (cued) ink(g, `♪ ${cued.title}`, W / 2, H - 48, 38, '#b9ffc4');
       this.tex.needsUpdate = true;
       return;
     }
 
-    // Live readout.
-    g.fillStyle = '#f4f6fb';
-    g.font = "900 84px 'Arial Black', system-ui, sans-serif";
-    g.fillText(`${d?.score ?? 0}`, W / 2, 96);
+    // Live readout — big ink, no furniture.
+    ink(g, `${d?.score ?? 0}`, W / 2, 88, 104, '#ffffff');
+    ink(
+      g,
+      d && d.combo > 0 ? `${d.combo} COMBO  ×${mult.toFixed(1)}` : 'NO COMBO',
+      W / 2,
+      196,
+      50,
+      d && d.combo > 0 ? '#ffb000' : 'rgba(168,172,186,0.9)',
+    );
+    if (match.grooveStreak >= 4) {
+      ink(g, `GROOVE ×${match.grooveStreak}`, W / 2, 258, 32, '#4fb7ff');
+    }
 
-    g.fillStyle = d && d.combo > 0 ? '#ffb000' : 'rgba(150,154,168,0.7)';
-    g.font = "900 54px 'Arial Black', system-ui, sans-serif";
-    g.fillText(d && d.combo > 0 ? `${d.combo} COMBO  ×${mult.toFixed(1)}` : 'NO COMBO', W / 2, 194);
-
-    // Lives as goo drops.
-    const lives = d?.lives ?? 0;
-    g.font = "900 64px 'Arial Black', system-ui, sans-serif";
-    let hearts = '';
-    for (let i = 0; i < SCORE.lives; i++) hearts += i < lives ? '🟢' : '⚫';
-    g.fillText(d?.alive === false ? 'SPECTATING' : hearts, W / 2, 300);
+    // Lives as goo drops — drawn, so they get outlines too.
     if (d?.alive === false) {
-      g.fillStyle = 'rgba(232,236,242,0.6)';
+      ink(g, 'SPECTATING', W / 2, 322, 44, 'rgba(232,236,242,0.85)');
+    } else {
+      const lives = d?.lives ?? 0;
+      const r = 22;
+      const gapX = 76;
+      const cx0 = W / 2 - gapX * ((SCORE.lives - 1) / 2);
+      for (let i = 0; i < SCORE.lives; i++) {
+        g.beginPath();
+        g.arc(cx0 + i * gapX, 322, r, 0, Math.PI * 2);
+        g.lineWidth = 9;
+        g.strokeStyle = 'rgba(0,2,6,0.96)';
+        g.stroke();
+        g.fillStyle = i < lives ? '#36e05a' : 'rgba(60,66,78,0.9)';
+        g.fill();
+      }
     }
 
     this.tex.needsUpdate = true;
@@ -198,11 +205,9 @@ export class HudSystem extends createSystem({}) {
       tone === 'perfect' ? '#ffd75e' : tone === 'hit' ? '#ff5040' : tone === 'milestone' ? '#ff2ad5' : '#b9ffc4';
     g.textAlign = 'center';
     g.textBaseline = 'middle';
-    g.font = "900 72px 'Arial Black', system-ui, sans-serif";
     g.shadowColor = color;
     g.shadowBlur = 26;
-    g.fillStyle = color;
-    g.fillText(text, 256, 80, 490);
+    ink(g, text, 256, 80, 72, color, 490);
     g.shadowBlur = 0;
     this.flairTex.needsUpdate = true;
   }

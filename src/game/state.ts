@@ -43,6 +43,9 @@ export interface Dancer {
 export interface GestureCue {
   kind: MoveKind;
   chargeBeats: number;
+  /** A follow-up strike inside a multi-landing move (seesaw halves, slam
+   *  drumline steps) — a quick jab/hook, not the full wind-up. */
+  step?: boolean;
 }
 
 /** A transient HUD flair (DODGE! / PERFECT! / combo milestones / OUT). */
@@ -91,6 +94,8 @@ export interface MatchState {
   headZ: number;
   /** True while the head is below the duck line. */
   ducked: boolean;
+  /** Live groove streak (one-hand-up-one-down swaps in rhythm) for the HUD. */
+  grooveStreak: number;
 
   /* ── buses ── */
   gestures: GestureCue[];
@@ -126,6 +131,7 @@ export const match: MatchState = {
   headY: 1.65,
   headZ: 0,
   ducked: false,
+  grooveStreak: 0,
   gestures: [],
   flairs: [],
   goopling: null,

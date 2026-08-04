@@ -78,6 +78,7 @@ export class ChoreoSystem extends createSystem({}) {
   private strikes = new StrikeFx();
   private lastBar = -1;
   private landedSfx = new Set<string>();
+  private cuedSteps = new Set<string>();
   private tutorialMoveHit = new Map<number, boolean>();
   private ended = false;
 
@@ -96,6 +97,7 @@ export class ChoreoSystem extends createSystem({}) {
     this.nextMove = 0;
     this.lastBar = -1;
     this.landedSfx.clear();
+    this.cuedSteps.clear();
     this.tutorialMoveHit.clear();
     this.ended = false;
     this.setlist =
@@ -134,6 +136,20 @@ export class ChoreoSystem extends createSystem({}) {
     while (this.nextMove < this.setlist.length && this.setlist[this.nextMove].telegraphBeat <= beat) {
       this.begin(this.setlist[this.nextMove]);
       this.nextMove++;
+    }
+
+    // Follow-up gestures: a multi-landing move keeps the GOOPLIATH swinging
+    // — every later landing gets its own quick strike cued a couple of beats
+    // out, so the boss's body telegraphs the WHOLE cascade, not just its
+    // opening. (Keyed per landing, not per seat — one giant, one swing.)
+    for (const z of this.zones) {
+      if (z.resolved || z.landingIdx === 0) continue;
+      const lead = z.dueBeat - beat;
+      if (lead > 2 || lead <= 0) continue;
+      const key = `${z.moveIdx}:${z.landingIdx}`;
+      if (this.cuedSteps.has(key)) continue;
+      this.cuedSteps.add(key);
+      match.gestures.push({ kind: z.kind, chargeBeats: lead, step: true });
     }
 
     // Advance live zones.

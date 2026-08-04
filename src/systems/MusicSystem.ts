@@ -9,7 +9,7 @@
  */
 
 import { createSystem } from '@iwsdk/core';
-import { MUSIC } from '../config.js';
+import { countInBeatsFor } from '../config.js';
 import {
   ambientBeat,
   ambientRunning,
@@ -44,7 +44,7 @@ export class MusicSystem extends createSystem({}) {
       const total = match.phrases;
       startSet({
         track,
-        countInBeats: MUSIC.countInBeats,
+        countInBeats: countInBeatsFor(track.bpm),
         endBeat: tutorial ? 1e9 : total * phraseBeats(),
         seed: match.seed,
         actAt: tutorial ? () => 0 : (beat) => actOfBeat(beat, total),

@@ -1,7 +1,10 @@
 /**
- * The holo leaderboard — a smoked-glass panel floating over the stage that
- * every dancer can read: live rank, name, score, combo. Canvas-drawn, redrawn
- * only when the standings actually change, billboarded by RankSystem.
+ * The holo leaderboard — free-floating ranking text over the stage that
+ * every dancer can read: live rank, name, score, combo. NO PANEL: no glass,
+ * no frame — every glyph wears a thick black outline instead, so the board
+ * reads over the gel, the lasers and whatever your real room is doing.
+ * Canvas-drawn, redrawn only when the standings actually change,
+ * billboarded by RankSystem.
  */
 
 import {
@@ -12,10 +15,33 @@ import {
   MeshBasicMaterial,
   PlaneGeometry,
 } from 'three';
-import { glowSprite } from '../materials/glow.js';
 
 const W = 768;
 const H = 1024;
+
+/** Heavy club lettering: thick near-black casing, then the colour. */
+function ink(
+  g: CanvasRenderingContext2D,
+  text: string,
+  x: number,
+  y: number,
+  px: number,
+  fill: string,
+  align: CanvasTextAlign,
+  maxWidth?: number,
+): void {
+  g.textAlign = align;
+  g.font = `900 ${px}px 'Arial Black', system-ui, sans-serif`;
+  g.lineJoin = 'round';
+  g.lineCap = 'round';
+  g.lineWidth = Math.max(6, px * 0.22);
+  g.strokeStyle = 'rgba(0,2,6,0.96)';
+  if (maxWidth) g.strokeText(text, x, y, maxWidth);
+  else g.strokeText(text, x, y);
+  g.fillStyle = fill;
+  if (maxWidth) g.fillText(text, x, y, maxWidth);
+  else g.fillText(text, x, y);
+}
 
 export interface BoardRow {
   rank: number;
@@ -43,64 +69,30 @@ export class HoloBoard {
     );
     this.mesh.renderOrder = 25; // above the gel, below the near menus
     this.group.add(this.mesh);
-    const halo = glowSprite(0xff2ad5, 3.4, 0.16);
-    halo.position.z = -0.05;
-    this.group.add(halo);
   }
 
   redraw(title: string, subtitle: string, rows: BoardRow[], accentCss: string): void {
     const g = this.canvas.getContext('2d')!;
     g.clearRect(0, 0, W, H);
-
-    // Smoked glass with a neon frame.
-    g.fillStyle = 'rgba(6,4,12,0.72)';
-    g.beginPath();
-    g.roundRect(8, 8, W - 16, H - 16, 26);
-    g.fill();
-    g.lineWidth = 5;
-    g.strokeStyle = accentCss;
-    g.shadowColor = accentCss;
-    g.shadowBlur = 22;
-    g.stroke();
-    g.shadowBlur = 0;
-
-    g.textAlign = 'center';
     g.textBaseline = 'middle';
-    g.font = "900 64px 'Arial Black', system-ui, sans-serif";
-    g.fillStyle = accentCss;
+
     g.shadowColor = accentCss;
     g.shadowBlur = 18;
-    g.fillText(title, W / 2, 78);
+    ink(g, title, W / 2, 64, 64, accentCss, 'center');
     g.shadowBlur = 0;
-    if (subtitle) {
-      g.font = "700 30px 'Arial Black', system-ui, sans-serif";
-      g.fillStyle = 'rgba(232,236,242,0.75)';
-      g.fillText(subtitle, W / 2, 132);
-    }
+    if (subtitle) ink(g, subtitle, W / 2, 126, 28, 'rgba(240,243,248,0.95)', 'center', W - 60);
 
-    const top = 180;
-    const rowH = Math.min(66, (H - top - 30) / Math.max(rows.length, 1));
+    const top = 176;
+    const rowH = Math.min(68, (H - top - 30) / Math.max(rows.length, 1));
     rows.forEach((row, i) => {
       const y = top + i * rowH + rowH / 2;
-      if (row.isMe) {
-        g.fillStyle = 'rgba(255,42,213,0.16)';
-        g.beginPath();
-        g.roundRect(22, y - rowH / 2 + 3, W - 44, rowH - 6, 12);
-        g.fill();
-      }
-      g.textAlign = 'left';
-      g.font = "900 36px 'Arial Black', system-ui, sans-serif";
-      g.fillStyle = row.rank === 1 ? '#ffd75e' : row.rank <= 10 ? '#b9ffc4' : 'rgba(232,236,242,0.85)';
-      if (!row.alive) g.fillStyle = 'rgba(150,150,160,0.55)';
-      g.fillText(`${row.rank}`, 40, y);
-      g.fillStyle = row.alive ? row.colorCss : 'rgba(150,150,160,0.55)';
-      g.fillText(row.name.slice(0, 14), 118, y);
-      g.textAlign = 'right';
-      g.fillStyle = row.alive ? 'rgba(244,246,251,0.95)' : 'rgba(150,150,160,0.55)';
-      g.fillText(`${row.score}`, W - 150, y);
-      g.font = "700 28px 'Arial Black', system-ui, sans-serif";
-      g.fillStyle = row.combo > 0 ? '#ffb000' : 'rgba(120,124,138,0.6)';
-      g.fillText(row.alive ? `×${row.combo}` : 'OUT', W - 40, y);
+      const dim = 'rgba(165,168,178,0.85)';
+      if (row.isMe) ink(g, '▶', 30, y, 26, '#ff2ad5', 'left');
+      const rankFill = !row.alive ? dim : row.rank === 1 ? '#ffd75e' : row.rank <= 10 ? '#b9ffc4' : '#f0f3f8';
+      ink(g, `${row.rank}`, 66, y, 38, rankFill, 'left');
+      ink(g, row.name.slice(0, 13), 140, y, 38, row.alive ? row.colorCss : dim, 'left', 356);
+      ink(g, `${row.score}`, W - 150, y, 38, row.alive ? '#ffffff' : dim, 'right');
+      ink(g, row.alive ? `×${row.combo}` : 'OUT', W - 34, y, 28, row.alive && row.combo > 0 ? '#ffb000' : dim, 'right');
     });
 
     this.tex.needsUpdate = true;

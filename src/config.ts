@@ -31,16 +31,23 @@ export const MUSIC = {
   fallbackBpm: 128,
   beatsPerBar: 4,
   barsPerPhrase: 8, // the choreography thinks in 8-bar phrases
-  /** Beats between the track's first downbeat and game beat 0 — two bars of
-   *  "get ready" over the top of the intro. */
-  countInBeats: 8,
-  /** Phrases at the top of the set that just dance (no moves land). */
-  introPhrases: 1,
+  /** Bars of pure dancing before the first landing — the first telegraph is
+   *  already blooming seconds after the drop. */
+  introBars: 2,
   /** Master music level (the sfx bus is its own knob in audio/sfx.ts). */
   volume: 0.6,
 };
 
 export const beatSeconds = (bpm: number): number => 60 / bpm;
+
+/**
+ * Count-in length in beats, sized in SECONDS so slow records don't dawdle:
+ * ~3 s of "the set drops in" whatever the tempo (MONEY at 78 BPM used to
+ * hold you for six seconds; LOOP at 150 still gets its full two bars).
+ */
+export function countInBeatsFor(bpm: number): number {
+  return Math.max(4, Math.min(8, Math.ceil(3.0 / (60 / bpm))));
+}
 
 /* ────────────────────────────── THE RING ─────────────────────────────────
  * Platforms stand on one circle around the boss stage. Every client sees
@@ -165,8 +172,10 @@ export const CHOREO = {
   sweepThickness: 0.19,
   /** Head below this fraction of your calibrated standing height = ducked. */
   duckFrac: 0.78,
-  /** Seesaw/surge: beats between half-floods per act (fast lanes later). */
-  seesawGapBeats: [4, 3, 2, 2],
+  /** Seesaw/surge: beats between half-floods per act. Whole bars early,
+   *  half-bars late — every flood lands where the music actually hits (a
+   *  3-beat gap straddled the grid and read as random). */
+  seesawGapBeats: [4, 4, 2, 2],
   /** Forgiveness strip either side of the centreline (m). */
   seesawSafeLip: 0.06,
   /** Nova safe-wedge half-angle (radians); tightens in the last act. */
@@ -175,14 +184,35 @@ export const CHOREO = {
   novaRadius: 1.15,
   /** Moves per phrase by act — the escalation curve. */
   movesPerPhrase: [2, 3, 4, 5],
-  /** Minimum clear beats between one landing and the next telegraph. */
-  restBeats: [4, 3, 2, 1],
+  /** Minimum clear beats between one landing and the next telegraph —
+   *  bar/half-bar multiples so successive moves stay on the grid. */
+  restBeats: [4, 4, 2, 2],
   /**
    * Act boundaries as a FRACTION of the set, not fixed phrase numbers —
    * the tracks run 2 to 4 minutes, so the escalation curve has to stretch
    * to whatever record is on. Act 0 opens, act 3 is the last fifth.
    */
   actAtProgress: [0, 0.25, 0.55, 0.8],
+};
+
+/* ────────────────────────────── THE GROOVE ───────────────────────────────
+ * Dance like the groupies dance: ONE HAND UP, ONE HAND DOWN, and swap on
+ * the beat. Every rhythmic swap pays a little — and the payout creeps up
+ * the longer you keep the motion going. It never rivals a dodge; it's the
+ * tax refund for actually dancing between them.
+ */
+export const GROOVE = {
+  /** Vertical hand separation (m) that counts as "one up, one down". */
+  split: 0.35,
+  /** Points for a rhythmic swap. */
+  base: 6,
+  /** Extra points per streak step — the consistency creep. */
+  perStreak: 0.5,
+  /** Streak stops growing here (base + 50 = 56 a swap at full groove). */
+  streakCap: 100,
+  /** A swap must land this many beats after the last to stay in the groove. */
+  minBeats: 0.4,
+  maxBeats: 2.6,
 };
 
 /* ────────────────────────────── THE SCORE ────────────────────────────────

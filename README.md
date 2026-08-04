@@ -11,6 +11,10 @@ everyone else.
 - **Dodge** a landing → your **combo** climbs → your points multiply (up to ×4).
 - Nail a **last-instant dodge** (still in the fire one beat out, clear on the
   drop) → **PERFECT!**, ×1.5.
+- **GROOVE**: dance like the groupies — one hand up, one hand down, swapping
+  on the beat. Every rhythmic swap pays a little, and the payout creeps up
+  the longer you keep the motion going. Stop, or swap off-rhythm, and the
+  streak lets go.
 - Get clipped → the combo dies and you lose one of **three lives**. Three hits
   and you're off the floor, spectating from a sunken deck.
 - A **live holo leaderboard** over the stage shows everyone's rank, score and

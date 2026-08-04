@@ -149,11 +149,14 @@ function buildLandings(kind: MoveKind, landBeat: number, act: number, rng: () =>
 export function generateSetlist(seed: number, phrases: number): SetMove[] {
   const rng = mulberry32(mix(seed, 0xc03e0));
   const moves: SetMove[] = [];
-  let cursor = MUSIC.introPhrases * phraseBeats; // the intro phrase just dances
+  // Two bars of dancing, then the show starts: the first telegraph blooms at
+  // bar 2 and the first landing hits the bar-3 downbeat — you're dodging
+  // within seconds of the drop, not a phrase later.
+  let cursor = MUSIC.introBars * barBeats;
   let last: MoveKind | null = null;
   let index = 0;
 
-  for (let phrase = MUSIC.introPhrases; phrase < phrases; phrase++) {
+  for (let phrase = 0; phrase < phrases; phrase++) {
     const act = actOfPhrase(phrase, phrases);
     const want = CHOREO.movesPerPhrase[Math.min(act, CHOREO.movesPerPhrase.length - 1)];
     const phraseEnd = (phrase + 1) * phraseBeats;
@@ -183,7 +186,7 @@ export function generateLesson(goopling: GooplingDef, seed: number, count = 60):
   const moves: SetMove[] = [];
   const charge = MOVES[goopling.move].chargeBeats;
   // One move per two bars, landing on the downbeat, forever.
-  let land = MUSIC.introPhrases > 0 ? barBeats * 2 : barBeats * 2;
+  let land = barBeats * 2;
   for (let i = 0; i < count; i++) {
     const landings = buildLandings(goopling.move, land, 0, rng);
     moves.push({
