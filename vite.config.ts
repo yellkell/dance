@@ -11,11 +11,17 @@ export default defineConfig({
       emulator: { device: 'metaQuest3' },
     }),
   ],
+  // The music masters ride along as static assets (Vite fingerprints and
+  // copies them); .m4a isn't in every Vite version's default asset list.
+  assetsInclude: ['**/*.m4a'],
   server: {
     host: true,
     port: 5173,
   },
   build: {
     target: 'esnext',
+    // Never inline a track — they must stay separate files so the browser
+    // can stream and cache them.
+    assetsInlineLimit: 4096,
   },
 });

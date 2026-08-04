@@ -153,11 +153,16 @@ wss.on('connection', (ws) => {
           info.seat = Math.floor((i * seats) / humans.length);
         });
         const seed = (Math.random() * 0xffffffff) >>> 0;
+        // The host's record choice rides along verbatim ('' = let every
+        // client derive the same one from the seed). The server never looks
+        // inside it — the client registry owns what track ids mean.
+        const track = typeof msg.track === 'string' ? msg.track.slice(0, 32) : '';
         for (const [member, info] of room.members.entries()) {
           send(member, {
             t: 'start',
             seed,
             seats,
+            track,
             startInMs: START_IN_MS,
             players: humans.map(([m, h]) => ({ seat: h.seat, name: h.name, you: m === member })),
           });

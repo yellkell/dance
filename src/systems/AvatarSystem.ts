@@ -8,6 +8,11 @@
  * a groupie do across the ring always matches what the leaderboard says
  * happened. Remote humans stream their real head/hands into the same rigs.
  *
+ * The rigs themselves are the slender humanoids in game/avatars.ts, driven
+ * purely by a head position and two hand targets — this system is the brain,
+ * that module is the body. The LOCAL player gets no rig at all: you never
+ * see your own body, only your controllers.
+ *
  * Rigs live in platform-local space under each seat's platform root — rank
  * lifts and eliminations carry them automatically.
  */
@@ -18,7 +23,7 @@ import { BOTS, OCTAGON_HALF_DEPTH, OCTAGON_HALF_WIDTH } from '../config.js';
 import { platformRoot } from '../arena/arena.js';
 import { choreoView } from './ChoreoSystem.js';
 import type { Zone } from '../choreo/setlist.js';
-import { buildDancer, type DancerRig } from '../game/avatars.js';
+import { buildDancer, type DancerPose, type DancerRig } from '../game/avatars.js';
 import { roll } from '../game/rng.js';
 import { seatBearing } from '../game/ring.js';
 import { match, type Dancer } from '../game/state.js';
@@ -28,7 +33,9 @@ interface Puppet {
   rig: DancerRig;
   seat: number;
   phase: number;
-  /** Current dance/dodge target in platform-local space. */
+  /** The live pose, eased toward targets every frame. */
+  pose: DancerPose;
+  /** Dance/dodge destination on the deck. */
   tx: number;
   tz: number;
   duck: boolean;
@@ -39,6 +46,8 @@ interface Puppet {
 
 const CLAMP_X = OCTAGON_HALF_WIDTH - 0.18;
 const CLAMP_Z = OCTAGON_HALF_DEPTH - 0.15;
+const STAND_HEAD = 1.56;
+const DUCK_HEAD = 1.02;
 
 export class AvatarSystem extends createSystem({}) {
   private generation = -1;
@@ -49,7 +58,7 @@ export class AvatarSystem extends createSystem({}) {
     for (const p of this.puppets) p.rig.dispose();
     this.puppets = [];
     for (const d of match.players) {
-      if (d.kind === 'local') continue;
+      if (d.kind === 'local') continue; // you never see your own body
       const parent = platformRoot(d.seat);
       if (!parent) continue;
       const rig = buildDancer(d.hue);
@@ -58,6 +67,12 @@ export class AvatarSystem extends createSystem({}) {
         rig,
         seat: d.seat,
         phase: (d.seat * 1.7) % (Math.PI * 2),
+        pose: {
+          hx: 0, hy: STAND_HEAD, hz: 0, yaw: 0,
+          lx: -0.3, ly: 1.0, lz: -0.1,
+          rx: 0.3, ry: 1.0, rz: -0.1,
+          slump: 0,
+        },
         tx: 0,
         tz: 0,
         duck: false,
@@ -81,16 +96,19 @@ export class AvatarSystem extends createSystem({}) {
       p.lastLives = d.lives;
       p.flash = Math.max(0, p.flash - delta);
 
-      // Slump on elimination (and recover if a new match resurrects the rig).
+      // Melt on elimination (and reform if a new match revives the rig).
       const slumpTarget = d.alive ? 0 : 1;
-      p.slump += (slumpTarget - p.slump) * Math.min(1, delta * 3);
+      p.slump += (slumpTarget - p.slump) * Math.min(1, delta * 2.5);
+      p.pose.slump = p.slump;
 
       for (const m of p.rig.accents) {
         const std = m as MeshStandardMaterial;
         if (std.emissive) {
-          std.emissiveIntensity = d.alive ? 0.9 + (p.flash > 0 ? 1.4 : 0) : 0.12;
+          std.emissiveIntensity = d.alive ? 1.1 + (p.flash > 0 ? 1.6 : 0) : 0.14;
           if (p.flash > 0) std.emissive.setHex(0xff4033);
           else std.emissive.setHex(p.rig.baseColor);
+        } else {
+          std.color.setHex(p.flash > 0 ? 0xff4033 : d.alive ? p.rig.baseColor : 0x3a3f4a);
         }
       }
 
@@ -100,12 +118,7 @@ export class AvatarSystem extends createSystem({}) {
         this.driveBot(p, d, beat, delta);
       }
 
-      // The slump: the whole rig melts floorward.
-      p.rig.torso.scale.y = 1 - p.slump * 0.72;
-      p.rig.torso.position.y = 1.02 * (1 - p.slump * 0.72);
-      if (p.slump > 0.01) {
-        p.rig.head.position.y = Math.min(p.rig.head.position.y, 1.45 - p.slump * 0.9);
-      }
+      p.rig.pose(p.pose);
     }
   }
 
@@ -113,24 +126,21 @@ export class AvatarSystem extends createSystem({}) {
     const pose = remotePoses.get(p.seat);
     if (!pose) return;
     const k = Math.min(1, delta * 14);
-    const r = p.rig;
-    r.head.position.x += (pose.hx - r.head.position.x) * k;
-    r.head.position.y += (pose.hy - r.head.position.y) * k;
-    r.head.position.z += (pose.hz - r.head.position.z) * k;
-    r.head.rotation.y += (pose.hyaw - r.head.rotation.y) * k;
-    r.handL.position.x += (pose.lx - r.handL.position.x) * k;
-    r.handL.position.y += (pose.ly - r.handL.position.y) * k;
-    r.handL.position.z += (pose.lz - r.handL.position.z) * k;
-    r.handR.position.x += (pose.rx - r.handR.position.x) * k;
-    r.handR.position.y += (pose.ry - r.handR.position.y) * k;
-    r.handR.position.z += (pose.rz - r.handR.position.z) * k;
-    r.torso.position.x = r.head.position.x * 0.92;
-    r.torso.position.z = r.head.position.z * 0.92;
-    r.torso.position.y = Math.max(0.55, r.head.position.y - 0.45);
+    const t = p.pose;
+    t.hx += (pose.hx - t.hx) * k;
+    t.hy += (pose.hy - t.hy) * k;
+    t.hz += (pose.hz - t.hz) * k;
+    t.yaw += (pose.hyaw - t.yaw) * k;
+    t.lx += (pose.lx - t.lx) * k;
+    t.ly += (pose.ly - t.ly) * k;
+    t.lz += (pose.lz - t.lz) * k;
+    t.rx += (pose.rx - t.rx) * k;
+    t.ry += (pose.ry - t.ry) * k;
+    t.rz += (pose.rz - t.rz) * k;
   }
 
   private driveBot(p: Puppet, d: Dancer, beat: number, delta: number): void {
-    const r = p.rig;
+    const t = p.pose;
 
     // What's coming for this seat? Mirror the judgement roll so the body
     // language always matches the outcome.
@@ -159,32 +169,36 @@ export class AvatarSystem extends createSystem({}) {
     p.tx = Math.max(-CLAMP_X, Math.min(CLAMP_X, want.x));
     p.tz = Math.max(-CLAMP_Z, Math.min(CLAMP_Z, want.z));
 
-    // Move the whole rig (head leads, torso follows).
+    // Glide toward the destination (the figure leans into its own steps).
     const speed = 2.3;
-    const dx = p.tx - r.head.position.x;
-    const dz = p.tz - r.head.position.z;
+    const dx = p.tx - t.hx;
+    const dz = p.tz - t.hz;
     const dist = Math.hypot(dx, dz);
     if (dist > 0.01) {
       const step = Math.min(dist, speed * delta);
-      r.head.position.x += (dx / dist) * step;
-      r.head.position.z += (dz / dist) * step;
+      t.hx += (dx / dist) * step;
+      t.hz += (dz / dist) * step;
     }
 
+    // Face the stage (−Z), glancing toward travel.
+    const targetYaw = dist > 0.05 ? Math.atan2(-dx, -dz) * 0.35 : 0;
+    t.yaw += (targetYaw - t.yaw) * Math.min(1, delta * 6);
+
     // The bob: down ON the kick, up off it — plus the duck when needed.
-    const bounce = d.alive ? Math.abs(Math.sin(beat * Math.PI + p.phase)) * 0.055 : 0;
-    const standY = p.duck ? 0.98 : 1.45;
-    r.head.position.y += (standY - bounce - r.head.position.y) * Math.min(1, delta * 8);
+    const bounce = d.alive ? Math.abs(Math.sin(beat * Math.PI + p.phase)) * 0.05 : 0;
+    const standY = p.duck ? DUCK_HEAD : STAND_HEAD;
+    t.hy += (standY - bounce - t.hy) * Math.min(1, delta * 8);
 
-    r.torso.position.x = r.head.position.x * 0.92;
-    r.torso.position.z = r.head.position.z * 0.92;
-    if (p.slump < 0.01) r.torso.position.y = Math.max(0.55, r.head.position.y - 0.43);
-
-    // Glowsticks up: alternate arms per beat, both up on phrase downbeats.
+    // Glowsticks: alternate arms per beat — one punches the air, one rests.
     const wave = Math.sin(beat * Math.PI + p.phase);
-    r.handL.position.set(r.head.position.x - 0.3, r.head.position.y - 0.32 + Math.max(0, wave) * 0.38, r.head.position.z - 0.06);
-    r.handR.position.set(r.head.position.x + 0.3, r.head.position.y - 0.32 + Math.max(0, -wave) * 0.38, r.head.position.z - 0.06);
-    r.handL.rotation.z = 0.3 - Math.max(0, wave) * 0.5;
-    r.handR.rotation.z = -0.3 + Math.max(0, -wave) * 0.5;
+    const upL = Math.max(0, wave);
+    const upR = Math.max(0, -wave);
+    t.lx = t.hx - 0.28 - upL * 0.06;
+    t.ly = t.hy - 0.5 + upL * 0.62;
+    t.lz = t.hz - 0.08 - upL * 0.05;
+    t.rx = t.hx + 0.28 + upR * 0.06;
+    t.ry = t.hy - 0.5 + upR * 0.62;
+    t.rz = t.hz - 0.08 - upR * 0.05;
   }
 
   /** Where a groupie stands for a zone, given whether it intends to live. */

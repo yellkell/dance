@@ -16,6 +16,7 @@ import {
   SpriteMaterial,
 } from 'three';
 import { SCORE } from '../config.js';
+import { trackById } from '../audio/tracks.js';
 import { match, me } from '../game/state.js';
 
 const W = 768;
@@ -81,6 +82,8 @@ export class HudSystem extends createSystem({}) {
     const key = [
       match.screen,
       count,
+      Number.isFinite(match.beat), // the "cueing the record" card
+      match.trackId,
       d?.score,
       d?.combo,
       d?.lives,
@@ -136,16 +139,32 @@ export class HudSystem extends createSystem({}) {
       return;
     }
 
+    if (match.screen === 'countdown' && !Number.isFinite(match.beat)) {
+      // The record is still decoding — the clock stays parked until it's
+      // ready, so nothing can land early.
+      g.fillStyle = '#ffd9f6';
+      g.font = "900 46px 'Arial Black', system-ui, sans-serif";
+      g.fillText('CUEING THE RECORD…', W / 2, H / 2);
+      this.tex.needsUpdate = true;
+      return;
+    }
+
     if (count > 0) {
+      const cued = trackById(match.trackId);
       g.fillStyle = '#ffd9f6';
       g.font = "900 40px 'Arial Black', system-ui, sans-serif";
-      g.fillText('THE SET DROPS IN', W / 2, 92);
+      g.fillText('THE SET DROPS IN', W / 2, 78);
       g.fillStyle = '#ff2ad5';
       g.shadowColor = '#ff2ad5';
       g.shadowBlur = 24;
-      g.font = "900 170px 'Arial Black', system-ui, sans-serif";
-      g.fillText(`${count}`, W / 2, H / 2 + 42);
+      g.font = "900 150px 'Arial Black', system-ui, sans-serif";
+      g.fillText(`${count}`, W / 2, H / 2 + 24);
       g.shadowBlur = 0;
+      if (cued) {
+        g.fillStyle = '#b9ffc4';
+        g.font = "900 38px 'Arial Black', system-ui, sans-serif";
+        g.fillText(`♪ ${cued.title}`, W / 2, H - 54);
+      }
       this.tex.needsUpdate = true;
       return;
     }

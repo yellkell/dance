@@ -9,7 +9,8 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "server": "node server/index.mjs"
+    "server": "node server/index.mjs",
+    "analyze": "node tools/analyze-track.mjs"
   },
   "dependencies": {
     "@iwsdk/core": "0.4.2",

@@ -21,23 +21,26 @@ import type { Vector2Tuple } from 'three';
 export const GAME_TITLE = 'GOOPLIATH: DANCE RAID';
 
 /* ────────────────────────────── THE MUSIC ────────────────────────────────
- * A placeholder techno track is synthesised at runtime (audio/techno.ts) so
- * the game is playable today; the real tracks drop into audio/tracks/ later
- * and only need to declare their BPM + intro offset to drive the same clock.
+ * The set is a REAL TRACK (see audio/tracks.ts — measured tempo, downbeat
+ * and loudness per file). The whole game hangs off its beat clock, and a
+ * track's length decides how long the set runs. audio/techno.ts survives as
+ * a synthesised fallback for any browser that can't decode a file.
  */
 export const MUSIC = {
-  bpm: 128,
+  /** Only used when a track can't be decoded and the synth takes over. */
+  fallbackBpm: 128,
   beatsPerBar: 4,
   barsPerPhrase: 8, // the choreography thinks in 8-bar phrases
-  /** Count-in phrases before the first move lands (dance, calibrate, vibe). */
+  /** Beats between the track's first downbeat and game beat 0 — two bars of
+   *  "get ready" over the top of the intro. */
+  countInBeats: 8,
+  /** Phrases at the top of the set that just dance (no moves land). */
   introPhrases: 1,
-  /** Total phrases in a raid set (~15 s per phrase at 128 → ~4 min set). */
-  raidPhrases: 14,
   /** Master music level (the sfx bus is its own knob in audio/sfx.ts). */
-  volume: 0.5,
+  volume: 0.6,
 };
 
-export const beatSeconds = (bpm = MUSIC.bpm): number => 60 / bpm;
+export const beatSeconds = (bpm: number): number => 60 / bpm;
 
 /* ────────────────────────────── THE RING ─────────────────────────────────
  * Platforms stand on one circle around the boss stage. Every client sees
@@ -174,8 +177,12 @@ export const CHOREO = {
   movesPerPhrase: [2, 3, 4, 5],
   /** Minimum clear beats between one landing and the next telegraph. */
   restBeats: [4, 3, 2, 1],
-  /** Acts: phrase index thresholds (act = index of first phrase ≥). */
-  actAtPhrase: [0, 4, 8, 11],
+  /**
+   * Act boundaries as a FRACTION of the set, not fixed phrase numbers —
+   * the tracks run 2 to 4 minutes, so the escalation curve has to stretch
+   * to whatever record is on. Act 0 opens, act 3 is the last fifth.
+   */
+  actAtProgress: [0, 0.25, 0.55, 0.8],
 };
 
 /* ────────────────────────────── THE SCORE ────────────────────────────────
@@ -235,7 +242,9 @@ export interface GooplingDef {
   move: MoveKind;
   /** Creature scale (the raid boss is 2.4). */
   scale: number;
-  bpm: number;
+  /** Which record this lesson runs on (audio/tracks.ts) — its measured
+   *  tempo sets the pace, so the row steps up 91 → 117 → 135 BPM. */
+  trackId: string;
   clears: number;
   /** What the card tells you. */
   lesson: string;
@@ -248,7 +257,7 @@ export const GOOPLINGS: GooplingDef[] = [
     epithet: 'the puddle prodigy',
     move: 'slam',
     scale: 1.0,
-    bpm: 100,
+    trackId: 'target',
     clears: 6,
     lesson: 'Discs mark where the goo lands.\nSTEP OFF the glow before the drop.',
   },
@@ -258,7 +267,7 @@ export const GOOPLINGS: GooplingDef[] = [
     epithet: 'the laser sommelier',
     move: 'beam',
     scale: 1.15,
-    bpm: 104,
+    trackId: 'target',
     clears: 6,
     lesson: 'A lane of light rakes the deck.\nSIDESTEP out of the strip.',
   },
@@ -268,7 +277,7 @@ export const GOOPLINGS: GooplingDef[] = [
     epithet: 'the limbo queen',
     move: 'sweep',
     scale: 1.3,
-    bpm: 108,
+    trackId: 'capture',
     clears: 6,
     lesson: 'A blade of goo sweeps head-high.\nDUCK — get LOW and hold it.',
   },
@@ -278,7 +287,7 @@ export const GOOPLINGS: GooplingDef[] = [
     epithet: 'the tide turner',
     move: 'seesaw',
     scale: 1.6,
-    bpm: 112,
+    trackId: 'capture',
     clears: 8,
     lesson: 'Half the deck floods, then the other.\nCROSS the centreline on the beat.',
   },
@@ -288,7 +297,7 @@ export const GOOPLINGS: GooplingDef[] = [
     epithet: 'the wedge preacher',
     move: 'nova',
     scale: 1.9,
-    bpm: 112,
+    trackId: 'combat',
     clears: 4,
     lesson: 'Everything burns except one wedge.\nSTAND in the marked safe ground.',
   },

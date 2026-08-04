@@ -73,7 +73,9 @@ export class GoopliathSystem extends createSystem({}) {
 
     this.fx?.update(delta);
 
-    const inSet = match.playing && (match.screen === 'raid' || match.screen === 'tutorial' || match.screen === 'countdown');
+    // He bounces to whatever is playing — including the lobby loop, so he's
+    // already nodding along on his stage before anyone starts a set.
+    const inSet = Number.isFinite(match.beat) && match.screen !== 'podium';
     const beat = Number.isFinite(match.beat) ? match.beat : 0;
 
     // Form: a chilled glob in the lobby, up on his feet for the set.

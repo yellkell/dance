@@ -63,8 +63,12 @@ export interface MatchState {
   /** My seat index (0 in solo; assigned by the relay online). */
   mySeat: number;
   seed: number;
+  /** The record on the decks — its measured tempo IS match.bpm. */
+  trackId: string;
+  /** Lobby override: a track id to always play, or '' for seed shuffle. */
+  preferredTrack: string;
   bpm: number;
-  /** Total phrases in the current set (raid or tutorial loop count). */
+  /** Total phrases in the current set — derived from the track's length. */
   phrases: number;
   /** Online only: AudioContext-clock time for beat 0 handed down by the
    *  relay sync (NaN = start whenever the music system likes). */
@@ -108,13 +112,15 @@ export const match: MatchState = {
   seats: RING.defaultSeats,
   mySeat: 0,
   seed: 1,
-  bpm: MUSIC.bpm,
-  phrases: MUSIC.raidPhrases,
+  trackId: '',
+  preferredTrack: '',
+  bpm: MUSIC.fallbackBpm,
+  phrases: 8,
   beatZeroAt: NaN,
   players: [],
   playing: false,
   beat: -Infinity,
-  beatLen: 60 / MUSIC.bpm,
+  beatLen: 60 / MUSIC.fallbackBpm,
   standingHeight: 1.65,
   headX: 0,
   headY: 1.65,

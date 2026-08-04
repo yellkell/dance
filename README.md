@@ -17,6 +17,11 @@ everyone else.
   combo. The **top ten** dance on raised platforms, and the current **champion
   above them all** — heights rendered relative to *your* platform, because your
   real floor never moves: when you lead, the ring drops away beneath you.
+- Every other dancer is a **slender humanoid figure** — gloss-black mannequin,
+  neon collar/waist/wrist trim and visor in their seat colour, glowsticks in
+  hand — solved live from just a head and two hands (which is all VR knows).
+  **You have no body of your own**: the local player sees only their
+  controllers; the figure is for everyone else's view of you.
 - Last dancer standing (or the highest score when the set ends) **owns the
   night**: podium, crown, confetti cannons.
 
@@ -83,14 +88,57 @@ In the lobby: **HOST ROOM** → share the 4-letter code (or the
 **DROP THE SET**. Humans are spread evenly around the ring; groupies fill the
 gaps. Point clients at a hosted relay with `?server=wss://your-host:8788`.
 
-## Bringing your own music
+## The music
 
-The current set is a **synthesised placeholder** (`src/audio/techno.ts`): a
-seeded 128 BPM techno engine so the game is fully playable today. When the real
-tracks land, start the same clock from a file instead — the contract is just
-`startSet({ bpm, countInBeats, endBeat, … })` plus "beat 0 is at AudioContext
-time T". Everything else (choreography, boss, lights, scoring) hangs off that
-clock and never knows the difference.
+Seven real tracks drive the game (`src/assets/music/`, registry in
+`src/audio/tracks.ts`). Every number in that registry was **measured from the
+files**, not guessed — the whole game is quantized to them, so they had to be:
+
+| Track | BPM | Set length | Loudness | Role |
+| --- | --- | --- | --- | --- |
+| SAKUPENED | 133.964 | 10 phrases | −8.1 LUFS | raid |
+| COMBAT | 135 | 12 phrases | −13.2 LUFS | raid · rehearsal |
+| LOOP | 150 | 17 phrases | −11.2 LUFS | raid |
+| CAPTURE | 117 | 13 phrases | −15.0 LUFS | raid · rehearsal |
+| MONEY | 78.395 | 6 phrases | −14.5 LUFS | raid |
+| TARGET | 91 | 11 phrases | −9.5 LUFS | raid · rehearsal |
+| SWAG | 91.974 | — | −15.7 LUFS | lobby loop |
+
+- **Tempo** came from an onset-flux autocorrelation phase-locked across each
+  whole track. Four land on exact integers (a DAW grid). Three genuinely sit a
+  hair under — and it matters: locking SAKUPENED at a round 134 instead of
+  133.964 drifts off the kick by the last third of the song (grid retention
+  falls from 68% to 35%), so the fractions stay.
+- **Loudness** is EBU R128 integrated. The masters span **7.6 dB** — SWAG at
+  −15.7 against SAKUPENED at −8.1 — so every track is gain-matched to −14 LUFS
+  at playback and the mix runs through a limiter. Nothing is re-encoded; it's
+  a gain node, and the files ship untouched.
+- **Downbeat** (seconds to bar 1 beat 1) is the one number a human ear might
+  want to nudge. If a set ever feels like it lands on the 2 instead of the 1,
+  move that one field by ±one beat — nothing else changes.
+
+**Set length follows the record.** A track's playable length becomes the number
+of 8-bar phrases in the match, and the act boundaries are *fractions* of the
+set — so MONEY (2.8 min) and LOOP (5.6 min) both get a full opening, build,
+peak and finale.
+
+**The lobby is never silent.** SWAG — the soft one — loops under the lobby and
+the rehearsal map at reduced level, and publishes its own beat, so the mirror
+ball, the lasers and the GOOPLIATH's idle bounce are already grooving before
+anyone starts a set.
+
+**Picking a record**: the lobby's `♪` row cycles SHUFFLE → each raid track.
+SHUFFLE derives the record from the match seed, so an online room agrees on the
+song without anyone sending it; a host's explicit pick rides along in the start
+message.
+
+**Adding a track**: drop the file in `src/assets/music/`, add a row to
+`TRACKS`, done. Roles decide where it plays. `npm run analyze -- <file…>` prints
+the BPM, downbeat and loudness row for you.
+
+If a browser can't decode a file (AAC support varies — Quest Browser and
+desktop Chrome are fine), the original synthesised set in `src/audio/techno.ts`
+takes over at the same tempo and the raid carries on. Nobody gets silence.
 
 ## Project map
 

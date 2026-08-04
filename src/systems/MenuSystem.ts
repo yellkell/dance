@@ -21,7 +21,8 @@ import {
 } from 'three';
 import { GOOPLINGS, RING } from '../config.js';
 import * as sfx from '../audio/sfx.js';
-import { musicVolume, setMusicVolume } from '../audio/techno.js';
+import { musicVolume, preload, setMusicVolume } from '../audio/music.js';
+import { pickRaidTrack, trackById, tracksFor } from '../audio/tracks.js';
 import { finishTutorial, startRaid, startTutorial, toLobby, toMap } from '../game/flow.js';
 import { allGooplingsCleared, clearedGooplings, gooplingUnlocked, match } from '../game/state.js';
 import {
@@ -36,6 +37,7 @@ import {
 import { Panel, UI, type PanelButton } from '../ui/panel.js';
 
 const SEATS_KEY = 'gdr-seats';
+const TRACK_KEY = 'gdr-track';
 
 interface Pointer {
   line: Line;
@@ -61,6 +63,8 @@ export class MenuSystem extends createSystem({}) {
       if (Number.isFinite(stored) && stored >= RING.minSeats) {
         match.seats = Math.min(RING.maxSeats, stored);
       }
+      const track = localStorage.getItem(TRACK_KEY);
+      if (track && trackById(track)) match.preferredTrack = track;
     } catch {
       /* fine */
     }
@@ -192,7 +196,7 @@ export class MenuSystem extends createSystem({}) {
 
   private action(id: string): void {
     if (id === 'raid') {
-      if (net.phase === 'hosting') requestStart(match.seats);
+      if (net.phase === 'hosting') requestStart(match.seats, match.preferredTrack);
       else startRaid({ seats: match.seats });
     } else if (id === 'rehearsal') {
       toMap();
@@ -207,6 +211,20 @@ export class MenuSystem extends createSystem({}) {
       }
     } else if (id === 'vol-' || id === 'vol+') {
       setMusicVolume(musicVolume() + (id === 'vol+' ? 0.1 : -0.1));
+    } else if (id === 'track') {
+      // Cycle: SHUFFLE → each raid record → back. Picking one warms it so
+      // the drop is instant; SHUFFLE lets the match seed choose (and every
+      // client in a room derives the same record from that seed).
+      const pool = tracksFor('raid');
+      const at = pool.findIndex((t) => t.id === match.preferredTrack);
+      const next = at + 1 >= pool.length ? '' : pool[at + 1].id;
+      match.preferredTrack = next;
+      try {
+        localStorage.setItem(TRACK_KEY, next);
+      } catch {
+        /* fine */
+      }
+      preload(trackById(next) ?? pickRaidTrack(match.seed));
     } else if (id === 'host') {
       hostRoom();
     } else if (id === 'join') {
@@ -283,6 +301,7 @@ export class MenuSystem extends createSystem({}) {
   private paintLobby(): void {
     const online = net.phase;
     const buttons: PanelButton[] = [];
+    const cued = trackById(match.preferredTrack);
 
     buttons.push({
       id: 'raid',
@@ -301,25 +320,40 @@ export class MenuSystem extends createSystem({}) {
       h: 150,
     });
 
-    buttons.push({ id: 'seats-', label: '−', x: 40, y: 380, w: 110, h: 92, disabled: match.seats <= RING.minSeats });
+    // The record on the decks — tap to cycle, SHUFFLE lets the seed pick.
+    buttons.push({
+      id: 'track',
+      label: cued ? `♪ ${cued.title}` : '♪ SHUFFLE',
+      sub: cued
+        ? `${cued.bpm.toFixed(cued.bpm % 1 ? 2 : 0)} BPM · ${Math.round(cued.seconds / 6) / 10} min`
+        : 'the match seed picks the record',
+      accent: UI.cyan,
+      x: 40,
+      y: 356,
+      w: 944,
+      h: 92,
+      small: true,
+    });
+
+    buttons.push({ id: 'seats-', label: '−', x: 40, y: 462, w: 110, h: 92, disabled: match.seats <= RING.minSeats });
     buttons.push({
       id: 'seats',
       label: `${match.seats} DANCERS`,
       x: 170,
-      y: 380,
+      y: 462,
       w: 340,
       h: 92,
       disabled: true,
       small: true,
     });
-    buttons.push({ id: 'seats+', label: '+', x: 530, y: 380, w: 110, h: 92, disabled: match.seats >= RING.maxSeats });
+    buttons.push({ id: 'seats+', label: '+', x: 530, y: 462, w: 110, h: 92, disabled: match.seats >= RING.maxSeats });
     buttons.push({
       id: 'rehearsal',
       label: 'REHEARSAL',
       sub: allGooplingsCleared() ? 'rave ready ✓' : `${clearedGooplings().size}/${GOOPLINGS.length} gooplings`,
       accent: UI.cyan,
       x: 660,
-      y: 380,
+      y: 462,
       w: 324,
       h: 92,
       small: true,
@@ -333,12 +367,12 @@ export class MenuSystem extends createSystem({}) {
         accent: UI.amber,
         disabled: true,
         x: 40,
-        y: 512,
+        y: 578,
         w: 616,
         h: 92,
         small: true,
       });
-      buttons.push({ id: 'leave', label: 'LEAVE', accent: UI.danger, x: 676, y: 512, w: 308, h: 92, small: true });
+      buttons.push({ id: 'leave', label: 'LEAVE', accent: UI.danger, x: 676, y: 578, w: 308, h: 92, small: true });
     } else {
       buttons.push({
         id: 'host',
@@ -347,7 +381,7 @@ export class MenuSystem extends createSystem({}) {
         accent: UI.amber,
         disabled: online === 'connecting',
         x: 40,
-        y: 512,
+        y: 578,
         w: 452,
         h: 92,
         small: true,
@@ -359,25 +393,25 @@ export class MenuSystem extends createSystem({}) {
         accent: UI.amber,
         disabled: online === 'connecting',
         x: 532,
-        y: 512,
+        y: 578,
         w: 452,
         h: 92,
         small: true,
       });
     }
 
-    buttons.push({ id: 'vol-', label: '−', x: 40, y: 644, w: 110, h: 92 });
+    buttons.push({ id: 'vol-', label: '−', x: 40, y: 694, w: 110, h: 92 });
     buttons.push({
       id: 'vol',
       label: `MUSIC ${Math.round(musicVolume() * 100)}%`,
       x: 170,
-      y: 644,
+      y: 694,
       w: 340,
       h: 92,
       disabled: true,
       small: true,
     });
-    buttons.push({ id: 'vol+', label: '+', x: 530, y: 644, w: 110, h: 92 });
+    buttons.push({ id: 'vol+', label: '+', x: 530, y: 694, w: 110, h: 92 });
 
     this.lobby.paint(
       'GOOPLIATH',
@@ -394,11 +428,11 @@ export class MenuSystem extends createSystem({}) {
             : net.phase === 'connecting'
               ? 'reaching the relay…'
               : 'dodge the moves · ride the beat · outlast the floor';
-        g.fillText(status, 512, 770);
+        g.fillText(status, 512, 838);
         g.fillStyle = UI.dim;
         g.font = "700 22px 'Arial Black', system-ui, sans-serif";
-        g.fillText('mid-set: right controller Ⓐ bails', 512, 940);
-        g.fillText('passthrough on — this room is your club 🪩', 512, 900);
+        g.fillText('mid-set: right controller Ⓐ bails', 512, 952);
+        g.fillText('passthrough on — this room is your club 🪩', 512, 912);
       },
       buttons,
       this.hover,

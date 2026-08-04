@@ -34,9 +34,11 @@ export class DiscoSystem extends createSystem({}) {
     }
 
     const live = match.playing && (match.screen === 'raid' || match.screen === 'tutorial');
-    const energy = live ? 1 : match.screen === 'countdown' ? 0.6 : 0.25;
-    const beat = Number.isFinite(match.beat) ? match.beat : performance.now() / 1000 / match.beatLen / 4;
-    const act = match.screen === 'raid' ? actOfBeat(beat) : 0;
+    // The lobby loop publishes a beat too, so the room grooves between sets.
+    const onBeat = Number.isFinite(match.beat);
+    const energy = live ? 1 : match.screen === 'countdown' ? 0.6 : onBeat ? 0.45 : 0.25;
+    const beat = onBeat ? match.beat : performance.now() / 1000 / match.beatLen / 4;
+    const act = match.screen === 'raid' ? actOfBeat(beat, match.phrases) : 0;
     rig.update(delta, beat, act, energy);
 
     // The stage ring breathes with the bar.

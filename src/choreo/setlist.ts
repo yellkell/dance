@@ -56,16 +56,20 @@ export interface SetMove {
 const barBeats = MUSIC.beatsPerBar;
 const phraseBeats = MUSIC.beatsPerBar * MUSIC.barsPerPhrase;
 
-export function actOfPhrase(phrase: number): number {
+/** Act for a phrase within a set of `total` phrases (boundaries are
+ *  fractions of the set, so a 2-minute track and a 4-minute track both get
+ *  a full opening, build, peak and finale). */
+export function actOfPhrase(phrase: number, total: number): number {
+  const progress = total > 0 ? phrase / total : 0;
   let act = 0;
-  for (let i = 0; i < CHOREO.actAtPhrase.length; i++) {
-    if (phrase >= CHOREO.actAtPhrase[i]) act = i;
+  for (let i = 0; i < CHOREO.actAtProgress.length; i++) {
+    if (progress >= CHOREO.actAtProgress[i]) act = i;
   }
   return act;
 }
 
-export function actOfBeat(beat: number): number {
-  return actOfPhrase(Math.floor(Math.max(0, beat) / phraseBeats));
+export function actOfBeat(beat: number, totalPhrases: number): number {
+  return actOfPhrase(Math.floor(Math.max(0, beat) / phraseBeats), totalPhrases);
 }
 
 function pickKind(rng: () => number, act: number, last: MoveKind | null): MoveKind {
@@ -150,7 +154,7 @@ export function generateSetlist(seed: number, phrases: number): SetMove[] {
   let index = 0;
 
   for (let phrase = MUSIC.introPhrases; phrase < phrases; phrase++) {
-    const act = actOfPhrase(phrase);
+    const act = actOfPhrase(phrase, phrases);
     const want = CHOREO.movesPerPhrase[Math.min(act, CHOREO.movesPerPhrase.length - 1)];
     const phraseEnd = (phrase + 1) * phraseBeats;
     const rest = CHOREO.restBeats[Math.min(act, CHOREO.restBeats.length - 1)];

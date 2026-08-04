@@ -147,6 +147,9 @@ function handle(msg: Record<string, unknown>): void {
         humans,
         beatZeroAt,
         online: true,
+        // The host's record (empty = everyone derives the same one from the
+        // seed). Either way the whole room lands on one song.
+        trackId: typeof msg.track === 'string' ? msg.track : undefined,
       });
       match.roomCode = net.code;
       break;
@@ -221,8 +224,8 @@ export function joinRoom(code: string): void {
 }
 
 /** Host only: lock the roster and drop the needle for the whole room. */
-export function requestStart(seats: number): void {
-  send({ t: 'start', seats });
+export function requestStart(seats: number, trackId = ''): void {
+  send({ t: 'start', seats, track: trackId });
 }
 
 export function leaveRoom(): void {
