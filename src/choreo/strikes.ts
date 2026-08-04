@@ -246,6 +246,74 @@ export class StrikeFx {
     );
   }
 
+  /** The gate slams shut: both danger fields flash as walls of light and
+   *  the doorposts of the safe column burn white-hot — the gap is exactly
+   *  where the telegraph promised. */
+  gate(parent: Object3D, x: number, halfW: number): void {
+    const edge = OCTAGON_HALF_WIDTH + 0.25;
+    const leftW = Math.max(0.05, x - halfW + edge);
+    const rightW = Math.max(0.05, edge - (x + halfW));
+    this.spawn(
+      parent,
+      0.45,
+      (k, g) => {
+        const fade = 1 - k;
+        (g.children[0] as Mesh & { material: MeshBasicMaterial }).material.opacity = 0.6 * fade;
+        (g.children[1] as Mesh & { material: MeshBasicMaterial }).material.opacity = 0.6 * fade;
+        (g.children[2] as Mesh & { material: MeshBasicMaterial }).material.opacity = 0.95 * (1 - k * k);
+        (g.children[3] as Mesh & { material: MeshBasicMaterial }).material.opacity = 0.95 * (1 - k * k);
+      },
+      (g) => {
+        const depth = OCTAGON_HALF_DEPTH * 2 + 0.6;
+        const wallL = new Mesh(new BoxGeometry(leftW, 2.2, depth), basic(WARN, 0.6));
+        wallL.position.set(x - halfW - leftW / 2, 1.1, 0);
+        g.add(wallL);
+        const wallR = new Mesh(new BoxGeometry(rightW, 2.2, depth), basic(WARN, 0.6));
+        wallR.position.set(x + halfW + rightW / 2, 1.1, 0);
+        g.add(wallR);
+        for (const side of [-1, 1] as const) {
+          const post = new Mesh(new BoxGeometry(0.045, 2.3, depth), basic(HOT, 0.95));
+          post.position.set(x + side * halfW, 1.15, 0);
+          g.add(post);
+        }
+      },
+    );
+  }
+
+  /** The chase pounces: the hunter's column crashes on the LOCKED spot —
+   *  amber, not goo green, because this one was aimed at a dancer. */
+  chase(parent: Object3D, x: number, z: number, r: number): void {
+    const sparks = new Sparks(16, WARN);
+    let pounced = false;
+    this.spawn(
+      parent,
+      0.5,
+      (k, g) => {
+        const col = g.children[0] as Mesh;
+        col.scale.set(1 + k * 0.3, Math.max(0.05, 1 - k * k), 1 + k * 0.3);
+        (col.material as MeshBasicMaterial).opacity = 0.85 * (1 - k);
+        const ring = g.children[1] as Mesh;
+        ring.scale.setScalar(1 + k * 2.0);
+        (ring.material as MeshBasicMaterial).opacity = 0.85 * (1 - k);
+        if (!pounced) {
+          pounced = true;
+          sparks.emit(x, 0.15, z, 10, 1.4);
+        }
+      },
+      (g) => {
+        const col = new Mesh(new CylinderGeometry(r * 0.7, r, 1.1, 10), basic(WARN, 0.85));
+        col.position.set(x, 0.55, z);
+        g.add(col);
+        const ring = new Mesh(new RingGeometry(r * 0.85, r * 1.05, 24), basic(HOT, 0.85));
+        ring.rotation.x = -Math.PI / 2;
+        ring.position.set(x, DECAL_Y + 0.005, z);
+        g.add(ring);
+        g.add(sparks.points);
+      },
+      (dt) => sparks.step(dt),
+    );
+  }
+
   /** PORTED: the nova lands as an expanding SHOCK RING — an open tube wall
    *  racing out from the centre — over the floor flash that spares the
    *  wedge, with sparks erupting along the front everywhere but the safe

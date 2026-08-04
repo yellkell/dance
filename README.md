@@ -60,13 +60,17 @@ There's also a debug hook in the console:
 | --- | --- | --- |
 | **SLAM** | amber discs charge on your deck (a drumline in later acts) | **step** off the glow |
 | **BEAM** | a strip rakes down the deck from the stage | **sidestep** the lane |
-| **SWEEP** | a blade of goo hangs at chest height, floor band beneath | **duck** — and hold it |
+| **SWEEP** | a blade hangs at chest height, chevrons cascading **downward** off it | **duck** — and hold it |
 | **SEESAW** | one half of the deck floods, then the other, on the beat | **cross** the centreline |
 | **SURGE** | the seesaw's front/back cousin | **cross**, the other way |
+| **GATE** | the whole deck floods except one clear column — doorposts + chevrons pointing in | **stand in the gap** |
+| **CHASE** | a disc glued to your feet, following you — then it **freezes** | **juke** after the freeze |
 | **NOVA** | everything burns except one wedge — same compass bearing for the whole ring | **stand** in the safe ground, together |
 
-Telegraph windups are sacred: escalation compresses the gaps between moves,
-never the read. Landings always hit bar downbeats.
+The telegraph is the whole instruction: whatever fills amber→red, don't be
+in it; wherever the doorpost rails and chevrons point, be there. Windups are
+sacred — escalation compresses the gaps between moves, never the read — and
+landings always hit bar downbeats.
 
 ## Rehearsal (the campaign)
 

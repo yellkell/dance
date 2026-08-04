@@ -26,7 +26,7 @@ import type { Zone } from '../choreo/setlist.js';
 import { buildDancer, type DancerPose, type DancerRig } from '../game/avatars.js';
 import { roll } from '../game/rng.js';
 import { seatBearing } from '../game/ring.js';
-import { match, type Dancer } from '../game/state.js';
+import { liveSpots, match, type Dancer } from '../game/state.js';
 import { remotePoses } from '../net/poses.js';
 
 interface Puppet {
@@ -118,6 +118,9 @@ export class AvatarSystem extends createSystem({}) {
         this.driveBot(p, d, beat, delta);
       }
 
+      // Where this dancer stands on their own deck — the chase discs hunt it.
+      liveSpots.set(p.seat, { x: p.pose.hx, z: p.pose.hz });
+
       p.rig.pose(p.pose);
     }
   }
@@ -156,7 +159,7 @@ export class AvatarSystem extends createSystem({}) {
         // The judge's exact formula and exact roll — body language never lies.
         const chance = Math.max(0.25, d.skill - soonest.act * BOTS.actPenalty);
         const willDodge = roll(match.seed, 0xb0b, soonest.seat, soonest.moveIdx, soonest.landingIdx) < chance;
-        want = this.spotFor(soonest.zone, p, willDodge);
+        want = this.spotFor(soonest, p, willDodge);
       }
     }
     if (!want) {
@@ -202,7 +205,8 @@ export class AvatarSystem extends createSystem({}) {
   }
 
   /** Where a groupie stands for a zone, given whether it intends to live. */
-  private spotFor(zone: Zone, p: Puppet, dodge: boolean): { x: number; z: number } {
+  private spotFor(live: (typeof choreoView.zones)[number], p: Puppet, dodge: boolean): { x: number; z: number } {
+    const zone: Zone = live.zone;
     switch (zone.kind) {
       case 'circle': {
         if (!dodge) return { x: zone.x, z: zone.z };
@@ -222,6 +226,23 @@ export class AvatarSystem extends createSystem({}) {
       case 'half': {
         const target = dodge ? -zone.side * 0.42 : zone.side * 0.42;
         return zone.axis === 1 ? { x: p.tx, z: target } : { x: target, z: p.tz };
+      }
+      case 'gate': {
+        // Live: into the safe column. Doomed: square in a danger field.
+        if (dodge) return { x: zone.x, z: p.tz };
+        return { x: zone.x > 0 ? zone.x - zone.halfW - 0.4 : zone.x + zone.halfW + 0.4, z: p.tz };
+      }
+      case 'chase': {
+        const c = live.chase;
+        if (!c) return { x: p.tx, z: p.tz };
+        if (!c.locked) {
+          // Being hunted: keep drifting (the disc follows anyway).
+          return { x: Math.sin(p.phase * 3) * 0.35, z: Math.cos(p.phase * 2) * 0.28 };
+        }
+        // Locked: the juke — away from the frozen disc, or freeze in it.
+        if (!dodge) return { x: c.x, z: c.z };
+        const away = Math.atan2(-c.x, -c.z);
+        return { x: c.x + Math.sin(away) * 0.55, z: c.z + Math.cos(away) * 0.45 };
       }
       case 'nova': {
         const local = zone.bearing - seatBearing(p.seat, match.seats);

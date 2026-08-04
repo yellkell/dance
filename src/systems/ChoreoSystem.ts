@@ -23,6 +23,7 @@ import { StrikeFx } from '../choreo/strikes.js';
 import {
   beamTelegraph,
   circleTelegraph,
+  gateTelegraph,
   halfTelegraph,
   novaTelegraph,
   sweepTelegraph,
@@ -36,6 +37,7 @@ import {
   aliveCount,
   barBeats,
   dancerAtSeat,
+  liveSpots,
   match,
   pushFlair,
   setEndBeat,
@@ -59,6 +61,9 @@ export interface LiveZone {
   probed: boolean;
   wasInside: boolean;
   resolved: boolean;
+  /** Chase runtime: where the hunting disc currently sits (per-seat — the
+   *  shared Zone object stays immutable), frozen once `locked`. */
+  chase?: { x: number; z: number; locked: boolean };
 }
 
 /** Read-only window for other systems (bot movement mirrors the judging). */
@@ -163,10 +168,29 @@ export class ChoreoSystem extends createSystem({}) {
         // at once reads as noise, two reads as "THIS side now, THAT next".
         if (z.zone.kind === 'half') z.tg.group.visible = z.dueBeat - beat < 4.2;
       }
+      // THE CHASE: the disc hunts its dancer's feet, then FREEZES with
+      // chaseLockBeats still on the clock — the freeze is the tell, the
+      // juke after it is the dodge.
+      if (z.zone.kind === 'chase' && z.chase) {
+        if (!z.chase.locked) {
+          if (beat >= z.dueBeat - CHOREO.chaseLockBeats) {
+            z.chase.locked = true;
+            z.chase.x = Math.max(-OCTAGON_HALF_WIDTH + 0.15, Math.min(OCTAGON_HALF_WIDTH - 0.15, z.chase.x));
+            z.chase.z = Math.max(-OCTAGON_HALF_DEPTH + 0.12, Math.min(OCTAGON_HALF_DEPTH - 0.12, z.chase.z));
+          } else {
+            const spot =
+              z.seat === match.mySeat ? { x: match.headX, z: match.headZ } : (liveSpots.get(z.seat) ?? { x: 0, z: 0 });
+            const k = Math.min(1, delta * 7); // glued, with a hint of lag
+            z.chase.x += (spot.x - z.chase.x) * k;
+            z.chase.z += (spot.z - z.chase.z) * k;
+          }
+        }
+        if (z.tg) z.tg.group.position.set(z.chase.x, 0.05, z.chase.z);
+      }
       // The perfect probe: were you still in the fire one beat out?
       if (!z.probed && z.seat === match.mySeat && beat >= z.dueBeat - SCORE.perfectProbeBeats) {
         z.probed = true;
-        z.wasInside = this.touchesLocal(z.zone);
+        z.wasInside = this.touchesLocal(z);
       }
       if (beat >= z.dueBeat) this.resolve(z);
     }
@@ -198,6 +222,14 @@ export class ChoreoSystem extends createSystem({}) {
       move.landings.forEach((landing, landingIdx) => {
         const tg = this.buildTelegraph(landing.zone, dancer.seat);
         if (tg) parent.add(tg.group);
+        // A chase disc opens on its dancer's current spot (per-seat state —
+        // the Zone object itself is shared across all seats).
+        const chase =
+          landing.zone.kind === 'chase'
+            ? dancer.seat === match.mySeat
+              ? { x: match.headX, z: match.headZ, locked: false }
+              : { ...(liveSpots.get(dancer.seat) ?? { x: 0, z: 0 }), locked: false }
+            : undefined;
         this.zones.push({
           moveIdx: move.index,
           landingIdx,
@@ -211,6 +243,7 @@ export class ChoreoSystem extends createSystem({}) {
           probed: false,
           wasInside: false,
           resolved: false,
+          chase,
         });
       });
     }
@@ -248,6 +281,17 @@ export class ChoreoSystem extends createSystem({}) {
         if (zone.axis) tg.group.rotation.y = -Math.PI / 2;
         return tg;
       }
+      case 'gate': {
+        const tg = gateTelegraph(OCTAGON_HALF_WIDTH, OCTAGON_HALF_DEPTH, zone.x, zone.halfW);
+        tg.group.position.y = 0.05;
+        return tg;
+      }
+      case 'chase': {
+        // Opens wherever the dancer stands; tracked live in update().
+        const tg = circleTelegraph(zone.r);
+        tg.group.position.set(0, 0.05, 0);
+        return tg;
+      }
       case 'nova': {
         const local = zone.bearing - seatBearing(seat, match.seats);
         const tg = novaTelegraph(CHOREO.novaRadius, local, zone.halfAngle);
@@ -258,7 +302,8 @@ export class ChoreoSystem extends createSystem({}) {
   }
 
   /** Does the local player's tracked body touch a zone RIGHT NOW? */
-  private touchesLocal(zone: Zone): boolean {
+  private touchesLocal(live: LiveZone): boolean {
+    const zone = live.zone;
     const x = match.headX;
     const z = match.headZ;
     switch (zone.kind) {
@@ -271,6 +316,14 @@ export class ChoreoSystem extends createSystem({}) {
       case 'half': {
         const along = zone.axis === 1 ? z : x;
         return along * zone.side > CHOREO.seesawSafeLip;
+      }
+      case 'gate':
+        // Danger is everywhere EXCEPT the column — be in the gap.
+        return Math.abs(x - zone.x) > zone.halfW;
+      case 'chase': {
+        const c = live.chase;
+        if (!c) return false;
+        return Math.hypot(x - c.x, z - c.z) <= zone.r + HEAD_R * 0.7;
       }
       case 'nova': {
         // Judged on the head alone, forgiving by design (reached the wedge =
@@ -307,6 +360,12 @@ export class ChoreoSystem extends createSystem({}) {
           sfx.sweepWhoosh();
           break;
         case 'half':
+          sfx.gooSlam();
+          break;
+        case 'gate':
+          sfx.slamImpact();
+          break;
+        case 'chase':
           sfx.gooSlam();
           break;
         case 'nova':
@@ -346,6 +405,12 @@ export class ChoreoSystem extends createSystem({}) {
       case 'half':
         this.strikes.halfFlood(parent, z.zone.side, z.zone.axis);
         break;
+      case 'gate':
+        this.strikes.gate(parent, z.zone.x, z.zone.halfW);
+        break;
+      case 'chase':
+        if (z.chase) this.strikes.chase(parent, z.chase.x, z.chase.z, z.zone.r);
+        break;
       case 'nova': {
         const local = z.zone.bearing - seatBearing(z.seat, match.seats);
         this.strikes.nova(parent, local, z.zone.halfAngle);
@@ -355,7 +420,7 @@ export class ChoreoSystem extends createSystem({}) {
   }
 
   private judgeLocal(z: LiveZone, d: Dancer): void {
-    const touching = this.touchesLocal(z.zone);
+    const touching = this.touchesLocal(z);
     if (touching && match.beat >= d.invulnUntilBeat) {
       this.applyHit(z, d);
       return;

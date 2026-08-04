@@ -153,6 +153,53 @@ const HALF_FRAG = /* glsl */ `
   }
 `;
 
+/**
+ * Gate: the WHOLE deck floods EXCEPT one clear column — the doorpost rails
+ * burn at its edges and chevron streams march INTO it from both sides. The
+ * linear cousin of the nova: the one telegraph that says "stand HERE", on a
+ * line instead of a compass. uGap = column centre (u), uHalf = half-width (u).
+ */
+const GATE_FRAG = /* glsl */ `
+  ${COMMON}
+  uniform float uGap, uHalf;
+  void main(){
+    vec3 col = warnColor();
+    float d = vUv.x - uGap;
+    float inGap = step(abs(d), uHalf);
+    float a = 0.0;
+    // The flood: everything OUTSIDE the column fills with the charge.
+    a += (1.0 - inGap) * (0.1 + 0.5 * uFill);
+    // Doorpost rails — the honest edges of the safe ground.
+    a += smoothstep(0.045, 0.0, abs(abs(d) - uHalf)) * (0.35 + 0.65 * uFill);
+    // Chevron streams marching INTO the gap from both sides.
+    float band = step(0.68, fract(abs(d) * 9.0 + uTime * 2.3));
+    a += band * (1.0 - inGap) * step(abs(fract(vUv.y * 4.0) - 0.5), 0.34) * 0.22;
+    a *= pulse();
+    gl_FragColor = vec4(col, a);
+  }
+`;
+
+/**
+ * Duck cascade: rows of downward-pointing chevrons pouring toward the floor
+ * beneath a sweep blade — the shape ITSELF says "get under". Drawn on a
+ * vertical plane; v = 0 is the floor end.
+ */
+const DUCK_FRAG = /* glsl */ `
+  ${COMMON}
+  void main(){
+    vec3 col = warnColor();
+    // A V-shape per row: the row line dips at the centre (chevron pointing
+    // down), and the whole pattern marches DOWNWARD with time.
+    float vee = vUv.y * 5.0 + abs(vUv.x - 0.5) * 2.2 + uTime * 1.8;
+    float row = smoothstep(0.42, 0.5, fract(vee)) * (1.0 - smoothstep(0.5, 0.58, fract(vee)));
+    float a = row * (0.16 + 0.38 * uFill);
+    // Fade at the plane's side edges so it reads as a stream, not a wall.
+    a *= smoothstep(0.0, 0.12, vUv.x) * smoothstep(1.0, 0.88, vUv.x);
+    a *= pulse();
+    gl_FragColor = vec4(col, a);
+  }
+`;
+
 /** Blade: a horizontal slice hanging in the air — bright core line, soft body. */
 const BLADE_FRAG = /* glsl */ `
   ${COMMON}
@@ -258,18 +305,40 @@ export function beamTelegraph(halfWidth: number, length: number): Telegraph {
 
 /**
  * A horizontal sweep slice: a glowing blade plane hanging at the strike
- * height `bladeY` (duck under it!) plus a dimmer band on the floor beneath so
- * the platform itself carries the warning. Place the group at the platform
- * centre on the floor; `width` spans the endangered lane, `depth` the floor
- * band's front-to-back reach.
+ * height `bladeY` (duck under it!), a cascade of DOWNWARD chevrons pouring
+ * off it toward the floor (the shape says "get under"), plus a dimmer band
+ * on the floor beneath so the platform itself carries the warning. Place
+ * the group at the platform centre on the floor; `width` spans the
+ * endangered lane, `depth` the floor band's front-to-back reach.
  */
 export function sweepTelegraph(width: number, depth: number, bladeY: number, thickness: number): Telegraph {
   const bladeMat = warnMat(BLADE_FRAG);
   const blade = new Mesh(new PlaneGeometry(width, thickness * 2), bladeMat);
   blade.position.y = bladeY;
+  const duckMat = warnMat(DUCK_FRAG);
+  const duckH = bladeY - 0.25;
+  const duck = new Mesh(new PlaneGeometry(width * 0.7, duckH), duckMat);
+  duck.position.y = 0.2 + duckH / 2;
   const bandMat = warnMat(BLADE_FRAG);
   const band = new Mesh(new PlaneGeometry(width, depth), bandMat);
   band.rotation.x = -Math.PI / 2;
   band.position.y = DECAL_Y;
-  return makeTelegraph([blade, band], [bladeMat, bandMat]);
+  return makeTelegraph([blade, duck, band], [bladeMat, duckMat, bandMat]);
+}
+
+/**
+ * The gate: a full-deck pane where everything fills EXCEPT one clear column
+ * centred at `gapX` (platform-local), `gapHalfW` wide each side. Place the
+ * group at the platform centre on the floor.
+ */
+export function gateTelegraph(halfWidth: number, halfDepth: number, gapX: number, gapHalfW: number): Telegraph {
+  const w = halfWidth * 2 + 0.4;
+  const d = halfDepth * 2 + 0.3;
+  const mat = warnMat(GATE_FRAG, {
+    uGap: { value: (gapX + w / 2) / w },
+    uHalf: { value: gapHalfW / w },
+  });
+  const pane = new Mesh(new PlaneGeometry(w, d), mat);
+  pane.rotation.x = -Math.PI / 2;
+  return makeTelegraph([pane], [mat]);
 }

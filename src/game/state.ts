@@ -196,6 +196,13 @@ export function pushFlair(text: string, tone: Flair['tone']): void {
   if (match.flairs.length > 6) match.flairs.shift();
 }
 
+/**
+ * Where each NON-LOCAL dancer currently stands on their own deck
+ * (platform-local x/z), written by AvatarSystem every frame — the chase
+ * discs hunt these. The local player's spot is match.headX/Z directly.
+ */
+export const liveSpots = new Map<number, { x: number; z: number }>();
+
 /* ── campaign progress (localStorage) ─────────────────────────────────── */
 
 import { CAMPAIGN_KEY } from '../config.js';

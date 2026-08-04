@@ -130,17 +130,27 @@ export const GOOP = {
 /* ─────────────────────────────── THE MOVES ───────────────────────────────
  * Every move telegraphs on EVERY live platform at once and lands ON a
  * downbeat. The windup is sacred: escalation compresses the gaps between
- * moves, never the read. Charges are in beats (at 128 BPM a beat is 469 ms).
+ * moves, never the read.
  *
- *  slam   : discs mark spots on your deck — STEP clear.
- *  beam   : a strip rakes across the deck — SIDESTEP off the lane.
- *  sweep  : a horizontal blade at chest height — DUCK under it.
- *  seesaw : one half floods, then the other — CROSS the centreline (left/right).
+ * THE TELEGRAPH IS THE WHOLE INSTRUCTION. Danger shapes fill amber→red:
+ * whatever is filling, don't be in it when it lands. Safe ground is drawn
+ * with bright DOORPOST rails and chevrons marching INTO it: whatever the
+ * chevrons run toward, be there. An experienced dancer never needs a word:
+ *
+ *  slam   : discs fill on the deck — STEP off them.
+ *  beam   : a strip fills down the deck — SIDESTEP off the lane.
+ *  sweep  : a blade hangs at chest height, chevrons cascade DOWNWARD
+ *           beneath it — get UNDER it (duck).
+ *  seesaw : one half floods, chevrons march at the centreline — CROSS.
  *  surge  : the seesaw's cousin, front/back.
+ *  gate   : the WHOLE deck fills except one clear column, doorposts + both
+ *           chevron streams pointing into it — STAND IN THE GAP.
+ *  chase  : a disc GLUED to your feet — it follows you while it fills,
+ *           freezes late, then lands. Moving after the freeze IS the dodge.
  *  nova   : everything burns EXCEPT one wedge at a shared compass bearing —
  *           the whole ring rotates to the same safe ground together.
  */
-export type MoveKind = 'slam' | 'beam' | 'sweep' | 'seesaw' | 'surge' | 'nova';
+export type MoveKind = 'slam' | 'beam' | 'sweep' | 'seesaw' | 'surge' | 'gate' | 'chase' | 'nova';
 
 export const MOVES: Record<
   MoveKind,
@@ -152,13 +162,18 @@ export const MOVES: Record<
   }
 > = {
   // The slam is deliberately RARE and LATE: it fits, but it was opening
-  // nearly every set and never letting up. Sweeps and beams carry the
-  // early acts now; the drumline is a mid-set guest, not the doorman.
+  // nearly every set and never letting up.
   slam: { chargeBeats: 4, weights: [1, 3, 2, 2] },
   beam: { chargeBeats: 4, weights: [2, 3, 3, 3] },
   sweep: { chargeBeats: 4, weights: [3, 3, 3, 3] },
-  seesaw: { chargeBeats: 4, weights: [0, 3, 4, 4] },
+  // The gentle 2-stage seesaw joins the openers — crossing is a day-one verb.
+  seesaw: { chargeBeats: 4, weights: [2, 3, 4, 4] },
   surge: { chargeBeats: 4, weights: [0, 0, 2, 3] },
+  // The GATE is the early-variety hero: instantly readable, teaches lateral
+  // precision, and looks great rippling around the whole ring.
+  gate: { chargeBeats: 4, weights: [3, 3, 2, 2] },
+  // The CHASE arrives once feet are warm — pursuit, then the late juke.
+  chase: { chargeBeats: 5, weights: [0, 2, 3, 3] },
   nova: { chargeBeats: 8, weights: [0, 0, 2, 3] },
 };
 
@@ -185,6 +200,13 @@ export const CHOREO = {
   novaHalfAngle: 0.6,
   novaHalfAngleLate: 0.45,
   novaRadius: 1.15,
+  /** Gate: half-width of the safe column; tightens in the last act. */
+  gateHalfW: 0.3,
+  gateHalfWLate: 0.22,
+  /** Chase: disc radius, and how many beats before landing it FREEZES —
+   *  the freeze is the cue, the juke after it is the dodge. */
+  chaseRadius: 0.42,
+  chaseLockBeats: 1.25,
   /** Moves per phrase by act — the escalation curve. */
   movesPerPhrase: [2, 3, 4, 5],
   /** Minimum clear beats between one landing and the next telegraph —

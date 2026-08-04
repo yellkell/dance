@@ -32,6 +32,11 @@ export type Zone =
   | { kind: 'lane'; x: number; halfW: number }
   | { kind: 'sweep' }
   | { kind: 'half'; side: 1 | -1; axis: 0 | 1 }
+  /** Everything burns EXCEPT a clear column at x — stand in the gap. */
+  | { kind: 'gate'; x: number; halfW: number }
+  /** A disc that HUNTS its dancer's feet, freezing late (the live lock
+   *  position is per-seat runtime state on the LiveZone, not here). */
+  | { kind: 'chase'; r: number }
   | { kind: 'nova'; bearing: number; halfAngle: number };
 
 /** One landing within a move (a move may land several beats in a row). */
@@ -119,6 +124,17 @@ function buildLandings(kind: MoveKind, landBeat: number, act: number, rng: () =>
     }
   } else if (kind === 'sweep') {
     landings.push({ beat: landBeat, zone: { kind: 'sweep' } });
+  } else if (kind === 'gate') {
+    landings.push({
+      beat: landBeat,
+      zone: {
+        kind: 'gate',
+        x: (rng() * 2 - 1) * 0.5,
+        halfW: act >= 3 ? CHOREO.gateHalfWLate : CHOREO.gateHalfW,
+      },
+    });
+  } else if (kind === 'chase') {
+    landings.push({ beat: landBeat, zone: { kind: 'chase', r: CHOREO.chaseRadius } });
   } else if (kind === 'seesaw' || kind === 'surge') {
     const axis: 0 | 1 = kind === 'surge' ? 1 : 0;
     const stages = 2 + Math.min(act, kind === 'surge' ? 2 : 3);

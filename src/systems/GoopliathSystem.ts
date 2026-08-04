@@ -45,6 +45,8 @@ const GESTURE: Record<MoveKind, AttackName> = {
   sweep: 'backfist',
   seesaw: 'clap',
   surge: 'spinkick',
+  gate: 'hook', // the wide arm swinging the doors shut
+  chase: 'cross', // the straight hunting punch, eyes on you
   nova: 'uppercut',
 };
 
@@ -55,6 +57,8 @@ const STEP_GESTURE: Record<MoveKind, AttackName> = {
   sweep: 'hook',
   seesaw: 'hook',
   surge: 'roundhouse',
+  gate: 'jab',
+  chase: 'jab',
   nova: 'jab',
 };
 
