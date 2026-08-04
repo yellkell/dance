@@ -30,6 +30,7 @@
 
 import { createSystem, Group, Vector3 } from '@iwsdk/core';
 import { GOOP, MUSIC, RING, ringRadius, type MoveKind } from '../config.js';
+import * as sfx from '../audio/sfx.js';
 import { arena } from '../arena/arena.js';
 import { GelCreature } from '../goopliath/GelCreature.js';
 import { CREATURE, ATTACKS, type AttackName } from '../goopliath/goopConfig.js';
@@ -75,6 +76,12 @@ const STEPS: ReadonlyArray<readonly [number, number]> = [
 const MELT_BEATS = 1.4;
 const MELT_CLEARANCE = 6;
 
+/** Finale entrance (song beats, negative = count-in): the goop is absent,
+ *  then DROPS out of the rig onto the MC, landing as a glob that swallows
+ *  him and pours itself up to full height for the show. */
+const EAT_START = -2.8;
+const EAT_LAND = -1.2;
+
 const _head = new Vector3();
 const _target = new Vector3();
 const _local = new Vector3();
@@ -90,6 +97,8 @@ export class GoopliathSystem extends createSystem({}) {
   private lastPhrase = -1;
   private meltUntilBeat = -Infinity;
   private hand: 'left' | 'right' = 'left';
+  /** Which generation's finale gulp already fired (one-shot). */
+  private gulpedGen = -2;
   /** A gesture that couldn't start (mid-melt/mid-swing): retried with its
    *  remaining charge until the landing is imminent. */
   private pending: { cue: GestureCue; dueBeat: number } | null = null;
@@ -111,6 +120,8 @@ export class GoopliathSystem extends createSystem({}) {
     // Parent scale converts the man-sized sim into the boss (or a goopling).
     this.root!.scale.setScalar((scale * 1.78) / CREATURE.height);
     this.root!.position.set(0, RING.stageHeight, z);
+    // Finale recolour (null restores the classic green).
+    this.goop!.tint(match.goopTint);
     this.lastBar = -1;
     this.lastPhrase = -1;
     this.meltUntilBeat = -Infinity;
@@ -123,6 +134,17 @@ export class GoopliathSystem extends createSystem({}) {
     const root = this.root;
     if (!goop || !root) return;
 
+    // Whose stage is it? The gel holds the lobby, the map, every rehearsal
+    // and the finale nights; on MC nights the whole sim sleeps.
+    const raidish =
+      match.after === 'raid' &&
+      (match.screen === 'countdown' || match.screen === 'raid' || match.screen === 'podium');
+    if (raidish && match.bossKind !== 'goop') {
+      root.visible = false;
+      return;
+    }
+    root.visible = true;
+
     this.fx?.update(delta);
 
     // He dances to whatever is playing — the set or the lobby loop.
@@ -131,10 +153,38 @@ export class GoopliathSystem extends createSystem({}) {
     const dancing = inSet && beat >= 0;
     const melting = beat < this.meltUntilBeat;
 
+    // THE ENTRANCE: on finale nights the gel isn't there yet — the MC holds
+    // the count-in until the goop drops out of the rig and EATS him.
+    let introDrop = 0;
+    let arriving = false;
+    if (match.eatIntro && match.screen === 'countdown') {
+      const b = match.beat;
+      if (!Number.isFinite(b) || b < EAT_START) {
+        root.visible = false;
+        arriving = true;
+      } else if (b < EAT_LAND) {
+        const t = (b - EAT_START) / (EAT_LAND - EAT_START);
+        introDrop = (1 - t) * (1 - t) * 6;
+        arriving = true;
+      } else if (this.gulpedGen !== this.generation) {
+        // Touchdown: the swallow. One heavy slam, the surface roils, and
+        // the glob starts pouring itself up to full height.
+        this.gulpedGen = this.generation;
+        sfx.gooSlam();
+        goop.sim.agitation = 1;
+        if (this.fx) {
+          _target.copy(root.position);
+          _target.y += 0.5 * root.scale.x;
+          this.fx.burst(_target, _up, 14, 3.2);
+        }
+      }
+    }
+
     // Form: a chilled glob in the lobby, up on his feet for the show —
-    // except mid-melt, when he deliberately lets himself go.
+    // except mid-melt (he deliberately lets himself go) and mid-entrance
+    // (he arrives AS a glob, swallows, then pours up).
     const lounging = match.screen === 'lobby' || match.screen === 'map';
-    goop.setFormTarget(lounging || melting ? 0 : 1);
+    goop.setFormTarget(lounging || melting || arriving ? 0 : 1);
 
     this.runGestures(goop, root, beat);
 
@@ -210,7 +260,7 @@ export class GoopliathSystem extends createSystem({}) {
       goop.moveTo(_local.set(0, 0, 0));
       this.lastKick = -1;
     }
-    root.position.y = RING.stageHeight + stageY + hop;
+    root.position.y = RING.stageHeight + stageY + hop + introDrop;
 
     /* ── the gaze ──────────────────────────────────────────────────────── */
     // He watches YOU — but the watching grooves: the gaze sways off you

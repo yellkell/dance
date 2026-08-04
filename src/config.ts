@@ -376,6 +376,64 @@ export const GOOPLINGS: GooplingDef[] = [
 
 export const CAMPAIGN_KEY = 'gdr-campaign';
 
+/* ──────────────────────────────── THE MC ─────────────────────────────────
+ * The headliner most nights: a GIANT of the dancers' own kind — same sleek
+ * neon humanoid as the groupies, scaled to tower over the stage — whose
+ * whole body ACTS OUT every attack during its charge. The point: the tell
+ * lives at EYE LEVEL, in silhouette, so nobody has to stare at the floor.
+ * The GOOP still owns the set finales (and eats this guy on the way in).
+ */
+export const MC = {
+  /** Rig root scale — the groupie figure is ~1.6 m, so ×2.1 ≈ a 3.4 m icon. */
+  scale: 2.1,
+  /** Signature colour (hue for hueToColor) — icy stage-cyan, no seat owns it. */
+  hue: 0.52,
+  /** Sticks/accents flip to WARN amber while a move charges. */
+  warnColor: 0xffb03a,
+};
+
+/* ─────────────────────────────── THE TOUR ────────────────────────────────
+ * The campaign proper: NIGHTS grouped into SETS of three records. Nights
+ * unlock in order; a set's third night is the GOOP FINALE — the gel returns
+ * in a new colour and EATS the MC as the record starts. The first
+ * `freeSets` sets ship with the game; the teaser row at the bottom of the
+ * tour screen is where paid sets would slot in later.
+ */
+export interface TourSet {
+  id: string;
+  name: string;
+  /** Exactly three track ids (audio/tracks.ts); index 2 is the finale. */
+  songs: [string, string, string];
+  /** Finale gel tint (gelMaterial uniforms); null = the classic green. */
+  tint: { shallow: number; deep: number; nucleus: number } | null;
+}
+
+export const TOUR: { sets: TourSet[]; freeSets: number } = {
+  freeSets: 3,
+  sets: [
+    {
+      id: 'opening',
+      name: 'OPENING SET',
+      songs: ['money', 'target', 'capture'], // 78 → 91 → 117 BPM
+      tint: null, // the classic green goop
+    },
+    {
+      id: 'peak',
+      name: 'PEAK HOURS',
+      songs: ['sakupened', 'combat', 'loop'], // 134 → 135 → 150 BPM
+      tint: { shallow: 0xff6ee0, deep: 0x571040, nucleus: 0xff9ff0 }, // hot magenta
+    },
+    {
+      id: 'afterhours',
+      name: 'AFTER HOURS',
+      songs: ['swag', 'sakupened', 'breakcore'], // 92 → 134 → 174 BPM
+      tint: { shallow: 0xffd24a, deep: 0x6e3c06, nucleus: 0xffefad }, // molten gold
+    },
+  ],
+};
+
+export const TOUR_KEY = 'gdr-tour';
+
 /* ─────────────────────────────── THE BOTS ────────────────────────────────
  * Empty seats are filled with goo-groupies — seeded, deterministic dancers
  * every client simulates identically (no bot netcode: same seed, same

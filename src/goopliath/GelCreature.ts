@@ -17,6 +17,7 @@
 import {
   BoxGeometry,
   CanvasTexture,
+  Color,
   Group,
   Matrix4,
   Mesh,
@@ -26,7 +27,7 @@ import {
   SphereGeometry,
   Vector3,
 } from 'three';
-import { ATTACKS, CREATURE, type AttackName } from './goopConfig.js';
+import { ATTACKS, CREATURE, GEL_LOOK, type AttackName } from './goopConfig.js';
 import * as sfx from '../audio/sfx.js';
 import type { GooFx } from './splats.js';
 import { createGelMaterial, type GelUniforms } from './gelMaterial.js';
@@ -114,6 +115,14 @@ export class GelCreature {
    *  heuristic below reads group-local distance, which is meaningless inside
    *  a scaled parent — and a giant that fills the view is never "far". */
   qualityOverride: number | null = null;
+  /** DANCE RAID patch: recolour the whole gel (tour finales bring the goop
+   *  back in a new colour). Pass null to restore the classic green. */
+  tint(t: { shallow: number; deep: number; nucleus: number } | null): void {
+    const u = this.gel.material.uniforms;
+    (u.uShallow.value as Color).setHex(t ? t.shallow : GEL_LOOK.shallowColor);
+    (u.uDeep.value as Color).setHex(t ? t.deep : GEL_LOOK.deepColor);
+    (u.uNucleus.value as Color).setHex(t ? t.nucleus : GEL_LOOK.nucleusColor);
+  }
   /** True while it's an exhausted puddle — hits do double (see EXHAUST). */
   vulnerable = false;
   /** Movement urgency: 1 = ooze, higher = lurch (the AI dashes in to strike). */

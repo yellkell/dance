@@ -31,6 +31,7 @@ import targetUrl from '../assets/music/target.m4a';
 import captureUrl from '../assets/music/capture.m4a';
 import loopUrl from '../assets/music/loop.m4a';
 import moneyUrl from '../assets/music/money.m4a';
+import breakcoreUrl from '../assets/music/breakcore.mp3';
 
 export type TrackRole = 'raid' | 'lobby' | 'rehearsal';
 
@@ -123,6 +124,18 @@ export const TRACKS: Track[] = [
     lufs: -9.5,
     // Slow, steady and long — the natural metronome to learn a move to.
     roles: ['raid', 'rehearsal'],
+  },
+  {
+    id: 'breakcore',
+    title: 'BREAKCORE',
+    url: breakcoreUrl,
+    bpm: 174.0,
+    downbeat: 1.6347,
+    seconds: 130.61,
+    lufs: -8.3,
+    // The endgame record: pure 174 DnB grid (phase-locked measurement said
+    // 174.005 — one analyser step off the integer, 4 ms over the file).
+    roles: ['raid'],
   },
   {
     id: 'swag',

@@ -19,6 +19,7 @@ import { ChoreoSystem } from './systems/ChoreoSystem.js';
 import { DiscoSystem } from './systems/DiscoSystem.js';
 import { GoopliathSystem } from './systems/GoopliathSystem.js';
 import { HudSystem } from './systems/HudSystem.js';
+import { McSystem } from './systems/McSystem.js';
 import { MenuSystem } from './systems/MenuSystem.js';
 import { MusicSystem } from './systems/MusicSystem.js';
 import { NetworkSystem } from './systems/NetworkSystem.js';
@@ -67,6 +68,7 @@ World.create(container, {
   world.registerSystem(MusicSystem);
   world.registerSystem(ChoreoSystem);
   world.registerSystem(GoopliathSystem);
+  world.registerSystem(McSystem);
   world.registerSystem(AvatarSystem);
   world.registerSystem(RankSystem);
   world.registerSystem(DiscoSystem);
@@ -109,7 +111,7 @@ World.create(container, {
 
 // Dev/debug hook: drive the flow from the console (or a headless test)
 // without controllers — e.g. __gdr.startRaid({ seats: 8 }).
-import { startRaid, startTutorial, toLobby, toMap } from './game/flow.js';
+import { startRaid, startTutorial, toLobby, toMap, toTour } from './game/flow.js';
 import { match } from './game/state.js';
 import { arena } from './arena/arena.js';
 import { choreoView } from './systems/ChoreoSystem.js';
@@ -121,10 +123,11 @@ declare global {
       startTutorial: typeof startTutorial;
       toLobby: typeof toLobby;
       toMap: typeof toMap;
+      toTour: typeof toTour;
       match: typeof match;
       arena: typeof arena;
       choreo: typeof choreoView;
     };
   }
 }
-window.__gdr = { startRaid, startTutorial, toLobby, toMap, match, arena, choreo: choreoView };
+window.__gdr = { startRaid, startTutorial, toLobby, toMap, toTour, match, arena, choreo: choreoView };

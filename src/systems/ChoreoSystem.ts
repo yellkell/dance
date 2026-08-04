@@ -42,6 +42,7 @@ import {
   pushFlair,
   setEndBeat,
   type Dancer,
+  type GestureCue,
 } from '../game/state.js';
 import {
   OCTAGON_HALF_DEPTH,
@@ -81,6 +82,22 @@ function angDist(a: number, b: number): number {
  *  charge already tells a veteran which way the blade will travel. */
 function sweepSide(moveIdx: number, landingIdx: number): 1 | -1 {
   return (moveIdx + landingIdx) % 2 === 0 ? 1 : -1;
+}
+
+/** The directional payload a gesture cue carries so the MC's body can ACT
+ *  the move out (zones are platform-local and identical for every seat, so
+ *  one giant's mime is honest for the whole ring). */
+function cueDirection(zone: Zone, moveIdx: number, landingIdx: number): Partial<GestureCue> {
+  switch (zone.kind) {
+    case 'sweep':
+      return { side: sweepSide(moveIdx, landingIdx) };
+    case 'half':
+      return { side: zone.side, axis: zone.axis };
+    case 'gate':
+      return { gapX: zone.x };
+    default:
+      return {};
+  }
 }
 
 export class ChoreoSystem extends createSystem({}) {
@@ -162,7 +179,7 @@ export class ChoreoSystem extends createSystem({}) {
       const key = `${z.moveIdx}:${z.landingIdx}`;
       if (this.cuedSteps.has(key)) continue;
       this.cuedSteps.add(key);
-      match.gestures.push({ kind: z.kind, chargeBeats: lead, step: true });
+      match.gestures.push({ kind: z.kind, chargeBeats: lead, step: true, ...cueDirection(z.zone, z.moveIdx, z.landingIdx), dueBeat: z.dueBeat });
     }
 
     // Advance live zones.
@@ -219,7 +236,13 @@ export class ChoreoSystem extends createSystem({}) {
   /** A move starts telegraphing: zones + shapes on every live platform, and
    *  the GOOPLIATH's wind-up gesture on the stage. */
   private begin(move: SetMove): void {
-    match.gestures.push({ kind: move.kind, chargeBeats: MOVES[move.kind].chargeBeats });
+    const first = move.landings[0];
+    match.gestures.push({
+      kind: move.kind,
+      chargeBeats: MOVES[move.kind].chargeBeats,
+      ...(first ? cueDirection(first.zone, move.index, 0) : {}),
+      dueBeat: first?.beat,
+    });
     sfx.gooCharge(MOVES[move.kind].chargeBeats * match.beatLen * 0.9);
 
     for (const dancer of match.players) {

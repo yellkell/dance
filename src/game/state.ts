@@ -12,7 +12,8 @@ export type Screen =
   | 'countdown' // seats locked, music counting in
   | 'raid' // the set is live
   | 'podium' // set over — winner on high, board frozen
-  | 'map' // rehearsal map (campaign)
+  | 'map' // rehearsal map (move lessons)
+  | 'tour' // the campaign screen: sets of nights
   | 'tutorial'; // one goopling teaching one move
 
 export interface Dancer {
@@ -39,13 +40,23 @@ export interface Dancer {
   netId?: number;
 }
 
-/** A one-shot the GOOPLIATH performs when a move starts telegraphing. */
+/** A one-shot the boss performs when a move starts telegraphing. */
 export interface GestureCue {
   kind: MoveKind;
   chargeBeats: number;
   /** A follow-up strike inside a multi-landing move (seesaw halves, slam
    *  drumline steps) — a quick jab/hook, not the full wind-up. */
   step?: boolean;
+  /** Directional payload so the MC's body can ACT the move out: sweep entry
+   *  side / seesaw-surge doomed side (platform-local sign). */
+  side?: number;
+  /** half-moves only: 0 = x split (seesaw), 1 = z split (surge). */
+  axis?: number;
+  /** gate only: the safe column's platform-local x. */
+  gapX?: number;
+  /** The landing this cue charges toward (song beats) — lets the MC time
+   *  its strike snap and the chase lock without re-deriving the set-list. */
+  dueBeat?: number;
 }
 
 /** A transient HUD flair (DODGE! / PERFECT! / combo milestones / OUT). */
@@ -105,6 +116,20 @@ export interface MatchState {
   goopling: GooplingDef | null;
   tutorialClears: number;
 
+  /* ── the headliner ── */
+  /** Who runs the stage this match: the MC most nights, the GOOP on
+   *  finales (and in every tutorial, as a goopling). */
+  bossKind: 'mc' | 'goop';
+  /** Finale gel recolour (null = classic green). */
+  goopTint: { shallow: number; deep: number; nucleus: number } | null;
+  /** Finale opener: the MC is on stage for the count-in until the goop
+   *  drops in and EATS him. */
+  eatIntro: boolean;
+
+  /* ── the tour (campaign) ── */
+  /** Which night this raid is, or null for a free-play set. */
+  tour: { set: number; song: number } | null;
+
   /* ── online ── */
   online: boolean;
   roomCode: string;
@@ -136,6 +161,10 @@ export const match: MatchState = {
   flairs: [],
   goopling: null,
   tutorialClears: 0,
+  bossKind: 'mc',
+  goopTint: null,
+  eatIntro: false,
+  tour: null,
   online: false,
   roomCode: '',
 };
@@ -203,9 +232,43 @@ export function pushFlair(text: string, tone: Flair['tone']): void {
  */
 export const liveSpots = new Map<number, { x: number; z: number }>();
 
-/* ── campaign progress (localStorage) ─────────────────────────────────── */
+/* ── tour progress (localStorage) ─────────────────────────────────────── */
 
-import { CAMPAIGN_KEY } from '../config.js';
+import { CAMPAIGN_KEY, TOUR, TOUR_KEY } from '../config.js';
+
+export function clearedTourNights(): Set<string> {
+  try {
+    const raw = localStorage.getItem(TOUR_KEY);
+    if (!raw) return new Set();
+    return new Set(JSON.parse(raw) as string[]);
+  } catch {
+    return new Set();
+  }
+}
+
+export function markTourNightCleared(set: number, song: number): void {
+  const done = clearedTourNights();
+  done.add(`${set}:${song}`);
+  try {
+    localStorage.setItem(TOUR_KEY, JSON.stringify([...done]));
+  } catch {
+    /* storage may be unavailable */
+  }
+}
+
+/** Night 1 of set 1 is always open; a night needs the previous night, and a
+ *  set needs the whole set before it. */
+export function tourNightUnlocked(set: number, song: number): boolean {
+  if (set >= TOUR.freeSets) return false; // the teaser rows — not for sale yet
+  const done = clearedTourNights();
+  for (let s = 0; s < set; s++) {
+    for (let i = 0; i < 3; i++) if (!done.has(`${s}:${i}`)) return false;
+  }
+  for (let i = 0; i < song; i++) if (!done.has(`${set}:${i}`)) return false;
+  return true;
+}
+
+/* ── rehearsal progress (localStorage) ────────────────────────────────── */
 
 export function clearedGooplings(): Set<string> {
   try {

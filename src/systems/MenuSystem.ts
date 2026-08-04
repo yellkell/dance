@@ -19,12 +19,19 @@ import {
   type Intersection,
   type Object3D,
 } from 'three';
-import { GOOPLINGS, RING } from '../config.js';
+import { GOOPLINGS, RING, TOUR } from '../config.js';
 import * as sfx from '../audio/sfx.js';
 import { musicVolume, preload, setMusicVolume } from '../audio/music.js';
 import { pickRaidTrack, trackById, tracksFor } from '../audio/tracks.js';
-import { finishTutorial, startRaid, startTutorial, toLobby, toMap } from '../game/flow.js';
-import { allGooplingsCleared, clearedGooplings, gooplingUnlocked, match } from '../game/state.js';
+import { finishTutorial, startRaid, startTutorial, toLobby, toMap, toTour } from '../game/flow.js';
+import {
+  allGooplingsCleared,
+  clearedGooplings,
+  clearedTourNights,
+  gooplingUnlocked,
+  match,
+  tourNightUnlocked,
+} from '../game/state.js';
 import { cycleRoomDim, roomDimName } from './DiscoSystem.js';
 import {
   CODE_ALPHABET,
@@ -48,6 +55,7 @@ interface Pointer {
 export class MenuSystem extends createSystem({}) {
   private lobby!: Panel;
   private map!: Panel;
+  private tour!: Panel;
   private exit!: Panel;
   private pointers!: Record<'left' | 'right', Pointer>;
   private ray = new Raycaster();
@@ -77,6 +85,10 @@ export class MenuSystem extends createSystem({}) {
     this.map = new Panel(1.25, 1.25, 1024, 1024);
     this.map.group.position.set(0, 1.45, -1.45);
     this.scene.add(this.map.group);
+
+    this.tour = new Panel(1.25, 1.25, 1024, 1024);
+    this.tour.group.position.set(0, 1.45, -1.45);
+    this.scene.add(this.tour.group);
 
     this.exit = new Panel(0.62, 0.2, 640, 208);
     this.exit.group.position.set(0.85, 1.15, -0.95);
@@ -114,12 +126,14 @@ export class MenuSystem extends createSystem({}) {
 
     const lobbyUp = screen === 'lobby';
     const mapUp = screen === 'map';
+    const tourUp = screen === 'tour';
     const exitUp = screen === 'tutorial' || screen === 'podium';
     this.lobby.group.visible = lobbyUp;
     this.map.group.visible = mapUp;
+    this.tour.group.visible = tourUp;
     this.exit.group.visible = exitUp;
 
-    if (!lobbyUp && !mapUp && !exitUp) {
+    if (!lobbyUp && !mapUp && !tourUp && !exitUp) {
       this.hidePointers();
       return;
     }
@@ -128,6 +142,7 @@ export class MenuSystem extends createSystem({}) {
     const targets: Object3D[] = [];
     if (lobbyUp) targets.push(this.lobby.mesh);
     if (mapUp) targets.push(this.map.mesh);
+    if (tourUp) targets.push(this.tour.mesh);
     if (exitUp) targets.push(this.exit.mesh);
 
     let hover: string | null = null;
@@ -158,6 +173,7 @@ export class MenuSystem extends createSystem({}) {
   private panelFor(obj: Object3D): Panel | null {
     if (obj === this.lobby.mesh) return this.lobby;
     if (obj === this.map.mesh) return this.map;
+    if (obj === this.tour.mesh) return this.tour;
     if (obj === this.exit.mesh) return this.exit;
     return null;
   }
@@ -201,6 +217,11 @@ export class MenuSystem extends createSystem({}) {
       else startRaid({ seats: match.seats });
     } else if (id === 'rehearsal') {
       toMap();
+    } else if (id === 'tour') {
+      toTour();
+    } else if (id.startsWith('night')) {
+      const [s, i] = id.slice(5).split('-').map(Number);
+      if (tourNightUnlocked(s, i)) startRaid({ seats: match.seats, tour: { set: s, song: i } });
     } else if (id === 'seats-' || id === 'seats+') {
       const step = id === 'seats+' ? 4 : -4;
       match.seats = Math.max(RING.minSeats, Math.min(RING.maxSeats, match.seats + step));
@@ -242,7 +263,7 @@ export class MenuSystem extends createSystem({}) {
       this.joinMode = false;
     } else if (id === 'back') {
       this.joinMode = false;
-      if (match.screen === 'map') toLobby();
+      if (match.screen === 'map' || match.screen === 'tour') toLobby();
     } else if (id.startsWith('node')) {
       startTutorial(Number(id.slice(4)));
     } else if (id === 'exit') {
@@ -270,6 +291,7 @@ export class MenuSystem extends createSystem({}) {
       net.code,
       net.members.length,
       match.tutorialClears,
+      clearedTourNights().size,
     ].join('|');
     if (key === this.lastKey) return;
     this.lastKey = key;
@@ -279,6 +301,8 @@ export class MenuSystem extends createSystem({}) {
       else this.paintLobby();
     } else if (match.screen === 'map') {
       this.paintMap();
+    } else if (match.screen === 'tour') {
+      this.paintTour();
     }
     if (match.screen === 'tutorial' || match.screen === 'podium') {
       this.exit.paint(
@@ -333,7 +357,22 @@ export class MenuSystem extends createSystem({}) {
       accent: UI.cyan,
       x: 40,
       y: 356,
-      w: 944,
+      w: 584,
+      h: 92,
+      small: true,
+    });
+
+    // The campaign: sets of nights, goop finales, the works.
+    const nightsDone = clearedTourNights().size;
+    const nightsAll = TOUR.sets.length * 3;
+    buttons.push({
+      id: 'tour',
+      label: '🗺 THE TOUR',
+      sub: nightsDone >= nightsAll ? 'tour complete ✓' : `${nightsDone}/${nightsAll} nights`,
+      accent: UI.goop,
+      x: 644,
+      y: 356,
+      w: 340,
       h: 92,
       small: true,
     });
@@ -476,6 +515,72 @@ export class MenuSystem extends createSystem({}) {
         g.fillStyle = UI.dim;
         g.fillText('tap a slot to cycle its letter (A–H)', 512, 180);
         g.fillText('or open the share link: ?room=CODE', 512, 890);
+      },
+      buttons,
+      this.hover,
+    );
+  }
+
+  private paintTour(): void {
+    const done = clearedTourNights();
+    const buttons: PanelButton[] = [];
+    TOUR.sets.forEach((set, s) => {
+      const rowY = 208 + s * 224;
+      set.songs.forEach((songId, i) => {
+        const track = trackById(songId);
+        const unlocked = tourNightUnlocked(s, i);
+        const cleared = done.has(`${s}:${i}`);
+        const finale = i === 2;
+        buttons.push({
+          id: `night${s}-${i}`,
+          label: `${cleared ? '✓ ' : unlocked ? '' : '🔒 '}${track?.title ?? songId}`,
+          sub: finale ? 'GOOP FINALE 👁' : `night ${i + 1} · ${Math.round(track?.bpm ?? 0)} BPM`,
+          accent: cleared ? UI.goop : finale ? UI.magenta : UI.cyan,
+          disabled: !unlocked,
+          x: 40 + i * 324,
+          y: rowY,
+          w: 296,
+          h: 118,
+          small: true,
+        });
+      });
+    });
+    // Where the paid sets will live — honest about it, buys nothing yet.
+    buttons.push({
+      id: 'more',
+      label: '🔒 MORE SETS ON THE WAY',
+      sub: 'new nights & records — the tour keeps growing',
+      disabled: true,
+      x: 40,
+      y: 208 + TOUR.sets.length * 224,
+      w: 620,
+      h: 92,
+      small: true,
+    });
+    buttons.push({
+      id: 'back',
+      label: 'BACK',
+      accent: UI.danger,
+      x: 684,
+      y: 208 + TOUR.sets.length * 224,
+      w: 300,
+      h: 92,
+      small: true,
+    });
+
+    this.tour.paint(
+      'THE TOUR',
+      (g) => {
+        g.textAlign = 'center';
+        g.font = "700 26px 'Arial Black', system-ui, sans-serif";
+        g.fillStyle = UI.dim;
+        g.fillText('three records a set — survive a night to book the next', 512, 150);
+        g.textAlign = 'left';
+        g.font = "900 30px 'Arial Black', system-ui, sans-serif";
+        TOUR.sets.forEach((set, s) => {
+          g.fillStyle = ['#8cff70', '#ff6ee0', '#ffd24a'][s % 3];
+          g.fillText(set.name, 44, 196 + s * 224);
+        });
       },
       buttons,
       this.hover,
