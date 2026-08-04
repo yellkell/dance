@@ -371,6 +371,24 @@ export const PALETTE = {
   mirror: 0xcfd8e6,
 };
 
+/**
+ * ROOM DIM — the Laser Dance move: darken the passthrough so the neon owns
+ * your real room. WebXR can't dim the camera feed itself, so we draw an
+ * enormous inside-out black shell behind everything; the compositor
+ * alpha-blends it over the passthrough and the whole room drops to club
+ * lighting. Three levels, cycled from the lobby panel, persisted.
+ */
+export const ROOM_DIM = {
+  levels: [0, 0.45, 0.72],
+  names: ['OFF', 'CLUB', 'CAVE'],
+  defaultLevel: 1,
+  /** The lobby keeps a little more of your room than the live set does. */
+  lobbyFactor: 0.7,
+  /** Subtle breathe on the kick while the set is live (kept tiny). */
+  beatPulse: 0.05,
+  key: 'gdr-room-dim',
+};
+
 /** Laser fan hues cycled by the light rig. */
 export const LASER_HUES = [0.9, 0.55, 0.75, 0.33, 0.12];
 

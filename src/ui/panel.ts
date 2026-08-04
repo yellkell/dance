@@ -36,6 +36,7 @@ export const UI = {
   green: '#b9ffc4',
   goop: '#36e05a',
   amber: '#ffb000',
+  violet: '#b06bff',
   danger: '#ff5040',
   text: '#f4f6fb',
   dim: 'rgba(232,236,242,0.6)',

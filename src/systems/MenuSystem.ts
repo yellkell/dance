@@ -25,6 +25,7 @@ import { musicVolume, preload, setMusicVolume } from '../audio/music.js';
 import { pickRaidTrack, trackById, tracksFor } from '../audio/tracks.js';
 import { finishTutorial, startRaid, startTutorial, toLobby, toMap } from '../game/flow.js';
 import { allGooplingsCleared, clearedGooplings, gooplingUnlocked, match } from '../game/state.js';
+import { cycleRoomDim, roomDimName } from './DiscoSystem.js';
 import {
   CODE_ALPHABET,
   autoJoinFromUrl,
@@ -211,6 +212,8 @@ export class MenuSystem extends createSystem({}) {
       }
     } else if (id === 'vol-' || id === 'vol+') {
       setMusicVolume(musicVolume() + (id === 'vol+' ? 0.1 : -0.1));
+    } else if (id === 'dim') {
+      cycleRoomDim();
     } else if (id === 'track') {
       // Cycle: SHUFFLE → each raid record → back. Picking one warms it so
       // the drop is instant; SHUFFLE lets the match seed choose (and every
@@ -412,6 +415,17 @@ export class MenuSystem extends createSystem({}) {
       small: true,
     });
     buttons.push({ id: 'vol+', label: '+', x: 530, y: 694, w: 110, h: 92 });
+    buttons.push({
+      id: 'dim',
+      label: `ROOM ${roomDimName()}`,
+      sub: 'darken your passthrough',
+      accent: UI.violet,
+      x: 660,
+      y: 694,
+      w: 324,
+      h: 92,
+      small: true,
+    });
 
     this.lobby.paint(
       'GOOPLIATH',
