@@ -242,8 +242,11 @@ export const GROOVE = {
   base: 6,
   /** Extra points per streak step — the consistency creep. */
   perStreak: 0.5,
-  /** Streak stops growing here (base + 50 = 56 a swap at full groove). */
-  streakCap: 100,
+  /** The STREAK counter runs to 999 — a whole-night flex on the HUD. */
+  streakCap: 999,
+  /** …but PAY saturates here (base + 50 = 56 a swap), so the trickle never
+   *  outruns dodging no matter how long the flex gets. */
+  payCap: 100,
   /**
    * PAY-RATE CAP: rewarded swaps can never come faster than the music.
    * A swap pays only if ~a full beat has passed since the last PAID one —

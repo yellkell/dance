@@ -244,7 +244,8 @@ export class PlayerSystem extends createSystem({}) {
 
     this.lastRewardBeat = match.beat;
     this.streak = Math.min(GROOVE.streakCap, this.streak + 1);
-    const award = Math.round(GROOVE.base + this.streak * GROOVE.perStreak);
+    // The counter runs to 999; the payout curve flattens at payCap.
+    const award = Math.round(GROOVE.base + Math.min(this.streak, GROOVE.payCap) * GROOVE.perStreak);
     d.score += award;
     match.grooveStreak = this.streak;
 
@@ -259,8 +260,15 @@ export class PlayerSystem extends createSystem({}) {
       this.popFloater(`+${award}`, _hand);
     }
 
-    if (this.streak === 8 || this.streak === 32 || this.streak === GROOVE.streakCap) {
-      pushFlair(this.streak === GROOVE.streakCap ? 'MAX GROOVE!!' : 'IN THE GROOVE!', 'milestone');
+    if (this.streak === 8 || this.streak === 32 || this.streak === 100 || this.streak === GROOVE.streakCap) {
+      pushFlair(
+        this.streak === GROOVE.streakCap
+          ? 'MAX GROOVE!!'
+          : this.streak === 100
+            ? 'CENTURY GROOVE!'
+            : 'IN THE GROOVE!',
+        'milestone',
+      );
       sfx.uiClick();
     }
   }

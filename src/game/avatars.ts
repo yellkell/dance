@@ -110,6 +110,18 @@ export function buildDancer(hue: number): DancerRig {
     metalness: 0.65,
     roughness: 0.28,
   });
+  // The limbs burn brighter than the torso: in a dark club a near-black arm
+  // disappears and the glowing hand reads as DETACHED — lit limbs keep every
+  // stick visibly connected to the body that swings it. Accent-registered,
+  // so warn flashes and elimination dims run down the arms too.
+  const limb = new MeshStandardMaterial({
+    color: 0x232833,
+    emissive: color,
+    emissiveIntensity: 0.5,
+    metalness: 0.5,
+    roughness: 0.35,
+  });
+  accents.push(limb);
   const neonStd = (): MeshStandardMaterial => {
     const m = new MeshStandardMaterial({
       color: 0x14161c,
@@ -153,10 +165,10 @@ export function buildDancer(hue: number): DancerRig {
   root.add(waistRing);
 
   /* ── arms: shoulder → elbow → hand, solved each pose ── */
-  const upperL = segment(0.024, 0.02, body);
-  const upperR = segment(0.024, 0.02, body);
-  const foreL = segment(0.019, 0.016, body);
-  const foreR = segment(0.019, 0.016, body);
+  const upperL = segment(0.032, 0.026, limb);
+  const upperR = segment(0.032, 0.026, limb);
+  const foreL = segment(0.026, 0.021, limb);
+  const foreR = segment(0.026, 0.021, limb);
   root.add(upperL, upperR, foreL, foreR);
 
   const mkHand = (): Group => {
@@ -176,8 +188,8 @@ export function buildDancer(hue: number): DancerRig {
   const handR = mkHand();
 
   /* ── legs: hip → floor, one long line each ── */
-  const legL = segment(0.03, 0.02, body);
-  const legR = segment(0.03, 0.02, body);
+  const legL = segment(0.034, 0.024, limb);
+  const legR = segment(0.034, 0.024, limb);
   root.add(legL, legR);
   const footL = new Mesh(new SphereGeometry(0.045, 8, 6), body);
   const footR = new Mesh(new SphereGeometry(0.045, 8, 6), body);

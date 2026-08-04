@@ -75,7 +75,7 @@ export class MusicSystem extends createSystem({}) {
         match.playing = false;
         this.generation = -1; // the next countdown always re-drops
       }
-      if (screen === 'lobby' || screen === 'map') {
+      if (screen === 'lobby' || screen === 'map' || screen === 'tour') {
         const room = tracksFor('lobby')[0];
         if (room) startAmbient(room);
         // Warm the raid record while the room track holds the floor, so the

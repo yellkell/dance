@@ -1,5 +1,5 @@
 /**
- * GOOPLIATH: DANCE RAID — entry point.
+ * RAVE RAID — entry point.
  *
  * Boots an IWSDK World with a WebXR passthrough (immersive-AR) session: the
  * platform ring, the centre stage, the mirror ball and the giant dancing gel
@@ -106,7 +106,7 @@ World.create(container, {
   }
 
   // eslint-disable-next-line no-console
-  console.info('[DANCE RAID] World ready — the floor is set, the goop is warm.');
+  console.info('[RAVE RAID] World ready — the floor is set, the goop is warm.');
 });
 
 // Dev/debug hook: drive the flow from the console (or a headless test)

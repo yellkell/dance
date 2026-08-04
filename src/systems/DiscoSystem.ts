@@ -88,6 +88,12 @@ export class DiscoSystem extends createSystem({}) {
     // whole light rig (ball, shafts, fans, confetti) stays with the show.
     if (a) rig.root.position.copy(a.stage.position);
 
+    // The rig is part of the CLUB — packed away with the ring while you're
+    // in the menus. (The room-dim shell stays: the green room keeps its own
+    // subdued darkness.)
+    const menuRoom = match.screen === 'lobby' || match.screen === 'map' || match.screen === 'tour';
+    rig.root.visible = !menuRoom;
+
     const live = match.playing && (match.screen === 'raid' || match.screen === 'tutorial');
     // The lobby loop publishes a beat too, so the room grooves between sets.
     const onBeat = Number.isFinite(match.beat);

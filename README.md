@@ -1,4 +1,4 @@
-# GOOPLIATH: DANCE RAID 🪩🕺💃
+# RAVE RAID 🪩🕺💃
 
 A **WebXR passthrough rhythm battle royale**. Up to **24 dancers** stand on
 octagonal platforms ringed around one giant gel creature — the **GOOPLIATH** —

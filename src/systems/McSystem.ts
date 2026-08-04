@@ -55,14 +55,25 @@ interface ActiveMime {
   dueBeat: number;
 }
 
+const freshPose = (): DancerPose => ({
+  hx: 0, hy: STAND, hz: 0, yaw: 0,
+  lx: -0.3, ly: 1.0, lz: -0.1,
+  rx: 0.3, ry: 1.0, rz: -0.1,
+  slump: 0,
+});
+
+/** Where the headliner poses in the green room (menu screens). */
+const MENU_SPOT = { x: 1.55, z: -2.55, scale: 1.35 };
+
 export class McSystem extends createSystem({}) {
   private rig: DancerRig | null = null;
-  private pose: DancerPose = {
-    hx: 0, hy: STAND, hz: 0, yaw: 0,
-    lx: -0.3, ly: 1.0, lz: -0.1,
-    rx: 0.3, ry: 1.0, rz: -0.1,
-    slump: 0,
-  };
+  /** The RENDERED pose — everything below writes `tgt` and this eases
+   *  toward it, so idle → wind-up → strike is one continuous motion and
+   *  the figure never teleports between choreography states. */
+  private pose: DancerPose = freshPose();
+  private tgt: DancerPose = freshPose();
+  private scale = MC.scale;
+  private menuClock = 0;
   private generation = -1;
   private mime: ActiveMime | null = null;
   private warn = 0;
@@ -84,26 +95,76 @@ export class McSystem extends createSystem({}) {
     this.eaten = false;
   }
 
+  /** Ease the rendered pose toward the target — the seam between every
+   *  choreography state. `rate` is per-second exponential chase. */
+  private easeTo(delta: number, rate: number): void {
+    const k = 1 - Math.exp(-rate * delta);
+    const c = this.pose;
+    const t = this.tgt;
+    c.hx += (t.hx - c.hx) * k;
+    c.hy += (t.hy - c.hy) * k;
+    c.hz += (t.hz - c.hz) * k;
+    c.yaw += (t.yaw - c.yaw) * k;
+    c.lx += (t.lx - c.lx) * k;
+    c.ly += (t.ly - c.ly) * k;
+    c.lz += (t.lz - c.lz) * k;
+    c.rx += (t.rx - c.rx) * k;
+    c.ry += (t.ry - c.ry) * k;
+    c.rz += (t.rz - c.rz) * k;
+    c.slump += (t.slump - c.slump) * k;
+  }
+
+  /** Face the origin (the local player) from wherever he stands — the rig's
+   *  forward is −Z at yaw 0, so aim that axis along (origin − position). */
+  private faceCrowd(x: number, z: number): void {
+    this.rig!.root.rotation.y = Math.atan2(-(0 - x), -(0 - z));
+  }
+
   update(delta: number): void {
     if (this.generation !== match.generation) this.rebuild();
     const rig = this.rig;
     if (!rig) return;
 
-    // The MC works raid nights (and their podiums). The goop keeps the
-    // lobby, the map and every rehearsal — and takes the stage mid-count-in
-    // on finale nights, over the MC's dead body.
+    // The GREEN ROOM: on menu screens he poses beside the board — the
+    // live-service lobby hero, grooving to the room loop.
+    const menuRoom = match.screen === 'lobby' || match.screen === 'map' || match.screen === 'tour';
+
+    // The MC works raid nights (and their podiums). The goop keeps every
+    // rehearsal — and takes the stage mid-count-in on finale nights, over
+    // the MC's dead body.
     const raidish =
       match.after === 'raid' &&
       (match.screen === 'countdown' || match.screen === 'raid' || match.screen === 'podium');
     const finaleNight = raidish && match.bossKind === 'goop';
-    const show = raidish && (match.bossKind === 'mc' || (finaleNight && match.eatIntro && !this.eaten));
+    const show =
+      menuRoom || (raidish && (match.bossKind === 'mc' || (finaleNight && match.eatIntro && !this.eaten)));
     rig.root.visible = show;
     if (!show) return;
+
+    // Scale eases too, so green room ↔ stage never pops.
+    const wantScale = menuRoom ? MENU_SPOT.scale : MC.scale;
+    this.scale += (wantScale - this.scale) * Math.min(1, delta * 6);
+    rig.root.scale.setScalar(this.scale);
+
+    if (menuRoom) {
+      this.menuClock += delta;
+      this.eaten = false;
+      this.mime = null;
+      rig.root.position.set(MENU_SPOT.x, 0, MENU_SPOT.z);
+      this.faceCrowd(MENU_SPOT.x, MENU_SPOT.z);
+      this.idleGroove(this.menuClock * 1.9); // ~114 BPM sway, clock of his own
+      this.warn += (0 - this.warn) * Math.min(1, delta * 6);
+      this.applyAccents(this.warn);
+      this.easeTo(delta, 5);
+      rig.pose(this.pose);
+      return;
+    }
 
     const beat = Number.isFinite(match.beat) ? match.beat : -8;
     const stage = arena()?.stage;
     const stageY = stage?.position.y ?? 0;
     rig.root.position.set(0, RING.stageHeight + stageY, -ringRadius(match.seats));
+    this.faceCrowd(0, -ringRadius(match.seats));
 
     /* ── the finale count-in: hyping, then eaten ── */
     if (finaleNight) {
@@ -118,19 +179,19 @@ export class McSystem extends createSystem({}) {
         // squash as the mass arrives.
         const t = (beat - EAT_START) / (EAT_LAND - EAT_START);
         const tremble = Math.sin(beat * 40) * 0.05 * t;
-        this.pose.hy = STAND - t * 0.5;
-        this.pose.hx = tremble;
-        this.pose.lx = -0.34 + tremble;
-        this.pose.rx = 0.34 + tremble;
-        this.pose.ly = this.pose.ry = STAND + 0.45 - t * 0.6;
-        this.pose.lz = this.pose.rz = -0.1;
-        rig.root.scale.set(MC.scale * (1 + t * 0.25), MC.scale * (1 - t * 0.55), MC.scale * (1 + t * 0.25));
+        const p = this.tgt;
+        p.hy = STAND - t * 0.5;
+        p.hx = tremble;
+        p.lx = -0.34 + tremble;
+        p.rx = 0.34 + tremble;
+        p.ly = p.ry = STAND + 0.45 - t * 0.6;
+        p.lz = p.rz = -0.1;
+        rig.root.scale.set(this.scale * (1 + t * 0.25), this.scale * (1 - t * 0.55), this.scale * (1 + t * 0.25));
         this.applyAccents(1); // full alarm
+        this.easeTo(delta, 14);
         rig.pose(this.pose);
         return;
       }
-      // Before the drop: an oblivious idle groove (poor guy).
-      rig.root.scale.setScalar(MC.scale);
     }
 
     /* ── gestures in, mime state forward ── */
@@ -138,14 +199,22 @@ export class McSystem extends createSystem({}) {
     if (this.mime && beat > this.mime.dueBeat + 0.45) this.mime = null;
 
     /* ── choreography: the mime if one is charging, else the groove ── */
-    if (this.mime && match.screen === 'raid') this.performMime(this.mime, beat);
-    else this.idleGroove(beat);
+    const miming = Boolean(this.mime && match.screen === 'raid');
+    let striking = false;
+    if (this.mime && miming) {
+      striking = beat > this.mime.dueBeat - 0.9;
+      this.performMime(this.mime, beat);
+    } else {
+      this.idleGroove(beat);
+    }
 
     // WARN burn while charging, seat-cyan otherwise.
-    const warnTarget = this.mime && match.screen === 'raid' ? 1 : 0;
+    const warnTarget = miming ? 1 : 0;
     this.warn += (warnTarget - this.warn) * Math.min(1, delta * 8);
     this.applyAccents(this.warn);
 
+    // Wind-ups chase briskly; the strike snap is fast but still a MOTION.
+    this.easeTo(delta, striking ? 16 : 9);
     rig.pose(this.pose);
   }
 
@@ -170,7 +239,7 @@ export class McSystem extends createSystem({}) {
   /* ── the language ─────────────────────────────────────────────────────── */
 
   private idleGroove(beat: number): void {
-    const p = this.pose;
+    const p = this.tgt;
     const bounce = Math.abs(Math.sin(beat * Math.PI)) * 0.06;
     p.hx = Math.sin(beat * 0.5) * 0.1;
     p.hz = 0;
@@ -190,7 +259,7 @@ export class McSystem extends createSystem({}) {
   }
 
   private performMime(mime: ActiveMime, beat: number): void {
-    const p = this.pose;
+    const p = this.tgt;
     const span = Math.max(0.001, mime.dueBeat - mime.startBeat);
     const u = Math.min(1, Math.max(0, (beat - mime.startBeat) / span));
     /** Strike phase: the last ~0.9 beats snap from wind-up into the hit. */

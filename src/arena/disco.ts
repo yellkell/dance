@@ -100,7 +100,9 @@ export class DiscoRig {
         depthWrite: false,
         side: DoubleSide,
       });
-      const len = 7 + (i % 3) * 2;
+      // Long enough to actually rake the floor from the ball's height —
+      // short cones read as stubby lampshades, not spotlight beams.
+      const len = 12 + (i % 3) * 3;
       const cone = new Mesh(new ConeGeometry(0.5 + (i % 2) * 0.35, len, 10, 1, true), mat);
       cone.translateY(-len / 2);
       const hanger = new Group();
