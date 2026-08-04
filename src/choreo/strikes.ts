@@ -31,7 +31,6 @@ import {
   Points,
   PointsMaterial,
   RingGeometry,
-  SphereGeometry,
   type Object3D,
 } from 'three';
 import { CHOREO, DECAL_Y, OCTAGON_HALF_DEPTH, OCTAGON_HALF_WIDTH, PALETTE } from '../config.js';
@@ -290,9 +289,8 @@ export class StrikeFx {
         wave.rotation.z = bearing - Math.PI / 2 + halfAngle;
         wave.position.y = DECAL_Y + 0.01;
         g.add(wave);
-        const boom = new Mesh(new SphereGeometry(0.5, 12, 8), basic(WARN, 0.28));
-        boom.position.y = 0.5;
-        g.add(boom);
+        // (No centre burst — the danger is the RING racing outward; a blob
+        // of light in the middle read as an explosion where nobody was.)
         g.add(sparks.points);
       },
       (dt) => sparks.step(dt),

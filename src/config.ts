@@ -151,8 +151,11 @@ export const MOVES: Record<
     weights: number[];
   }
 > = {
-  slam: { chargeBeats: 4, weights: [4, 4, 3, 3] },
-  beam: { chargeBeats: 4, weights: [0, 3, 3, 3] },
+  // The slam is deliberately RARE and LATE: it fits, but it was opening
+  // nearly every set and never letting up. Sweeps and beams carry the
+  // early acts now; the drumline is a mid-set guest, not the doorman.
+  slam: { chargeBeats: 4, weights: [1, 3, 2, 2] },
+  beam: { chargeBeats: 4, weights: [2, 3, 3, 3] },
   sweep: { chargeBeats: 4, weights: [3, 3, 3, 3] },
   seesaw: { chargeBeats: 4, weights: [0, 3, 4, 4] },
   surge: { chargeBeats: 4, weights: [0, 0, 2, 3] },
