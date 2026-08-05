@@ -82,7 +82,14 @@ export class RankSystem extends createSystem({}) {
       // Elimination dims the deck's neon.
       const rimTarget = d && !d.alive ? 0.12 : 0.9;
       handle.rimMat.opacity += (rimTarget - handle.rimMat.opacity) * Math.min(1, delta * 3);
-      handle.nameSprite.material.opacity = d && !d.alive ? 0.25 : 1;
+      handle.nameMat.opacity = d && !d.alive ? 0.25 : 1;
+
+      // Name tags YAW toward the viewer but never roll or pitch — a tilted
+      // head must never tilt the room's text. World yaw minus the seat's
+      // baked platform yaw gives the tag's local turn.
+      handle.nameTag.getWorldPosition(_tag);
+      handle.nameTag.rotation.y =
+        Math.atan2(match.headX - _tag.x, match.headZ - _tag.z) - handle.root.rotation.y;
 
       // MY pedestal (only my handle carries one): stretch the column from my
       // slab's underside down to the common floor — the plane the stage base
@@ -159,3 +166,4 @@ export class RankSystem extends createSystem({}) {
 }
 
 const _head = new Vector3();
+const _tag = new Vector3();

@@ -16,8 +16,6 @@ import {
   Mesh,
   MeshBasicMaterial,
   PlaneGeometry,
-  Sprite,
-  SpriteMaterial,
 } from 'three';
 import { SCORE, TOUR } from '../config.js';
 import { trackById } from '../audio/tracks.js';
@@ -54,7 +52,9 @@ export class HudSystem extends createSystem({}) {
   private canvas = document.createElement('canvas');
   private tex!: CanvasTexture;
   private panel!: Mesh;
-  private flair!: Sprite;
+  /** A plane, not a Sprite — flair text must never roll with the head. */
+  private flair!: Mesh;
+  private flairMat!: MeshBasicMaterial;
   private flairCanvas = document.createElement('canvas');
   private flairTex!: CanvasTexture;
   private flairAge = 9;
@@ -76,10 +76,15 @@ export class HudSystem extends createSystem({}) {
     this.flairCanvas.width = 512;
     this.flairCanvas.height = 160;
     this.flairTex = new CanvasTexture(this.flairCanvas);
-    this.flair = new Sprite(new SpriteMaterial({ map: this.flairTex, transparent: true, depthWrite: false }));
+    this.flairMat = new MeshBasicMaterial({
+      map: this.flairTex,
+      transparent: true,
+      depthWrite: false,
+      side: DoubleSide,
+    });
+    this.flair = new Mesh(new PlaneGeometry(1.3, 0.4), this.flairMat);
     this.flair.renderOrder = 31;
-    this.flair.position.set(0, 1.75, -1.3);
-    this.flair.scale.set(1.3, 0.4, 1);
+    this.flair.position.set(0, 1.75, -1.3); // dead ahead, facing the player
     this.scene.add(this.flair);
   }
 
@@ -97,8 +102,9 @@ export class HudSystem extends createSystem({}) {
     const k = Math.min(1, this.flairAge / 0.18);
     const fade = Math.max(0, 1 - Math.max(0, this.flairAge - 0.9) / 0.5);
     this.flair.visible = inSet && fade > 0;
-    this.flair.scale.set(1.3 * (0.6 + 0.4 * k), 0.4 * (0.6 + 0.4 * k), 1);
-    (this.flair.material as SpriteMaterial).opacity = fade;
+    const pop = 0.6 + 0.4 * k;
+    this.flair.scale.set(pop, pop, 1);
+    this.flairMat.opacity = fade;
 
     if (!inSet) return;
 

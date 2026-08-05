@@ -21,11 +21,10 @@ import {
   Mesh,
   MeshBasicMaterial,
   MeshStandardMaterial,
+  PlaneGeometry,
   PointLight,
   RingGeometry,
   Scene,
-  Sprite,
-  SpriteMaterial,
   Vector3,
 } from 'three';
 import {
@@ -47,7 +46,11 @@ export interface PlatformHandle {
   /** The neon rim material (beat pulse + elimination dim live here). */
   rimMat: MeshBasicMaterial;
   slabMat: MeshStandardMaterial;
-  nameSprite: Sprite;
+  /** The floating name tag — a PLANE, not a Sprite: sprites copy the
+   *  camera's roll, so every head tilt tilted all the text. RankSystem
+   *  yaws it toward the viewer each frame; it stays world-upright. */
+  nameTag: Mesh;
+  nameMat: MeshBasicMaterial;
   /** MY platform only: the column under the deck that makes the climb
    *  VISIBLE — its top hugs the slab, its base reaches the common floor
    *  (where the stage sits), so looking over your rim you SEE you're up.
@@ -130,17 +133,18 @@ function buildPlatform(seat: number, name: string, isMine: boolean): PlatformHan
   root.add(rim);
 
   // Floating name tag over the far rim (not for my own platform — I know).
-  const nameSprite = new Sprite(
-    new SpriteMaterial({
-      map: nameTexture(name, cssColor(accent)),
-      transparent: true,
-      depthWrite: false,
-    }),
-  );
-  nameSprite.scale.set(1.1, 0.28, 1);
-  nameSprite.position.set(0, 2.05, 0);
-  nameSprite.visible = !isMine;
-  root.add(nameSprite);
+  // A yaw-billboarded plane: it turns to face you but never rolls.
+  const nameMat = new MeshBasicMaterial({
+    map: nameTexture(name, cssColor(accent)),
+    transparent: true,
+    depthWrite: false,
+    side: DoubleSide,
+  });
+  const nameTag = new Mesh(new PlaneGeometry(1.1, 0.28), nameMat);
+  nameTag.position.set(0, 2.05, 0);
+  nameTag.visible = !isMine;
+  nameTag.renderOrder = 24; // over the gel, under the board
+  root.add(nameTag);
 
   // MY pedestal: a unit-height octagonal column (slightly inset) with a
   // neon foot ring, hidden until the ranks raise me. RankSystem stretches
@@ -171,7 +175,7 @@ function buildPlatform(seat: number, name: string, isMine: boolean): PlatformHan
     root.add(pedestal);
   }
 
-  return { seat, root, rimMat, slabMat, nameSprite, pedestal, lift: 0 };
+  return { seat, root, rimMat, slabMat, nameTag, nameMat, pedestal, lift: 0 };
 }
 
 function buildStage(): { stage: Group; ringMat: MeshBasicMaterial; topY: number } {

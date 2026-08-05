@@ -467,9 +467,10 @@ export const TOUR: { sets: TourSet[]; freeSets: number; maxPhrases: number } = {
 export const TOUR_KEY = 'gdr-tour';
 
 /* ─────────────────────────────── THE BOTS ────────────────────────────────
- * Empty seats are filled with goo-groupies — seeded, deterministic dancers
- * every client simulates identically (no bot netcode: same seed, same
- * outcome, same leaderboard everywhere).
+ * Empty seats are filled with bots — seeded, deterministic dancers every
+ * client simulates identically (no bot netcode: same seed, same outcome,
+ * same leaderboard everywhere). They wear plain service tags (BOT01…),
+ * numbered around the ring in state.buildRoster.
  */
 export const BOTS = {
   /** Dodge chance range rolled per bot from the match seed. */
@@ -477,13 +478,6 @@ export const BOTS = {
   skillMax: 0.96,
   /** Dodge chance shrinks by this per act (the floor thins as the set peaks). */
   actPenalty: 0.05,
-  names: [
-    'MC WOBBLE', 'JELLY ROLL', 'GLUCOSE', 'SLIME BOOTS', 'DJ OOZE',
-    'GEL-VIS', 'BOUNCEHAUS', 'THE BLOBFATHER', 'MISS SQUISH', 'GOOTHYK',
-    'LORD LAVA LAMP', 'PECTIN', 'WIGGLETRON', 'AGAR AGAR', 'FLUBBERINA',
-    'SIR OSMOSIS', 'TAPIOCA', 'GLOOPI GOTH', 'VISCOSA', 'THE MARMALADE',
-    'PLASMA PAM', 'GUNK FUNK', 'SLURP DOGG',
-  ],
 };
 
 /* ─────────────────────────────── THE LOOK ────────────────────────────────

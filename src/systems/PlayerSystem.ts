@@ -26,9 +26,11 @@ import { createSystem, Vector3 } from '@iwsdk/core';
 import {
   CanvasTexture,
   CylinderGeometry,
+  DoubleSide,
   Group,
   Mesh,
   MeshBasicMaterial,
+  PlaneGeometry,
   Sprite,
   SpriteMaterial,
   type Object3D,
@@ -49,8 +51,11 @@ interface Stick {
   attachedTo: Object3D | null;
 }
 
+/** +N tags are PLANES, not Sprites — sprites roll with the camera, and a
+ *  tilted head must never tilt the text. Yawed toward the head each frame. */
 interface Floater {
-  sprite: Sprite;
+  tag: Mesh;
+  mat: MeshBasicMaterial;
   tex: CanvasTexture;
   canvas: HTMLCanvasElement;
   age: number;
@@ -79,12 +84,12 @@ export class PlayerSystem extends createSystem({}) {
       canvas.width = 160;
       canvas.height = 80;
       const tex = new CanvasTexture(canvas);
-      const sprite = new Sprite(new SpriteMaterial({ map: tex, transparent: true, depthWrite: false }));
-      sprite.scale.set(0.16, 0.08, 1);
-      sprite.renderOrder = 31;
-      sprite.visible = false;
-      this.scene.add(sprite);
-      this.floaters.push({ sprite, tex, canvas, age: 9 });
+      const mat = new MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, side: DoubleSide });
+      const tag = new Mesh(new PlaneGeometry(0.16, 0.08), mat);
+      tag.renderOrder = 31;
+      tag.visible = false;
+      this.scene.add(tag);
+      this.floaters.push({ tag, mat, tex, canvas, age: 9 });
     }
   }
 
@@ -174,19 +179,21 @@ export class PlayerSystem extends createSystem({}) {
     g.fillStyle = '#4fb7ff';
     g.fillText(text, 80, 40);
     f.tex.needsUpdate = true;
-    f.sprite.position.copy(at);
-    f.sprite.visible = true;
+    f.tag.position.copy(at);
+    f.tag.visible = true;
     f.age = 0;
   }
 
   private updateFloaters(delta: number): void {
     for (const f of this.floaters) {
-      if (!f.sprite.visible) continue;
+      if (!f.tag.visible) continue;
       f.age += delta;
-      f.sprite.position.y += delta * 0.35;
+      f.tag.position.y += delta * 0.35;
+      // Face the head with yaw only — upright text, whatever your neck does.
+      f.tag.rotation.y = Math.atan2(match.headX - f.tag.position.x, match.headZ - f.tag.position.z);
       const fade = 1 - Math.max(0, f.age - 0.25) / 0.5;
-      (f.sprite.material as SpriteMaterial).opacity = Math.max(0, fade);
-      if (f.age > 0.75) f.sprite.visible = false;
+      f.mat.opacity = Math.max(0, fade);
+      if (f.age > 0.75) f.tag.visible = false;
     }
   }
 

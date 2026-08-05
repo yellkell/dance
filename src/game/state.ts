@@ -183,12 +183,12 @@ export const setEndBeat = (): number => match.phrases * phraseBeats();
  *  play; every unlisted seat becomes a seeded goo-groupie. */
 export function buildRoster(seats: number, seed: number, mySeat: number, humans?: Map<number, { name: string; netId?: number }>): void {
   const rng = mulberry32(mix(seed, 0xb07));
-  const names = [...BOTS.names];
   const players: Dancer[] = [];
+  let bots = 0;
   for (let seat = 0; seat < seats; seat++) {
     const human = seat === mySeat ? { name: 'YOU' } : humans?.get(seat);
-    const nameIdx = names.length ? Math.floor(rng() * names.length) : 0;
-    const botName = names.length ? names.splice(nameIdx, 1)[0] : `GOOPIE ${seat}`;
+    // Bots wear plain service tags, numbered around the ring.
+    const botName = human ? '' : `BOT${String(++bots).padStart(2, '0')}`;
     players.push({
       seat,
       kind: seat === mySeat ? 'local' : human ? 'remote' : 'bot',
