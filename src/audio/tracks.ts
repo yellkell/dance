@@ -32,6 +32,8 @@ import captureUrl from '../assets/music/capture.m4a';
 import loopUrl from '../assets/music/loop.m4a';
 import moneyUrl from '../assets/music/money.m4a';
 import breakcoreUrl from '../assets/music/breakcore.mp3';
+import infectionUrl from '../assets/music/infection.m4a';
+import unityUrl from '../assets/music/unity.m4a';
 
 export type TrackRole = 'raid' | 'lobby' | 'rehearsal';
 
@@ -135,6 +137,29 @@ export const TRACKS: Track[] = [
     lufs: -8.3,
     // The endgame record: pure 174 DnB grid (phase-locked measurement said
     // 174.005 — one analyser step off the integer, 4 ms over the file).
+    roles: ['raid'],
+  },
+  {
+    id: 'unity',
+    title: 'UNITY',
+    url: unityUrl,
+    bpm: 117.0,
+    downbeat: 0.0464,
+    seconds: 299.49,
+    lufs: -13.8,
+    // The five-minute journey — its ambient open is skipped so a set
+    // drops straight into the groove (bar 7 on the grid).
+    startAt: 12.3542,
+    roles: ['raid'],
+  },
+  {
+    id: 'infection',
+    title: 'INFECTION',
+    url: infectionUrl,
+    bpm: 138.0,
+    downbeat: 0.7308,
+    seconds: 222.61,
+    lufs: -10.9,
     roles: ['raid'],
   },
   {

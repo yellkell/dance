@@ -150,12 +150,16 @@ export function buildDancer(hue: number): DancerRig {
   head.add(glowSprite(color, 0.4, 0.4));
   root.add(head);
 
-  /* ── torso: neck → chest → waist, one tapering line ── */
+  /* ── torso: neck → chest → waist, one tapering line ──
+   * The chest keeps the gloss-black jacket look (bounded by the bright
+   * collar above and clavicle across); the WAIST runs in the lit limb
+   * material — a dark pelvis column vanished at range and the legs read
+   * as standing apart from the body. */
   const neck = segment(0.028, 0.034, body);
   root.add(neck);
   const chest = segment(0.062, 0.045, body); // shoulders → waist (inverted: top wider)
   root.add(chest);
-  const waist = segment(0.045, 0.06, body); // waist → hips flare, subtle
+  const waist = segment(0.045, 0.06, limb); // waist → hips flare, subtle
   root.add(waist);
   const collar = new Mesh(new TorusGeometry(0.075, 0.008, 6, 16), neonStd());
   collar.rotation.x = Math.PI / 2;
@@ -197,7 +201,28 @@ export function buildDancer(hue: number): DancerRig {
   footR.scale.set(0.9, 0.45, 1.6);
   root.add(footL, footR);
 
-  /** Solve one two-bone arm and place its meshes. */
+  /* ── the girdle: what actually ATTACHES the limbs ──
+   * The torso is a slim centre line but the shoulders sit a hand's width
+   * out from it — with nothing spanning that gap the upper arms started in
+   * mid-air and every bend opened a hole at the elbow. A clavicle bar runs
+   * shoulder-to-shoulder through the chest, and joint balls cap every
+   * hinge (shoulders, elbows, hips) so the chains read as one body at any
+   * pose angle. */
+  const clavicle = segment(0.03, 0.03, limb);
+  root.add(clavicle);
+  const joint = (r: number): Mesh => {
+    const ball = new Mesh(new SphereGeometry(r, 10, 8), limb);
+    root.add(ball);
+    return ball;
+  };
+  const shoulderBallL = joint(0.042);
+  const shoulderBallR = joint(0.042);
+  const elbowBallL = joint(0.032);
+  const elbowBallR = joint(0.032);
+  const hipBallL = joint(0.04);
+  const hipBallR = joint(0.04);
+
+  /** Solve one two-bone arm and place its meshes (elbow ball included). */
   const solveArm = (
     side: -1 | 1,
     shoulder: Vector3,
@@ -207,6 +232,7 @@ export function buildDancer(hue: number): DancerRig {
     hz: number,
     upper: Mesh,
     fore: Mesh,
+    elbow: Mesh,
   ): void => {
     _b.set(hx, hy, hz);
     _dir.copy(_b).sub(shoulder);
@@ -230,6 +256,7 @@ export function buildDancer(hue: number): DancerRig {
     _mid.copy(shoulder).addScaledVector(_dir, along).addScaledVector(_perp, lift);
     align(upper, shoulder, _mid);
     align(fore, _mid, _b);
+    elbow.position.copy(_mid);
     hand.position.copy(_b);
     // The glowstick leans with the forearm, flared slightly outward.
     hand.quaternion.setFromUnitVectors(UP, _dir.set(side * 0.35, 1, -0.15).normalize());
@@ -273,9 +300,14 @@ export function buildDancer(hue: number): DancerRig {
     waistRing.position.set(_mid.x, _mid.y, _mid.z);
     waistRing.rotation.y = p.yaw;
 
+    // The girdle: clavicle bar + shoulder balls pin the arms to the torso.
+    align(clavicle, shoulderL, shoulderR);
+    shoulderBallL.position.copy(shoulderL);
+    shoulderBallR.position.copy(shoulderR);
+
     // Arms.
-    solveArm(-1, shoulderL, handL, p.lx, p.ly * (1 - melt * 0.6), p.lz, upperL, foreL);
-    solveArm(1, shoulderR, handR, p.rx, p.ry * (1 - melt * 0.6), p.rz, upperR, foreR);
+    solveArm(-1, shoulderL, handL, p.lx, p.ly * (1 - melt * 0.6), p.lz, upperL, foreL, elbowBallL);
+    solveArm(1, shoulderR, handR, p.rx, p.ry * (1 - melt * 0.6), p.rz, upperR, foreR, elbowBallR);
 
     // Legs: feet plant a touch wider than the hips and trail the body.
     for (const side of [-1, 1] as const) {
@@ -283,6 +315,7 @@ export function buildDancer(hue: number): DancerRig {
       foot.set(hipX + side * (HIP_W + 0.035) * cos, 0.025, hipZ - side * (HIP_W + 0.035) * sin + 0.02);
       const leg = side < 0 ? legL : legR;
       align(leg, foot, hip);
+      (side < 0 ? hipBallL : hipBallR).position.copy(hip);
       const shoe = side < 0 ? footL : footR;
       shoe.position.copy(foot);
       shoe.rotation.y = p.yaw;
