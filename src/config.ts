@@ -212,6 +212,12 @@ export const CHOREO = {
   novaHalfAngle: 0.6,
   novaHalfAngleLate: 0.45,
   novaRadius: 1.15,
+  /** THE GAUNTLET (late-act nova): extra pies drop in rhythm, each safe
+   *  wedge stepped this far around the compass — adjacent wedges nearly
+   *  touch (turn − 2×halfAngle of danger between them), so the whole ring
+   *  times a walk through the slices together. */
+  novaWalkBeats: 2,
+  novaWalkTurn: 1.05,
   /** Gate: half-width of the safe column; tightens in the last act. */
   gateHalfW: 0.3,
   gateHalfWLate: 0.22,

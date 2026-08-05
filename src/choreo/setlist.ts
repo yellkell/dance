@@ -145,15 +145,19 @@ function buildLandings(kind: MoveKind, landBeat: number, act: number, rng: () =>
       side = side === 1 ? -1 : 1;
     }
   } else {
-    // nova: one canonical compass bearing for the whole ring.
-    landings.push({
-      beat: landBeat,
-      zone: {
-        kind: 'nova',
-        bearing: rng() * Math.PI * 2,
-        halfAngle: act >= 3 ? CHOREO.novaHalfAngleLate : CHOREO.novaHalfAngle,
-      },
-    });
+    // nova: one canonical compass bearing for the whole ring — and at the
+    // set's peak, THE GAUNTLET: extra pies laid down in rhythm, each safe
+    // wedge a step further around the compass. Every disc fills toward its
+    // own landing (the established drumline language), so the order reads,
+    // and the whole ring times the walk through the slices together.
+    const slices = act >= 3 ? 3 : act >= 2 && rng() < 0.45 ? 2 : 1;
+    const halfAngle = act >= 3 ? CHOREO.novaHalfAngleLate : CHOREO.novaHalfAngle;
+    let bearing = rng() * Math.PI * 2;
+    const turn = (rng() < 0.5 ? 1 : -1) * CHOREO.novaWalkTurn;
+    for (let i = 0; i < slices; i++) {
+      landings.push({ beat: landBeat + i * CHOREO.novaWalkBeats, zone: { kind: 'nova', bearing, halfAngle } });
+      bearing += turn;
+    }
   }
   return landings;
 }

@@ -392,17 +392,16 @@ export class ChoreoSystem extends createSystem({}) {
           sfx.sweepWhoosh();
           break;
         case 'half':
-          sfx.gooSlam();
+          sfx.floodCrash();
           break;
         case 'gate':
           sfx.slamImpact();
           break;
         case 'chase':
-          sfx.gooSlam();
+          sfx.pounceSnap();
           break;
         case 'nova':
-          sfx.beamBlast();
-          sfx.slamImpact();
+          sfx.novaBoom();
           break;
       }
     }

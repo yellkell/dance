@@ -88,34 +88,51 @@
         position: relative;
         z-index: 1;
         text-align: center;
-        line-height: 0.95;
+        line-height: 0.92;
         user-select: none;
       }
-      .landing__goop {
+      .landing__rave,
+      .landing__raidword {
         display: block;
         font-family: 'Arial Black', 'Arial Narrow', system-ui, sans-serif;
         font-weight: 900;
-        font-size: clamp(52px, 13vw, 150px);
-        letter-spacing: 0.02em;
+        font-size: clamp(72px, 18vw, 210px);
+        letter-spacing: 0.04em;
+        text-indent: 0.04em;
+      }
+      /* RAVE: goo-green face with a magenta chromatic ghost — the two house
+         colours split like stage light through a prism. */
+      .landing__rave {
         color: #b9ffc4;
         text-shadow:
-          0 0 18px rgba(54, 224, 90, 0.95),
-          0 0 60px rgba(54, 224, 90, 0.55),
-          0 4px 0 rgba(10, 46, 24, 0.9);
+          -5px 0 0 rgba(255, 42, 213, 0.55),
+          5px 0 0 rgba(79, 183, 255, 0.45),
+          0 0 22px rgba(54, 224, 90, 0.95),
+          0 0 70px rgba(54, 224, 90, 0.5),
+          0 6px 0 rgba(10, 46, 24, 0.9);
         animation: throb 1.875s ease-in-out infinite; /* two bars at 128 BPM */
       }
-      .landing__raid {
-        display: block;
-        margin-top: 0.35em;
-        font-family: 'Arial Black', system-ui, sans-serif;
-        font-weight: 900;
-        font-size: clamp(20px, 4.6vw, 52px);
-        letter-spacing: 0.42em;
-        text-indent: 0.42em;
+      .landing__raidword {
         color: #ffd9f6;
         text-shadow:
-          0 0 14px rgba(255, 42, 213, 0.95),
-          0 0 44px rgba(255, 42, 213, 0.5);
+          -5px 0 0 rgba(54, 224, 90, 0.5),
+          5px 0 0 rgba(176, 107, 255, 0.5),
+          0 0 22px rgba(255, 42, 213, 0.95),
+          0 0 70px rgba(255, 42, 213, 0.55),
+          0 6px 0 rgba(66, 6, 52, 0.95);
+        animation: throb 1.875s ease-in-out infinite;
+        animation-delay: 0.234s; /* half a beat behind — they trade the kick */
+      }
+      .landing__feat {
+        display: block;
+        margin-top: 1.1em;
+        font-family: 'Arial Black', system-ui, sans-serif;
+        font-weight: 900;
+        font-size: clamp(12px, 2vw, 20px);
+        letter-spacing: 0.5em;
+        text-indent: 0.5em;
+        color: rgba(185, 255, 196, 0.75);
+        text-shadow: 0 0 12px rgba(54, 224, 90, 0.6);
       }
       @keyframes throb {
         0%,
@@ -123,25 +140,46 @@
           transform: scale(1);
         }
         6% {
-          transform: scale(1.035) skewX(-1deg);
+          transform: scale(1.045) skewX(-1deg);
         }
         12% {
-          transform: scale(0.995);
+          transform: scale(0.99);
         }
       }
-      .landing__sub {
-        position: relative;
-        z-index: 1;
-        margin: 0;
-        max-width: 34em;
-        text-align: center;
-        color: rgba(232, 236, 242, 0.78);
-        font-size: clamp(13px, 1.9vw, 17px);
-        letter-spacing: 0.04em;
+      /* The equaliser: a strip of neon bars dancing along the bottom edge. */
+      .landing__eq {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: 18vh;
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+        gap: clamp(6px, 1.2vw, 16px);
+        pointer-events: none;
+        opacity: 0.8;
+        filter: blur(0.4px);
       }
-      .landing__sub b {
-        color: #b9ffc4;
-        font-weight: 700;
+      .landing__eq span {
+        width: clamp(10px, 2.4vw, 30px);
+        border-radius: 6px 6px 0 0;
+        animation: eq 0.9375s ease-in-out infinite alternate; /* two beats up-down */
+        transform-origin: bottom;
+      }
+      .landing__eq span:nth-child(6n + 1) { background: linear-gradient(#ff2ad5, transparent); height: 34%; animation-duration: 0.85s; }
+      .landing__eq span:nth-child(6n + 2) { background: linear-gradient(#4fb7ff, transparent); height: 58%; animation-duration: 1.05s; }
+      .landing__eq span:nth-child(6n + 3) { background: linear-gradient(#36e05a, transparent); height: 42%; animation-duration: 0.7s; }
+      .landing__eq span:nth-child(6n + 4) { background: linear-gradient(#ffb000, transparent); height: 66%; animation-duration: 1.2s; }
+      .landing__eq span:nth-child(6n + 5) { background: linear-gradient(#b06bff, transparent); height: 30%; animation-duration: 0.95s; }
+      .landing__eq span:nth-child(6n + 6) { background: linear-gradient(#ffd9f6, transparent); height: 50%; animation-duration: 0.8s; }
+      @keyframes eq {
+        from {
+          transform: scaleY(0.25);
+        }
+        to {
+          transform: scaleY(1);
+        }
       }
       #enter-vr {
         position: relative;
@@ -175,30 +213,22 @@
         opacity: 0.45;
         cursor: default;
       }
-      .landing__hint {
-        position: relative;
-        z-index: 1;
-        margin: 0;
-        color: rgba(232, 236, 242, 0.4);
-        font-size: 12px;
-        letter-spacing: 0.08em;
-      }
     </style>
   </head>
   <body>
     <div id="scene-container"></div>
     <div class="landing">
       <div class="landing__title">
-        <span class="landing__goop">RAVE&nbsp;RAID</span>
-        <span class="landing__raid">feat.&nbsp;THE&nbsp;GOOPLIATH</span>
+        <span class="landing__rave">RAVE</span>
+        <span class="landing__raidword">RAID</span>
+        <span class="landing__feat">feat. THE GOOPLIATH</span>
       </div>
-      <p class="landing__sub">
-        A passthrough rave in your own room. Up to <b>24 dancers</b> ring one giant headliner —
-        every move they throw marks <b>every platform at once</b>. Read the air, move on the beat,
-        keep your combo alive. Last dancer standing owns the night. 🪩
-      </p>
       <button id="enter-vr">ENTER THE RAVE</button>
-      <p class="landing__hint">Quest browser: passthrough AR &nbsp;·&nbsp; Desktop: WebXR emulator (WASD + mouse)</p>
+      <div class="landing__eq" aria-hidden="true">
+        <span></span><span></span><span></span><span></span><span></span><span></span>
+        <span></span><span></span><span></span><span></span><span></span><span></span>
+        <span></span><span></span><span></span><span></span><span></span><span></span>
+      </div>
     </div>
     <script type="module" src="/src/main.ts"></script>
   </body>

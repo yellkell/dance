@@ -873,6 +873,33 @@ export function gooSlam(): void {
   tone({ freq: 140, to: 44, type: 'sine', dur: 0.22, gain: 0.22, delay: 0.005 }); // low thud
 }
 
+/** Half the deck flooding at once — a wave front breaking over the line.
+ *  (Seesaw and surge landings: they used to borrow the slam's thud.) */
+export function floodCrash(): void {
+  whooshNoise(0.34, 0.3, 240, 1600); // the wall of goo arriving
+  noiseHit(0.28, 0.32, 900, 90, 2.2); // the break
+  tone({ freq: 70, to: 30, type: 'sine', dur: 0.45, gain: 0.34 });
+  bubble(220, 0.06, 0.16, 0.08);
+  bubble(320, 0.05, 0.3, 0.06);
+}
+
+/** The chase disc pouncing shut on its mark — a SNAP, not a slam. */
+export function pounceSnap(): void {
+  tone({ freq: 900, to: 70, type: 'square', dur: 0.12, gain: 0.11 }); // jaws down
+  noiseHit(0.1, 0.28, 2600, 400, 1.2);
+  tone({ freq: 95, to: 34, type: 'sine', dur: 0.3, gain: 0.3, delay: 0.03 }); // planted
+  clank(420, 0.1, 0.05, 0.05);
+}
+
+/** The pie detonating — one shockwave rolling over the whole ring. */
+export function novaBoom(): void {
+  noiseHit(0.4, 0.4, 3000, 120, 1.6); // the blast front
+  whooshNoise(0.7, 0.15, 2200, 200, 0.05); // rolling outward
+  tone({ freq: 60, to: 24, type: 'sine', dur: 0.8, gain: 0.4 }); // sub drop
+  subSwell(40, 26, 1.0, 0.2, 0.05, 0.05);
+  clank(90, 0.11, 0.6, 0.14); // the room answering
+}
+
 /** The spinning attack — a long sweeping rotor of air and slime. */
 export function spinWhoosh(): void {
   whooshNoise(0.4, 0.22, 180, 1300);
