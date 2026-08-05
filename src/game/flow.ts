@@ -68,6 +68,8 @@ export function startRaid(opts: RaidOptions = {}): void {
     (match.preferredTrack ? trackById(match.preferredTrack) : undefined) ??
     pickRaidTrack(match.seed);
   mountTrack(chosen);
+  // Campaign nights stay night-sized even on marathon records.
+  if (opts.tour) match.phrases = Math.min(match.phrases, TOUR.maxPhrases);
 
   match.goopling = null;
   match.beatZeroAt = opts.beatZeroAt ?? NaN;

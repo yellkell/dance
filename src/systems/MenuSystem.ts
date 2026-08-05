@@ -399,7 +399,12 @@ export class MenuSystem extends createSystem({}) {
         [
           {
             id: 'exit',
-            label: match.screen === 'tutorial' ? 'END REHEARSAL' : 'BACK TO THE GREEN ROOM',
+            label:
+              match.screen === 'tutorial'
+                ? 'END REHEARSAL'
+                : match.tour
+                  ? 'BACK TO THE MAP'
+                  : 'BACK TO THE GREEN ROOM',
             accent: UI.danger,
             x: 24,
             y: 24,
@@ -510,18 +515,6 @@ export class MenuSystem extends createSystem({}) {
 
     // Tab-specific body decoration.
     if (tab === 'tour') this.drawTreasureMap(g);
-    if (tab === 'map') {
-      g.textAlign = 'left';
-      g.font = "700 24px 'Arial Black', system-ui, sans-serif";
-      g.fillStyle = allGooplingsCleared() ? UI.goop : UI.dim;
-      g.fillText(
-        allGooplingsCleared()
-          ? 'RAVE READY — every move in your feet'
-          : 'five gooplings · five moves · clear the row',
-        CONTENT_X,
-        920,
-      );
-    }
     if (tab === 'sys') {
       g.textAlign = 'left';
       g.font = "700 24px 'Arial Black', system-ui, sans-serif";
@@ -548,14 +541,19 @@ export class MenuSystem extends createSystem({}) {
       );
     }
 
-    // Footer — the tour swaps the controls hint for the edge-of-the-map tease.
+    // Footer — tab-aware: the tour teases past the map's edge, the
+    // rehearsal reports the row, everyone else gets the controls hint.
     g.textAlign = 'center';
     g.font = "700 21px 'Arial Black', system-ui, sans-serif";
-    g.fillStyle = 'rgba(232,236,242,0.4)';
+    g.fillStyle = tab === 'map' && allGooplingsCleared() ? UI.goop : 'rgba(232,236,242,0.4)';
     g.fillText(
       tab === 'tour'
         ? '🔒 MORE TREASURE PAST THE EDGE OF THE MAP — new sets on the way ⟶'
-        : 'point · pull the trigger — mid-set the board packs away, right Ⓐ bails',
+        : tab === 'map'
+          ? allGooplingsCleared()
+            ? 'RAVE READY — every move in your feet'
+            : `${GOOPLINGS.length} gooplings · every move in the game · clear the row`
+          : 'point · pull the trigger — mid-set the board packs away, right Ⓐ bails',
       W / 2,
       992,
     );
@@ -939,6 +937,7 @@ export class MenuSystem extends createSystem({}) {
 
   private rehearsalContent(buttons: PanelButton[]): void {
     const cleared = clearedGooplings();
+    // Seven tutors fit the column at a tighter pitch.
     GOOPLINGS.forEach((gp, i) => {
       const unlocked = gooplingUnlocked(i);
       const done = cleared.has(gp.id);
@@ -949,9 +948,9 @@ export class MenuSystem extends createSystem({}) {
         accent: done ? UI.goop : unlocked ? UI.magenta : undefined,
         disabled: !unlocked,
         x: CONTENT_X,
-        y: 152 + i * 142,
+        y: 148 + i * 114,
         w: CONTENT_W,
-        h: 124,
+        h: 102,
         small: true,
       });
     });

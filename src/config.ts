@@ -369,6 +369,26 @@ export const GOOPLINGS: GooplingDef[] = [
     lesson: 'Half the deck floods, then the other.\nCROSS the centreline on the beat.',
   },
   {
+    id: 'door',
+    name: 'BOUNCER',
+    epithet: 'the velvet rope',
+    move: 'gate',
+    scale: 1.45,
+    trackId: 'capture',
+    clears: 6,
+    lesson: 'The whole deck floods — one gap stays.\nSTAND IN THE DOORWAY.',
+  },
+  {
+    id: 'cling',
+    name: 'SMITTEN',
+    epithet: 'the lovestruck puddle',
+    move: 'chase',
+    scale: 1.5,
+    trackId: 'combat',
+    clears: 6,
+    lesson: 'A disc GLUES to your feet and follows.\nKEEP MOVING — JUKE when it freezes.',
+  },
+  {
     id: 'compass',
     name: 'GLOBULON',
     epithet: 'the wedge preacher',
@@ -414,8 +434,12 @@ export interface TourSet {
   tint: { shallow: number; deep: number; nucleus: number } | null;
 }
 
-export const TOUR: { sets: TourSet[]; freeSets: number } = {
+export const TOUR: { sets: TourSet[]; freeSets: number; maxPhrases: number } = {
   freeSets: 3,
+  /** Tour nights cap here even when the record could run longer — UNITY is
+   *  five minutes; a campaign night shouldn't be. Free play still rides the
+   *  whole file. */
+  maxPhrases: 12,
   sets: [
     {
       id: 'opening',

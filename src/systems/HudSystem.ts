@@ -19,9 +19,11 @@ import {
   Sprite,
   SpriteMaterial,
 } from 'three';
-import { SCORE } from '../config.js';
+import { SCORE, TOUR } from '../config.js';
 import { trackById } from '../audio/tracks.js';
 import { match, me } from '../game/state.js';
+
+const SET_COLORS = ['#8cff70', '#ff6ee0', '#ffd24a'];
 
 const W = 768;
 const H = 384;
@@ -155,9 +157,21 @@ export class HudSystem extends createSystem({}) {
 
     if (count > 0) {
       const cued = trackById(match.trackId);
-      ink(g, 'THE SET DROPS IN', W / 2, 70, 40, '#ffd9f6');
-      ink(g, `${count}`, W / 2, H / 2 + 18, 150, '#ff2ad5');
-      if (cued) ink(g, `♪ ${cued.title}`, W / 2, H - 48, 38, '#b9ffc4');
+      ink(g, 'THE SET DROPS IN', W / 2, 64, 40, '#ffd9f6');
+      // Tour nights announce themselves on the card.
+      if (match.tour) {
+        const set = TOUR.sets[match.tour.set];
+        ink(
+          g,
+          `${set?.name ?? 'THE TOUR'} — NIGHT ${match.tour.song + 1}`,
+          W / 2,
+          112,
+          26,
+          SET_COLORS[match.tour.set % SET_COLORS.length],
+        );
+      }
+      ink(g, `${count}`, W / 2, H / 2 + 22, 144, '#ff2ad5');
+      if (cued) ink(g, `♪ ${cued.title}`, W / 2, H - 44, 38, '#b9ffc4');
       this.tex.needsUpdate = true;
       return;
     }
@@ -174,6 +188,29 @@ export class HudSystem extends createSystem({}) {
     );
     if (match.grooveStreak >= 4) {
       ink(g, `GROOVE ×${match.grooveStreak}`, W / 2, 258, 32, '#4fb7ff');
+    } else if (match.grooveStreak > 0) {
+      // The wind-up: rogue-style combo pips. Each rhythmic swap lights one;
+      // at four the row gives way to the ×meter above. Same ink discipline —
+      // heavy casing so they read on any room.
+      const pips = 4;
+      const gap = 54;
+      const x0 = W / 2 - gap * ((pips - 1) / 2);
+      for (let i = 0; i < pips; i++) {
+        g.beginPath();
+        g.arc(x0 + i * gap, 258, 12, 0, Math.PI * 2);
+        g.lineWidth = 8;
+        g.strokeStyle = 'rgba(0,2,6,0.96)';
+        g.stroke();
+        if (i < match.grooveStreak) {
+          g.shadowColor = '#4fb7ff';
+          g.shadowBlur = 16;
+          g.fillStyle = '#4fb7ff';
+        } else {
+          g.fillStyle = 'rgba(50,58,72,0.9)';
+        }
+        g.fill();
+        g.shadowBlur = 0;
+      }
     }
 
     // Lives as goo drops — drawn, so they get outlines too.
