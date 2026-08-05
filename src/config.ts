@@ -180,7 +180,10 @@ export const MOVES: Record<
   gate: { chargeBeats: 4, weights: [3, 3, 2, 2] },
   // The CHASE arrives once feet are warm — pursuit, then the late juke.
   chase: { chargeBeats: 5, weights: [0, 2, 3, 3] },
-  nova: { chargeBeats: 8, weights: [0, 0, 2, 3] },
+  // The PIE hits on a chase-length fuse: finding the wedge takes one look,
+  // and the old 8-beat wind-up was a 6-second stand-and-wait on slow
+  // records. 5 beats keeps the whole-ring rotate honest and lands sooner.
+  nova: { chargeBeats: 5, weights: [0, 0, 2, 3] },
 };
 
 export const CHOREO = {
