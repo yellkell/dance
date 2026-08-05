@@ -123,17 +123,6 @@
         animation: throb 1.875s ease-in-out infinite;
         animation-delay: 0.234s; /* half a beat behind — they trade the kick */
       }
-      .landing__feat {
-        display: block;
-        margin-top: 1.1em;
-        font-family: 'Arial Black', system-ui, sans-serif;
-        font-weight: 900;
-        font-size: clamp(12px, 2vw, 20px);
-        letter-spacing: 0.5em;
-        text-indent: 0.5em;
-        color: rgba(185, 255, 196, 0.75);
-        text-shadow: 0 0 12px rgba(54, 224, 90, 0.6);
-      }
       @keyframes throb {
         0%,
         100% {
@@ -144,41 +133,6 @@
         }
         12% {
           transform: scale(0.99);
-        }
-      }
-      /* The equaliser: a strip of neon bars dancing along the bottom edge. */
-      .landing__eq {
-        position: absolute;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        height: 18vh;
-        display: flex;
-        align-items: flex-end;
-        justify-content: center;
-        gap: clamp(6px, 1.2vw, 16px);
-        pointer-events: none;
-        opacity: 0.8;
-        filter: blur(0.4px);
-      }
-      .landing__eq span {
-        width: clamp(10px, 2.4vw, 30px);
-        border-radius: 6px 6px 0 0;
-        animation: eq 0.9375s ease-in-out infinite alternate; /* two beats up-down */
-        transform-origin: bottom;
-      }
-      .landing__eq span:nth-child(6n + 1) { background: linear-gradient(#ff2ad5, transparent); height: 34%; animation-duration: 0.85s; }
-      .landing__eq span:nth-child(6n + 2) { background: linear-gradient(#4fb7ff, transparent); height: 58%; animation-duration: 1.05s; }
-      .landing__eq span:nth-child(6n + 3) { background: linear-gradient(#36e05a, transparent); height: 42%; animation-duration: 0.7s; }
-      .landing__eq span:nth-child(6n + 4) { background: linear-gradient(#ffb000, transparent); height: 66%; animation-duration: 1.2s; }
-      .landing__eq span:nth-child(6n + 5) { background: linear-gradient(#b06bff, transparent); height: 30%; animation-duration: 0.95s; }
-      .landing__eq span:nth-child(6n + 6) { background: linear-gradient(#ffd9f6, transparent); height: 50%; animation-duration: 0.8s; }
-      @keyframes eq {
-        from {
-          transform: scaleY(0.25);
-        }
-        to {
-          transform: scaleY(1);
         }
       }
       #enter-vr {
@@ -221,14 +175,8 @@
       <div class="landing__title">
         <span class="landing__rave">RAVE</span>
         <span class="landing__raidword">RAID</span>
-        <span class="landing__feat">feat. THE GOOPLIATH</span>
       </div>
       <button id="enter-vr">ENTER THE RAVE</button>
-      <div class="landing__eq" aria-hidden="true">
-        <span></span><span></span><span></span><span></span><span></span><span></span>
-        <span></span><span></span><span></span><span></span><span></span><span></span>
-        <span></span><span></span><span></span><span></span><span></span><span></span>
-      </div>
     </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
