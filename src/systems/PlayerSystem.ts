@@ -36,9 +36,8 @@ import {
   type Object3D,
 } from 'three';
 import { CHOREO, GROOVE, hueToColor, seatHue } from '../config.js';
-import * as sfx from '../audio/sfx.js';
 import { glowSprite } from '../materials/glow.js';
-import { match, me, pushFlair } from '../game/state.js';
+import { match, me } from '../game/state.js';
 
 const _head = new Vector3();
 const _hand = new Vector3();
@@ -267,16 +266,8 @@ export class PlayerSystem extends createSystem({}) {
       this.popFloater(`+${award}`, _hand);
     }
 
-    if (this.streak === 8 || this.streak === 32 || this.streak === 100 || this.streak === GROOVE.streakCap) {
-      pushFlair(
-        this.streak === GROOVE.streakCap
-          ? 'MAX GROOVE!!'
-          : this.streak === 100
-            ? 'CENTURY GROOVE!'
-            : 'IN THE GROOVE!',
-        'milestone',
-      );
-      sfx.uiClick();
-    }
+    // No milestone pop-ups: the pips, the ×meter and the stick pulses ARE
+    // the groove feedback — the flair channel stays clear for dodges, hits
+    // and the fights that matter.
   }
 }
