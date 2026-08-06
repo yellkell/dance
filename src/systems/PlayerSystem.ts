@@ -255,8 +255,9 @@ export class PlayerSystem extends createSystem({}) {
     d.score += award;
     match.grooveStreak = this.streak;
 
-    // The quiet answer from the hand that went up: the stick pops and a
-    // small +N drifts off it.
+    // The quiet answer from the hand that went up: the stick pops, a small
+    // +N drifts off it, and the palm gets a short TICK — a touch stronger
+    // as the streak deepens. Felt, not heard.
     const hand = side === 1 ? 'left' : 'right';
     const stick = this.sticks[hand];
     stick.pulse = 1;
@@ -265,9 +266,29 @@ export class PlayerSystem extends createSystem({}) {
       _hand.y += 0.12;
       this.popFloater(`+${award}`, _hand);
     }
+    this.buzz(hand, 0.28 + Math.min(this.streak, 50) * 0.004, 40);
 
     // No milestone pop-ups: the pips, the ×meter and the stick pulses ARE
     // the groove feedback — the flair channel stays clear for dodges, hits
     // and the fights that matter.
+  }
+
+  /** A short haptic tick on one controller. The IWSDK gamepad wrapper is a
+   *  pure state tracker, so this talks to the raw WebXR input source; on
+   *  hardware without an actuator it's a silent no-op. */
+  private buzz(hand: 'left' | 'right', intensity: number, ms: number): void {
+    const session = (this.world as { session?: XRSession | null }).session;
+    if (!session?.inputSources) return;
+    for (const src of session.inputSources) {
+      if (src.handedness !== hand) continue;
+      const actuator = (
+        src.gamepad as { hapticActuators?: readonly { pulse?: (i: number, ms: number) => void }[] } | undefined
+      )?.hapticActuators?.[0];
+      try {
+        actuator?.pulse?.(Math.min(1, intensity), ms);
+      } catch {
+        /* some browsers throw on unsupported pulse — fine, it's garnish */
+      }
+    }
   }
 }
