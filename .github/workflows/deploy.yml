@@ -40,6 +40,14 @@ jobs:
   deploy:
     needs: build
     runs-on: ubuntu-latest
+    # Declared HERE as well as at the top of the file: deploy-pages mints an
+    # OIDC token to prove it may publish, and a run whose deploy job didn't
+    # carry id-token:write failed with "Invalid actions OIDC token". The
+    # job-level grant is what GitHub's own Pages template ships.
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
