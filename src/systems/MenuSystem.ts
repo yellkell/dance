@@ -474,9 +474,6 @@ export class MenuSystem extends createSystem({}) {
     g.shadowBlur = 22;
     g.fillText('RAVE RAID', 40, 66);
     g.shadowBlur = 0;
-    g.font = "700 20px 'Arial Black', system-ui, sans-serif";
-    g.fillStyle = UI.dim;
-    g.fillText('feat. THE GOOPLIATH', 44, 108);
 
     // Header status, right-aligned.
     g.textAlign = 'right';
@@ -494,9 +491,6 @@ export class MenuSystem extends createSystem({}) {
       g.fillStyle = UI.dim;
       g.fillText('OFFLINE · SOLO + GROUPIES', W - 40, 56);
     }
-    g.font = "700 18px 'Arial Black', system-ui, sans-serif";
-    g.fillStyle = 'rgba(232,236,242,0.35)';
-    g.fillText(`${match.seats}-DANCER RING`, W - 40, 92);
 
     // Rail plate + active accent bar.
     g.fillStyle = 'rgba(12,9,22,0.66)';
@@ -541,22 +535,22 @@ export class MenuSystem extends createSystem({}) {
       );
     }
 
-    // Footer — tab-aware: the tour teases past the map's edge, the
-    // rehearsal reports the row, everyone else gets the controls hint.
-    g.textAlign = 'center';
-    g.font = "700 21px 'Arial Black', system-ui, sans-serif";
-    g.fillStyle = tab === 'map' && allGooplingsCleared() ? UI.goop : 'rgba(232,236,242,0.4)';
-    g.fillText(
-      tab === 'tour'
-        ? '🔒 MORE TREASURE PAST THE EDGE OF THE MAP — new sets on the way ⟶'
-        : tab === 'map'
+    // Footer — the rehearsal reports its row, PLAY gets the controls hint.
+    // The map carries none: the chart speaks for itself.
+    if (tab !== 'tour') {
+      g.textAlign = 'center';
+      g.font = "700 21px 'Arial Black', system-ui, sans-serif";
+      g.fillStyle = tab === 'map' && allGooplingsCleared() ? UI.goop : 'rgba(232,236,242,0.4)';
+      g.fillText(
+        tab === 'map'
           ? allGooplingsCleared()
             ? 'RAVE READY — every move in your feet'
             : `${GOOPLINGS.length} gooplings · every move in the game · clear the row`
           : 'point · pull the trigger — mid-set the board packs away, right Ⓐ bails',
-      W / 2,
-      992,
-    );
+        W / 2,
+        992,
+      );
+    }
   }
 
   /* ── PLAY ── */
@@ -752,25 +746,8 @@ export class MenuSystem extends createSystem({}) {
     }
     trail(Math.min(frontier, 8), 'rgba(140,255,112,0.6)', 6);
 
-    // Set banners — anchored in open water, clear of every stop label.
-    const banners: { x: number; y: number; rot: number }[] = [
-      { x: 1188, y: 856, rot: 0.03 },
-      { x: 985, y: 474, rot: -0.03 },
-      { x: 352, y: 316, rot: -0.04 },
-    ];
-    TOUR.sets.forEach((set, s) => {
-      const b = banners[s];
-      g.save();
-      g.translate(b.x, b.y);
-      g.rotate(b.rot);
-      g.textAlign = 'left';
-      g.font = "900 27px 'Arial Black', system-ui, sans-serif";
-      g.fillStyle = SET_COLORS[s % SET_COLORS.length];
-      g.fillText(`SET ${s + 1} · ${set.name}`, 0, 0);
-      g.restore();
-    });
-
-    // The stops.
+    // The stops. (No set banners: the coloured regions and the trail order
+    // group them; the count-in card names the night you booked.)
     TOUR.sets.forEach((set, s) => {
       set.songs.forEach((songId, i) => {
         const n = MAP_NODES[s][i];
@@ -856,13 +833,11 @@ export class MenuSystem extends createSystem({}) {
           g.fillText('▼ NEXT', n.x, n.y - n.r - 30);
         }
 
-        // Stop labels.
+        // Stop label: the record's name, nothing else. Finales are marked by
+        // the goop's eyes and the treasure by its X — the chart, not a caption.
         g.font = "900 23px 'Arial Black', system-ui, sans-serif";
         g.fillStyle = unlocked ? UI.text : 'rgba(200,204,216,0.45)';
         g.fillText(track?.title ?? songId, n.x, n.y + n.r + 26);
-        g.font = "700 18px 'Arial Black', system-ui, sans-serif";
-        g.fillStyle = finale ? setColor : UI.dim;
-        g.fillText(finale ? (treasure ? 'THE TREASURE · GOOP FINALE' : 'GOOP FINALE') : `night ${i + 1} · ${Math.round(track?.bpm ?? 0)} BPM`, n.x, n.y + n.r + 52);
       });
     });
 
@@ -907,10 +882,6 @@ export class MenuSystem extends createSystem({}) {
       g.fillStyle = '#f4fff2';
       g.fill();
     }
-    g.font = "italic 700 19px Arial, system-ui, sans-serif";
-    g.fillStyle = UI.dim;
-    g.fillText('here be goop', gx, gy + 40);
-
   }
 
   private tourContent(buttons: PanelButton[]): void {
