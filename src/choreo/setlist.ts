@@ -77,11 +77,17 @@ export function actOfBeat(beat: number, totalPhrases: number): number {
   return actOfPhrase(Math.floor(Math.max(0, beat) / phraseBeats), totalPhrases);
 }
 
-function pickKind(rng: () => number, act: number, last: MoveKind | null): MoveKind {
+function pickKind(
+  rng: () => number,
+  act: number,
+  last: MoveKind | null,
+  banned: readonly MoveKind[],
+): MoveKind {
   const kinds = Object.keys(MOVES) as MoveKind[];
   const pool: Array<[MoveKind, number]> = [];
   let total = 0;
   for (const k of kinds) {
+    if (banned.includes(k)) continue; // this record never calls it
     const weights = MOVES[k].weights;
     let w = weights[Math.min(act, weights.length - 1)];
     if (w <= 0) continue;
@@ -163,10 +169,12 @@ function buildLandings(kind: MoveKind, landBeat: number, act: number, rng: () =>
 }
 
 /**
- * The full raid set. Pure function of (seed, phrases) — every client, and
- * every rewatch of the same seed, gets the identical show.
+ * The full raid set. Pure function of (seed, phrases, banned) — every
+ * client, and every rewatch of the same seed, gets the identical show.
+ * `banned` comes from the record on the decks (tracks.ts): some songs
+ * simply never call certain moves.
  */
-export function generateSetlist(seed: number, phrases: number): SetMove[] {
+export function generateSetlist(seed: number, phrases: number, banned: readonly MoveKind[] = []): SetMove[] {
   const rng = mulberry32(mix(seed, 0xc03e0));
   const moves: SetMove[] = [];
   // Two bars of dancing, then the show starts: the first telegraph blooms at
@@ -183,7 +191,7 @@ export function generateSetlist(seed: number, phrases: number): SetMove[] {
     const rest = CHOREO.restBeats[Math.min(act, CHOREO.restBeats.length - 1)];
 
     for (let m = 0; m < want; m++) {
-      const kind = pickKind(rng, act, last);
+      const kind = pickKind(rng, act, last, banned);
       const charge = MOVES[kind].chargeBeats;
       // Land on the next bar downbeat that the telegraph fits in front of.
       const landBeat = Math.ceil((cursor + charge) / barBeats) * barBeats;

@@ -18,6 +18,7 @@
 import { createSystem } from '@iwsdk/core';
 import { BOTS, CHOREO, MOVES, SCORE, type MoveKind } from '../config.js';
 import * as sfx from '../audio/sfx.js';
+import { trackById } from '../audio/tracks.js';
 import { platformRoot } from '../arena/arena.js';
 import { StrikeFx } from '../choreo/strikes.js';
 import {
@@ -133,7 +134,7 @@ export class ChoreoSystem extends createSystem({}) {
     this.setlist =
       match.after === 'tutorial' && match.goopling
         ? generateLesson(match.goopling, match.seed)
-        : generateSetlist(match.seed, match.phrases);
+        : generateSetlist(match.seed, match.phrases, trackById(match.trackId)?.banned ?? []);
   }
 
   update(delta: number): void {

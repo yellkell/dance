@@ -171,7 +171,9 @@ export const MOVES: Record<
   // nearly every set and never letting up.
   slam: { chargeBeats: 4, weights: [1, 3, 2, 2] },
   beam: { chargeBeats: 4, weights: [2, 3, 3, 3] },
-  sweep: { chargeBeats: 4, weights: [3, 3, 3, 3] },
+  // Ducking is the most physically demanding dodge in the game — a spice,
+  // not a staple. At weight 3 it was landing several times every song.
+  sweep: { chargeBeats: 4, weights: [1, 2, 2, 2] },
   // The gentle 2-stage seesaw joins the openers — crossing is a day-one verb.
   seesaw: { chargeBeats: 4, weights: [2, 3, 4, 4] },
   surge: { chargeBeats: 4, weights: [0, 0, 2, 3] },

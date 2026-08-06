@@ -35,6 +35,7 @@ import breakcoreUrl from '../assets/music/breakcore.mp3';
 import infectionUrl from '../assets/music/infection.m4a';
 import unityUrl from '../assets/music/unity.m4a';
 import dynastyUrl from '../assets/music/dynasty.mp3';
+import type { MoveKind } from '../config.js';
 
 export type TrackRole = 'raid' | 'lobby' | 'rehearsal';
 
@@ -55,6 +56,10 @@ export interface Track {
   /** Optional: begin playback this far into the file (skips an ambient
    *  intro). Must still sit on the grid — use downbeat + n×4 beats. */
   startAt?: number;
+  /** Optional: move kinds this record never calls — the set-list generator
+   *  skips them entirely. Same trackId on every client, so a ban never
+   *  desyncs a room. */
+  banned?: MoveKind[];
 }
 
 /**
@@ -116,6 +121,8 @@ export const TRACKS: Track[] = [
     seconds: 173.88,
     lufs: -14.5,
     roles: ['raid'],
+    // The tour's opening night — everyone stays on their feet.
+    banned: ['sweep'],
   },
   {
     id: 'target',
