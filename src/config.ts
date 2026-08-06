@@ -456,7 +456,10 @@ export const TOUR: { sets: TourSet[]; freeSets: number; maxPhrases: number } = {
     {
       id: 'peak',
       name: 'PEAK HOURS',
-      songs: ['sakupened', 'combat', 'loop'], // 134 → 135 → 150 BPM
+      // DYNASTY takes SAKUPENED's place on the tour (SAKUPENED stays in the
+      // quick-raid pool). At 155 it's the fastest of the three, so it closes
+      // the set — every set still climbs.
+      songs: ['combat', 'loop', 'dynasty'], // 135 → 150 → 155 BPM
       tint: { shallow: 0xff6ee0, deep: 0x571040, nucleus: 0xff9ff0 }, // hot magenta
     },
     {

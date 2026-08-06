@@ -34,6 +34,7 @@ import moneyUrl from '../assets/music/money.m4a';
 import breakcoreUrl from '../assets/music/breakcore.mp3';
 import infectionUrl from '../assets/music/infection.m4a';
 import unityUrl from '../assets/music/unity.m4a';
+import dynastyUrl from '../assets/music/dynasty.mp3';
 
 export type TrackRole = 'raid' | 'lobby' | 'rehearsal';
 
@@ -137,6 +138,17 @@ export const TRACKS: Track[] = [
     lufs: -8.3,
     // The endgame record: pure 174 DnB grid (phase-locked measurement said
     // 174.005 — one analyser step off the integer, 4 ms over the file).
+    roles: ['raid'],
+  },
+  {
+    id: 'dynasty',
+    title: 'DYNASTY',
+    url: dynastyUrl,
+    bpm: 155.0,
+    downbeat: 1.5444,
+    seconds: 139.2,
+    lufs: -9.6,
+    // PEAK HOURS' closer: the magenta goop's record.
     roles: ['raid'],
   },
   {
