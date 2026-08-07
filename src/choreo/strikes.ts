@@ -323,8 +323,9 @@ export class StrikeFx {
    *  wedge, with sparks erupting along the front everywhere but the safe
    *  ground. */
   nova(parent: Object3D, bearing: number, halfAngle: number): void {
-    const sparks = new Sparks(30, WARN);
+    const sparks = new Sparks(90, WARN);
     let burstClock = 0;
+    let crowned = false;
     this.spawn(
       parent,
       0.5,
@@ -337,15 +338,29 @@ export class StrikeFx {
         const wave = g.children[1] as Mesh;
         wave.scale.setScalar(0.3 + grow * 1.5);
         (wave.material as MeshBasicMaterial).opacity = 0.7 * (1 - k);
-        // Fire along the expanding front — everywhere but the wedge.
+        // Fire along the expanding front — everywhere but the wedge. Each
+        // pie in the chain is singular, so it gets to be the whole show:
+        // twice the emitters of the old gauntlet discs, on a faster clock.
         const age = k * 0.5;
         if (age > burstClock) {
-          burstClock = age + 0.05;
-          for (let i = 0; i < 3; i++) {
+          burstClock = age + 0.04;
+          for (let i = 0; i < 6; i++) {
             const a = Math.random() * Math.PI * 2 - Math.PI;
             const d = Math.abs(((a - bearing + Math.PI * 3) % (Math.PI * 2)) - Math.PI);
             if (d <= halfAngle) continue; // the safe ground stays safe
             sparks.emit(Math.sin(a) * r * 0.9, 0.1, Math.cos(a) * r * 0.9, 3, 1.1);
+          }
+        }
+        // THE CROWN: the instant the front reaches the deck edge, embers
+        // erupt all around the full rim at once — the pie goes off like a
+        // powder keg. Still sparing the wedge, still nothing at centre.
+        if (!crowned && grow >= 1) {
+          crowned = true;
+          for (let i = 0; i < 14; i++) {
+            const a = (i / 14) * Math.PI * 2 - Math.PI;
+            const d = Math.abs(((a - bearing + Math.PI * 3) % (Math.PI * 2)) - Math.PI);
+            if (d <= halfAngle) continue;
+            sparks.emit(Math.sin(a) * CHOREO.novaRadius, 0.12, Math.cos(a) * CHOREO.novaRadius, 2, 1.6);
           }
         }
       },

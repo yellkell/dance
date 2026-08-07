@@ -190,6 +190,11 @@ export class ChoreoSystem extends createSystem({}) {
       const fill = Math.min(1, Math.max(0, (beat - z.tgStartBeat) / span));
       if (z.tg) {
         z.tg.update(fill, time);
+        // A chained pie stays OFF the floor until its own window opens —
+        // the next disc appears exactly as the previous one detonates, so
+        // there is only ever ONE pie to read. (No-op for ordinary zones:
+        // their window opens with the move's telegraph.)
+        z.tg.group.visible = beat >= z.tgStartBeat;
         // The seesaw shows only the imminent pane and the one after — five
         // at once reads as noise, two reads as "THIS side now, THAT next".
         if (z.zone.kind === 'half') z.tg.group.visible = z.dueBeat - beat < 4.2;
@@ -262,6 +267,13 @@ export class ChoreoSystem extends createSystem({}) {
               ? { x: match.headX, z: match.headZ, locked: false }
               : { ...(liveSpots.get(dancer.seat) ?? { x: 0, z: 0 }), locked: false }
             : undefined;
+        // A chained pie (nova landing 2+) opens its telegraph window only
+        // as the previous pie detonates — each singular disc rides its own
+        // short fuse instead of three discs stacking up from the start.
+        const tgStartBeat =
+          landing.zone.kind === 'nova' && landingIdx > 0
+            ? landing.beat - CHOREO.novaChainBeats
+            : move.telegraphBeat;
         this.zones.push({
           moveIdx: move.index,
           landingIdx,
@@ -269,7 +281,7 @@ export class ChoreoSystem extends createSystem({}) {
           zone: landing.zone,
           kind: move.kind,
           act: move.act,
-          tgStartBeat: move.telegraphBeat,
+          tgStartBeat,
           dueBeat: landing.beat,
           tg,
           probed: false,

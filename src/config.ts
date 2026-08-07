@@ -214,12 +214,14 @@ export const CHOREO = {
   novaHalfAngle: 0.6,
   novaHalfAngleLate: 0.45,
   novaRadius: 1.15,
-  /** THE GAUNTLET (late-act nova): extra pies drop in rhythm, each safe
-   *  wedge stepped this far around the compass — adjacent wedges nearly
-   *  touch (turn − 2×halfAngle of danger between them), so the whole ring
-   *  times a walk through the slices together. */
-  novaWalkBeats: 2,
-  novaWalkTurn: 1.05,
+  /** THE CHAIN (late-act nova): three SINGULAR pies, one after the other,
+   *  each safe wedge a third of the compass further on — three dodges walk
+   *  you the whole way around the ring. Only ONE pie is ever on the floor
+   *  (the next disc doesn't even appear until the last one has gone off),
+   *  and each rides the same short fuse, so the chain reads as three clean
+   *  beats instead of a slow stack of overlapping discs. */
+  novaChainBeats: 3,
+  novaChainTurn: (Math.PI * 2) / 3,
   /** Gate: half-width of the safe column; tightens in the last act. */
   gateHalfW: 0.3,
   gateHalfWLate: 0.22,
@@ -259,13 +261,14 @@ export const GROOVE = {
    *  outruns dodging no matter how long the flex gets. */
   payCap: 100,
   /**
-   * PAY-RATE CAP: rewarded swaps can never come faster than the music.
-   * A swap pays only if ~a full beat has passed since the last PAID one —
-   * flailing at light speed is silently absorbed (no reward, no reset) and
-   * earns exactly the same as dancing on the beat. Slightly under 1.0 so an
-   * honest on-beat alternation with human timing slop always lands.
+   * PAY-RATE CAP: rewarded swaps lock to the HALF-BEAT grid. Records have
+   * double-time passages (MORNING's fast bits) where swapping on the
+   * eighths IS the dance — capping at whole beats forced you to groove
+   * slower than the song. Light-speed flailing is still absorbed silently
+   * (no reward, no reset): pay can never exceed two swaps a beat, however
+   * fast the hands go. Slightly under 0.5 for human timing slop.
    */
-  minBeats: 0.95,
+  minBeats: 0.45,
   /** Stop swapping for this long and the streak lets go. */
   maxBeats: 2.6,
 };

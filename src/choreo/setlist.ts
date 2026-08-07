@@ -152,16 +152,17 @@ function buildLandings(kind: MoveKind, landBeat: number, act: number, rng: () =>
     }
   } else {
     // nova: one canonical compass bearing for the whole ring — and at the
-    // set's peak, THE GAUNTLET: extra pies laid down in rhythm, each safe
-    // wedge a step further around the compass. Every disc fills toward its
-    // own landing (the established drumline language), so the order reads,
-    // and the whole ring times the walk through the slices together.
+    // set's peak, THE CHAIN: three SINGULAR pies one after the other, each
+    // safe wedge a third of the compass on, so the wedges partition the
+    // whole rose and the ring walks the full way around together. Each
+    // disc appears only as the previous pie detonates (ChoreoSystem gates
+    // the telegraph per landing) — one pie on the floor at a time, ever.
     const slices = act >= 3 ? 3 : act >= 2 && rng() < 0.45 ? 2 : 1;
     const halfAngle = act >= 3 ? CHOREO.novaHalfAngleLate : CHOREO.novaHalfAngle;
     let bearing = rng() * Math.PI * 2;
-    const turn = (rng() < 0.5 ? 1 : -1) * CHOREO.novaWalkTurn;
+    const turn = (rng() < 0.5 ? 1 : -1) * CHOREO.novaChainTurn;
     for (let i = 0; i < slices; i++) {
-      landings.push({ beat: landBeat + i * CHOREO.novaWalkBeats, zone: { kind: 'nova', bearing, halfAngle } });
+      landings.push({ beat: landBeat + i * CHOREO.novaChainBeats, zone: { kind: 'nova', bearing, halfAngle } });
       bearing += turn;
     }
   }
