@@ -467,9 +467,10 @@ export const TOUR: { sets: TourSet[]; freeSets: number; maxPhrases: number } = {
     {
       id: 'afterhours',
       name: 'AFTER HOURS',
-      // No repeats anywhere on the tour: UNITY and INFECTION took the slots
-      // swag (back to lobby-only) and the sakupened re-run were holding.
-      songs: ['unity', 'infection', 'breakcore'], // 117 → 138 → 174 BPM
+      // No repeats anywhere on the tour. SPREAD replaced UNITY (a fight
+      // record where a five-minute journey used to sit) and, being the
+      // faster of the two openers, it plays second so the set still climbs.
+      songs: ['infection', 'spread', 'breakcore'], // 138 → 150 → 174 BPM
       tint: { shallow: 0xffd24a, deep: 0x6e3c06, nucleus: 0xffefad }, // molten gold
     },
   ],

@@ -35,6 +35,7 @@ import breakcoreUrl from '../assets/music/breakcore.mp3';
 import infectionUrl from '../assets/music/infection.m4a';
 import unityUrl from '../assets/music/unity.m4a';
 import dynastyUrl from '../assets/music/dynasty.mp3';
+import spreadUrl from '../assets/music/spread.m4a';
 import type { MoveKind } from '../config.js';
 
 export type TrackRole = 'raid' | 'lobby' | 'rehearsal';
@@ -159,6 +160,20 @@ export const TRACKS: Track[] = [
     roles: ['raid'],
   },
   {
+    id: 'spread',
+    title: 'SPREAD',
+    url: spreadUrl,
+    bpm: 150.0,
+    downbeat: 1.2523,
+    seconds: 244.81,
+    lufs: -13.1,
+    // A proper fight record — it took UNITY's night on the tour. Its groove
+    // proper starts six bars in, so a set skips straight to it (still on
+    // the grid: downbeat + 6 bars at 150).
+    startAt: 10.8523,
+    roles: ['raid'],
+  },
+  {
     id: 'unity',
     title: 'UNITY',
     url: unityUrl,
@@ -167,7 +182,8 @@ export const TRACKS: Track[] = [
     seconds: 299.49,
     lufs: -13.8,
     // The five-minute journey — its ambient open is skipped so a set
-    // drops straight into the groove (bar 7 on the grid).
+    // drops straight into the groove (bar 7 on the grid). SPREAD took its
+    // tour night; it plays on for quick raids and the seeded shuffle.
     startAt: 12.3542,
     roles: ['raid'],
   },
