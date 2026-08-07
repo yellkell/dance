@@ -67,18 +67,28 @@ There's also a debug hook in the console:
 | **GATE** | the whole deck floods except one clear column — doorposts + chevrons pointing in | **stand in the gap** |
 | **CHASE** | a disc glued to your feet, following you — then it **freezes** | **juke** after the freeze |
 | **NOVA** | everything burns except one wedge — same compass bearing for the whole ring | **stand** in the safe ground, together |
+| **CROSSFIRE** | a laser is loaded on one side rail and a strip fills **across** the deck (late on, a stage lane crosses it) | **step forward or back** off the strip — diagonally, once it's a lattice |
+| **TRIP WEB** | shin-high laser wire strung over the whole deck; nothing safe is drawn, because nothing is | **hold still** until it discharges |
 
 The telegraph is the whole instruction: whatever fills amber→red, don't be
 in it; wherever the doorpost rails and chevrons point, be there. Windups are
 sacred — escalation compresses the gaps between moves, never the read — and
 landings always hit bar downbeats.
 
+Two of those answers are deliberate exceptions, and both are drawn in the
+AIR rather than on the deck — floor paint means "move your feet" everywhere
+else, so a move whose answer is *don't* must never use it. The **sweep**
+says drop; the **trip web** says freeze.
+
 ## Rehearsal (the campaign)
 
-The lobby's **REHEARSAL** map is a row of five goop creatures, each teaching
-one move at a gentle BPM: **GOOPLET** (step), **DRIZZLE** (sidestep),
-**SLOSHA** (duck), **BIG SPILL** (cross), **GLOBULON** (the nova wedge).
-Clear the row and you're **RAVE READY**. Progress saves locally.
+The lobby's **REHEARSAL** map is a row of goop creatures, each drilling one
+move at a gentle BPM: **GOOPLET** (step), **DRIZZLE** (sidestep), **SLOSHA**
+(duck), **BIG SPILL** (cross the line), **BOUNCER** (the gate), **SMITTEN**
+(the chase juke), **GLOBULON** (the nova wedge). Clear the row and you're
+**RAVE READY**. Progress saves locally. Surge, crossfire and the trip web
+have no tutor yet — they arrive in a set and teach themselves off the
+telegraph.
 
 ## Multiplayer
 

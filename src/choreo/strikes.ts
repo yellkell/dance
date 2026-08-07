@@ -250,6 +250,96 @@ export class StrikeFx {
     );
   }
 
+  /** THE CROSSFIRE fires: a wall of light rakes ACROSS the deck, exactly on
+   *  the strip — with the emitter that fed it flaring on its rail, so the
+   *  eye can see where the shot came from even after the beam is gone. */
+  rail(parent: Object3D, z: number, halfD: number, from: 1 | -1): void {
+    const span = OCTAGON_HALF_WIDTH * 2 + 0.9;
+    const sparks = new Sparks(24, WARN);
+    let fired = false;
+    this.spawn(
+      parent,
+      0.45,
+      (k, g) => {
+        const wall = g.children[0] as Mesh;
+        (wall.material as MeshBasicMaterial).opacity = 0.7 * (1 - k);
+        wall.scale.z = 1 - k * 0.55;
+        const core = g.children[1] as Mesh;
+        (core.material as MeshBasicMaterial).opacity = 0.95 * (1 - k * k);
+        core.scale.z = 1 - k * 0.4;
+        // The muzzle flare dies faster than the beam it threw.
+        const flare = g.children[2] as Mesh;
+        flare.scale.setScalar(Math.max(0.001, 1.35 - k * 1.6));
+        if (!fired) {
+          fired = true;
+          // Embers thrown off the wire where it crosses the deck.
+          for (let i = -2; i <= 2; i++) {
+            sparks.emit((i / 2) * OCTAGON_HALF_WIDTH * 0.8, 0.12, z, 4, 1.2);
+          }
+        }
+      },
+      (g) => {
+        const wall = new Mesh(new BoxGeometry(span, 2.4, halfD * 2), basic(WARN, 0.7));
+        wall.position.set(0, 1.2, z);
+        g.add(wall);
+        const core = new Mesh(new BoxGeometry(span, 2.4, halfD * 0.7), basic(HOT, 0.95));
+        core.position.set(0, 1.2, z);
+        g.add(core);
+        const flare = glowSprite(HOT, 0.5, 0.9);
+        flare.position.set(from * (OCTAGON_HALF_WIDTH + 0.3), 1.1, z);
+        g.add(flare);
+        g.add(sparks.points);
+      },
+      (dt) => sparks.step(dt),
+    );
+  }
+
+  /** THE TRIP WEB discharges: every wire in the lattice goes white-hot at
+   *  once and blows apart into embers at shin height. Nothing sweeps and
+   *  nothing lands — the whole deck simply answers, which is what makes
+   *  having stood still feel like getting away with something. */
+  wire(parent: Object3D, y: number): void {
+    const span = OCTAGON_HALF_WIDTH * 2 + 0.5;
+    const depth = OCTAGON_HALF_DEPTH * 2 + 0.4;
+    const sparks = new Sparks(48, WARN);
+    let snapped = false;
+    this.spawn(
+      parent,
+      0.42,
+      (k, g) => {
+        const fade = 1 - k * k;
+        // The six wires come first; the spark cloud is the last child and
+        // runs its own fade.
+        for (let i = 0; i < 6; i++) {
+          const w = g.children[i] as Mesh;
+          (w.material as MeshBasicMaterial).opacity = 0.9 * fade;
+          w.scale.y = 1 + k * 2.4; // each wire whips as it lets go
+        }
+        if (!snapped) {
+          snapped = true;
+          for (let i = 0; i < 8; i++) {
+            const a = (i / 8) * Math.PI * 2;
+            sparks.emit(Math.sin(a) * OCTAGON_HALF_WIDTH * 0.7, y, Math.cos(a) * OCTAGON_HALF_DEPTH * 0.7, 6, 1.5);
+          }
+        }
+      },
+      (g) => {
+        for (const dz of [-depth * 0.34, 0, depth * 0.34]) {
+          const w = new Mesh(new BoxGeometry(span, 0.05, 0.05), basic(HOT, 0.9));
+          w.position.set(0, y, dz);
+          g.add(w);
+        }
+        for (const dx of [-span * 0.32, 0, span * 0.32]) {
+          const w = new Mesh(new BoxGeometry(0.05, 0.05, depth), basic(HOT, 0.9));
+          w.position.set(dx, y, 0);
+          g.add(w);
+        }
+        g.add(sparks.points);
+      },
+      (dt) => sparks.step(dt),
+    );
+  }
+
   /** The gate slams shut: both danger fields flash as walls of light and
    *  the doorposts of the safe column burn white-hot — the gap is exactly
    *  where the telegraph promised. */

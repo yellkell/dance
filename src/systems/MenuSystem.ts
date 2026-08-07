@@ -545,7 +545,7 @@ export class MenuSystem extends createSystem({}) {
         tab === 'map'
           ? allGooplingsCleared()
             ? 'RAVE READY — every move in your feet'
-            : `${GOOPLINGS.length} gooplings · every move in the game · clear the row`
+            : `${GOOPLINGS.length} gooplings · one move each · clear the row`
           : 'point · pull the trigger — mid-set the board packs away, right Ⓐ bails',
         W / 2,
         992,

@@ -156,8 +156,27 @@ export const GOOP = {
  *           freezes late, then lands. Moving after the freeze IS the dodge.
  *  nova   : everything burns EXCEPT one wedge at a shared compass bearing —
  *           the whole ring rotates to the same safe ground together.
+ *  cross  : LASERS FROM THE SIDES. A strip fills ACROSS the deck, fed from
+ *           an emitter at one rail — step FORWARD or BACK off it (the beam's
+ *           quarter-turn cousin: same read, the other axis). Late on it
+ *           lays a stage lane across itself and the safe ground is a cell.
+ *  wire   : the trip web — a shin-high lattice of laser wire strung over
+ *           the whole deck. There is no safe ground and nothing to step to:
+ *           the only answer is HOLD STILL until it clears. The one move in
+ *           the game whose dodge is stillness, so it never paints the floor
+ *           (floor paint means "move your feet" everywhere else).
  */
-export type MoveKind = 'slam' | 'beam' | 'sweep' | 'seesaw' | 'surge' | 'gate' | 'chase' | 'nova';
+export type MoveKind =
+  | 'slam'
+  | 'beam'
+  | 'sweep'
+  | 'seesaw'
+  | 'surge'
+  | 'gate'
+  | 'chase'
+  | 'nova'
+  | 'cross'
+  | 'wire';
 
 export const MOVES: Record<
   MoveKind,
@@ -187,6 +206,14 @@ export const MOVES: Record<
   // and the old 8-beat wind-up was a 6-second stand-and-wait on slow
   // records. 5 beats keeps the whole-ring rotate honest and lands sooner.
   nova: { chargeBeats: 5, weights: [0, 0, 2, 3] },
+  // CROSSFIRE is a day-one verb (it reads exactly like the beam) and it's
+  // the only move that regularly asks for a step toward or away from the
+  // stage — the ring stops being a left/right game.
+  cross: { chargeBeats: 4, weights: [2, 3, 3, 3] },
+  // The TRIP WEB needs a long fuse: you have to see the wires, plant, and
+  // commit to standing still. Held back until the floor is warm, and never
+  // common — stillness is a punchline that stops working if it's constant.
+  wire: { chargeBeats: 6, weights: [0, 2, 2, 2] },
 };
 
 export const CHOREO = {
@@ -223,6 +250,24 @@ export const CHOREO = {
    *  beats instead of a slow stack of overlapping discs. */
   novaChainBeats: 3,
   novaChainTurn: (Math.PI * 2) / 3,
+  /** CROSSFIRE: half-depth of the side-laser strip (a shade tighter than the
+   *  beam's — the deck is shallower front-to-back than it is wide, so the
+   *  same margin has to come out of less ground). */
+  railHalfDepth: 0.2,
+  /** How far off deck centre a rail can sit — a rail through the middle
+   *  leaves a mean margin both ways, so they always favour one side. */
+  railOffsetMin: 0.12,
+  railOffsetMax: 0.42,
+  /** From this act on, the crossfire lays a stage lane ACROSS the rail: the
+   *  safe ground becomes a quarter of the deck and the dodge is diagonal. */
+  latticeFromAct: 2,
+  /** THE TRIP WEB: wire height (shin), how many beats before the landing the
+   *  sensor arms, and how much drift is forgiven while it's live. The slack
+   *  is generous on purpose — a passthrough dancer sways, and the move
+   *  punishes STEPPING, not breathing. */
+  wireY: 0.36,
+  wireHoldBeats: 2,
+  wireSlack: 0.24,
   /** Gate: half-width of the safe column; tightens in the last act. */
   gateHalfW: 0.3,
   gateHalfWLate: 0.22,

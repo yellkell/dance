@@ -381,6 +381,68 @@ export function sweepTelegraph(
 }
 
 /**
+ * THE CROSSFIRE's rail: the beam strip a quarter-turn round, running left to
+ * right across the deck so the dodge is a step toward or away from the
+ * stage. `from` is the local-x side the emitter sits on: the strip's fill
+ * front advances from there, so the charge already shows which rail is
+ * feeding it. Place the group at the deck centre, at the strip's z.
+ */
+export function railTelegraph(halfDepth: number, length: number, from: 1 | -1): Telegraph {
+  const mat = warnMat(STRIP_FRAG);
+  const strip = new Mesh(new PlaneGeometry(halfDepth * 2, length), mat);
+  // Flat on the deck (x tip), then spun within the floor plane (z spin —
+  // innermost in three's default XYZ order, so it turns the strip in place).
+  // The sign puts v = 1, where the fill front starts, on the emitter side.
+  strip.rotation.set(-Math.PI / 2, 0, (from * Math.PI) / 2);
+  return makeTelegraph([strip], [mat]);
+}
+
+/**
+ * THE TRIP WEB: a shin-high lattice of laser wire strung across the whole
+ * deck — the one telegraph with NO safe ground drawn, because there isn't
+ * any: the answer is to stop moving. Deliberately air-only (floor paint
+ * says "move your feet" in every other move) and deliberately dense: from
+ * anywhere on the deck a wire crosses your view, so "stepping breaks one of
+ * these" needs no explaining. Each wire is a short vertical ribbon — a flat
+ * one at shin height is edge-on from standing and renders as nothing.
+ */
+export function wireTelegraph(width: number, depth: number, y: number): Telegraph {
+  const meshes: Mesh[] = [];
+  const mats: ShaderMaterial[] = [];
+  const h = 0.075;
+  // Wires across (facing the stage) and wires down the deck, woven into a
+  // grid — the crossings are what make it read as a web and not as rails.
+  for (const dz of [-depth * 0.34, 0, depth * 0.34]) {
+    const mat = warnMat(BLADE_FRAG);
+    const wire = new Mesh(new PlaneGeometry(width, h), mat);
+    wire.position.set(0, y, dz);
+    meshes.push(wire);
+    mats.push(mat);
+  }
+  for (const dx of [-width * 0.32, 0, width * 0.32]) {
+    const mat = warnMat(BLADE_FRAG);
+    const wire = new Mesh(new PlaneGeometry(depth, h), mat);
+    wire.position.set(dx, y, 0);
+    wire.rotation.y = Math.PI / 2;
+    meshes.push(wire);
+    mats.push(mat);
+  }
+  // The emitter posts the web is strung between — off at the deck corners,
+  // so the danger still owns the air and nothing paints the ground.
+  for (const sx of [-1, 1] as const) {
+    for (const sz of [-1, 1] as const) {
+      const mat = warnMat(BLADE_FRAG);
+      const post = new Mesh(new PlaneGeometry(0.06, y * 2), mat);
+      post.position.set((sx * width) / 2, y, (sz * depth) / 2);
+      post.rotation.y = Math.PI / 4;
+      meshes.push(post);
+      mats.push(mat);
+    }
+  }
+  return makeTelegraph(meshes, mats);
+}
+
+/**
  * The gate: a full-deck pane where everything fills EXCEPT one clear column
  * centred at `gapX` (platform-local), `gapHalfW` wide each side. Place the
  * group at the platform centre on the floor.

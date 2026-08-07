@@ -891,6 +891,27 @@ export function pounceSnap(): void {
   clank(420, 0.1, 0.05, 0.05);
 }
 
+/** THE CROSSFIRE: a laser thrown from a side rail, raking across the deck.
+ *  Reads sideways on purpose — the beam's blast is a flat wall of noise,
+ *  this one is a pitch that TRAVELS, so the ear places it off to one side
+ *  even when the eye was looking the other way. */
+export function railZap(): void {
+  tone({ freq: 1750, to: 320, type: 'sawtooth', dur: 0.2, gain: 0.1 }); // the shot leaving the rail
+  whooshNoise(0.24, 0.22, 3200, 420); // and crossing
+  noiseHit(0.12, 0.2, 2400, 700, 3.0); // the deck taking it
+  tone({ freq: 120, to: 52, type: 'sine', dur: 0.26, gain: 0.24, delay: 0.02 });
+}
+
+/** THE TRIP WEB letting go: every wire in the lattice discharging at once —
+ *  a hard electric snap with a dying buzz, and no impact under it, because
+ *  nothing actually landed. */
+export function wireSnap(): void {
+  noiseHit(0.07, 0.34, 5200, 1800, 4.0); // the snap
+  tone({ freq: 2400, to: 1500, type: 'square', dur: 0.06, gain: 0.07 });
+  tone({ freq: 300, to: 120, type: 'sawtooth', dur: 0.3, gain: 0.06, delay: 0.03 }); // the buzz dying
+  clank(1400, 0.07, 0.12, 0.02);
+}
+
 /** The pie detonating — one shockwave rolling over the whole ring. */
 export function novaBoom(): void {
   noiseHit(0.4, 0.4, 3000, 120, 1.6); // the blast front

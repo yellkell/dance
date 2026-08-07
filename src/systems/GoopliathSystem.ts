@@ -49,6 +49,8 @@ const GESTURE: Record<MoveKind, AttackName> = {
   gate: 'hook', // the wide arm swinging the doors shut
   chase: 'cross', // the straight hunting punch, eyes on you
   nova: 'uppercut',
+  cross: 'backfist', // thrown sideways, across the body — the side laser
+  wire: 'clap', // both limbs snapping shut: the web goes taut
 };
 
 /** The quick follow-up strikes inside a multi-landing move. */
@@ -61,6 +63,8 @@ const STEP_GESTURE: Record<MoveKind, AttackName> = {
   gate: 'jab',
   chase: 'jab',
   nova: 'jab',
+  cross: 'backfist',
+  wire: 'jab',
 };
 
 /** The two-step floor pattern, one target per beat of the bar (sim units):

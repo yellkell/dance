@@ -219,6 +219,19 @@ export class AvatarSystem extends createSystem({}) {
         const clear = zone.x > 0 ? zone.x - zone.halfW - 0.38 : zone.x + zone.halfW + 0.38;
         return { x: clear, z: p.tz };
       }
+      case 'rail': {
+        if (!dodge) return { x: p.tx, z: zone.z };
+        // Step off the strip toward whichever side of it has more deck.
+        const clear = zone.z > 0 ? zone.z - zone.halfD - 0.32 : zone.z + zone.halfD + 0.32;
+        return { x: p.tx, z: clear };
+      }
+      case 'wire': {
+        // The whole ring goes STILL — the best picture this game makes. A
+        // groupie who is about to eat it fidgets instead, and the web has
+        // it: the twitch you can see IS why that one got clipped.
+        if (dodge) return { x: p.tx, z: p.tz };
+        return { x: p.tx + Math.sin(p.phase * 5) * 0.3, z: p.tz + Math.cos(p.phase * 4) * 0.24 };
+      }
       case 'sweep': {
         p.duck = dodge;
         return { x: p.tx, z: p.tz };

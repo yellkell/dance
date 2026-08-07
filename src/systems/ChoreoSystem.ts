@@ -27,7 +27,9 @@ import {
   gateTelegraph,
   halfTelegraph,
   novaTelegraph,
+  railTelegraph,
   sweepTelegraph,
+  wireTelegraph,
   type Telegraph,
 } from '../choreo/telegraphs.js';
 import { generateLesson, generateSetlist, type SetMove, type Zone } from '../choreo/setlist.js';
@@ -66,6 +68,10 @@ export interface LiveZone {
   /** Chase runtime: where the hunting disc currently sits (per-seat — the
    *  shared Zone object stays immutable), frozen once `locked`. */
   chase?: { x: number; z: number; locked: boolean };
+  /** Trip-web runtime (local seat only): where the head was when the sensor
+   *  armed, and the furthest it has strayed since. Judgement is that drift,
+   *  not a position — the web has no safe ground to stand on. */
+  wire?: { x0: number; z0: number; armed: boolean; moved: number };
 }
 
 /** Read-only window for other systems (bot movement mirrors the judging). */
@@ -96,6 +102,11 @@ function cueDirection(zone: Zone, moveIdx: number, landingIdx: number): Partial<
       return { side: zone.side, axis: zone.axis };
     case 'gate':
       return { gapX: zone.x };
+    case 'rail':
+      // Which rail threw it (so the MC shoots from that side), and whether
+      // the near or far ground is the doomed one (so his body says which
+      // way to move) — the surge's front/back grammar, borrowed.
+      return { side: zone.from, axis: zone.z > 0 ? 1 : 0 };
     default:
       return {};
   }
@@ -218,6 +229,21 @@ export class ChoreoSystem extends createSystem({}) {
         }
         if (z.tg) z.tg.group.position.set(z.chase.x, 0.05, z.chase.z);
       }
+      // THE TRIP WEB: the wires go live `hold` beats out. From that instant
+      // the only thing judged is how far you STRAY from where you were
+      // standing — so the sensor remembers that spot and keeps the worst
+      // drift since (a step out and back still broke the beam).
+      if (z.zone.kind === 'wire' && z.wire && z.seat === match.mySeat) {
+        if (!z.wire.armed && beat >= z.dueBeat - z.zone.hold) {
+          z.wire.armed = true;
+          z.wire.x0 = match.headX;
+          z.wire.z0 = match.headZ;
+          z.wire.moved = 0;
+        }
+        if (z.wire.armed) {
+          z.wire.moved = Math.max(z.wire.moved, Math.hypot(match.headX - z.wire.x0, match.headZ - z.wire.z0));
+        }
+      }
       // The perfect probe: were you still in the fire one beat out?
       if (!z.probed && z.seat === match.mySeat && beat >= z.dueBeat - SCORE.perfectProbeBeats) {
         z.probed = true;
@@ -288,6 +314,8 @@ export class ChoreoSystem extends createSystem({}) {
           wasInside: false,
           resolved: false,
           chase,
+          wire:
+            landing.zone.kind === 'wire' ? { x0: 0, z0: 0, armed: false, moved: 0 } : undefined,
         });
       });
     }
@@ -337,6 +365,19 @@ export class ChoreoSystem extends createSystem({}) {
         tg.group.position.set(0, 0.05, 0);
         return tg;
       }
+      case 'rail': {
+        const tg = railTelegraph(zone.halfD, OCTAGON_HALF_WIDTH * 2 + 0.8, zone.from);
+        tg.group.position.set(0, 0.05, zone.z);
+        return tg;
+      }
+      case 'wire': {
+        const tg = wireTelegraph(
+          OCTAGON_HALF_WIDTH * 2 + 0.2,
+          OCTAGON_HALF_DEPTH * 2 + 0.2,
+          CHOREO.wireY,
+        );
+        return tg;
+      }
       case 'nova': {
         const local = zone.bearing - seatBearing(seat, match.seats);
         const tg = novaTelegraph(CHOREO.novaRadius, local, zone.halfAngle);
@@ -356,6 +397,12 @@ export class ChoreoSystem extends createSystem({}) {
         return Math.hypot(x - zone.x, z - zone.z) <= zone.r + HEAD_R * 0.7;
       case 'lane':
         return Math.abs(x - zone.x) <= zone.halfW + HEAD_R * 0.7;
+      case 'rail':
+        return Math.abs(z - zone.z) <= zone.halfD + HEAD_R * 0.7;
+      case 'wire':
+        // Nowhere to stand — the web catches MOVEMENT. Un-armed (the sensor
+        // hasn't gone live yet) is always clean.
+        return (live.wire?.moved ?? 0) > CHOREO.wireSlack;
       case 'sweep':
         return !match.ducked;
       case 'half': {
@@ -416,6 +463,12 @@ export class ChoreoSystem extends createSystem({}) {
         case 'nova':
           sfx.novaBoom();
           break;
+        case 'rail':
+          sfx.railZap();
+          break;
+        case 'wire':
+          sfx.wireSnap();
+          break;
       }
     }
 
@@ -450,6 +503,12 @@ export class ChoreoSystem extends createSystem({}) {
         break;
       case 'chase':
         if (z.chase) this.strikes.chase(parent, z.chase.x, z.chase.z, z.zone.r);
+        break;
+      case 'rail':
+        this.strikes.rail(parent, z.zone.z, z.zone.halfD, z.zone.from);
+        break;
+      case 'wire':
+        this.strikes.wire(parent, CHOREO.wireY);
         break;
       case 'nova': {
         const local = z.zone.bearing - seatBearing(z.seat, match.seats);

@@ -30,6 +30,12 @@ import { mix, mulberry32 } from '../game/rng.js';
 export type Zone =
   | { kind: 'circle'; x: number; z: number; r: number }
   | { kind: 'lane'; x: number; halfW: number }
+  /** The crossfire's side laser: a strip ACROSS the deck at local z, fed
+   *  from the rail on `from` — step forward or back off it. */
+  | { kind: 'rail'; z: number; halfD: number; from: 1 | -1 }
+  /** The trip web: no ground to move to — the whole deck is strung with
+   *  laser wire and the dodge is holding still until it clears. */
+  | { kind: 'wire'; hold: number }
   | { kind: 'sweep' }
   | { kind: 'half'; side: 1 | -1; axis: 0 | 1 }
   /** Everything burns EXCEPT a clear column at x — stand in the gap. */
@@ -128,6 +134,25 @@ function buildLandings(kind: MoveKind, landBeat: number, act: number, rng: () =>
       const x = i === 0 ? first : -Math.sign(first) * (0.3 + rng() * 0.3);
       landings.push({ beat: landBeat, zone: { kind: 'lane', x, halfW: CHOREO.beamHalfWidth } });
     }
+  } else if (kind === 'cross') {
+    // LASERS FROM THE SIDES: a strip across the deck, always pushed off
+    // centre so one side of it is roomy ground and the read is obvious.
+    // From the lattice act on, a stage lane crosses it on the same beat and
+    // the safe ground becomes a quarter — the dodge turns diagonal.
+    const zSign = rng() < 0.5 ? 1 : -1;
+    const z =
+      zSign * (CHOREO.railOffsetMin + rng() * (CHOREO.railOffsetMax - CHOREO.railOffsetMin));
+    const from: 1 | -1 = rng() < 0.5 ? 1 : -1;
+    landings.push({ beat: landBeat, zone: { kind: 'rail', z, halfD: CHOREO.railHalfDepth, from } });
+    if (act >= CHOREO.latticeFromAct) {
+      const xSign = rng() < 0.5 ? 1 : -1;
+      landings.push({
+        beat: landBeat,
+        zone: { kind: 'lane', x: xSign * (0.2 + rng() * 0.32), halfW: CHOREO.beamHalfWidth },
+      });
+    }
+  } else if (kind === 'wire') {
+    landings.push({ beat: landBeat, zone: { kind: 'wire', hold: CHOREO.wireHoldBeats } });
   } else if (kind === 'sweep') {
     landings.push({ beat: landBeat, zone: { kind: 'sweep' } });
   } else if (kind === 'gate') {

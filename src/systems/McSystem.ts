@@ -364,6 +364,52 @@ export class McSystem extends createSystem({}) {
         p.hy = STAND - (locked ? 0.08 : 0);
         break;
       }
+      case 'cross': {
+        // THE CROSSFIRE: he loads a laser on ONE rail — that arm goes out
+        // flat to the side, level with the strip — then throws it across
+        // his body on the hit. The other arm reads the ground: pushing the
+        // crowd back off the near strip, or waving them in off the far one.
+        const s = this.mir(mime.cue.side ?? 1);
+        const nearDoomed = (mime.cue.axis ?? 0) === 1;
+        const load = 0.62 + u * 0.22 + pump * 0.05;
+        const throwX = s * load * (1 - strike * 2); // out … then dragged across
+        const lead = s < 0 ? 'l' : 'r';
+        const leadY = 1.12;
+        const offX = nearDoomed ? 0.26 : 0.16;
+        const offY = nearDoomed ? 1.3 : 0.95;
+        const offZ = nearDoomed ? -0.42 - strike * 0.2 : -0.2 + strike * 0.12;
+        if (lead === 'l') {
+          p.lx = throwX; p.ly = leadY; p.lz = -0.12 - strike * 0.15;
+          p.rx = offX; p.ry = offY; p.rz = offZ;
+        } else {
+          p.rx = throwX; p.ry = leadY; p.rz = -0.12 - strike * 0.15;
+          p.lx = -offX; p.ly = offY; p.lz = offZ;
+        }
+        // He leans off the doomed ground himself.
+        p.hz = nearDoomed ? -0.1 * strike : 0.1 * strike;
+        p.yaw = s * 0.18;
+        break;
+      }
+      case 'wire': {
+        // THE TRIP WEB: one flat palm out — STOP — and then he goes utterly
+        // rigid. Everything else on this stage eases and sways; a giant who
+        // has stopped dead is the loudest instruction in the show. He holds
+        // it through the snap, then lets go.
+        const settle = Math.min(1, u * 2.2); // arm rises once, early
+        p.lx = -0.34; p.ly = 0.8; p.lz = -0.06;
+        p.rx = 0.06 + settle * 0.1;
+        p.ry = 0.95 + settle * 0.42;
+        p.rz = -0.3 - settle * 0.3;
+        p.hy = STAND;
+        p.yaw = 0;
+        // Not one part of him moves with the beat — no pump term anywhere.
+        if (strike > 0.6) {
+          // The web lets go and the giant unclenches with it.
+          p.ry -= (strike - 0.6) * 0.5;
+          p.rz += (strike - 0.6) * 0.25;
+        }
+        break;
+      }
       case 'nova': {
         // The shockwave: arms spread flat, a slow wind-up spin, arms
         // snapping down on the burst.
