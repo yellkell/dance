@@ -452,7 +452,9 @@ export const TOUR: { sets: TourSet[]; freeSets: number; maxPhrases: number } = {
     {
       id: 'opening',
       name: 'OPENING SET',
-      songs: ['money', 'target', 'capture'], // 78 → 91 → 117 BPM
+      // The night starts in the MORNING — short, fun, duck-free. MONEY
+      // moved to the quick-raid pool when it gave up the slot.
+      songs: ['morning', 'target', 'capture'], // 97 → 91 → 117 BPM
       tint: null, // the classic green goop
     },
     {

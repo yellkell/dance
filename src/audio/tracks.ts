@@ -36,6 +36,7 @@ import infectionUrl from '../assets/music/infection.m4a';
 import unityUrl from '../assets/music/unity.m4a';
 import dynastyUrl from '../assets/music/dynasty.mp3';
 import spreadUrl from '../assets/music/spread.m4a';
+import morningUrl from '../assets/music/morning.mp3';
 import type { MoveKind } from '../config.js';
 
 export type TrackRole = 'raid' | 'lobby' | 'rehearsal';
@@ -114,6 +115,19 @@ export const TRACKS: Track[] = [
     roles: ['raid', 'rehearsal'],
   },
   {
+    id: 'morning',
+    title: 'MORNING',
+    url: morningUrl,
+    bpm: 96.665,
+    downbeat: 0.8239,
+    seconds: 112.65,
+    lufs: -11.1,
+    roles: ['raid'],
+    // The tour's opening night: short, fun, and called MORNING — the night
+    // starts here. Everyone stays on their feet.
+    banned: ['sweep'],
+  },
+  {
     id: 'money',
     title: 'MONEY',
     url: moneyUrl,
@@ -121,8 +135,9 @@ export const TRACKS: Track[] = [
     downbeat: 0.4934,
     seconds: 173.88,
     lufs: -14.5,
+    // MORNING took its tour night; it plays on in the quick-raid pool —
+    // and a record this laid-back still never asks anyone to duck.
     roles: ['raid'],
-    // The tour's opening night — everyone stays on their feet.
     banned: ['sweep'],
   },
   {
