@@ -108,7 +108,9 @@ export class DiscoSystem extends createSystem({}) {
     this.duck += ((danger ? 1 : 0) - this.duck) * Math.min(1, delta * 6);
     energy *= 1 - this.duck * 0.75;
 
-    rig.update(delta, beat, act, energy);
+    // A hidden rig doesn't animate — no ball spin, shaft sweeps or confetti
+    // math for a club that's packed away.
+    if (!menuRoom) rig.update(delta, beat, act, energy);
 
     const pulse = Math.max(0, 1 - (beat - Math.floor(beat)) * 2.2);
 

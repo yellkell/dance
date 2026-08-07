@@ -139,7 +139,11 @@ export class GoopliathSystem extends createSystem({}) {
     const raidish =
       match.after === 'raid' &&
       (match.screen === 'countdown' || match.screen === 'raid' || match.screen === 'podium');
-    if (raidish && match.bossKind !== 'goop') {
+    // The green room is goop-free: the raymarched gel is the most expensive
+    // draw in the game, and idling it on a menu was pure lag. He appears
+    // where he performs — rehearsals, finales, the eat — and nowhere else.
+    const menuRoom = match.screen === 'lobby' || match.screen === 'map' || match.screen === 'tour';
+    if (menuRoom || (raidish && match.bossKind !== 'goop')) {
       root.visible = false;
       return;
     }
@@ -180,12 +184,10 @@ export class GoopliathSystem extends createSystem({}) {
       }
     }
 
-    // Form: a chilled glob in the green room, up on his feet for the show —
-    // except mid-melt (he deliberately lets himself go) and mid-entrance
-    // (he arrives AS a glob, swallows, then pours up).
-    const lounging =
-      match.screen === 'lobby' || match.screen === 'map' || match.screen === 'tour';
-    goop.setFormTarget(lounging || melting || arriving ? 0 : 1);
+    // Form: up on his feet for the show — except mid-melt (he deliberately
+    // lets himself go) and mid-entrance (he arrives AS a glob, swallows,
+    // then pours up).
+    goop.setFormTarget(melting || arriving ? 0 : 1);
 
     this.runGestures(goop, root, beat);
 
@@ -261,14 +263,7 @@ export class GoopliathSystem extends createSystem({}) {
       goop.moveTo(_local.set(0, 0, 0));
       this.lastKick = -1;
     }
-    if (lounging) {
-      // THE GREEN ROOM: he chills beside the menu board, man-adjacent sized,
-      // still nodding to the room loop — the club itself is packed away.
-      root.scale.setScalar((1.15 * 1.78) / CREATURE.height);
-      root.position.set(-1.7, 0.02 + hop, -2.4);
-    } else {
-      root.position.y = RING.stageHeight + stageY + hop + introDrop;
-    }
+    root.position.y = RING.stageHeight + stageY + hop + introDrop;
 
     /* ── the gaze ──────────────────────────────────────────────────────── */
     // He watches YOU — but the watching grooves: the gaze sways off you
