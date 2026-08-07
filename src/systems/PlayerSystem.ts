@@ -9,17 +9,18 @@
  * decays DOWN very slowly, so a whole set spent crouching never quietly
  * lowers the bar the sweeps are judged against.
  *
- * THE GROOVE: dance like the groupies — one hand up, one hand down, and
- * SWAP on the beat. Each rhythmic swap pays a few points, and the payout
- * creeps upward the longer the motion stays consistent (the streak). Swap
- * off-rhythm or stop, and the streak lets go. It never outweighs dodging;
- * it's the trickle that makes standing still the wrong idea.
+ * THE GROOVE (the COMBO on screen): dance like the groupies — one hand up,
+ * one hand down, and SWAP on the beat. Each rhythmic swap pays a few
+ * points, and the payout creeps upward the longer the motion stays
+ * consistent (the streak). Swap off-rhythm or stop, and it lets go. It
+ * never outweighs dodging; it's the trickle that makes standing still the
+ * wrong idea. (The dodge counter is a separate thing — the DODGE STREAK.)
  *
  * THE STICKS: every dancer on the ring carries glowsticks — now so do you,
- * riding your controllers in your seat's colour. They burn brighter as your
- * groove streak climbs, and every REWARDED swap answers quietly from the
- * hand that went up: the stick pulses and a small "+N" drifts off it. No
- * panels, no fanfare — the stick itself tells you the dancing is paying.
+ * riding your controllers in your seat's colour. They burn brighter as the
+ * combo climbs, and every REWARDED swap answers quietly from the hand that
+ * went up: the stick pulses and a small "+N" drifts off it. No panels, no
+ * fanfare — the stick itself tells you the dancing is paying.
  */
 
 import { createSystem, Vector3 } from '@iwsdk/core';

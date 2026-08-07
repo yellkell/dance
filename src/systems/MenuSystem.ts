@@ -525,7 +525,7 @@ export class MenuSystem extends createSystem({}) {
       g.font = "700 23px 'Arial Black', system-ui, sans-serif";
       g.fillStyle = UI.dim;
       g.fillText('dodge the moves · ride the beat · outlast the floor', CONTENT_X, 740);
-      g.fillText('groove pays: one stick up, one down, swap on the kick', CONTENT_X, 776);
+      g.fillText('combo pays: one stick up, one down, swap on the kick', CONTENT_X, 776);
       const done = clearedTourNights().size;
       g.fillStyle = done ? UI.goop : UI.dim;
       g.fillText(

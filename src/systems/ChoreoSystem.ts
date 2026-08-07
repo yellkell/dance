@@ -495,7 +495,7 @@ export class ChoreoSystem extends createSystem({}) {
         sfx.glassClink();
       }
       if (d.combo > 0 && d.combo % 10 === 0) {
-        pushFlair(`${d.combo} COMBO — ×${mult.toFixed(1)}`, 'milestone');
+        pushFlair(`DODGE STREAK ${d.combo} — ×${mult.toFixed(1)}`, 'milestone');
         sfx.uiClick();
       }
     }

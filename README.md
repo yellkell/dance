@@ -8,17 +8,18 @@ moves that mark **every platform at the same time**.
 You don't fight back. You read the floor, move with the rhythm, and outlast
 everyone else.
 
-- **Dodge** a landing → your **combo** climbs → your points multiply (up to ×4).
+- **Dodge** a landing → your **DODGE STREAK** climbs → your points multiply
+  (up to ×4).
 - Nail a **last-instant dodge** (still in the fire one beat out, clear on the
   drop) → **PERFECT!**, ×1.5.
-- **GROOVE**: dance like the groupies — one hand up, one hand down, swapping
+- **COMBO**: dance like the groupies — one hand up, one hand down, swapping
   on the beat. Every rhythmic swap pays a little, and the payout creeps up
   the longer you keep the motion going. Stop, or swap off-rhythm, and the
-  streak lets go.
-- Get clipped → the combo dies and you lose one of **three lives**. Three hits
-  and you're off the floor, spectating from a sunken deck.
+  combo lets go.
+- Get clipped → the dodge streak dies and you lose one of **three lives**.
+  Three hits and you're off the floor, spectating from a sunken deck.
 - A **live holo leaderboard** over the stage shows everyone's rank, score and
-  combo. The **top ten** dance on raised platforms, and the current **champion
+  dodge streak. The **top ten** dance on raised platforms, and the current **champion
   above them all** — heights rendered relative to *your* platform, because your
   real floor never moves: when you lead, the ring drops away beneath you.
 - Every other dancer is a **slender humanoid figure** — gloss-black mannequin,

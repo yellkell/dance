@@ -7,10 +7,11 @@
  * moves that mark EVERY platform at the same time. You don't fight back.
  * You read the floor, move with the rhythm, and outlast everyone else.
  *
- * Dodge → combo climbs → points multiply. Get clipped → combo dies, one of
- * three lives gone. Three hits and you're off the floor. A live holo
- * leaderboard rings the stage; the top ten dance on raised platforms and the
- * current champion above them all.
+ * Dodge → the DODGE STREAK climbs → points multiply. Get clipped → the
+ * streak dies, one of three lives gone. Three hits and you're off the
+ * floor. Dancing in rhythm builds the COMBO meter for bonus points. A live
+ * holo leaderboard rings the stage; the top ten dance on raised platforms
+ * and the current champion above them all.
  *
  * Dimensions are metres. Times are expressed in BEATS wherever the music
  * rules (the whole game is quantized to the track).
@@ -247,6 +248,11 @@ export const CHOREO = {
  * the beat. Every rhythmic swap pays a little — and the payout creeps up
  * the longer you keep the motion going. It never rivals a dodge; it's the
  * tax refund for actually dancing between them.
+ *
+ * NAMING: on screen this meter is the COMBO (COMBO ×n and the wind-up
+ * pips), and the dodge counter is the DODGE STREAK. The code keeps its
+ * groove-flavoured identifiers so the two streaks can never be confused
+ * in here.
  */
 export const GROOVE = {
   /** Vertical hand separation (m) that counts as "one up, one down". */
@@ -274,8 +280,10 @@ export const GROOVE = {
 };
 
 /* ────────────────────────────── THE SCORE ────────────────────────────────
- * Survive a landing → a DODGE: points × combo multiplier, combo +1.
- * Get clipped → lose a life, combo dies, brief i-frames. Three and out.
+ * Survive a landing → a DODGE: points × the DODGE STREAK multiplier, and
+ * the streak climbs one. Get clipped → lose a life, the streak dies, brief
+ * i-frames. Three and out. (The streak is `combo` in code — the field rides
+ * the score wire; on screen it's always the DODGE STREAK.)
  * A PERFECT is a last-instant dodge: you were still inside the doomed zone
  * one beat before impact and clear when it landed — riding the beat.
  */

@@ -1,7 +1,8 @@
 /**
  * HudSystem — your own numbers, floating free just past your platform's
- * front rim: score, combo multiplier, groove streak, lives, the count-in,
- * and the flair pops (PERFECT! / 20 COMBO / HIT).
+ * front rim: score, the DODGE STREAK multiplier, the COMBO meter (the
+ * rhythm-swap streak — `grooveStreak` in code), lives, the count-in, and
+ * the flair pops (PERFECT! / DODGE STREAK 20 / HIT).
  *
  * NO PANELS. No smoked glass, no frames — menus get panels, gameplay gets
  * ink: every glyph wears a thick black outline so it reads against a bright
@@ -186,14 +187,14 @@ export class HudSystem extends createSystem({}) {
     ink(g, `${d?.score ?? 0}`, W / 2, 88, 104, '#ffffff');
     ink(
       g,
-      d && d.combo > 0 ? `${d.combo} COMBO  ×${mult.toFixed(1)}` : 'NO COMBO',
+      d && d.combo > 0 ? `DODGE STREAK ${d.combo}  ×${mult.toFixed(1)}` : 'NO STREAK',
       W / 2,
       196,
       50,
       d && d.combo > 0 ? '#ffb000' : 'rgba(168,172,186,0.9)',
     );
     if (match.grooveStreak >= 4) {
-      ink(g, `GROOVE ×${match.grooveStreak}`, W / 2, 258, 32, '#4fb7ff');
+      ink(g, `COMBO ×${match.grooveStreak}`, W / 2, 258, 32, '#4fb7ff');
     } else if (match.grooveStreak > 0) {
       // The wind-up: rogue-style combo pips. Each rhythmic swap lights one;
       // at four the row gives way to the ×meter above. Same ink discipline —
