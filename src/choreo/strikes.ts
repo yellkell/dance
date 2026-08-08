@@ -250,6 +250,61 @@ export class StrikeFx {
     );
   }
 
+  /** THE DONUT closes: the rim goes up as a wall of light and RUSHES IN,
+   *  stopping dead on the doorpost circle — the opposite motion to the
+   *  nova's shock ring, so the two can never be confused at a glance even
+   *  though both are round. The middle is left conspicuously untouched:
+   *  that's the ground that lived. */
+  donut(parent: Object3D, innerR: number): void {
+    const outer = CHOREO.donutRadius;
+    const sparks = new Sparks(54, WARN);
+    let landed = false;
+    this.spawn(
+      parent,
+      0.5,
+      (k, g) => {
+        const close = Math.min(1, k / 0.7);
+        const wall = g.children[0] as Mesh;
+        // The wall races in from the deck edge and parks on the safe rim.
+        const r = outer - close * (outer - innerR);
+        wall.scale.set(r, 1, r);
+        (wall.material as MeshBasicMaterial).opacity = 0.85 * (1 - k * k);
+        const floor = g.children[1] as Mesh;
+        (floor.material as MeshBasicMaterial).opacity = 0.7 * (1 - k);
+        const rim = g.children[2] as Mesh;
+        (rim.material as MeshBasicMaterial).opacity = 0.95 * (1 - k);
+        rim.scale.setScalar(1 + k * 0.06);
+        if (!landed && close >= 1) {
+          landed = true;
+          // Embers thrown UP off the doorpost circle as the wall piles into
+          // it — the safe disc gets a crown, not a covering.
+          for (let i = 0; i < 16; i++) {
+            const a = (i / 16) * Math.PI * 2;
+            sparks.emit(Math.sin(a) * innerR, 0.14, Math.cos(a) * innerR, 3, 1.5);
+          }
+        }
+      },
+      (g) => {
+        const wall = new Mesh(new CylinderGeometry(1, 1, 0.6, 40, 1, true), basic(WARN, 0.85));
+        wall.position.y = 0.3;
+        wall.scale.set(outer, 1, outer);
+        g.add(wall);
+        // The doomed annulus flashing on the deck — a hole where you stood.
+        const floor = new Mesh(new RingGeometry(innerR, outer, 44), basic(WARN, 0.7));
+        floor.rotation.x = -Math.PI / 2;
+        floor.position.y = DECAL_Y + 0.01;
+        g.add(floor);
+        // The doorpost circle, white-hot: exactly where the telegraph drew it.
+        const rim = new Mesh(new RingGeometry(innerR - 0.03, innerR + 0.03, 44), basic(HOT, 0.95));
+        rim.rotation.x = -Math.PI / 2;
+        rim.position.y = DECAL_Y + 0.02;
+        g.add(rim);
+        g.add(sparks.points);
+      },
+      (dt) => sparks.step(dt),
+    );
+  }
+
   /** THE CROSSFIRE fires: a wall of light rakes ACROSS the deck, exactly on
    *  the strip — with the emitter that fed it flaring on its rail, so the
    *  eye can see where the shot came from even after the beam is gone. */

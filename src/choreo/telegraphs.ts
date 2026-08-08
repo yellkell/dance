@@ -125,6 +125,37 @@ const NOVA_FRAG = /* glsl */ `
 `;
 
 /**
+ * Donut: the RIM floods and the middle lives — the nova's opposite number.
+ * A bright doorpost CIRCLE burns at the edge of the safe disc with chevrons
+ * marching inward across the doomed ring, so the shape says "in here", not
+ * "somewhere over there". uInner = safe radius as a fraction of the pane.
+ */
+const DONUT_FRAG = /* glsl */ `
+  ${COMMON}
+  uniform float uInner;
+  void main(){
+    vec2 p = vUv * 2.0 - 1.0;
+    float r = length(p);
+    if (r > 1.0) discard;
+    float safe = step(r, uInner);
+    vec3 col = warnColor();
+    float a = 0.0;
+    // The flood: everything outside the safe disc fills with the charge.
+    a += (1.0 - safe) * (0.12 + 0.5 * uFill);
+    // The doorpost ring — the honest edge of the ground that lives.
+    a += smoothstep(0.055, 0.0, abs(r - uInner)) * (0.35 + 0.65 * uFill);
+    // Chevron rings marching INWARD toward the safe disc (+uTime pulls the
+    // pattern to smaller radii as the clock runs).
+    float band = step(0.68, fract((r - uInner) * 5.5 + uTime * 1.9));
+    a += band * (1.0 - safe) * (0.12 + 0.2 * uFill);
+    // Outer rim ring, so the doomed annulus has a far edge too.
+    a += smoothstep(0.92, 0.97, r) * (1.0 - smoothstep(0.99, 1.0, r)) * 0.6;
+    a *= pulse();
+    gl_FragColor = vec4(col, a);
+  }
+`;
+
+/**
  * Half-platform flood (GOOPLIATH's seesaw): one side of the deck fills with
  * warning while a hard rail burns along the centreline — the honest border —
  * and chevrons march toward the SAFE half: jump. uDir is the local-x
@@ -277,6 +308,18 @@ function makeTelegraph(meshes: Mesh[], mats: ShaderMaterial[]): Telegraph {
  */
 export function novaTelegraph(radius: number, angle: number, halfAngle: number): Telegraph {
   const mat = warnMat(NOVA_FRAG, { uAngle: { value: angle }, uHalf: { value: halfAngle } });
+  const disc = new Mesh(new PlaneGeometry(radius * 2, radius * 2), mat);
+  disc.rotation.x = -Math.PI / 2;
+  return makeTelegraph([disc], [mat]);
+}
+
+/**
+ * THE DONUT: the deck's rim floods and one disc in the middle survives.
+ * `radius` covers the whole deck (corners included), `innerR` is the safe
+ * disc. Place the group at the platform centre on the floor.
+ */
+export function donutTelegraph(radius: number, innerR: number): Telegraph {
+  const mat = warnMat(DONUT_FRAG, { uInner: { value: innerR / radius } });
   const disc = new Mesh(new PlaneGeometry(radius * 2, radius * 2), mat);
   disc.rotation.x = -Math.PI / 2;
   return makeTelegraph([disc], [mat]);

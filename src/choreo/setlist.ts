@@ -36,6 +36,9 @@ export type Zone =
   /** The trip web: no ground to move to — the whole deck is strung with
    *  laser wire and the dodge is holding still until it clears. */
   | { kind: 'wire'; hold: number }
+  /** The rim burns, the middle lives — everything outside `innerR` is
+   *  doomed, so the whole ring collapses toward its own centre. */
+  | { kind: 'donut'; innerR: number }
   | { kind: 'sweep' }
   | { kind: 'half'; side: 1 | -1; axis: 0 | 1 }
   /** Everything burns EXCEPT a clear column at x — stand in the gap. */
@@ -126,14 +129,41 @@ function buildLandings(kind: MoveKind, landBeat: number, act: number, rng: () =>
       });
     }
   } else if (kind === 'beam') {
-    const lanes = act >= 2 ? 2 : 1;
-    const first = (rng() * 2 - 1) * 0.5;
-    for (let i = 0; i < lanes; i++) {
-      // The second lane cuts the other side of the deck — between them the
-      // safe ground is a readable stripe, never a coin flip.
-      const x = i === 0 ? first : -Math.sign(first) * (0.3 + rng() * 0.3);
-      landings.push({ beat: landBeat, zone: { kind: 'lane', x, halfW: CHOREO.beamHalfWidth } });
+    const halfW = CHOREO.beamHalfWidth;
+    const lane = (x: number) => landings.push({ beat: landBeat, zone: { kind: 'lane', x, halfW } });
+    if (act < 2) {
+      // One laser, and it lands on a SLOT: the middle, or a third out.
+      lane(CHOREO.beamSlots[Math.floor(rng() * CHOREO.beamSlots.length)]);
+    } else if (rng() < CHOREO.beamSplitChance[Math.min(act, CHOREO.beamSplitChance.length - 1)]) {
+      // SPLIT: evenly spaced either side of centre. What's left is a
+      // corridor down the middle — the dodge is to stand BETWEEN them.
+      lane(-CHOREO.beamSplitX);
+      lane(CHOREO.beamSplitX);
+    } else {
+      // TWIN: two strips shoulder to shoulder, taking one whole side and
+      // the middle with them. No corridor, no choice — get across.
+      const s = rng() < 0.5 ? 1 : -1;
+      lane(s * CHOREO.beamTwinInner);
+      lane(s * (CHOREO.beamTwinInner + halfW * 2 + 0.02));
     }
+  } else if (kind === 'donut') {
+    // THE ONE-TWO: a laser straight down the middle drives everyone off
+    // centre, and a bar later the rim closes and the middle is the only
+    // ground left. Out, then back — the whole deck used in four beats.
+    // (The ring's own telegraph holds off until the laser has fired; see
+    // ChoreoSystem, which gates the second stage's window.)
+    const innerR = act >= 3 ? CHOREO.donutInnerRLate : CHOREO.donutInnerR;
+    const opens = rng() < CHOREO.donutOpenChance;
+    if (opens) {
+      landings.push({
+        beat: landBeat,
+        zone: { kind: 'lane', x: 0, halfW: CHOREO.beamHalfWidth },
+      });
+    }
+    landings.push({
+      beat: landBeat + (opens ? CHOREO.donutFollowBeats : 0),
+      zone: { kind: 'donut', innerR },
+    });
   } else if (kind === 'cross') {
     // LASERS FROM THE SIDES: a strip across the deck, always pushed off
     // centre so one side of it is roomy ground and the read is obvious.

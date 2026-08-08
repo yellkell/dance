@@ -262,6 +262,13 @@ export class AvatarSystem extends createSystem({}) {
         const r = dodge ? 0.55 : -0.55;
         return { x: Math.sin(local) * r, z: Math.cos(local) * r };
       }
+      case 'donut': {
+        // Everyone piles into the middle — with a little seeded scatter so
+        // twenty-four decks aren't twenty-four identical statues.
+        if (dodge) return { x: Math.sin(p.phase * 2) * 0.1, z: Math.cos(p.phase * 3) * 0.09 };
+        const out = zone.innerR + 0.28;
+        return { x: Math.sin(p.phase) * out, z: Math.cos(p.phase) * out };
+      }
     }
   }
 }

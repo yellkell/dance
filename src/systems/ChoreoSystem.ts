@@ -24,6 +24,7 @@ import { StrikeFx } from '../choreo/strikes.js';
 import {
   beamTelegraph,
   circleTelegraph,
+  donutTelegraph,
   gateTelegraph,
   halfTelegraph,
   novaTelegraph,
@@ -293,13 +294,16 @@ export class ChoreoSystem extends createSystem({}) {
               ? { x: match.headX, z: match.headZ, locked: false }
               : { ...(liveSpots.get(dancer.seat) ?? { x: 0, z: 0 }), locked: false }
             : undefined;
-        // A chained pie (nova landing 2+) opens its telegraph window only
-        // as the previous pie detonates — each singular disc rides its own
-        // short fuse instead of three discs stacking up from the start.
+        // Staged shapes open their own telegraph window instead of riding
+        // the move's: a chained pie appears exactly as the last one goes
+        // off, and the donut's ring waits for its opening laser to fire —
+        // one shape to read at a time, always.
         const tgStartBeat =
           landing.zone.kind === 'nova' && landingIdx > 0
             ? landing.beat - CHOREO.novaChainBeats
-            : move.telegraphBeat;
+            : landing.zone.kind === 'donut' && landingIdx > 0
+              ? landing.beat - CHOREO.donutFollowBeats
+              : move.telegraphBeat;
         this.zones.push({
           moveIdx: move.index,
           landingIdx,
@@ -384,6 +388,11 @@ export class ChoreoSystem extends createSystem({}) {
         tg.group.position.y = 0.05;
         return tg;
       }
+      case 'donut': {
+        const tg = donutTelegraph(CHOREO.donutRadius, zone.innerR);
+        tg.group.position.y = 0.05;
+        return tg;
+      }
     }
   }
 
@@ -417,6 +426,10 @@ export class ChoreoSystem extends createSystem({}) {
         if (!c) return false;
         return Math.hypot(x - c.x, z - c.z) <= zone.r + HEAD_R * 0.7;
       }
+      case 'donut':
+        // Same forgiveness as the wedge: the head reaching the middle is
+        // the dodge, heels or no heels.
+        return Math.hypot(x, z) > zone.innerR + HEAD_R * 0.5;
       case 'nova': {
         // Judged on the head alone, forgiving by design (reached the wedge =
         // safe, even if your heels trail).
@@ -469,6 +482,9 @@ export class ChoreoSystem extends createSystem({}) {
         case 'wire':
           sfx.wireSnap();
           break;
+        case 'donut':
+          sfx.donutSlam();
+          break;
       }
     }
 
@@ -509,6 +525,9 @@ export class ChoreoSystem extends createSystem({}) {
         break;
       case 'wire':
         this.strikes.wire(parent, CHOREO.wireY);
+        break;
+      case 'donut':
+        this.strikes.donut(parent, z.zone.innerR);
         break;
       case 'nova': {
         const local = z.zone.bearing - seatBearing(z.seat, match.seats);

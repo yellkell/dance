@@ -410,6 +410,19 @@ export class McSystem extends createSystem({}) {
         }
         break;
       }
+      case 'donut': {
+        // THE GATHER: arms thrown wide and high, then HAULED in against
+        // his chest as the rim closes — the nova's mime run backwards, and
+        // the crowd's instruction either way is what his hands do.
+        const wide = 0.78 - strike * 0.68;
+        const y = 1.34 - strike * 0.34 + pump * 0.05;
+        p.lx = -wide; p.rx = wide;
+        p.ly = p.ry = y;
+        p.lz = p.rz = -0.32 + strike * 0.24;
+        // He crouches into the huddle he's demanding.
+        p.hy = STAND - strike * 0.18;
+        break;
+      }
       case 'nova': {
         // The shockwave: arms spread flat, a slow wind-up spin, arms
         // snapping down on the burst.

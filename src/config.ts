@@ -142,7 +142,12 @@ export const GOOP = {
  * chevrons run toward, be there. An experienced dancer never needs a word:
  *
  *  slam   : discs fill on the deck — STEP off them.
- *  beam   : a strip fills down the deck — SIDESTEP off the lane.
+ *  beam   : a strip fills down the deck — SIDESTEP off the lane. A single
+ *           laser snaps to one of three slots (middle, or a third out); a
+ *           DOUBLE is never two random strips — it is either a TWIN pair
+ *           shoulder to shoulder covering one side and the middle (get
+ *           across), or a SPLIT evenly either side of centre (stand in the
+ *           corridor between them). Deliberate shapes, read at a glance.
  *  sweep  : the AIR burns, never the floor — a danger roof overhead with a
  *           blazing limbo line as its underside, a short chevron fringe
  *           dripping off it — get UNDER the line (duck). The deck stays
@@ -156,6 +161,11 @@ export const GOOP = {
  *           freezes late, then lands. Moving after the freeze IS the dodge.
  *  nova   : everything burns EXCEPT one wedge at a shared compass bearing —
  *           the whole ring rotates to the same safe ground together.
+ *  donut  : the RIM burns and the middle lives — a closing ring with a
+ *           bright doorpost circle and chevrons marching INWARD: get to the
+ *           centre. Usually opens with a laser straight down the middle,
+ *           which drives you OFF centre first, so the pair walks you out
+ *           and hauls you back in.
  *  cross  : LASERS FROM THE SIDES. A strip fills ACROSS the deck, fed from
  *           an emitter at one rail — step FORWARD or BACK off it (the beam's
  *           quarter-turn cousin: same read, the other axis). Late on it
@@ -176,7 +186,8 @@ export type MoveKind =
   | 'chase'
   | 'nova'
   | 'cross'
-  | 'wire';
+  | 'wire'
+  | 'donut';
 
 export const MOVES: Record<
   MoveKind,
@@ -214,6 +225,10 @@ export const MOVES: Record<
   // commit to standing still. Held back until the floor is warm, and never
   // common — stillness is a punchline that stops working if it's constant.
   wire: { chargeBeats: 6, weights: [0, 2, 2, 2] },
+  // The DONUT is the nova's opposite number and mostly arrives as a
+  // one-two, so it charges like one: long enough to read the middle laser,
+  // clear it, and still get home.
+  donut: { chargeBeats: 5, weights: [0, 2, 3, 3] },
 };
 
 export const CHOREO = {
@@ -223,6 +238,30 @@ export const CHOREO = {
   slamStepBeats: 1,
   /** Beam lane half-width. */
   beamHalfWidth: 0.24,
+  /** A SINGLE laser only ever lands on one of these local-x slots — the
+   *  middle or a third out. Random x read as noise; three slots read as a
+   *  choice the boss made, and the middle one is the setup the donut wants
+   *  to answer. */
+  beamSlots: [-0.42, 0, 0.42],
+  /** DOUBLE lasers, two deliberate shapes and nothing in between:
+   *   SPLIT — one either side of centre at ±beamSplitX. The strips leave a
+   *     corridor down the middle and only slivers at the rim, so the answer
+   *     is to stand BETWEEN the lasers.
+   *   TWIN — two shoulder to shoulder from beamTwinInner outward, covering
+   *     one whole side AND the middle: the answer is to get across.
+   *  The split gets likelier at the peak, where precision is the point. */
+  beamSplitX: 0.5,
+  beamTwinInner: 0.12,
+  beamSplitChance: [0.4, 0.4, 0.55, 0.55],
+  /** THE DONUT: radius of the safe disc in the middle (tighter at the
+   *  peak), how long after the opening laser the ring closes, and how often
+   *  it opens with that laser instead of arriving alone. A full bar between
+   *  the two is the whole move: driven off centre, then hauled back. */
+  donutInnerR: 0.46,
+  donutInnerRLate: 0.38,
+  donutRadius: 1.15,
+  donutFollowBeats: 4,
+  donutOpenChance: 0.7,
   /** The sweep's LIMBO LINE: the rendered underside of the danger. Sits a
    *  touch BELOW the average duck threshold (judgement is duck-state, not
    *  metres) so "visibly under the line" is never a hit — the picture may

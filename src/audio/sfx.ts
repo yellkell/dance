@@ -912,6 +912,16 @@ export function wireSnap(): void {
   clank(1400, 0.07, 0.12, 0.02);
 }
 
+/** THE DONUT closing — the mirror of the pie: the rim rushing INWARD and
+ *  piling up on the safe circle. Everything sweeps up in pitch (the pie's
+ *  roll falls away), so the ear knows which way the danger is moving. */
+export function donutSlam(): void {
+  whooshNoise(0.34, 0.26, 260, 2600); // the rim rushing in
+  tone({ freq: 140, to: 420, type: 'sawtooth', dur: 0.3, gain: 0.08 }); // closing
+  noiseHit(0.16, 0.34, 1800, 500, 2.0, 0.28); // piling onto the circle
+  tone({ freq: 88, to: 40, type: 'sine', dur: 0.36, gain: 0.3, delay: 0.28 });
+}
+
 /** The pie detonating — one shockwave rolling over the whole ring. */
 export function novaBoom(): void {
   noiseHit(0.4, 0.4, 3000, 120, 1.6); // the blast front

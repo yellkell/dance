@@ -60,7 +60,7 @@ There's also a debug hook in the console:
 | Move | The tell | Your answer |
 | --- | --- | --- |
 | **SLAM** | amber discs charge on your deck (a drumline in later acts) | **step** off the glow |
-| **BEAM** | a strip rakes down the deck from the stage | **sidestep** the lane |
+| **BEAM** | a strip rakes down the deck from the stage — one laser on a slot, or a deliberate **double**: a TWIN pair taking one side and the middle, or a SPLIT evenly either side of centre | **sidestep** the lane; **get across** a twin; **stand between** a split |
 | **SWEEP** | a blade hangs at chest height, chevrons cascading **downward** off it | **duck** — and hold it |
 | **SEESAW** | one half of the deck floods, then the other, on the beat | **cross** the centreline |
 | **SURGE** | the seesaw's front/back cousin | **cross**, the other way |
@@ -69,6 +69,7 @@ There's also a debug hook in the console:
 | **NOVA** | everything burns except one wedge — same compass bearing for the whole ring | **stand** in the safe ground, together |
 | **CROSSFIRE** | a laser is loaded on one side rail and a strip fills **across** the deck (late on, a stage lane crosses it) | **step forward or back** off the strip — diagonally, once it's a lattice |
 | **TRIP WEB** | shin-high laser wire strung over the whole deck; nothing safe is drawn, because nothing is | **hold still** until it discharges |
+| **DONUT** | usually a laser straight down the middle, and a bar later the rim closes with chevrons marching **inward** | **step off** the middle, then **run back into it** |
 
 The telegraph is the whole instruction: whatever fills amber→red, don't be
 in it; wherever the doorpost rails and chevrons point, be there. Windups are
@@ -79,6 +80,13 @@ Two of those answers are deliberate exceptions, and both are drawn in the
 AIR rather than on the deck — floor paint means "move your feet" everywhere
 else, so a move whose answer is *don't* must never use it. The **sweep**
 says drop; the **trip web** says freeze.
+
+Nothing is placed at random. Lasers land on slots and doubles come in two
+shapes only, so a glance is enough to know whether you're crossing or
+threading. The donut is built as a **one-two** — the middle laser drives
+everyone off centre, the ring hauls them back a bar later — and its ring
+stays dark until that laser has fired, so there is only ever one shape on
+the deck to read (the same staging the pie chain uses).
 
 ## Rehearsal (the campaign)
 
