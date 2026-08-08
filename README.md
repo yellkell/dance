@@ -70,6 +70,7 @@ There's also a debug hook in the console:
 | **CROSSFIRE** | a laser is loaded on one side rail and a strip fills **across** the deck (late on, a stage lane crosses it) | **step forward or back** off the strip — diagonally, once it's a lattice |
 | **TRIP WEB** | shin-high laser wire strung over the whole deck; nothing safe is drawn, because nothing is | **hold still** until it discharges |
 | **DONUT** | usually a laser straight down the middle, and a bar later the rim closes with chevrons marching **inward** | **step off** the middle, then **run back into it** |
+| **ROUTINE** | the deck splits into quarters and the boss **teaches** a corner sequence — each marked with its step number, each pointed out in turn — then the marks go out | **remember it**, and hit each corner on its tick |
 
 The telegraph is the whole instruction: whatever fills amber→red, don't be
 in it; wherever the doorpost rails and chevrons point, be there. Windups are
@@ -81,9 +82,16 @@ AIR rather than on the deck — floor paint means "move your feet" everywhere
 else, so a move whose answer is *don't* must never use it. The **sweep**
 says drop; the **trip web** says freeze.
 
-Nothing is placed at random. Lasers land on slots and doubles come in two
-shapes only, so a glance is enough to know whether you're crossing or
-threading. The donut is built as a **one-two** — the middle laser drives
+The **routine** is the one move that isn't read at all — it's learned. Two
+to four corners, never the same one twice, taught during a two-bar wind-up
+and then hidden; from there the only cue is a bell a beat ahead of each
+step, pitched up an arpeggio so the sound says *which* step as well as
+*when*. The quarter lines stay lit the whole way through, because the floor
+should always tell you where the boxes land — never which one is yours.
+
+Nothing else is placed at random either. Lasers land on slots and doubles
+come in two shapes only, so a glance is enough to know whether you're
+crossing or threading. The donut is built as a **one-two** — the middle laser drives
 everyone off centre, the ring hauls them back a bar later — and its ring
 stays dark until that laser has fired, so there is only ever one shape on
 the deck to read (the same staging the pie chain uses).

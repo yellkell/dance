@@ -912,6 +912,28 @@ export function wireSnap(): void {
   clank(1400, 0.07, 0.12, 0.02);
 }
 
+/** THE ROUTINE calling a step: a bright bell a beat ahead of each landing,
+ *  pitched by step number up a major arpeggio. Once the marks are out this
+ *  tick is the ONLY cue, so it has to say two things at once — "now", and
+ *  "this is step three" — and pitch is how a dancer counts without
+ *  counting. */
+const ROUTINE_NOTES = [523.25, 659.25, 783.99, 987.77]; // C E G B
+
+export function routineTick(step: number): void {
+  const f = ROUTINE_NOTES[Math.max(0, Math.min(ROUTINE_NOTES.length - 1, step))];
+  tone({ freq: f, to: f, type: 'triangle', dur: 0.16, gain: 0.15 });
+  tone({ freq: f * 2, to: f * 2, type: 'sine', dur: 0.1, gain: 0.06 }); // the shine
+  clank(f * 3, 0.05, 0.06, 0.005);
+}
+
+/** The blocks landing on the three quarters you didn't learn. */
+export function quadCrash(): void {
+  noiseHit(0.22, 0.34, 1100, 130, 1.4); // slabs meeting deck
+  tone({ freq: 96, to: 34, type: 'sine', dur: 0.4, gain: 0.36 });
+  clank(180, 0.12, 0.22, 0.02);
+  squelch(0.5);
+}
+
 /** THE DONUT closing — the mirror of the pie: the rim rushing INWARD and
  *  piling up on the safe circle. Everything sweeps up in pitch (the pie's
  *  roll falls away), so the ear knows which way the danger is moving. */

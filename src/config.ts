@@ -161,6 +161,14 @@ export const GOOP = {
  *           freezes late, then lands. Moving after the freeze IS the dodge.
  *  nova   : everything burns EXCEPT one wedge at a shared compass bearing —
  *           the whole ring rotates to the same safe ground together.
+ *  routine: THE MEMORY TEST. The deck splits into four quarters and the
+ *           boss teaches a ROUTINE — two to four corners, never the same
+ *           one twice, each marked with its step number and pointed out in
+ *           order by his own body. Then the marks go out. From there the
+ *           only cue is a TICK a beat ahead of each step, pitched by step
+ *           number, and blocks crush the three corners you didn't learn.
+ *           The quarter lines stay lit the whole way through: the floor
+ *           tells you where the boxes are, never which one is yours.
  *  donut  : the RIM burns and the middle lives — a closing ring with a
  *           bright doorpost circle and chevrons marching INWARD: get to the
  *           centre. Usually opens with a laser straight down the middle,
@@ -187,7 +195,8 @@ export type MoveKind =
   | 'nova'
   | 'cross'
   | 'wire'
-  | 'donut';
+  | 'donut'
+  | 'routine';
 
 export const MOVES: Record<
   MoveKind,
@@ -229,6 +238,11 @@ export const MOVES: Record<
   // one-two, so it charges like one: long enough to read the middle laser,
   // clear it, and still get home.
   donut: { chargeBeats: 5, weights: [0, 2, 3, 3] },
+  // THE ROUTINE charges for two bars because the charge IS the lesson —
+  // you're being taught, not warned. Rare on purpose: it's the set piece
+  // the floor talks about afterwards, and a memory test you meet every
+  // phrase stops being one.
+  routine: { chargeBeats: 8, weights: [0, 1, 2, 2] },
 };
 
 export const CHOREO = {
@@ -253,6 +267,18 @@ export const CHOREO = {
   beamSplitX: 0.5,
   beamTwinInner: 0.12,
   beamSplitChance: [0.4, 0.4, 0.55, 0.55],
+  /** THE ROUTINE: how many corners you're asked to hold in your head (per
+   *  act, clamped to the 2–4 the deck's four quarters can offer without
+   *  ever repeating one), and how many beats apart the steps land. Two
+   *  beats is a brisk corner-to-corner step — about a metre of travel —
+   *  which is the point: the memory has to be ready before the tick. */
+  routineSteps: [2, 2, 3, 4],
+  routineStepBeats: 2,
+  /** How far PAST the quarter line you must stand for a corner to count.
+   *  Without it, loitering at dead centre would satisfy all four corners
+   *  at once and the whole move would be free — so the routine asks you to
+   *  commit, and the lit quarter lines show exactly where the line is. */
+  routineMargin: 0.08,
   /** THE DONUT: radius of the safe disc in the middle (tighter at the
    *  peak), how long after the opening laser the ring closes, and how often
    *  it opens with that laser instead of arriving alone. A full bar between

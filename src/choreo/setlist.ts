@@ -39,6 +39,11 @@ export type Zone =
   /** The rim burns, the middle lives — everything outside `innerR` is
    *  doomed, so the whole ring collapses toward its own centre. */
   | { kind: 'donut'; innerR: number }
+  /** One step of THE ROUTINE: the deck's four quarters, and `corner` is
+   *  the only one that lives. Every step carries the WHOLE routine so the
+   *  preview (and the boss's body) can teach it before step one lands.
+   *  Corner bit 0 = local +x, bit 1 = local +z. */
+  | { kind: 'quad'; corner: number; step: number; routine: readonly number[] }
   | { kind: 'sweep' }
   | { kind: 'half'; side: 1 | -1; axis: 0 | 1 }
   /** Everything burns EXCEPT a clear column at x — stand in the gap. */
@@ -181,6 +186,23 @@ function buildLandings(kind: MoveKind, landBeat: number, act: number, rng: () =>
         zone: { kind: 'lane', x: xSign * (0.2 + rng() * 0.32), halfW: CHOREO.beamHalfWidth },
       });
     }
+  } else if (kind === 'routine') {
+    // THE MEMORY TEST. A seeded shuffle of the four quarters, cut to
+    // length — a shuffle can't repeat a corner, so "never the same corner
+    // twice" is true by construction rather than by retrying rolls.
+    const bag = [0, 1, 2, 3];
+    for (let i = bag.length - 1; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1));
+      [bag[i], bag[j]] = [bag[j], bag[i]];
+    }
+    const want = CHOREO.routineSteps[Math.min(act, CHOREO.routineSteps.length - 1)];
+    const routine = bag.slice(0, Math.max(2, Math.min(4, want)));
+    routine.forEach((corner, step) => {
+      landings.push({
+        beat: landBeat + step * CHOREO.routineStepBeats,
+        zone: { kind: 'quad', corner, step, routine },
+      });
+    });
   } else if (kind === 'wire') {
     landings.push({ beat: landBeat, zone: { kind: 'wire', hold: CHOREO.wireHoldBeats } });
   } else if (kind === 'sweep') {

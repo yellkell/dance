@@ -28,7 +28,9 @@ import {
   gateTelegraph,
   halfTelegraph,
   novaTelegraph,
+  quarterTelegraph,
   railTelegraph,
+  routineMarksTelegraph,
   sweepTelegraph,
   wireTelegraph,
   type Telegraph,
@@ -103,6 +105,10 @@ function cueDirection(zone: Zone, moveIdx: number, landingIdx: number): Partial<
       return { side: zone.side, axis: zone.axis };
     case 'gate':
       return { gapX: zone.x };
+    case 'quad':
+      // The whole routine travels with the cue: the boss teaches it by
+      // pointing each corner out while the marks are still lit.
+      return { routine: zone.routine };
     case 'rail':
       // Which rail threw it (so the MC shoots from that side), and whether
       // the near or far ground is the doomed one (so his body says which
@@ -122,6 +128,7 @@ export class ChoreoSystem extends createSystem({}) {
   private lastBar = -1;
   private landedSfx = new Set<string>();
   private cuedSteps = new Set<string>();
+  private cuedTicks = new Set<string>();
   private tutorialMoveHit = new Map<number, boolean>();
   private ended = false;
 
@@ -141,6 +148,7 @@ export class ChoreoSystem extends createSystem({}) {
     this.lastBar = -1;
     this.landedSfx.clear();
     this.cuedSteps.clear();
+    this.cuedTicks.clear();
     this.tutorialMoveHit.clear();
     this.ended = false;
     this.setlist =
@@ -193,6 +201,18 @@ export class ChoreoSystem extends createSystem({}) {
       if (this.cuedSteps.has(key)) continue;
       this.cuedSteps.add(key);
       match.gestures.push({ kind: z.kind, chargeBeats: lead, step: true, ...cueDirection(z.zone, z.moveIdx, z.landingIdx), dueBeat: z.dueBeat });
+    }
+
+    // THE ROUTINE calls itself: one tick a beat ahead of every step,
+    // pitched by step number. Once the marks have faded this is the only
+    // cue there is, so it fires for the whole ring at once (one landing,
+    // one call) regardless of how many decks are still dancing.
+    for (const z of this.zones) {
+      if (z.resolved || z.zone.kind !== 'quad' || beat < z.dueBeat - 1) continue;
+      const key = `${z.moveIdx}:${z.landingIdx}`;
+      if (this.cuedTicks.has(key)) continue;
+      this.cuedTicks.add(key);
+      sfx.routineTick(z.zone.step);
     }
 
     // Advance live zones.
@@ -393,6 +413,24 @@ export class ChoreoSystem extends createSystem({}) {
         tg.group.position.y = 0.05;
         return tg;
       }
+      case 'quad': {
+        // Two shapes across the whole move, and neither belongs to a single
+        // step: the LESSON (hung on step one, so its fade rides that step's
+        // charge and it is gone before the first block) and the QUARTER
+        // LINES (hung on the last step, so they outlive every landing).
+        // The steps in between draw nothing — that's the memory test.
+        if (zone.step === 0) {
+          const tg = routineMarksTelegraph(zone.routine, OCTAGON_HALF_WIDTH, OCTAGON_HALF_DEPTH);
+          tg.group.position.y = 0.05;
+          return tg;
+        }
+        if (zone.step === zone.routine.length - 1) {
+          const tg = quarterTelegraph(OCTAGON_HALF_WIDTH, OCTAGON_HALF_DEPTH);
+          tg.group.position.y = 0.048;
+          return tg;
+        }
+        return null;
+      }
     }
   }
 
@@ -430,6 +468,13 @@ export class ChoreoSystem extends createSystem({}) {
         // Same forgiveness as the wedge: the head reaching the middle is
         // the dodge, heels or no heels.
         return Math.hypot(x, z) > zone.innerR + HEAD_R * 0.5;
+      case 'quad': {
+        // You have to be COMMITTED into the learned quarter — hovering on
+        // the lines would otherwise satisfy every corner at once.
+        const sx = zone.corner & 1 ? 1 : -1;
+        const sz = zone.corner & 2 ? 1 : -1;
+        return !(x * sx >= CHOREO.routineMargin && z * sz >= CHOREO.routineMargin);
+      }
       case 'nova': {
         // Judged on the head alone, forgiving by design (reached the wedge =
         // safe, even if your heels trail).
@@ -485,6 +530,9 @@ export class ChoreoSystem extends createSystem({}) {
         case 'donut':
           sfx.donutSlam();
           break;
+        case 'quad':
+          sfx.quadCrash();
+          break;
       }
     }
 
@@ -528,6 +576,9 @@ export class ChoreoSystem extends createSystem({}) {
         break;
       case 'donut':
         this.strikes.donut(parent, z.zone.innerR);
+        break;
+      case 'quad':
+        this.strikes.quadBlocks(parent, z.zone.corner);
         break;
       case 'nova': {
         const local = z.zone.bearing - seatBearing(z.seat, match.seats);

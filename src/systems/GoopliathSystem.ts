@@ -52,6 +52,7 @@ const GESTURE: Record<MoveKind, AttackName> = {
   cross: 'backfist', // thrown sideways, across the body — the side laser
   wire: 'clap', // both limbs snapping shut: the web goes taut
   donut: 'clap', // both arms hauling the rim in on the middle
+  routine: 'overhand', // the slabs coming down on three quarters
 };
 
 /** The quick follow-up strikes inside a multi-landing move. */
@@ -67,6 +68,7 @@ const STEP_GESTURE: Record<MoveKind, AttackName> = {
   cross: 'backfist',
   wire: 'jab',
   donut: 'hook', // the wide arm sweeping the rim inward
+  routine: 'overhand', // one drop per step of the routine
 };
 
 /** The two-step floor pattern, one target per beat of the bar (sim units):

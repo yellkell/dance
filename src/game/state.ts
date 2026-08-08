@@ -56,6 +56,9 @@ export interface GestureCue {
   axis?: number;
   /** gate only: the safe column's platform-local x. */
   gapX?: number;
+  /** routine only: the whole corner sequence, so the boss can TEACH it —
+   *  he points each one out in turn while the marks are still lit. */
+  routine?: readonly number[];
   /** The landing this cue charges toward (song beats) — lets the MC time
    *  its strike snap and the chase lock without re-deriving the set-list. */
   dueBeat?: number;

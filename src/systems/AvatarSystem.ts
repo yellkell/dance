@@ -262,6 +262,15 @@ export class AvatarSystem extends createSystem({}) {
         const r = dodge ? 0.55 : -0.55;
         return { x: Math.sin(local) * r, z: Math.cos(local) * r };
       }
+      case 'quad': {
+        // The whole ring performing the same routine in unison is the best
+        // picture this game makes — and the ones who forgot are visibly in
+        // the wrong corner a beat before the blocks find them.
+        const c = dodge ? zone.corner : (zone.corner + 2) % 4;
+        const sx = c & 1 ? 1 : -1;
+        const sz = c & 2 ? 1 : -1;
+        return { x: sx * 0.46, z: sz * 0.4 };
+      }
       case 'donut': {
         // Everyone piles into the middle — with a little seeded scatter so
         // twenty-four decks aren't twenty-four identical statues.

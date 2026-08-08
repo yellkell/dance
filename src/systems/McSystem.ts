@@ -53,6 +53,10 @@ interface ActiveMime {
   cue: GestureCue;
   startBeat: number;
   dueBeat: number;
+  /** How many follow-up landings this mime has been extended through — 0
+   *  while the wind-up is still the whole story. THE ROUTINE reads it to
+   *  know when the teaching is over and the hammering starts. */
+  steps: number;
 }
 
 const freshPose = (): DancerPose => ({
@@ -224,10 +228,11 @@ export class McSystem extends createSystem({}) {
       // Step cues extend the running mime's life; full cues replace it.
       if (cue.step && this.mime && this.mime.cue.kind === cue.kind) {
         this.mime.dueBeat = due;
+        this.mime.steps++;
         this.mime.cue = { ...this.mime.cue, side: cue.side ?? this.mime.cue.side };
         continue;
       }
-      this.mime = { cue, startBeat: beat, dueBeat: due };
+      this.mime = { cue, startBeat: beat, dueBeat: due, steps: 0 };
     }
   }
 
@@ -407,6 +412,56 @@ export class McSystem extends createSystem({}) {
           // The web lets go and the giant unclenches with it.
           p.ry -= (strike - 0.6) * 0.5;
           p.rz += (strike - 0.6) * 0.25;
+        }
+        break;
+      }
+      case 'routine': {
+        // TEACHING THE ROUTINE: he walks the corners in order, stabbing a
+        // stick at each one in turn, so a dancer who never looks down can
+        // still learn the whole thing off his body. The count is in the
+        // stabs — one corner per slice of the wind-up, held long enough to
+        // land in someone's memory.
+        const seq = mime.cue.routine ?? [];
+        const n = Math.max(1, seq.length);
+        if (mime.steps > 0) {
+          // TEACHING'S OVER. Once the first block has dropped he gives
+          // nothing away — just brings the next one down on the beat. A
+          // giant still pointing at corners here would be answering the
+          // question the move exists to ask.
+          p.lx = -0.24; p.rx = 0.24;
+          p.ly = p.ry = 1.22 + pump * 0.06 - strike * 0.82;
+          p.lz = p.rz = -0.14;
+          p.hy = STAND - strike * 0.22;
+          break;
+        }
+        const at = Math.min(n - 1, Math.floor(u * n));
+        const local = (u * n) % 1;
+        const c = seq[at] ?? 0;
+        const s = this.mir(c & 1 ? 1 : -1);
+        // Platform +z is the ground BEHIND the dancer, away from the stage:
+        // he draws those corners in toward himself and pushes the near ones
+        // out — the surge's front/back grammar, so it reads the same way.
+        const back = (c & 2) !== 0;
+        const stab = Math.sin(Math.min(1, local * 2.6) * Math.PI) * 0.22;
+        const lead = s < 0 ? 'l' : 'r';
+        const armX = s * (0.5 + stab);
+        const armY = (back ? 0.92 : 1.34) + stab * 0.1;
+        const armZ = back ? -0.18 + stab * 0.1 : -0.52 - stab * 0.2;
+        if (lead === 'l') {
+          p.lx = armX; p.ly = armY; p.lz = armZ;
+          p.rx = 0.26; p.ry = 0.8; p.rz = -0.04;
+        } else {
+          p.rx = armX; p.ry = armY; p.rz = armZ;
+          p.lx = -0.26; p.ly = 0.8; p.lz = -0.04;
+        }
+        p.yaw = s * 0.22;
+        // On the beat itself: both fists down, the blocks let go.
+        if (strike > 0.05) {
+          p.lx = -0.24; p.rx = 0.24;
+          p.ly = p.ry = 1.15 - strike * 0.75;
+          p.lz = p.rz = -0.16;
+          p.hy = STAND - strike * 0.2;
+          p.yaw = 0;
         }
         break;
       }

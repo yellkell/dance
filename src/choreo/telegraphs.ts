@@ -125,6 +125,60 @@ const NOVA_FRAG = /* glsl */ `
 `;
 
 /**
+ * THE ROUTINE's step mark: one quarter of the deck, ringed and washed, with
+ * its STEP NUMBER spelled out as a row of dots in the middle — one dot for
+ * step one, two for step two. Drawn in goo green, not hazard amber: during
+ * the preview nothing is dangerous yet, and the marks are a lesson rather
+ * than a warning. They fade out near the end of the charge, and from then
+ * on the routine lives only in your head. uOrd = the step number.
+ */
+const MARK_FRAG = /* glsl */ `
+  ${COMMON}
+  uniform float uOrd, uAspect;
+  void main(){
+    // Goo green — the boss's own colour, and never confusable with the
+    // amber that means "don't be here".
+    vec3 col = vec3(0.62, 1.0, 0.70);
+    // The lesson is over before the first step lands.
+    float fade = 1.0 - smoothstep(0.70, 0.92, uFill);
+    float a = 0.10;
+    // Border around the quarter — this whole square is the ground.
+    float e = min(min(vUv.x, 1.0 - vUv.x), min(vUv.y, 1.0 - vUv.y));
+    a += (1.0 - smoothstep(0.022, 0.055, e)) * 0.55;
+    // The step number, as dots in a row across the middle.
+    for (int i = 0; i < 4; i++) {
+      if (float(i) >= uOrd) break;
+      float cx = 0.5 + (float(i) - (uOrd - 1.0) * 0.5) * 0.15;
+      vec2 p = (vUv - vec2(cx, 0.5)) * vec2(1.0, 1.0 / uAspect);
+      a += (1.0 - smoothstep(0.04, 0.055, length(p))) * 0.95;
+    }
+    a *= fade * pulse();
+    gl_FragColor = vec4(col, a);
+  }
+`;
+
+/**
+ * THE ROUTINE's quarter lines: the cross that splits the deck into four,
+ * lit dim and neutral for the whole move. It is furniture, not danger —
+ * it says where the boxes will land, never which quarter is yours — so it
+ * stays a cool chalk white and never fills.
+ */
+const QUARTER_FRAG = /* glsl */ `
+  ${COMMON}
+  void main(){
+    float a = 0.0;
+    // Two chalk lines through the middle, softly feathered.
+    a += (1.0 - smoothstep(0.004, 0.016, abs(vUv.x - 0.5))) * 0.5;
+    a += (1.0 - smoothstep(0.004, 0.016, abs(vUv.y - 0.5))) * 0.5;
+    // Ticks at the rim so the split reads even from across the ring.
+    float edge = min(min(vUv.x, 1.0 - vUv.x), min(vUv.y, 1.0 - vUv.y));
+    a *= 0.55 + 0.45 * (1.0 - smoothstep(0.0, 0.18, edge));
+    a *= 0.75 + 0.25 * sin(uTime * 2.0);
+    gl_FragColor = vec4(vec3(0.86, 0.92, 1.0), a);
+  }
+`;
+
+/**
  * Donut: the RIM floods and the middle lives — the nova's opposite number.
  * A bright doorpost CIRCLE burns at the edge of the safe disc with chevrons
  * marching inward across the doomed ring, so the shape says "in here", not
@@ -311,6 +365,40 @@ export function novaTelegraph(radius: number, angle: number, halfAngle: number):
   const disc = new Mesh(new PlaneGeometry(radius * 2, radius * 2), mat);
   disc.rotation.x = -Math.PI / 2;
   return makeTelegraph([disc], [mat]);
+}
+
+/**
+ * THE ROUTINE, taught: one marked quarter per step, each carrying its step
+ * number in dots. `corners` are (sx, sz) signs in platform-local space.
+ * Place the group at the deck centre on the floor; the marks fade
+ * themselves out as the charge runs down.
+ */
+export function routineMarksTelegraph(
+  routine: readonly number[],
+  halfWidth: number,
+  halfDepth: number,
+): Telegraph {
+  const meshes: Mesh[] = [];
+  const mats: ShaderMaterial[] = [];
+  const w = halfWidth * 0.92;
+  const d = halfDepth * 0.92;
+  routine.forEach((corner, step) => {
+    const mat = warnMat(MARK_FRAG, { uOrd: { value: step + 1 }, uAspect: { value: w / d } });
+    const pane = new Mesh(new PlaneGeometry(w, d), mat);
+    pane.rotation.x = -Math.PI / 2;
+    pane.position.set(((corner & 1 ? 1 : -1) * halfWidth) / 2, 0, ((corner & 2 ? 1 : -1) * halfDepth) / 2);
+    meshes.push(pane);
+    mats.push(mat);
+  });
+  return makeTelegraph(meshes, mats);
+}
+
+/** THE ROUTINE's quarter lines — the split deck, lit for the whole move. */
+export function quarterTelegraph(halfWidth: number, halfDepth: number): Telegraph {
+  const mat = warnMat(QUARTER_FRAG);
+  const pane = new Mesh(new PlaneGeometry(halfWidth * 2, halfDepth * 2), mat);
+  pane.rotation.x = -Math.PI / 2;
+  return makeTelegraph([pane], [mat]);
 }
 
 /**
