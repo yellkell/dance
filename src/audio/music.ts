@@ -211,10 +211,17 @@ export function startSet(opts: SetOptions): void {
     const now = c.currentTime;
     const lead = 0.12;
     const fileZero = Math.max(track.downbeat, track.startAt ?? 0);
+    // THE NEEDLE DROP. `startAt` is where the record actually begins for us —
+    // the needle goes down THERE, so a long quiet intro is not something the
+    // room waits through, it simply never plays. (Without a startAt this is
+    // 0 and the file rolls from its head, exactly as before.)
+    const skip = Math.max(0, Math.min(track.startAt ?? 0, Math.max(0, buf.duration - 1)));
     // Where beat 0 lands: dictated online, else as soon as we can play.
-    const zero = opts.beatZeroAt ?? now + lead + fileZero + opts.countInBeats * beatLen;
-    // File time 0 must occur at (zero − fileZero − countIn).
-    const fileStart = zero - fileZero - opts.countInBeats * beatLen;
+    const zero = opts.beatZeroAt ?? now + lead + fileZero - skip + opts.countInBeats * beatLen;
+    // File position `skip` must be HEARD at (zero − (fileZero − skip) − countIn),
+    // which keeps beat 0 exactly countIn beats after the file's own fileZero
+    // however deep into the record the needle went down.
+    const fileStart = zero - (fileZero - skip) - opts.countInBeats * beatLen;
 
     const gain = c.createGain();
     gain.gain.value = trackGain(track);
@@ -233,11 +240,11 @@ export function startSet(opts: SetOptions): void {
       }
     }
     if (fileStart >= now + 0.02) {
-      src.start(fileStart);
+      src.start(fileStart, skip);
     } else {
-      // Late (slow decode, or a late join): skip into the file so the grid
-      // stays exactly where the room agreed it would be.
-      const offset = now + 0.02 - fileStart;
+      // Late (slow decode, or a late join): skip further into the file so the
+      // grid stays exactly where the room agreed it would be.
+      const offset = skip + (now + 0.02 - fileStart);
       if (offset < buf.duration) src.start(now + 0.02, offset);
       else return; // the set is already over — nothing to play
     }

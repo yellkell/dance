@@ -37,6 +37,7 @@ import unityUrl from '../assets/music/unity.m4a';
 import dynastyUrl from '../assets/music/dynasty.mp3';
 import spreadUrl from '../assets/music/spread.m4a';
 import morningUrl from '../assets/music/morning.mp3';
+import assembleUrl from '../assets/music/assemble.m4a';
 import type { MoveKind } from '../config.js';
 
 export type TrackRole = 'raid' | 'lobby' | 'rehearsal';
@@ -200,6 +201,24 @@ export const TRACKS: Track[] = [
     // drops straight into the groove (bar 7 on the grid). SPREAD took its
     // tour night; it plays on for quick raids and the seeded shuffle.
     startAt: 12.3542,
+    roles: ['raid'],
+  },
+  {
+    id: 'assemble',
+    title: 'ASSEMBLE',
+    url: assembleUrl,
+    bpm: 125.0,
+    // The record opens with about six seconds of near-silent riser (−55 dB
+    // climbing to −30) and then SLAMS in at 5.804 s — a transient sharp
+    // enough to see, jumping 18 dB inside 5 ms. Both the whole-file and the
+    // body-only tempo passes put a beat within 2 ms of it, so the drop is
+    // the honest anchor: bar 1 beat 1 is the slam, and startAt puts the
+    // needle down right on it. The riser never plays.
+    downbeat: 5.8043,
+    startAt: 5.8043,
+    seconds: 263.04,
+    // The hottest master in the box, hotter even than sakupened.
+    lufs: -7.5,
     roles: ['raid'],
   },
   {

@@ -125,18 +125,25 @@ gaps. Point clients at a hosted relay with `?server=wss://your-host:8788`.
 
 ## The music
 
-Seven real tracks drive the game (`src/assets/music/`, registry in
+Fourteen real tracks drive the game (`src/assets/music/`, registry in
 `src/audio/tracks.ts`). Every number in that registry was **measured from the
 files**, not guessed — the whole game is quantized to them, so they had to be:
 
-| Track | BPM | Set length | Loudness | Role |
+| Track | BPM | Set length | Loudness | Where it plays |
 | --- | --- | --- | --- | --- |
-| SAKUPENED | 133.964 | 10 phrases | −8.1 LUFS | raid |
-| COMBAT | 135 | 12 phrases | −13.2 LUFS | raid · rehearsal |
-| LOOP | 150 | 17 phrases | −11.2 LUFS | raid |
-| CAPTURE | 117 | 13 phrases | −15.0 LUFS | raid · rehearsal |
-| MONEY | 78.395 | 6 phrases | −14.5 LUFS | raid |
-| TARGET | 91 | 11 phrases | −9.5 LUFS | raid · rehearsal |
+| MORNING | 96.665 | 5 phrases | −11.1 LUFS | tour: opening night · no ducking |
+| TARGET | 91 | 11 phrases | −9.5 LUFS | tour · rehearsal |
+| CAPTURE | 117 | 13 phrases | −15.0 LUFS | tour: first goop finale · rehearsal |
+| COMBAT | 135 | 12 phrases | −13.2 LUFS | tour: peak hours · rehearsal |
+| LOOP | 150 | 17 phrases | −11.2 LUFS | tour: peak hours |
+| DYNASTY | 155 | 10 phrases | −9.6 LUFS | tour: peak-hours finale |
+| INFECTION | 138 | 15 phrases | −10.9 LUFS | tour: after hours |
+| SPREAD | 150 | 17 phrases | −13.1 LUFS | tour: after hours · skips 6 bars in |
+| BREAKCORE | 174 | 11 phrases | −8.3 LUFS | tour: the last night |
+| ASSEMBLE | 125 | 16 phrases | −7.5 LUFS | quick raid · drops on the slam |
+| SAKUPENED | 133.964 | 10 phrases | −8.1 LUFS | quick raid |
+| UNITY | 117 | 17 phrases | −13.8 LUFS | quick raid · skips its ambient open |
+| MONEY | 78.395 | 6 phrases | −14.5 LUFS | quick raid · no ducking |
 | SWAG | 91.974 | — | −15.7 LUFS | lobby loop |
 
 - **Tempo** came from an onset-flux autocorrelation phase-locked across each
@@ -151,6 +158,13 @@ files**, not guessed — the whole game is quantized to them, so they had to be:
 - **Downbeat** (seconds to bar 1 beat 1) is the one number a human ear might
   want to nudge. If a set ever feels like it lands on the 2 instead of the 1,
   move that one field by ±one beat — nothing else changes.
+- **The needle drop.** A record that opens with an ambient wash or a long
+  quiet riser carries a `startAt`, and the needle goes down *there* — the
+  intro never plays and the count-in stays a count-in instead of a minute of
+  waiting. It has to sit on the bar grid (`downbeat + n×4 beats`) so the set
+  still lands where the music does. ASSEMBLE is the extreme case: six seconds
+  of near-silence climbing from −55 dB, then an 18 dB transient inside 5 ms,
+  and the set begins **on that slam**.
 
 **Set length follows the record.** A track's playable length becomes the number
 of 8-bar phrases in the match, and the act boundaries are *fractions* of the
