@@ -17,7 +17,10 @@ everyone else.
 - **COMBO**: dance like the groupies — one hand up, one hand down, swapping
   on the beat. Every rhythmic swap pays a little and throws **sparks off the
   glowstick** that went up — a few faint motes at first, a hotter, denser
-  fountain the deeper the groove. Stop, or swap off-rhythm, and it lets go.
+  fountain the deeper the groove. The HUD's **groove row** keeps the ledger:
+  four pips light one per swap as it catches, then give way to a fill bar
+  and the points that streak has paid. Stop, or swap off-rhythm, and it
+  lets go — row and all.
 - Get clipped → the chain dies and you lose one of **three lives**. Three
   hits and you're off the floor, spectating from a dimmed deck.
 - A **live holo leaderboard** over the stage shows everyone's rank, score and

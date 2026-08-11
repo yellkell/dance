@@ -365,10 +365,12 @@ export const CHOREO = {
  * the longer you keep the motion going. It never rivals a dodge; it's the
  * tax refund for actually dancing between them.
  *
- * NAMING: neither meter wears a word on screen anymore — the groove
- * answers through the glowsticks (spark bursts off the paying tip), the
- * dodge chain through the wedge's ×N. The code keeps its groove-flavoured
- * identifiers so the two streaks can never be confused in here.
+ * NAMING: neither meter wears a word on screen anymore. The groove
+ * answers loudly through the glowsticks (spark bursts off the paying tip)
+ * and quietly through the wedge's GROOVE ROW (pips winding up, then a
+ * fill bar and the streak's earnings); the dodge chain is the wedge's ×N.
+ * The code keeps its groove-flavoured identifiers so the two streaks can
+ * never be confused in here.
  */
 export const GROOVE = {
   /** Vertical hand separation (m) that counts as "one up, one down". */

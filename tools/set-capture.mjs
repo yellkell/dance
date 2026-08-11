@@ -80,10 +80,28 @@ await page.waitForTimeout(400);
 await rig(0, 0.4, 0);
 await shot('vr-set-live'); // the void, the ring, the show
 
-// The wedge HUD: crouch a little and turn toward the front-left rim.
-await rig(0, 0.2, 0.51, -0.5);
+// The wedge HUD: turn toward it (it rides off the left shoulder).
+await rig(0, 0.2, 0.5);
 await page.waitForTimeout(400);
 await shot('vr-hud-wedge');
+
+// The groove row winding up, then running with its ledger. (The emulator
+// pins controller poses, so the streak is injected rather than danced.)
+for (const [streak, score, name] of [
+  [2, 13, 'vr-hud-groove-start'],
+  [26, 402, 'vr-hud-groove-run'],
+]) {
+  await page.evaluate(([s, sc]) => {
+    window.__gdr.match.grooveStreak = s;
+    window.__gdr.match.grooveScore = sc;
+  }, [streak, score]);
+  await page.waitForTimeout(350);
+  await shot(name);
+}
+await page.evaluate(() => {
+  window.__gdr.match.grooveStreak = 0;
+  window.__gdr.match.grooveScore = 0;
+});
 await rig(0, 0.4, 0, 0);
 
 // ── THE ROUTINE's blocks, on demand ──────────────────────────────────────

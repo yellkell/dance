@@ -111,8 +111,12 @@ export interface MatchState {
   /** True while the head is below the duck line. */
   ducked: boolean;
   /** Live rhythm-swap streak (one hand up, one down, swap on the beat) —
-   *  no meter on screen: the glowstick spark bursts are its voice. */
+   *  the glowstick sparks are its voice, the wedge's groove row its
+   *  ledger. Never a word on screen. */
   grooveStreak: number;
+  /** Points the CURRENT groove streak has paid so far — the HUD's combo
+   *  tally. Resets with the streak, so it always reads "this run". */
+  grooveScore: number;
 
   /* ── buses ── */
   gestures: GestureCue[];
@@ -164,6 +168,7 @@ export const match: MatchState = {
   headZ: 0,
   ducked: false,
   grooveStreak: 0,
+  grooveScore: 0,
   gestures: [],
   flairs: [],
   goopling: null,

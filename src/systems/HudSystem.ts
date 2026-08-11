@@ -1,10 +1,15 @@
 /**
  * HudSystem — your numbers, OUT of your sightline. A small readout floats
- * low off the FRONT-LEFT rim of your deck, angled up at you like a monitor
- * wedge at a gig: the score, the ×multiplier (only while a chain is alive),
- * and three lives. Nothing else — no labels, no words, no meter for the
- * groove (the glowsticks in your hands are that meter). The centre of your
- * view belongs to the giant and the blocks.
+ * off to your LEFT at a natural glance height, turned toward you like a
+ * monitor wedge at a gig: the score, the ×multiplier (only while a chain
+ * is alive), the GROOVE row, and three lives. No labels, no words. The
+ * centre of your view belongs to the giant and the blocks.
+ *
+ * THE GROOVE ROW is how you see the combo catch: four pips light one per
+ * rhythmic swap as it winds up, and once it's running they give way to a
+ * fill bar with the points that streak has paid so far. It dies with the
+ * streak, so the row always reads "this run". The sparks off the sticks
+ * are still the loud half of the answer; this is the quiet ledger.
  *
  * The count-in and the goopling's lesson still take the centre — they're
  * cards you READ while nothing is trying to kill you — and the flair pops
@@ -24,7 +29,7 @@ import {
   MeshBasicMaterial,
   PlaneGeometry,
 } from 'three';
-import { SCORE, TOUR, hueToColor, seatHue } from '../config.js';
+import { GROOVE, SCORE, TOUR, hueToColor, seatHue } from '../config.js';
 import { trackById } from '../audio/tracks.js';
 import { match, me } from '../game/state.js';
 
@@ -35,7 +40,9 @@ const CW = 768;
 const CH = 384;
 /** The wedge strip (live readout). */
 const SW = 512;
-const SH = 256;
+const SH = 288;
+/** The groove's own colour — never the seat's, so the two never blur. */
+const GROOVE_CSS = '#4fb7ff';
 
 const _head = new Vector3();
 
@@ -95,11 +102,16 @@ export class HudSystem extends createSystem({}) {
     this.stripCanvas.height = SH;
     this.stripTex = new CanvasTexture(this.stripCanvas);
     this.strip = new Mesh(
-      new PlaneGeometry(0.44, 0.22),
+      new PlaneGeometry(0.5, 0.28),
       new MeshBasicMaterial({ map: this.stripTex, transparent: true, side: DoubleSide, depthWrite: false }),
     );
     this.strip.renderOrder = 30;
-    this.strip.position.set(-0.55, 0.34, -0.78);
+    // Glance height, not floor height: off the left shoulder, a little
+    // below eye line, where a look costs a flick of the eyes and never a
+    // drop of the chin. Everything on it is CENTRED in the plane — content
+    // pushed to the outer edge would sit further into the periphery than
+    // the wedge itself, which is how the first pass hid its own numbers.
+    this.strip.position.set(-0.52, 1.2, -0.9);
     this.scene.add(this.strip);
 
     this.flairCanvas.width = 512;
@@ -159,6 +171,8 @@ export class HudSystem extends createSystem({}) {
       d?.combo,
       d?.lives,
       d?.alive,
+      match.grooveStreak,
+      match.grooveScore,
       match.tutorialClears,
       match.goopling?.id,
     ].join(':');
@@ -225,28 +239,30 @@ export class HudSystem extends createSystem({}) {
 
     const d = me();
     const seatCss = `#${hueToColor(seatHue(match.mySeat), 0.62).toString(16).padStart(6, '0')}`;
+    const cx = SW / 2;
 
-    // Score — big, white, left-anchored.
-    g.textAlign = 'left';
-    ink(g, `${d?.score ?? 0}`, 34, 84, 96, '#ffffff');
-
-    // The chain multiplier, in YOUR colour — only while a chain is alive.
-    // No label: ×3.4 says everything the old shouting line said.
+    // Score — big and white, with the chain riding beside it so one glance
+    // catches both.
+    g.textAlign = 'center';
+    ink(g, `${d?.score ?? 0}`, cx, 74, 92, '#ffffff');
     if (d && d.alive && d.combo > 0) {
       const mult = 1 + SCORE.comboStep * Math.min(d.combo, SCORE.comboCap);
-      ink(g, `×${mult.toFixed(1)}`, 36, 164, 58, seatCss);
+      ink(g, `×${mult.toFixed(1)}`, cx, 150, 54, seatCss);
     }
 
+    if (d?.alive !== false) this.drawGroove(g, cx);
+
     if (d?.alive === false) {
-      ink(g, 'SPECTATING', 34, 222, 34, 'rgba(232,236,242,0.8)');
+      ink(g, 'SPECTATING', cx, 252, 34, 'rgba(232,236,242,0.8)');
     } else {
       // Lives as goo drops.
       const lives = d?.lives ?? 0;
-      const r = 16;
-      const gapX = 52;
+      const r = 15;
+      const gapX = 48;
+      const x0 = cx - (gapX * (SCORE.lives - 1)) / 2;
       for (let i = 0; i < SCORE.lives; i++) {
         g.beginPath();
-        g.arc(52 + i * gapX, 224, r, 0, Math.PI * 2);
+        g.arc(x0 + i * gapX, 254, r, 0, Math.PI * 2);
         g.lineWidth = 7;
         g.strokeStyle = 'rgba(0,2,6,0.96)';
         g.stroke();
@@ -256,6 +272,67 @@ export class HudSystem extends createSystem({}) {
     }
 
     this.stripTex.needsUpdate = true;
+  }
+
+  /**
+   * THE GROOVE ROW — the combo catching, then running.
+   *
+   * Cold: four hollow pips, an invitation. Winding up: one fills per
+   * rhythmic swap, so the very first paid swap is visible. Running (past
+   * the fourth): the pips give way to a fill bar that creeps toward the
+   * pay ceiling, with the streak's earnings beside it. It all vanishes
+   * when the groove drops — you always know whether you're on or off.
+   */
+  private drawGroove(g: CanvasRenderingContext2D, cx: number): void {
+    const streak = match.grooveStreak;
+    const PIPS = 4;
+    const y = 202;
+    // The row is [meter][tally], centred as a pair — so it stays balanced
+    // whether the tally is there or not.
+    const meterW = 150;
+    const tally = match.grooveScore > 0 ? `+${match.grooveScore}` : '';
+    const tallyW = tally ? 96 : 0;
+    const left = cx - (meterW + tallyW) / 2;
+
+    if (streak <= PIPS) {
+      const gap = meterW / PIPS;
+      for (let i = 0; i < PIPS; i++) {
+        g.beginPath();
+        g.arc(left + gap / 2 + i * gap, y, 11, 0, Math.PI * 2);
+        g.lineWidth = 6;
+        g.strokeStyle = 'rgba(0,2,6,0.96)';
+        g.stroke();
+        if (i < streak) {
+          g.shadowColor = GROOVE_CSS;
+          g.shadowBlur = 14;
+          g.fillStyle = GROOVE_CSS;
+        } else {
+          g.fillStyle = 'rgba(58,66,82,0.8)';
+        }
+        g.fill();
+        g.shadowBlur = 0;
+      }
+    } else {
+      // The bar: how deep the groove runs, against the pay ceiling.
+      const h = 15;
+      const fill = Math.min(1, streak / GROOVE.payCap);
+      g.lineWidth = 6;
+      g.strokeStyle = 'rgba(0,2,6,0.96)';
+      g.strokeRect(left, y - h / 2, meterW, h);
+      g.fillStyle = 'rgba(58,66,82,0.8)';
+      g.fillRect(left, y - h / 2, meterW, h);
+      g.shadowColor = GROOVE_CSS;
+      g.shadowBlur = 16;
+      g.fillStyle = GROOVE_CSS;
+      g.fillRect(left, y - h / 2, Math.max(5, meterW * fill), h);
+      g.shadowBlur = 0;
+    }
+
+    // What the streak has paid — the combo's own ledger, dying with it.
+    if (tally) {
+      g.textAlign = 'left';
+      ink(g, tally, left + meterW + 14, y, 40, GROOVE_CSS);
+    }
   }
 
   private drawFlair(text: string, tone: 'dodge' | 'perfect' | 'hit' | 'milestone' | 'info'): void {

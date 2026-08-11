@@ -275,6 +275,7 @@ export class PlayerSystem extends createSystem({}) {
       this.grooveSide = 0;
       this.streak = 0;
       match.grooveStreak = 0;
+      match.grooveScore = 0;
       return;
     }
 
@@ -287,10 +288,11 @@ export class PlayerSystem extends createSystem({}) {
     const diff = ly - ry;
     const side = diff > GROOVE.split ? 1 : diff < -GROOVE.split ? -1 : 0;
     if (side === 0 || side === this.grooveSide) {
-      // Held too long without a swap → the groove lets go.
+      // Held too long without a swap → the groove lets go, tally and all.
       if (this.streak > 0 && match.beat - this.lastFlipBeat > GROOVE.maxBeats) {
         this.streak = 0;
         match.grooveStreak = 0;
+        match.grooveScore = 0;
       }
       return;
     }
@@ -317,6 +319,7 @@ export class PlayerSystem extends createSystem({}) {
     const award = Math.round(GROOVE.base + Math.min(this.streak, GROOVE.payCap) * GROOVE.perStreak);
     d.score += award;
     match.grooveStreak = this.streak;
+    match.grooveScore += award;
 
     // The answer from the hand that went up: the stick pops, sparks jump
     // off its tip — more and hotter the deeper the streak — and the palm
