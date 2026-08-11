@@ -33,9 +33,6 @@ export type Zone =
   /** The crossfire's side laser: a strip ACROSS the deck at local z, fed
    *  from the rail on `from` — step forward or back off it. */
   | { kind: 'rail'; z: number; halfD: number; from: 1 | -1 }
-  /** The trip web: no ground to move to — the whole deck is strung with
-   *  laser wire and the dodge is holding still until it clears. */
-  | { kind: 'wire'; hold: number }
   /** The rim burns, the middle lives — everything outside `innerR` is
    *  doomed, so the whole ring collapses toward its own centre. */
   | { kind: 'donut'; innerR: number }
@@ -203,9 +200,7 @@ function buildLandings(kind: MoveKind, landBeat: number, act: number, rng: () =>
         zone: { kind: 'quad', corner, step, routine },
       });
     });
-  } else if (kind === 'wire') {
-    landings.push({ beat: landBeat, zone: { kind: 'wire', hold: CHOREO.wireHoldBeats } });
-  } else if (kind === 'sweep') {
+    } else if (kind === 'sweep') {
     landings.push({ beat: landBeat, zone: { kind: 'sweep' } });
   } else if (kind === 'gate') {
     landings.push({

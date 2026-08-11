@@ -353,52 +353,6 @@ export class StrikeFx {
     );
   }
 
-  /** THE TRIP WEB discharges: every wire in the lattice goes white-hot at
-   *  once and blows apart into embers at shin height. Nothing sweeps and
-   *  nothing lands — the whole deck simply answers, which is what makes
-   *  having stood still feel like getting away with something. */
-  wire(parent: Object3D, y: number): void {
-    const span = OCTAGON_HALF_WIDTH * 2 + 0.5;
-    const depth = OCTAGON_HALF_DEPTH * 2 + 0.4;
-    const sparks = new Sparks(48, WARN);
-    let snapped = false;
-    this.spawn(
-      parent,
-      0.42,
-      (k, g) => {
-        const fade = 1 - k * k;
-        // The six wires come first; the spark cloud is the last child and
-        // runs its own fade.
-        for (let i = 0; i < 6; i++) {
-          const w = g.children[i] as Mesh;
-          (w.material as MeshBasicMaterial).opacity = 0.9 * fade;
-          w.scale.y = 1 + k * 2.4; // each wire whips as it lets go
-        }
-        if (!snapped) {
-          snapped = true;
-          for (let i = 0; i < 8; i++) {
-            const a = (i / 8) * Math.PI * 2;
-            sparks.emit(Math.sin(a) * OCTAGON_HALF_WIDTH * 0.7, y, Math.cos(a) * OCTAGON_HALF_DEPTH * 0.7, 6, 1.5);
-          }
-        }
-      },
-      (g) => {
-        for (const dz of [-depth * 0.34, 0, depth * 0.34]) {
-          const w = new Mesh(new BoxGeometry(span, 0.05, 0.05), basic(HOT, 0.9));
-          w.position.set(0, y, dz);
-          g.add(w);
-        }
-        for (const dx of [-span * 0.32, 0, span * 0.32]) {
-          const w = new Mesh(new BoxGeometry(0.05, 0.05, depth), basic(HOT, 0.9));
-          w.position.set(dx, y, 0);
-          g.add(w);
-        }
-        g.add(sparks.points);
-      },
-      (dt) => sparks.step(dt),
-    );
-  }
-
   /** The gate slams shut: both danger fields flash as walls of light and
    *  the doorposts of the safe column burn white-hot — the gap is exactly
    *  where the telegraph promised. */
