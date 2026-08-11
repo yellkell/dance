@@ -13,7 +13,8 @@
  */
 
 import { createSystem, Quaternion, Vector3 } from '@iwsdk/core';
-import { NET } from '../config.js';
+import { NET, PODIUM } from '../config.js';
+import { toLobby } from '../game/flow.js';
 import { match, me, type Screen } from '../game/state.js';
 import { backToClub, net, sendPose, sendScore } from '../net/session.js';
 
@@ -26,10 +27,20 @@ export class NetworkSystem extends createSystem({}) {
   private scoreT = 0;
   private lastLives = -1;
   private prevScreen: Screen | '' = '';
+  private podiumT = 0;
 
   update(delta: number): void {
     const screen = match.screen;
     const menuRoom = screen === 'lobby' || screen === 'map' || screen === 'tour';
+
+    // An online podium DEPOSITS you back on the club floor by itself once
+    // the reading's done — nobody should have to find a button to go home.
+    if (screen === 'podium' && net.phase === 'live') {
+      this.podiumT += delta;
+      if (this.podiumT >= PODIUM.holdSeconds) toLobby();
+    } else {
+      this.podiumT = 0;
+    }
 
     // Back on the club floor with a live session? The set is over for me —
     // fold the session back to the room, not out of it. A direct raid →

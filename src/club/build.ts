@@ -1,14 +1,15 @@
 /**
- * THE GILDED ECLIPSE — the venue itself.
+ * THE CLUB — the venue itself. (It has no name; regulars just call it the
+ * club, and the sign over the stage is a moon, not a word.)
  *
- * One double-height Art Deco hall the menus live in and the social floor
- * fills: herringbone parquet under an eclipse of counter-rotating brass
- * rings, a crescent stage under a brass sunburst, a smoked-oak bar with a
- * backlit ribbed-glass wall, oxblood velvet booths, a raised brass-railed
- * terrace, and a hushed STILL ROOM off the north-west corner for coming
- * down. Where FIRE FIGHT's club was diamond-plate and hazard amber, this is
- * plaster, oak, stone and champagne brass — the rave's neon is allowed in
- * only as LIGHT: coves, candles, signage, and the eclipse itself.
+ * One double-height Art Deco hall the social floor fills: herringbone
+ * parquet under an eclipse of counter-rotating brass rings, a crescent
+ * stage under a brass sunburst, a smoked-oak bar with a backlit
+ * ribbed-glass wall, oxblood velvet booths, a raised brass-railed terrace,
+ * and a hushed STILL ROOM off the north-west corner for coming down. Where
+ * FIRE FIGHT's club was diamond-plate and hazard amber, this is plaster,
+ * oak, stone and champagne brass — the rave's neon is allowed in only as
+ * LIGHT: coves, candles, signage, and the eclipse itself.
  *
  * Detail discipline (the reason it reads expensive): every edge that
  * matters carries thickness — skirting, dado and picture rails on the
@@ -50,8 +51,18 @@ import {
   type Object3D,
   type Scene,
 } from 'three';
-import { PALETTE } from '../config.js';
+import { PALETTE, hueToColor } from '../config.js';
 import { glowTexture } from '../materials/glow.js';
+import {
+  buildGridFloor,
+  buildHorizon,
+  buildPylon,
+  buildRingStack,
+  buildShards,
+  type Pylon,
+  type Shard,
+  type VoidRing,
+} from '../arena/voidkit.js';
 import { CLUB, DECOR } from './config.js';
 import {
   blackSteelMat,
@@ -75,15 +86,20 @@ export interface ChandelierRing {
   speed: number;
 }
 
-/** The FOYER — the menu place. A separate, compact antechamber: the front
- *  desk of the club, not the club. Its doors open on the social floor the
- *  moment your room does. */
+/** The FOYER — the menu place. Not an antechamber of the club anymore but
+ *  a piece of THE VOID (the set's own space, see arena/voidkit.ts): a
+ *  floating platform in reactive darkness, with a portal that opens on the
+ *  warm room the moment yours does. */
 export interface FoyerRefs {
   root: Group;
-  /** The brass door-crack glow — warms when a room is open beyond. */
-  doorGlowMat: MeshStandardMaterial;
-  /** The desk lamp + candle flames share the club's flicker material. */
-  candleMat: SpriteMaterial;
+  /** The portal's inner shimmer — breathes; flares while connecting. */
+  portalMat: MeshBasicMaterial;
+  /** The portal ring's glow. */
+  portalRingMat: MeshStandardMaterial;
+  pylons: Pylon[];
+  rings: VoidRing[];
+  shards: Shard[];
+  gridMat: MeshBasicMaterial;
 }
 
 /** Everything the systems animate or query — kept out of the static bake. */
@@ -167,7 +183,7 @@ function signPlane(w: number, h: number, px: number, draw: (g: CanvasRenderingCo
 
 export function buildClub(scene: Scene): ClubRefs {
   const root = new Group();
-  root.name = 'gilded-eclipse';
+  root.name = 'the-club';
 
   const W = CLUB.halfW;
   const NZ = CLUB.minZ;
@@ -640,36 +656,37 @@ function buildStage(root: Group): MeshBasicMaterial {
   }
   root.add(console);
 
-  // "THE GILDED ECLIPSE" — the house sign, floating over the stage: thin
-  // double keyline, serif smallcaps, the eclipse glyph at centre.
-  const sign = signPlane(4.2, 0.85, 1024, (s, sw, sh) => {
+  // The house mark over the stage: no name, just the sign of the place —
+  // an eclipsed moon in a thin double keyline, flanked by its phases. The
+  // room doesn't say what it's called; it just is.
+  const sign = signPlane(3.2, 0.85, 1024, (s, sw, sh) => {
     s.strokeStyle = 'rgba(201,168,106,0.9)';
     s.lineWidth = 3;
     s.strokeRect(10, 10, sw - 20, sh - 20);
     s.lineWidth = 1.5;
     s.strokeRect(20, 20, sw - 40, sh - 40);
-    s.textAlign = 'center';
-    s.textBaseline = 'middle';
-    s.fillStyle = '#e8d9b0';
-    s.shadowColor = 'rgba(255,196,110,0.8)';
-    s.shadowBlur = 18;
-    s.font = `500 68px Georgia, 'Times New Roman', serif`;
-    s.fillText('T H E   G I L D E D', sw / 2, sh * 0.32);
-    s.font = `600 86px Georgia, 'Times New Roman', serif`;
-    s.fillText('E C L I P S E', sw / 2, sh * 0.68);
-    // The glyph: a moon disc bitten by its shadow, either side.
-    for (const gx of [70, sw - 70]) {
-      s.shadowBlur = 12;
+    // The glyph, centre: a moon disc bitten by its shadow — and a phase
+    // march either side, waxing in, waning out.
+    const moon = (gx: number, r: number, bite: number): void => {
+      s.shadowColor = 'rgba(242,236,255,0.8)';
+      s.shadowBlur = 14;
       s.beginPath();
-      s.arc(gx, sh / 2, 26, 0, Math.PI * 2);
+      s.arc(gx, sh / 2, r, 0, Math.PI * 2);
       s.fillStyle = '#f2ecff';
       s.fill();
-      s.beginPath();
-      s.arc(gx + 11, sh / 2, 23, 0, Math.PI * 2);
-      s.fillStyle = '#0d0a14';
       s.shadowBlur = 0;
-      s.fill();
-    }
+      if (bite > 0) {
+        s.beginPath();
+        s.arc(gx + r * bite, sh / 2, r * 0.92, 0, Math.PI * 2);
+        s.fillStyle = '#0d0a14';
+        s.fill();
+      }
+    };
+    moon(sw / 2, 64, 0.42);
+    moon(sw * 0.26, 30, 0.85);
+    moon(sw * 0.74, 30, -0.0001);
+    moon(sw * 0.13, 20, 1.15);
+    moon(sw * 0.87, 20, 0.6);
   });
   sign.name = 'live-house-sign';
   sign.position.set(0, 2.95, CLUB.minZ + 0.6);
@@ -1097,23 +1114,20 @@ function buildVestibule(root: Group): void {
     root.add(seg);
   }
 
-  // House plaque beside the portal.
+  // House plaque beside the portal — no name on the door, just who it's for.
   const plaque = signPlane(0.92, 0.5, 512, (g, sw, sh) => {
     g.strokeStyle = 'rgba(201,168,106,0.85)';
     g.lineWidth = 3;
     g.strokeRect(8, 8, sw - 16, sh - 16);
     g.textAlign = 'center';
     g.fillStyle = '#e8d9b0';
-    g.font = `500 54px Georgia, serif`;
-    g.fillText('THE GILDED ECLIPSE', sw / 2, sh * 0.36);
-    g.font = `400 34px Georgia, serif`;
-    g.fillStyle = 'rgba(232,217,176,0.75)';
-    g.fillText('members & dancers', sw / 2, sh * 0.62);
+    g.font = `500 48px Georgia, serif`;
+    g.fillText('members & dancers', sw / 2, sh * 0.42);
     g.fillStyle = css(PALETTE.magenta);
     g.shadowColor = css(PALETTE.magenta);
     g.shadowBlur = 12;
-    g.font = `700 30px 'Arial Black', system-ui, sans-serif`;
-    g.fillText('RAVE RAID', sw / 2, sh * 0.85);
+    g.font = `700 34px 'Arial Black', system-ui, sans-serif`;
+    g.fillText('RAVE RAID', sw / 2, sh * 0.74);
   });
   plaque.name = 'live-plaque';
   plaque.rotation.y = Math.PI;
@@ -1224,132 +1238,116 @@ function buildStillRoom(root: Group, candleMat: SpriteMaterial): MeshStandardMat
 }
 
 /* ═════════════════════════════ THE FOYER ═════════════════════════════════
- * The menu place — a different room from the club. You arrive HERE: a
- * compact antechamber in the same wardrobe (plaster, brass, oxblood), the
- * board floating at the desk, the MC posing beside it, the coat check on
- * the west wall, and the double doors to THE FLOOR — closed until a room
- * of yours is open on the other side. Solo raids launch from here and the
- * foyer packs away into passthrough; host or join, and the doors are the
- * transition to the social area.
+ * The menu place — and a piece of THE VOID, not of the club. You arrive on
+ * a floating platform in the set's own abstract space (arena/voidkit.ts):
+ * darkness shaped by light — a neon-edged deck, monolith pylons breathing
+ * in the distance, two great hexes turning slowly overhead, shards adrift,
+ * a horizon band with no land under it, and a grid far below where ground
+ * would be. The board floats at the platform's heart, the MC poses beside
+ * it, and the PORTAL stands at the north edge: a moon-gate of light,
+ * closed to a shimmer until a room of yours is open on the other side —
+ * host or join, and the warm room takes you. Solo sets launch from here
+ * and the platform gives way to the raid's void.
  */
 
-export function buildFoyer(scene: Scene, candleMat: SpriteMaterial): FoyerRefs {
+export function buildFoyer(scene: Scene): FoyerRefs {
   const root = new Group();
-  root.name = 'eclipse-foyer';
+  root.name = 'club-foyer';
 
-  const HW = 3.6; // half width
-  const NZ = -3.6; // the doors-to-the-floor wall
-  const SZ = 2.4; // the street doors behind you
-  const H = 3.0;
+  const R = 4.0; // platform radius (hex)
 
-  // ── shell ─────────────────────────────────────────────────────────────
-  const plaster = new MeshStandardMaterial({ map: plasterTexture([3, 1.4]), roughness: 0.94, metalness: 0.02 });
-  const wall = (w: number, x: number, z: number, ry: number): void => {
-    const m = new Mesh(new PlaneGeometry(w, H), plaster);
-    m.position.set(x, H / 2, z);
-    m.rotation.y = ry;
-    root.add(m);
-  };
-  wall(HW * 2, 0, NZ, 0);
-  wall(HW * 2, 0, SZ, Math.PI);
-  wall(SZ - NZ, -HW, (NZ + SZ) / 2, Math.PI / 2);
-  wall(SZ - NZ, HW, (NZ + SZ) / 2, -Math.PI / 2);
-
-  const floor = new Mesh(
-    new PlaneGeometry(HW * 2, SZ - NZ),
-    new MeshStandardMaterial({ map: parquetTexture([4, 3]), metalness: 0.16, roughness: 0.5 }),
+  // ── the platform: a dark gloss hex deck with a neon rim ───────────────
+  const deck = new Mesh(
+    new CylinderGeometry(R, R * 0.94, 0.3, 6),
+    new MeshStandardMaterial({ color: 0x0b0a12, metalness: 0.85, roughness: 0.3 }),
   );
-  floor.rotation.x = -Math.PI / 2;
-  floor.position.set(0, 0, (NZ + SZ) / 2);
-  root.add(floor);
-  const rug = new Mesh(
-    new PlaneGeometry(1.7, 4.6),
-    new MeshStandardMaterial({ map: runnerTexture([1, 2]), roughness: 0.92, metalness: 0 }),
-  );
-  rug.rotation.x = -Math.PI / 2;
-  rug.position.set(0, 0.012, -0.6);
-  root.add(rug);
-
-  const ceil = new Mesh(
-    new PlaneGeometry(HW * 2, SZ - NZ),
-    new MeshStandardMaterial({ color: DECOR.plasterDeep, roughness: 0.95 }),
-  );
-  ceil.rotation.x = Math.PI / 2;
-  ceil.position.set(0, H, (NZ + SZ) / 2);
-  root.add(ceil);
-
-  // Trim registers + a perimeter cove, same law as the hall.
-  const skirtM = blackSteelMat();
-  const railM = brassMat(0.34);
-  const coveM = brassGlowMat(1.0);
-  for (const [len, x, z, ry] of [
-    [HW * 2, 0, NZ + 0.02, 0],
-    [HW * 2, 0, SZ - 0.02, Math.PI],
-    [SZ - NZ, -HW + 0.02, (NZ + SZ) / 2, Math.PI / 2],
-    [SZ - NZ, HW - 0.02, (NZ + SZ) / 2, -Math.PI / 2],
+  deck.position.y = -0.15;
+  root.add(deck);
+  const rim = new Mesh(new TorusGeometry(R - 0.03, 0.035, 4, 6), new MeshStandardMaterial({
+    color: 0x0c0b12,
+    emissive: hueToColor(0.55, 0.55),
+    emissiveIntensity: 1.2,
+    metalness: 0.3,
+    roughness: 0.4,
+  }));
+  rim.rotation.x = Math.PI / 2;
+  rim.rotation.z = Math.PI / 6; // flats align with the deck's
+  rim.position.y = 0.012;
+  root.add(rim);
+  // Two step-slabs trailing off behind the spawn — the way you "came in".
+  for (const [sx, sy, sz, sr] of [
+    [0.5, -0.5, 5.1, 0.9],
+    [-0.4, -1.1, 6.3, 0.7],
   ] as const) {
-    box(root, skirtM, len, 0.16, 0.03, x, 0.08, z, ry);
-    box(root, railM, len, 0.035, 0.02, x, 1.0, z, ry);
-    box(root, coveM, len - 0.2, 0.04, 0.04, x, H - 0.05, z, ry);
+    const slab = new Mesh(
+      new CylinderGeometry(sr, sr * 0.9, 0.16, 6),
+      new MeshStandardMaterial({ color: 0x0b0a12, metalness: 0.8, roughness: 0.35 }),
+    );
+    slab.position.set(sx, sy, sz);
+    root.add(slab);
   }
 
-  // A single eclipse ring overhead — the house motif, foreshadowed.
-  const ring = new Mesh(new TorusGeometry(0.8, 0.024, 8, 40), brassMat(0.22));
-  ring.rotation.x = Math.PI / 2;
-  ring.position.set(0, H - 0.55, -1.2);
-  root.add(ring);
-  const ringGlow = new Mesh(new TorusGeometry(0.8, 0.01, 6, 40), brassGlowMat(1.3));
-  ringGlow.rotation.x = Math.PI / 2;
-  ringGlow.position.set(0, H - 0.585, -1.2);
-  root.add(ringGlow);
-  for (let k = 0; k < 3; k++) {
-    const a = (k / 3) * Math.PI * 2;
-    const cable = new Mesh(new CylinderGeometry(0.004, 0.004, 0.55, 4), blackSteelMat());
-    cable.position.set(Math.sin(a) * 0.8, H - 0.28, -1.2 + Math.cos(a) * 0.8);
-    root.add(cable);
+  // ── the void around: grid far below, horizon, pylons, hexes, shards ───
+  const grid = buildGridFloor(40, hueToColor(0.75, 0.5), 2.2, 0.1);
+  grid.group.name = 'live-foyer-grid';
+  grid.group.position.y = -7;
+  root.add(grid.group);
+
+  const horizon = buildHorizon(46, 20, hueToColor(0.9, 0.5), 0.38);
+  root.add(horizon.mesh);
+
+  const pylons: Pylon[] = [];
+  const pylonHues = [0.55, 0.75, 0.9, 0.55, 0.75];
+  for (let i = 0; i < 5; i++) {
+    const a = (i / 5) * Math.PI * 2 + 0.45;
+    const pylon = buildPylon(5 + (i % 3) * 1.6, hueToColor(pylonHues[i], 0.55), 0.8);
+    pylon.group.name = `live-foyer-pylon-${i}`;
+    pylon.group.position.set(Math.sin(a) * 10, -1.6, Math.cos(a) * 10);
+    pylon.group.rotation.y = a + Math.PI;
+    root.add(pylon.group);
+    pylons.push(pylon);
   }
 
-  // ── THE DOORS TO THE FLOOR (north, beyond the board) ──────────────────
-  // Closed double doors in a stepped brass portal; a warm crack of light
-  // glows between them — brighter when a room of yours is open beyond.
-  const doorW = 2.0;
-  const doorH = 2.4;
-  for (let i = 0; i < 2; i++) {
-    const w = doorW + 0.26 + i * 0.3;
-    const h = doorH + 0.18 + i * 0.24;
-    const t = 0.08 - i * 0.02;
-    const mat = i === 0 ? brassMat(0.25) : bronzeMat();
-    box(root, mat, t, h, t, -w / 2, h / 2, NZ + 0.14 - i * 0.04);
-    box(root, mat, t, h, t, w / 2, h / 2, NZ + 0.14 - i * 0.04);
-    box(root, mat, w + t, t, t, 0, h, NZ + 0.14 - i * 0.04);
-  }
-  const doorMat = new MeshStandardMaterial({ map: oakTexture([1, 2]), roughness: 0.55, metalness: 0.05 });
-  for (const side of [-1, 1] as const) {
-    const leaf = new Mesh(new BoxGeometry(doorW / 2 - 0.028, doorH, 0.06), doorMat);
-    leaf.position.set((side * doorW) / 4, doorH / 2, NZ + 0.1);
-    root.add(leaf);
-    box(root, brassMat(0.3), 0.05, 0.32, 0.02, side * 0.14, 1.12, NZ + 0.14);
-    // Porthole: a small round window with the club's glow behind it.
-    const port = new Mesh(new TorusGeometry(0.11, 0.018, 8, 20), brassMat(0.25));
-    port.position.set((side * doorW) / 4, 1.7, NZ + 0.135);
-    root.add(port);
-  }
-  const doorGlowMat = new MeshStandardMaterial({
-    color: 0x201812,
+  const stack = buildRingStack(2, 4.6, 0.9, 4.4, 1.5, hueToColor(0.55, 0.55));
+  stack.group.name = 'live-foyer-rings';
+  root.add(stack.group);
+
+  const drift = buildShards(8, 6.5, 9.5, 1, 6, hueToColor(0.75, 0.5), 0x1f);
+  drift.group.name = 'live-foyer-shards';
+  root.add(drift.group);
+
+  // ── THE PORTAL: the moon-gate to the club floor ───────────────────────
+  // A ring of light standing on the deck's north edge; its inner shimmer
+  // breathes while the way is shut, flares while the relay is being rung,
+  // and the room swap IS the passage.
+  const portalRingMat = new MeshStandardMaterial({
+    color: 0x0c0b12,
     emissive: DECOR.cove,
-    emissiveIntensity: 0.5,
-    roughness: 0.5,
+    emissiveIntensity: 1.1,
+    metalness: 0.4,
+    roughness: 0.35,
   });
-  const crack = new Mesh(new PlaneGeometry(0.035, doorH - 0.08), doorGlowMat);
-  crack.name = 'live-door-crack';
-  crack.position.set(0, doorH / 2, NZ + 0.135);
-  root.add(crack);
-  for (const side of [-1, 1] as const) {
-    const portGlow = new Mesh(new CircleGeometry(0.095, 16), doorGlowMat);
-    portGlow.name = 'live-door-port';
-    portGlow.position.set((side * doorW) / 4, 1.7, NZ + 0.132);
-    root.add(portGlow);
-  }
+  const gate = new Mesh(new TorusGeometry(1.3, 0.07, 10, 40), portalRingMat);
+  gate.position.set(0, 1.42, -3.35);
+  root.add(gate);
+  const portalMat = new MeshBasicMaterial({
+    color: DECOR.cove,
+    transparent: true,
+    opacity: 0.14,
+    blending: AdditiveBlending,
+    depthWrite: false,
+    side: DoubleSide,
+  });
+  const shimmer = new Mesh(new CircleGeometry(1.24, 40), portalMat);
+  shimmer.name = 'live-portal-shimmer';
+  shimmer.position.set(0, 1.42, -3.35);
+  root.add(shimmer);
+  const step = new Mesh(
+    new BoxGeometry(2.0, 0.1, 0.7),
+    new MeshStandardMaterial({ color: 0x0b0a12, metalness: 0.8, roughness: 0.35 }),
+  );
+  step.position.set(0, 0.05, -3.3);
+  root.add(step);
   const floorSign = signPlane(1.42, 0.3, 768, (g, sw, sh) => {
     g.textAlign = 'center';
     g.textBaseline = 'middle';
@@ -1361,142 +1359,48 @@ export function buildFoyer(scene: Scene, candleMat: SpriteMaterial): FoyerRefs {
     g.shadowBlur = 0;
     g.font = `400 30px Georgia, serif`;
     g.fillStyle = 'rgba(232,217,176,0.7)';
-    g.fillText('host or join a room — the doors do the rest', sw / 2, sh * 0.82);
+    g.fillText('host or join a room — the portal does the rest', sw / 2, sh * 0.82);
   });
   floorSign.name = 'live-floor-sign';
-  floorSign.position.set(0, 2.72, NZ + 0.12);
+  floorSign.position.set(0, 3.05, -3.4);
   root.add(floorSign);
 
-  // ── THE COAT CHECK (west wall) ────────────────────────────────────────
-  // A counter under a brass-framed hatch, numbered tags, a call bell, and
-  // a rail of checked coats fading into the dark behind it.
-  const counterMat = new MeshStandardMaterial({ map: oakTexture([2, 1]), roughness: 0.5, metalness: 0.06 });
-  box(root, counterMat, 0.5, 0.98, 1.9, -HW + 0.35, 0.49, -1.0);
-  box(root, new MeshStandardMaterial({ map: marbleTexture([1, 1]), metalness: 0.2, roughness: 0.22 }), 0.56, 0.04, 2.0, -HW + 0.37, 1.0, -1.0);
-  // Hatch: a dark opening with a brass frame and half-drawn ribbed shade.
-  const hatch = new Mesh(new PlaneGeometry(1.7, 1.1), new MeshBasicMaterial({ color: 0x07060a }));
-  hatch.rotation.y = Math.PI / 2;
-  hatch.position.set(-HW + 0.02, 1.65, -1.0);
-  root.add(hatch);
-  box(root, brassMat(0.3), 0.05, 0.06, 1.8, -HW + 0.06, 2.22, -1.0);
-  box(root, brassMat(0.3), 0.05, 0.06, 1.8, -HW + 0.06, 1.08, -1.0);
-  const shade = new Mesh(
-    new PlaneGeometry(1.7, 0.42),
-    new MeshStandardMaterial({ map: ribbedGlassTexture([4, 1]), emissive: DECOR.cove, emissiveIntensity: 0.2, roughness: 0.45 }),
-  );
-  shade.rotation.y = Math.PI / 2;
-  shade.position.set(-HW + 0.04, 2.0, -1.0);
-  root.add(shade);
-  // Coats on a rail inside the dark: simple hung silhouettes.
-  const coatMat = new MeshStandardMaterial({ color: 0x17151c, roughness: 0.95 });
-  const railRod = new Mesh(new CylinderGeometry(0.012, 0.012, 1.5, 6), brassMat(0.4));
-  railRod.rotation.x = Math.PI / 2;
-  railRod.position.set(-HW - 0.25, 1.9, -1.0);
-  root.add(railRod);
-  for (let i = 0; i < 5; i++) {
-    const coat = new Mesh(new CylinderGeometry(0.07, 0.13, 0.7, 8), coatMat);
-    coat.position.set(-HW - 0.25, 1.5, -1.62 + i * 0.3);
-    root.add(coat);
-  }
-  // The call bell + a stack of numbered tags on the counter.
-  const bell = new Mesh(new CylinderGeometry(0.045, 0.055, 0.045, 14), brassMat(0.18));
-  bell.position.set(-HW + 0.4, 1.045, -0.5);
-  root.add(bell);
-  const bellPip = new Mesh(new CylinderGeometry(0.008, 0.008, 0.02, 6), blackSteelMat());
-  bellPip.position.set(-HW + 0.4, 1.08, -0.5);
-  root.add(bellPip);
-  for (let i = 0; i < 3; i++) {
-    box(root, brassMat(0.45), 0.07, 0.008, 0.1, -HW + 0.42, 1.026 + i * 0.009, -1.5 + i * 0.012);
-  }
-  const checkSign = signPlane(0.72, 0.2, 512, (g, sw, sh) => {
-    g.textAlign = 'center';
-    g.textBaseline = 'middle';
-    g.fillStyle = 'rgba(232,217,176,0.92)';
-    g.font = `400 52px Georgia, serif`;
-    g.fillText('C O A T   C H E C K', sw / 2, sh / 2);
-  });
-  checkSign.name = 'live-check-sign';
-  checkSign.rotation.y = Math.PI / 2;
-  checkSign.position.set(-HW + 0.09, 2.42, -1.0);
-  root.add(checkSign);
-
-  // ── the east side: velvet bench, poster frames, a mirror that isn't ───
-  const benchSeat = new MeshStandardMaterial({ map: velvetTexture([2, 1]), roughness: 0.96, metalness: 0 });
-  box(root, blackSteelMat(), 1.7, 0.12, 0.5, HW - 0.55, 0.2, -0.6);
-  const cushion = new Mesh(roundedPuck(0.26, 0.1, 0.04), benchSeat);
-  cushion.scale.set(3.2, 1, 0.9);
-  cushion.position.set(HW - 0.55, 0.31, -0.6);
-  root.add(cushion);
-  for (const bx of [HW - 1.25, HW + 0.15]) {
-    box(root, brassMat(0.35), 0.05, 0.34, 0.05, bx, 0.17, -0.6);
-  }
-  // Aged "mirror" — a dark gloss panel in a brass frame (reflection implied).
-  const mirror = new Mesh(
-    new PlaneGeometry(0.7, 1.5),
-    new MeshStandardMaterial({ color: 0x11141c, metalness: 0.9, roughness: 0.08 }),
-  );
-  mirror.rotation.y = -Math.PI / 2;
-  mirror.position.set(HW - 0.03, 1.6, 0.6);
-  root.add(mirror);
-  box(root, brassMat(0.3), 0.03, 1.58, 0.78, HW - 0.02, 1.6, 0.6);
-  // Tonight's bill, framed: three set names in house type.
-  const bill = signPlane(0.82, 1.1, 512, (g, sw, sh) => {
-    g.strokeStyle = 'rgba(201,168,106,0.9)';
+  // ── tonight's bill, as a holo card floating off the deck's east edge ──
+  const bill = signPlane(0.92, 1.14, 512, (g, sw, sh) => {
+    g.fillStyle = 'rgba(7,5,14,0.72)';
+    g.beginPath();
+    g.roundRect(6, 6, sw - 12, sh - 12, 22);
+    g.fill();
+    g.strokeStyle = 'rgba(79,183,255,0.8)';
     g.lineWidth = 4;
-    g.strokeRect(8, 8, sw - 16, sh - 16);
+    g.stroke();
     g.textAlign = 'center';
-    g.fillStyle = 'rgba(232,217,176,0.95)';
-    g.font = `500 44px Georgia, serif`;
-    g.fillText('TONIGHT', sw / 2, 90);
-    g.font = `400 34px Georgia, serif`;
-    g.fillStyle = 'rgba(232,217,176,0.8)';
+    g.fillStyle = css(PALETTE.cyan);
+    g.shadowColor = css(PALETTE.cyan);
+    g.shadowBlur = 14;
+    g.font = `900 46px 'Arial Black', system-ui, sans-serif`;
+    g.fillText('TONIGHT', sw / 2, 92);
+    g.shadowBlur = 0;
+    g.fillStyle = 'rgba(232,236,242,0.88)';
+    g.font = `900 32px 'Arial Black', system-ui, sans-serif`;
     ['OPENING SET', 'PEAK HOURS', 'AFTER HOURS'].forEach((line, i) => {
-      g.fillText(line, sw / 2, 210 + i * 100);
+      g.fillText(line, sw / 2, 200 + i * 92);
     });
     g.fillStyle = css(PALETTE.magenta);
     g.shadowColor = css(PALETTE.magenta);
     g.shadowBlur = 10;
     g.font = `700 24px 'Arial Black', system-ui, sans-serif`;
-    g.fillText('THE GOOP GUARDS EVERY THIRD', sw / 2, sh - 80, sw - 70);
+    g.fillText('THE GOOP GUARDS EVERY THIRD', sw / 2, sh - 74, sw - 70);
   });
   bill.name = 'live-bill';
-  bill.rotation.y = -Math.PI / 2;
-  bill.position.set(HW - 0.04, 1.62, -1.9);
+  bill.rotation.y = -0.7;
+  bill.position.set(2.9, 1.62, -1.3);
   root.add(bill);
 
-  // ── the street doors behind you + plaque ──────────────────────────────
-  for (const side of [-1, 1] as const) {
-    const leaf = new Mesh(new BoxGeometry(0.85, 2.3, 0.06), doorMat);
-    leaf.position.set(side * 0.45, 1.15, SZ - 0.1);
-    root.add(leaf);
-    box(root, brassMat(0.3), 0.05, 0.3, 0.02, side * 0.14, 1.1, SZ - 0.14);
-  }
-  box(root, brassMat(0.25), 2.1, 0.08, 0.08, 0, 2.34, SZ - 0.1);
-  const nightSign = signPlane(1.05, 0.34, 512, (g, sw, sh) => {
-    g.textAlign = 'center';
-    g.textBaseline = 'middle';
-    g.fillStyle = 'rgba(232,217,176,0.6)';
-    g.font = `400 34px Georgia, serif`;
-    g.fillText('outside is a rumour', sw / 2, sh / 2);
-  });
-  nightSign.name = 'live-night-sign';
-  nightSign.rotation.y = Math.PI;
-  nightSign.position.set(0, 2.62, SZ - 0.08);
-  root.add(nightSign);
-
-  // A desk candle by the board (shares the club's flicker material).
-  const candleHolder = new Group();
-  candleHolder.name = 'live-foyer-candle';
-  const flame = new Sprite(candleMat);
-  flame.scale.setScalar(0.14);
-  flame.position.set(HW - 0.55, 0.5, -0.6);
-  candleHolder.add(flame);
-  root.add(candleHolder);
-
-  // ── light: one warm point + hemi, a room you can read faces in ────────
-  root.add(new HemisphereLight(0x9a92b8, 0x100c16, 0.66));
-  const key = new PointLight(0xffd9ac, 1.35, 9, 1.6);
-  key.position.set(0, H - 0.5, -1.2);
+  // ── light: a cool wash + one soft key — the board does the reading ────
+  root.add(new HemisphereLight(0x8a90c8, 0x05040a, 0.6));
+  const key = new PointLight(0xc8d4ff, 1.2, 10, 1.6);
+  key.position.set(0, 3.1, -1.4);
   root.add(key);
 
   scene.add(root);
@@ -1508,7 +1412,15 @@ export function buildFoyer(scene: Scene, candleMat: SpriteMaterial): FoyerRefs {
     return false;
   });
 
-  return { root, doorGlowMat, candleMat };
+  return {
+    root,
+    portalMat,
+    portalRingMat,
+    pylons,
+    rings: stack.rings,
+    shards: drift.shards,
+    gridMat: grid.mat,
+  };
 }
 
 /* ── real lights: four points + a hemisphere, and not one more ──────────── */

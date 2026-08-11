@@ -240,7 +240,7 @@ export const TRACKS: Track[] = [
     downbeat: 3.4248,
     seconds: 154.03,
     lufs: -10.4,
-    // THE GILDED ECLIPSE's own record — a slow-burn 70 BPM groove that holds
+    // The club's own record — a slow-burn 70 BPM groove that holds
     // the club whenever an online room has the floor between sets. The
     // chandelier phases to it. Never a raid record: at this tempo the ring
     // would be a waiting room, and the club deserves a house sound no set

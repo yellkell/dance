@@ -1,31 +1,35 @@
 /**
- * ClubSystem — keeper of the venue's THREE places. The law of the land:
- * where you are is what you're doing.
+ * ClubSystem — keeper of the venue's places. The law of the land: where
+ * you are is what you're doing.
  *
- *  1. THE FOYER — the menu place. Every menu screen (lobby, tour, map)
- *     stands at the front desk: the board, the coat check, the MC posing,
- *     and the closed doors to THE FLOOR with warm light in the crack.
- *  2. THE CLUB — the social place. Host or join a room and the doors do
- *     the rest: the full GILDED ECLIPSE hall swaps in around you — dance
- *     floor, eclipse chandelier, bar, booths, terrace, still room — with
- *     your room-mates live in it (ClubSocialSystem) and teleport movement
- *     (ClubTeleportSystem). Leave the room and you're back in the foyer.
- *  3. THE SET — the game place. The needle drops, both rooms pack away,
- *     and the passthrough raid takes your real room, exactly as ever.
+ *  1. THE FOYER — the menu place, and a piece of THE VOID: a floating
+ *     neon-edged platform in the set's own abstract space (pylons, slow
+ *     hexes, drifting shards, a horizon with no land), with the board, the
+ *     MC, and a moon-gate PORTAL shimmering shut until a room of yours is
+ *     open beyond it.
+ *  2. THE CLUB — the social place, the warm human room between the voids.
+ *     Host or join and the portal does the rest: the Art Deco hall swaps
+ *     in around you — dance floor, eclipse chandelier, bar, booths,
+ *     terrace, still room — with your room-mates live in it
+ *     (ClubSocialSystem) and teleport movement (ClubTeleportSystem).
+ *  3. THE SET — the game place. The ball fires (or a solo set starts),
+ *     both rooms pack away, and the raid takes over — wrapped in the void
+ *     environment at SET VOID levels (DiscoSystem's business), or raw
+ *     passthrough at OFF.
  *
  * This system builds both interiors once, swaps them per frame, and keeps
  * whichever is open breathing:
  *
- *  - the eclipse chandelier counter-rotates and PHASES with the music,
- *    leaning into the kick; the moon brightens on the bar, the corona
- *    breathes; the floor's brass inlay (the raid ring's ghost) shimmers;
- *  - the bar's ribbed-glass wall pulses slow, candles flicker on one
- *    shared flame, the DJ console blinks, the still room's lamp breathes
- *    at a resting heart rate;
- *  - the foyer's door-crack glow warms while the relay is being reached
- *    and settles once you're through;
- *  - a whisper of FogExp2 gives the hall its depth (lifted for raids —
- *    passthrough must stay clean).
+ *  - club: the eclipse chandelier counter-rotates and PHASES with the
+ *    music, leaning into the kick; the moon brightens on the bar; the
+ *    floor's brass inlay (the raid ring's ghost) shimmers; the bar's
+ *    ribbed glass pulses slow; candles flicker on one shared flame; the
+ *    DJ console blinks; the still room's lamp breathes at rest.
+ *  - foyer: the portal shimmer breathes (and flares while the relay is
+ *    rung), the pylons roll a slow wave, the hexes turn, shards drift.
+ *
+ * Fog belongs to whoever's place is up — this system owns it for the foyer
+ * and club and never clobbers the set's (DiscoSystem's) fog.
  *
  * THE STILL ROOM's law is enforced here: step through its door and the
  * club's music falls away to a murmur (setAmbientDuck), voices untouched.
@@ -34,24 +38,25 @@
 import { createSystem } from '@iwsdk/core';
 import { FogExp2, type Scene } from 'three';
 import { setAmbientDuck } from '../audio/music.js';
+import { VOID_BG } from '../arena/voidkit.js';
 import { buildClub, buildFoyer, type ClubRefs, type FoyerRefs } from '../club/build.js';
 import { CLUB } from '../club/config.js';
 import { match } from '../game/state.js';
 import { net } from '../net/session.js';
 
-const FOG_DENSITY = 0.028;
-
 export class ClubSystem extends createSystem({}) {
   private club: ClubRefs | null = null;
   private foyer: FoyerRefs | null = null;
-  private fog = new FogExp2(0x0b0810, FOG_DENSITY);
+  private clubFog = new FogExp2(0x0b0810, 0.028);
+  private foyerFog = new FogExp2(VOID_BG, 0.026);
+  private fogOwned: 'club' | 'foyer' | null = null;
   private clock = 0;
   private duckTarget = 1;
 
   init(): void {
     this.club = buildClub(this.scene);
     this.club.root.visible = false;
-    this.foyer = buildFoyer(this.scene, this.club.candleMat);
+    this.foyer = buildFoyer(this.scene);
     this.foyer.root.visible = false;
   }
 
@@ -67,15 +72,25 @@ export class ClubSystem extends createSystem({}) {
 
     if (club.root.visible !== wantClub) club.root.visible = wantClub;
     if (foyer.root.visible !== wantFoyer) foyer.root.visible = wantFoyer;
-    const fogged = wantClub || wantFoyer;
-    if (((this.scene as Scene).fog !== null) !== fogged) {
-      (this.scene as Scene).fog = fogged ? this.fog : null;
+
+    // Fog handoff: claim it for our place, release it ONLY if it's ours —
+    // the set's void fog is DiscoSystem's and must never be stomped here.
+    const want: 'club' | 'foyer' | null = wantClub ? 'club' : wantFoyer ? 'foyer' : null;
+    if (want !== this.fogOwned) {
+      const scene = this.scene as Scene;
+      if (want === null) {
+        if (scene.fog === this.clubFog || scene.fog === this.foyerFog) scene.fog = null;
+      } else {
+        scene.fog = want === 'club' ? this.clubFog : this.foyerFog;
+      }
+      this.fogOwned = want;
     }
     if (!wantClub && this.duckTarget !== 1) {
       // Leaving the floor (set booked, room left): the hush lifts.
       this.duckTarget = 1;
       setAmbientDuck(1);
     }
+    if (!wantClub && !wantFoyer) return;
 
     this.clock += delta;
     const t = this.clock;
@@ -86,21 +101,33 @@ export class ClubSystem extends createSystem({}) {
     const pulse = Math.max(0, 1 - beatFrac * 2.4); // crests on the kick, dies fast
     const bar = beat / 4;
 
-    // The shared candle flame flickers for whichever room is lit.
-    if (fogged) {
-      club.candleMat.opacity = 0.74 + Math.sin(t * 12.7) * 0.07 + Math.sin(t * 29.3) * 0.05;
-    }
-
     if (wantFoyer) {
-      // The door crack: settled warmth, a slow breathe — and a reaching
-      // flare while the relay is being rung.
+      // The portal: a settled breathing shimmer, flaring while the relay
+      // is being rung — the way in, warming up.
       const reaching = net.phase === 'connecting';
-      foyer.doorGlowMat.emissiveIntensity = reaching
-        ? 0.9 + Math.sin(t * 6) * 0.5
-        : 0.5 + Math.sin(t * 0.8) * 0.12 + pulse * 0.08;
+      foyer.portalMat.opacity = reaching ? 0.3 + Math.sin(t * 7) * 0.16 : 0.12 + Math.sin(t * 0.9) * 0.05 + pulse * 0.04;
+      foyer.portalRingMat.emissiveIntensity = reaching ? 1.6 + Math.sin(t * 7) * 0.5 : 1.05 + pulse * 0.2;
+      // The void idles: a slow wave rolls the pylons, the hexes turn,
+      // shards drift, the far grid breathes.
+      foyer.pylons.forEach((p, i) => {
+        const wave = Math.sin(t * 0.6 + i * 1.3);
+        for (const m of p.glowMats) m.emissiveIntensity = 0.75 + Math.max(0, wave) * 0.4 + pulse * 0.18;
+      });
+      for (const r of foyer.rings) {
+        r.mesh.rotation.z += r.speed * delta;
+        r.mat.emissiveIntensity = 0.7 + pulse * 0.25;
+      }
+      for (const s of foyer.shards) {
+        s.mesh.rotation.y += s.spin * delta;
+        s.mesh.position.y = s.baseY + Math.sin(t * 0.4 + s.phase) * s.bob;
+      }
+      foyer.gridMat.opacity = 0.07 + pulse * 0.03;
     }
 
     if (wantClub) {
+      // The shared candle flame flickers wherever it burns.
+      club.candleMat.opacity = 0.74 + Math.sin(t * 12.7) * 0.07 + Math.sin(t * 29.3) * 0.05;
+
       // ── the eclipse ───────────────────────────────────────────────────
       club.chandelier.rings.forEach((ring, i) => {
         ring.pivot.rotation.y += ring.speed * delta;

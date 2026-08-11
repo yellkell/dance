@@ -16,6 +16,7 @@ import { ensureAudio } from './audio/sfx.js';
 import { ArenaSystem } from './systems/ArenaSystem.js';
 import { AvatarSystem } from './systems/AvatarSystem.js';
 import { ChoreoSystem } from './systems/ChoreoSystem.js';
+import { ClubBallSystem } from './systems/ClubBallSystem.js';
 import { ClubSocialSystem } from './systems/ClubSocialSystem.js';
 import { ClubSystem } from './systems/ClubSystem.js';
 import { ClubTeleportSystem } from './systems/ClubTeleportSystem.js';
@@ -72,13 +73,14 @@ World.create(container, {
   // that reads both. Music owns the clock; choreo owns the judgement.
   world.registerSystem(PlayerSystem);
   world.registerSystem(ArenaSystem);
-  // THE GILDED ECLIPSE: the venue the menus live in, its teleport-only
-  // movement, and the social floor (room-mates, voice, mute/block). The
-  // teleport system runs before the network pumps so the rig is already
-  // re-planted at the spawn on the frame a set books the floor.
+  // The venue's places (foyer void + the club), teleport-only movement,
+  // the social floor (room-mates, voice, mute/block), and the raid-calling
+  // ball. The teleport system runs before the network pumps so the rig is
+  // already re-planted at the spawn on the frame a set books the floor.
   world.registerSystem(ClubSystem);
   world.registerSystem(ClubTeleportSystem);
   world.registerSystem(ClubSocialSystem);
+  world.registerSystem(ClubBallSystem);
   world.registerSystem(MusicSystem);
   world.registerSystem(ChoreoSystem);
   world.registerSystem(GoopliathSystem);
@@ -130,7 +132,7 @@ import { startRaid, startTutorial, toLobby, toMap, toTour } from './game/flow.js
 import { match } from './game/state.js';
 import { arena } from './arena/arena.js';
 import { choreoView } from './systems/ChoreoSystem.js';
-import { hostRoom, joinRoom, leaveRoom, net, requestStart, setDancerName } from './net/session.js';
+import { callBall, cancelBall, hostRoom, joinBall, joinRoom, leaveRoom, net, setDancerName } from './net/session.js';
 import { clubPoses } from './net/poses.js';
 
 declare global {
@@ -148,11 +150,12 @@ declare global {
         host: typeof hostRoom;
         join: typeof joinRoom;
         leave: typeof leaveRoom;
-        start: typeof requestStart;
         setName: typeof setDancerName;
         state: typeof net;
         poses: typeof clubPoses;
       };
+      /** THE BALL, drivable headlessly: call one, touch in, call it off. */
+      club: { call: typeof callBall; touch: typeof joinBall; cancel: typeof cancelBall };
       /** Park the player rig at (x, z) facing `yaw` — headless club walks. */
       rig: (x: number, z: number, yaw?: number, y?: number) => void;
     };
@@ -171,11 +174,11 @@ window.__gdr = {
     host: hostRoom,
     join: joinRoom,
     leave: leaveRoom,
-    start: requestStart,
     setName: setDancerName,
     state: net,
     poses: clubPoses,
   },
+  club: { call: callBall, touch: joinBall, cancel: cancelBall },
   rig: (x, z, yaw = 0, y = 0) => {
     const w = worldRef;
     if (!w) return;

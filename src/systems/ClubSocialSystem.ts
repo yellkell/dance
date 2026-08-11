@@ -36,8 +36,11 @@ import {
 } from 'three';
 import { hueToColor, seatHue } from '../config.js';
 import * as sfx from '../audio/sfx.js';
+import { preload } from '../audio/music.js';
+import { pickRaidTrack, trackById, tracksFor } from '../audio/tracks.js';
 import { platformRoot } from '../arena/arena.js';
-import { CLUB_NET } from '../club/config.js';
+import { ballSpawnPos } from '../club/ball.js';
+import { CLUB, CLUB_NET } from '../club/config.js';
 import { socialBlocked, socialMuted, toggleSocialBlock, toggleSocialMute } from '../club/social.js';
 import {
   clearVoiceSpeakers,
@@ -57,8 +60,10 @@ import {
 import { buildDancer, type DancerPose, type DancerRig } from '../game/avatars.js';
 import { match } from '../game/state.js';
 import { clubPoses, remotePoses } from '../net/poses.js';
-import { net, onVoice, seatByIdx, sendClubPose, sendVoice } from '../net/session.js';
+import { callBall, cancelBall, net, onVoice, seatByIdx, sendClubPose, sendVoice } from '../net/session.js';
 import { Panel, UI, type PanelButton } from '../ui/panel.js';
+
+const TRACK_KEY = 'gdr-track';
 
 const _v = new Vector3();
 const _q = new Quaternion();
@@ -120,7 +125,7 @@ export class ClubSocialSystem extends createSystem({}) {
     // Inbound voice frames route straight to their spatial speaker.
     onVoice((id, frame) => pushVoiceFrame(id, frame));
 
-    this.panel = new Panel(0.58, 0.66, 700, 800);
+    this.panel = new Panel(0.6, 0.9, 700, 1050);
     this.panel.mesh.visible = false;
     this.panel.mesh.rotation.order = 'YXZ';
     this.scene.add(this.panel.group);
@@ -178,8 +183,9 @@ export class ClubSocialSystem extends createSystem({}) {
       setVoiceSpeakerMuted(String(p.idx), hidden || socialMuted(p.name));
 
       if (liveSet) {
-        // Mid-set their figure lives on the ring (AvatarSystem's), but the
-        // voice needs a home: pin it to their dancer on their platform.
+        // I'M on the ring. Fellow players' voices pin to their dancer on
+        // their platform; the friends still back on the floor keep talking
+        // from where they stand in the club (their poses keep streaming).
         const seat = seatByIdx.get(p.idx);
         if (seat !== undefined) {
           const root = platformRoot(seat);
@@ -189,7 +195,23 @@ export class ClubSocialSystem extends createSystem({}) {
             root.localToWorld(_v);
             setVoiceSpeakerPosition(String(p.idx), _v);
           }
+        } else {
+          const floorPose = clubPoses.get(p.idx);
+          if (floorPose) {
+            _v.set(floorPose.hx, floorPose.hy, floorPose.hz);
+            setVoiceSpeakerPosition(String(p.idx), _v);
+          }
         }
+        continue;
+      }
+
+      if (net.gamePlayers.has(p.idx)) {
+        // They're away playing: their figure steps off the floor and their
+        // voice sings from the stage — the set, heard from the club.
+        p.rig.root.visible = false;
+        p.tag.visible = false;
+        _v.set(0, 1.7, CLUB.stage.z + 1.1);
+        setVoiceSpeakerPosition(String(p.idx), _v);
         continue;
       }
       if (!this.crowd.visible) continue;
@@ -355,6 +377,12 @@ export class ClubSocialSystem extends createSystem({}) {
         setVoiceEnabled(!voiceEnabled());
       } else if (clicked === 'mic') {
         toggleVoiceMuted();
+      } else if (clicked === 'track') {
+        this.cycleTrack();
+      } else if (clicked === 'call') {
+        this.callFromHere();
+      } else if (clicked === 'cancel') {
+        cancelBall();
       } else if (clicked.startsWith('mute:')) {
         toggleSocialMute(clicked.slice(5));
       } else if (clicked.startsWith('block:')) {
@@ -364,6 +392,32 @@ export class ClubSocialSystem extends createSystem({}) {
     }
 
     this.paint();
+  }
+
+  /** Cycle my song pick: SHUFFLE → each raid record → back. The pick rides
+   *  the ball when I call one (same store the board's ♪ row uses). */
+  private cycleTrack(): void {
+    const pool = tracksFor('raid');
+    const at = pool.findIndex((t) => t.id === match.preferredTrack);
+    const next = at + 1 >= pool.length ? '' : pool[at + 1].id;
+    match.preferredTrack = next;
+    try {
+      localStorage.setItem(TRACK_KEY, next);
+    } catch {
+      /* fine */
+    }
+    preload(trackById(next) ?? pickRaidTrack(match.seed));
+  }
+
+  /** Send the ball up just ahead of me, and warm my record for the drop. */
+  private callFromHere(): void {
+    const headObj = this.playerHeadEntity?.object3D;
+    if (!headObj) return;
+    headObj.getWorldPosition(_v);
+    headObj.getWorldQuaternion(_q);
+    _fwd.set(0, 0, -1).applyQuaternion(_q);
+    callBall(ballSpawnPos(_v, _fwd));
+    preload(trackById(match.preferredTrack) ?? pickRaidTrack(match.seed));
   }
 
   /** In front of you at waist height with a lectern lean, facing you. */
@@ -381,18 +435,23 @@ export class ClubSocialSystem extends createSystem({}) {
   }
 
   private paint(): void {
-    const members = net.members.filter((m) => m.idx !== net.myIdx).slice(0, 12);
+    const members = net.members.filter((m) => m.idx !== net.myIdx).slice(0, 8);
+    const more = Math.max(0, net.members.length - 1 - members.length);
     const on = voiceEnabled();
     const mic = !isVoiceMuted() && isVoiceCapturing();
+    const cued = trackById(match.preferredTrack);
+    const ballUp = net.ball !== null;
+    const mine = ballUp && net.ball!.callerIdx === net.myIdx;
+    const setOut = net.gamePlayers.size > 0;
     const key =
       members.map((m) => `${m.name}|${socialMuted(m.name) ? 1 : 0}${socialBlocked(m.name) ? 1 : 0}`).join(';') +
-      `#${this.hover ?? ''}#${on ? 1 : 0}#${mic ? 1 : 0}#${net.phase}`;
+      `#${this.hover ?? ''}#${on ? 1 : 0}#${mic ? 1 : 0}#${net.phase}#${cued?.id ?? ''}#${ballUp ? (mine ? 'B' : 'b') : ''}#${setOut ? net.gamePlayers.size : 0}#${more}`;
     if (key === this.paintKey) return;
     this.paintKey = key;
 
     const buttons: PanelButton[] = [];
-    const ROW0 = 178;
-    const ROW_H = 64;
+    const ROW0 = 172;
+    const ROW_H = 58;
     members.forEach((m, i) => {
       const y = ROW0 + i * ROW_H;
       buttons.push({
@@ -402,7 +461,7 @@ export class ClubSocialSystem extends createSystem({}) {
         x: 396,
         y,
         w: 136,
-        h: 52,
+        h: 50,
         small: true,
       });
       buttons.push({
@@ -412,18 +471,62 @@ export class ClubSocialSystem extends createSystem({}) {
         x: 546,
         y,
         w: 136,
-        h: 52,
+        h: 50,
         small: true,
       });
     });
+
+    // ── calling a raid: the song pick + the ball ────────────────────────
+    buttons.push({
+      id: 'track',
+      label: cued ? `♪ ${cued.title}` : '♪ SHUFFLE',
+      sub: cued ? `${cued.bpm.toFixed(cued.bpm % 1 ? 2 : 0)} BPM — rides the ball you call` : 'the seed picks — rides the ball you call',
+      accent: UI.cyan,
+      x: 24,
+      y: 668,
+      w: 652,
+      h: 74,
+      small: true,
+    });
+    if (mine) {
+      buttons.push({
+        id: 'cancel',
+        label: 'CALL IT OFF',
+        sub: 'your ball is up — or just touch it',
+        accent: UI.danger,
+        x: 24,
+        y: 752,
+        w: 652,
+        h: 74,
+        small: true,
+      });
+    } else {
+      buttons.push({
+        id: 'call',
+        label: ballUp ? 'THE BALL IS UP' : setOut ? 'A SET IS OUT' : 'SEND THE BALL UP',
+        sub: ballUp
+          ? 'touch it to dance — 60 s from the call'
+          : setOut
+            ? `${net.gamePlayers.size} on the ring — the floor waits for them`
+            : 'a ball spawns before you · touchers ride at zero',
+        accent: UI.goop,
+        disabled: ballUp || setOut,
+        x: 24,
+        y: 752,
+        w: 652,
+        h: 74,
+        small: true,
+      });
+    }
+
     buttons.push({
       id: 'mic',
       label: mic ? 'MIC LIVE — left Ⓨ mutes' : on ? 'MIC MUTED — left Ⓨ opens it' : 'MIC OFF',
       accent: mic ? UI.goop : UI.danger,
       x: 24,
-      y: 656,
+      y: 844,
       w: 652,
-      h: 60,
+      h: 56,
       small: true,
     });
     buttons.push({
@@ -432,7 +535,7 @@ export class ClubSocialSystem extends createSystem({}) {
       sub: on ? 'the room can talk — spatial, by the figure' : 'hear no one, send nothing',
       accent: on ? UI.cyan : UI.danger,
       x: 24,
-      y: 724,
+      y: 908,
       w: 652,
       h: 64,
       small: true,
@@ -459,8 +562,9 @@ export class ClubSocialSystem extends createSystem({}) {
           g.fillText('right Ⓐ closes this panel', 28, 130);
         }
         members.forEach((m, i) => {
-          const y = ROW0 + i * ROW_H + 26;
+          const y = ROW0 + i * ROW_H + 25;
           const hidden = socialBlocked(m.name);
+          const away = net.gamePlayers.has(m.idx);
           g.font = "900 30px 'Arial Black', system-ui, sans-serif";
           g.fillStyle = hidden
             ? 'rgba(172,182,198,0.45)'
@@ -476,12 +580,21 @@ export class ClubSocialSystem extends createSystem({}) {
             g.lineTo(28 + w, y);
             g.stroke();
           }
-          if (isSpeaking(String(m.idx))) {
+          if (away) {
+            g.fillStyle = UI.amber;
+            g.font = "700 20px 'Arial Black', system-ui, sans-serif";
+            g.fillText('ON THE RING', 250, y);
+          } else if (isSpeaking(String(m.idx))) {
             g.fillStyle = UI.goop;
             g.font = "700 22px 'Arial Black', system-ui, sans-serif";
             g.fillText('◉', 340, y);
           }
         });
+        if (more > 0) {
+          g.font = "700 22px 'Arial Black', system-ui, sans-serif";
+          g.fillStyle = UI.dim;
+          g.fillText(`…and ${more} more on the floor`, 28, ROW0 + members.length * ROW_H + 22);
+        }
         if (!members.length) {
           g.font = "700 26px 'Arial Black', system-ui, sans-serif";
           g.fillStyle = UI.dim;

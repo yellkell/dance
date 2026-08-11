@@ -29,13 +29,22 @@ everyone else.
   controllers; the figure is for everyone else's view of you.
 - Last dancer standing (or the highest score when the set ends) **owns the
   night**: podium, crown, confetti cannons.
-- Between sets, online rooms live in **THE GILDED ECLIPSE** — the club. An
-  Art Deco hall with a dance floor, a backlit bar, velvet booths, a raised
-  terrace and a hushed STILL ROOM, under an eclipse of counter-rotating
-  brass rings. Teleport around it, **talk** to your room (spatial voice),
-  and mute/block anyone from the SOCIAL panel. The room **outlives its
-  sets**: the drop takes everyone to the raid, the last beat brings everyone
-  back to the floor.
+- Between sets, online rooms live in **THE CLUB** (it has no name — the
+  sign over the stage is a moon, not a word). An Art Deco hall with a dance
+  floor, a backlit bar, velvet booths, a raised terrace and a hushed STILL
+  ROOM, under an eclipse of counter-rotating brass rings. Teleport around
+  it, **talk** to your room (spatial voice), and mute/block anyone from the
+  SOCIAL panel.
+- Raids are **called from the floor with THE BALL**: anyone sends a mirror
+  ball up (their song pick rides along), it hangs for sixty seconds, and
+  whoever **touches it** rides to the ring with them at zero — while the
+  rest of the room keeps the floor. When the set resolves, the players are
+  deposited straight back among their friends.
+- The set itself happens inside **THE VOID** — an actual environment in the
+  Beat-Saber-background bloodline: a circle of monolith pylons pulsing on
+  the kick, huge hexagonal rings turning overhead, a grid floor dissolving
+  into fog, shards adrift, a horizon of light. (SET VOID in SYSTEM cycles
+  OFF / VOID / DEEP — OFF rides raw passthrough exactly as before.)
 
 Built on Meta's [Immersive Web SDK](https://developers.meta.com/horizon/documentation/web/immersive-web-sdk/)
 (`@iwsdk/core`) + Three.js. The gel creature, the telegraph language and the
@@ -130,31 +139,39 @@ npm run server       # room relay on :8788
 
 There are **three places**, and where you are is what you're doing:
 
-1. **THE FOYER** — the menu place. Every menu screen stands at the front
-   desk of THE GILDED ECLIPSE: the board, the coat check, the MC posing,
-   and the closed doors to THE FLOOR with warm light in the crack.
-2. **THE CLUB** — the social place. **HOST ROOM** → share the 4-letter code
-   (or the `?room=CODE&name=YOU` link) → friends **JOIN ROOM** — and the
-   doors do the rest: your whole room stands in the club together. Every
-   member is a raver figure in their join colour with a name tag that
-   swells while they talk. Voice is **spatial** (each voice comes from its
-   figure, HRTF + distance falloff) and rides the same room socket as
-   Int16 PCM — no SFU, no peer soup, the exact system proven in FIRE
-   FIGHT's pub. Movement is **teleport-only**: deflect a thumbstick, aim
-   the arc, roll the stick to set your landing facing, release to go; an
-   isolated sideways flick snap-turns. Left **Ⓨ** mutes your mic. Right
-   **Ⓐ** raises the **SOCIAL panel**: MUTE (silence) or BLOCK (silence +
-   vanish) anyone, persisted by name, strictly local — plus the voice-chat
-   master switch. Step into **THE STILL ROOM** (north-west corner) and the
-   music falls to a murmur; voices stay.
-3. **THE SET** — the game place. The host presses **DROP THE SET**: both
-   rooms pack away and the passthrough raid takes your real room. Humans
-   spread evenly around the ring; groupies fill the gaps. Voice keeps
-   running through the set, pinned to each dancer's platform. When the set
-   resolves (or you bail with right Ⓐ), everyone lands **back on the club
-   floor, room intact** — the code survives, the floor reopens, the next
-   set is one button away. A departing host hands the room to the
-   longest-standing member instead of folding the party.
+1. **THE FOYER** — the menu place, and a piece of THE VOID: a floating
+   neon-edged platform in the set's own abstract space (monolith pylons,
+   slow hexes, drifting shards, a horizon with no land under it), with the
+   board, the MC posing, and a moon-gate **PORTAL** shimmering shut until a
+   room of yours is open beyond it.
+2. **THE CLUB** — the social place, the warm room between the voids.
+   **HOST ROOM** → share the 4-letter code (or the `?room=CODE&name=YOU`
+   link) → friends **JOIN ROOM** — the portal does the rest: your whole
+   room stands in the club together. Every member is a raver figure in
+   their join colour with a name tag that swells while they talk. Voice is
+   **spatial** (each voice comes from its figure, HRTF + distance falloff)
+   and rides the same room socket as Int16 PCM — no SFU, no peer soup, the
+   exact system proven in FIRE FIGHT's pub. Movement is **teleport-only**:
+   deflect a thumbstick, aim the arc, roll the stick to set your landing
+   facing, release to go; an isolated sideways flick snap-turns. Left
+   **Ⓨ** mutes your mic. Right **Ⓐ** raises the **SOCIAL panel**: MUTE
+   (silence) or BLOCK (silence + vanish) anyone, persisted by name,
+   strictly local — the voice-chat master switch, your ♪ song pick, and
+   **SEND THE BALL UP**. Step into **THE STILL ROOM** (north-west corner)
+   and the music falls to a murmur; voices stay.
+3. **THE SET** — the game place, called with **THE BALL**. Anyone sends it
+   up (from the SOCIAL panel or the board); a mirror ball hangs in front
+   of them for **60 seconds** wearing a countdown plate — the song, the
+   caller, who's touched in. **Touch the ball** (hand close + trigger) to
+   join; touch again to step out; the caller's touch cancels. At zero the
+   relay deals the caller + touchers onto the ring and the raid takes
+   over, wrapped in the void environment (or raw passthrough at SET VOID:
+   OFF). **The floor never closes**: stay-behinds keep dancing and
+   talking (players' voices sing from the stage while they're away),
+   newcomers can still join the room, and when the podium settles every
+   player is deposited back on the floor automatically. A departing host
+   hands the room to the longest-standing member instead of folding the
+   party.
 
 Point clients at a hosted relay with `?server=wss://your-host:8788` (the
 production default is `wss://rave-raid-relay.onrender.com` — deploy
@@ -213,9 +230,9 @@ peak and finale.
 **The lobby is never silent.** SWAG — the soft one — loops under the foyer
 and the rehearsal map at reduced level, and publishes its own beat, so the
 room is already grooving before anyone starts a set. The moment a room has
-the floor (hosting or joined), **ECLIPSE** — the club's own slow-burn 70 BPM
-record — takes the decks, and the chandelier phases to it. Step into THE
-STILL ROOM and the mix ducks to a murmur without stopping.
+the floor (hosting or joined), **ECLIPSE** — the club's own slow-burn
+70 BPM record — takes the decks, and the chandelier phases to it. Step
+into THE STILL ROOM and the mix ducks to a murmur without stopping.
 
 **Picking a record**: the lobby's `♪` row cycles SHUFFLE → each raid track.
 SHUFFLE derives the record from the match seed, so an online room agrees on the
@@ -242,17 +259,19 @@ src/
   choreo/setlist.ts    seeded, beat-quantized move generation
   choreo/telegraphs.ts the hazard-shape shader kit (vendored)
   choreo/strikes.ts    landing FX per platform
-  arena/               platform ring, stage, disco rig
-  club/                THE GILDED ECLIPSE: venue + foyer build, layout,
-                       materials, voice (capture + spatial playback),
-                       mute/block store, static-merge helper
+  arena/               platform ring, stage, disco rig, the void kit +
+                       the set's environment
+  club/                the club: venue + void foyer build, layout,
+                       materials, the ball, voice (capture + spatial
+                       playback), mute/block store, static-merge helper
   game/                state, flow, ring math, rng, avatars
   systems/             Music, Choreo, Player, Avatar, Rank, Goopliath,
                        Disco, Hud, Menu, Network, Arena,
-                       Club, ClubTeleport, ClubSocial
+                       Club, ClubTeleport, ClubSocial, ClubBall
   net/                 room session + pose stores (ring + club floor)
 server/index.mjs       the room relay (seats/seed/poses + club poses,
-                       voice fan-out, rooms that outlive their sets)
+                       voice fan-out, THE BALL's clock, rooms that
+                       outlive their sets)
 tools/                 track analyzer · preview-shot · club-capture ·
                        social-check (two-headset end-to-end)
 avatar-preview.html    dev-only dancer catwalk (never shipped)

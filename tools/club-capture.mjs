@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Walk THE GILDED ECLIPSE headlessly and photograph it — the club's fixed
+ * Walk the club headlessly and photograph it — the club's fixed
  * review views, captured through the real app (IWER emulated XR):
  *
  *   npm run dev        # terminal 1
@@ -53,14 +53,14 @@ const shot = async (name) => {
 
 const rig = (x, z, yaw, y = 0) => page.evaluate(([px, pz, pyaw, py]) => window.__gdr.rig(px, pz, pyaw, py), [x, z, yaw, y]);
 
-// ── the FOYER (menu place) ────────────────────────────────────────────────
+// ── the FOYER (menu place — a piece of the void) ─────────────────────────
 console.log('foyer:');
 await rig(0, 0.6, 0);
 await shot('foyer-desk');
-await rig(1.4, 1.2, 2.4);
-await shot('foyer-coatcheck');
+await rig(-1.6, 1.8, 0.75);
+await shot('foyer-void-wide');
 
-// ── host a room → the doors open on the CLUB (social place) ──────────────
+// ── host a room → the portal opens on the CLUB (social place) ────────────
 console.log('club:');
 await page.evaluate(() => window.__gdr.net.host());
 await page.waitForFunction(() => window.__gdr.net.state.phase === 'hosting', { timeout: 8000 }).catch(() => {
@@ -82,6 +82,22 @@ await rig(-6.6, -9.6, 2.6);
 await shot('club-still-room');
 await rig(0.4, -4.0, -0.5);
 await shot('club-under-eclipse');
+
+// ── THE BALL, hanging on the floor ───────────────────────────────────────
+await rig(0, -0.4, 0);
+await page.evaluate(() => window.__gdr.club.call([0, 1.5, -1.9]));
+await page.waitForFunction(() => window.__gdr.net.state.ball !== null, { timeout: 5000, polling: 200 }).catch(() => {});
+await shot('club-ball-up');
+await page.evaluate(() => window.__gdr.club.cancel());
+
+// ── THE SET inside the void ──────────────────────────────────────────────
+console.log('the set:');
+await page.evaluate(() => window.__gdr.net.leave());
+await page.waitForTimeout(600);
+await page.evaluate(() => window.__gdr.startRaid({ seats: 12 }));
+await page.waitForTimeout(6500);
+await shot('set-void');
+await page.evaluate(() => window.__gdr.toLobby());
 
 await browser.close();
 

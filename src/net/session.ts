@@ -41,6 +41,17 @@ export interface LobbyMember {
   idx: number;
 }
 
+/** THE BALL, while it hangs: who sent it up, on what song, where it floats,
+ *  when it fires (local performance.now ms), and who has touched in. */
+export interface BallState {
+  callerIdx: number;
+  callerName: string;
+  track: string;
+  pos: [number, number, number];
+  firesAt: number;
+  joins: Set<number>;
+}
+
 export const net = {
   phase: 'off' as NetPhase,
   code: '',
@@ -48,6 +59,10 @@ export const net = {
   isHost: false,
   /** My own relay member index (−1 until the room hands it over). */
   myIdx: -1,
+  /** The raid-summoning ball currently in the air, or null. */
+  ball: null as BallState | null,
+  /** Members currently away playing a set (the floor sees them out). */
+  gamePlayers: new Set<number>(),
   error: '',
   rttMs: 0,
   /** Bumped on any lobby change so menus know to repaint. */
@@ -139,6 +154,8 @@ function teardown(reason: string): void {
   net.members = [];
   net.isHost = false;
   net.myIdx = -1;
+  net.ball = null;
+  net.gamePlayers = new Set();
   net.dirty++;
   seatByIdx.clear();
   stopVoiceCapture();
@@ -190,9 +207,46 @@ function handle(msg: Record<string, unknown>): void {
       net.dirty++;
       break;
     }
+    case 'ball-up': {
+      // Somebody sent the ball up — it hangs for `ms`, then fires.
+      const joins = Array.isArray(msg.joins) ? (msg.joins as number[]).filter((n) => Number.isFinite(n)) : [];
+      net.ball = {
+        callerIdx: Number(msg.idx),
+        callerName: String(msg.name ?? ''),
+        track: typeof msg.track === 'string' ? msg.track : '',
+        pos:
+          Array.isArray(msg.pos) && msg.pos.length === 3
+            ? [Number(msg.pos[0]), Number(msg.pos[1]), Number(msg.pos[2])]
+            : [0, 1.5, -1.5],
+        firesAt: performance.now() + Number(msg.ms ?? 60_000),
+        joins: new Set(joins),
+      };
+      net.dirty++;
+      break;
+    }
+    case 'ball-join': {
+      if (!net.ball) break;
+      const idx = Number(msg.idx);
+      if (msg.in === false) net.ball.joins.delete(idx);
+      else net.ball.joins.add(idx);
+      net.dirty++;
+      break;
+    }
+    case 'ball-off':
+      net.ball = null;
+      net.dirty++;
+      break;
+    case 'game': {
+      // Who is away on the ring right now (empty = the floor is whole).
+      const players = Array.isArray(msg.players) ? (msg.players as number[]) : [];
+      net.gamePlayers = new Set(players.filter((n) => Number.isFinite(n)));
+      net.dirty++;
+      break;
+    }
     case 'start': {
-      // Everyone leaves the club floor together: seed + seats + my ring seat
-      // + the human seat map + a shared "beat 0 in N ms" (RTT-compensated).
+      // The ball fired with ME on it: seed + seats + my ring seat + the
+      // player seat map + a shared "beat 0 in N ms" (RTT-compensated).
+      net.ball = null;
       const players = (msg.players as { seat: number; name: string; idx?: number; you?: boolean }[]) ?? [];
       const humans = new Map<number, { name: string; netId?: number }>();
       seatByIdx.clear();
@@ -310,25 +364,39 @@ export function joinRoom(code: string): void {
   connect(() => send({ t: 'join', code: code.toUpperCase(), name: myName }));
 }
 
-/** Host only: lock the roster and drop the needle for the whole room. */
-export function requestStart(seats: number, trackId = ''): void {
-  send({ t: 'start', seats, track: trackId });
-}
-
 export function leaveRoom(): void {
   teardown('');
 }
 
+/* ── THE BALL: how games start from the floor ──────────────────────────── */
+
+/** Send the ball up at `pos` — my song pick and ring-size preference ride
+ *  along. The relay owns the 60-second clock from here. */
+export function callBall(pos: [number, number, number]): void {
+  if (net.phase !== 'hosting' && net.phase !== 'joined') return;
+  send({ t: 'ball-up', track: match.preferredTrack, seats: match.seats, pos });
+}
+
+/** Touch in (or step back out) of the hanging ball. */
+export function joinBall(wantIn: boolean): void {
+  send({ t: 'ball-join', in: wantIn });
+}
+
+/** The caller waving their own ball away. */
+export function cancelBall(): void {
+  send({ t: 'ball-off' });
+}
+
 /**
- * A finished (or bailed) set folds back into the club, NOT out of the room:
- * phase returns to hosting/joined, the host tells the relay the floor is
- * open again, and the same members carry on where the music left them.
+ * A finished (or bailed) set folds back onto the club floor, NOT out of the
+ * room: phase returns to hosting/joined and the relay is told this player
+ * is home — when the last one is, the floor can raise the next ball.
  */
 export function backToClub(): void {
   if (net.phase !== 'live') return;
   net.phase = net.isHost ? 'hosting' : 'joined';
   net.dirty++;
-  if (net.isHost) send({ t: 'end' });
+  send({ t: 'game-out' });
   remotePoses.clear();
   seatByIdx.clear();
 }

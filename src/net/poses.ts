@@ -28,7 +28,7 @@ export function clearRemotePoses(): void {
 
 /**
  * CLUB poses — the same wire shape, different space and key: while a room
- * hangs out in THE GILDED ECLIPSE (before/after a set) every member streams
+ * hangs out in the club (before/after a set) every member streams
  * head + hands in club WORLD space, keyed by their relay member idx (seats
  * don't exist yet). ClubSocialSystem embodies these.
  */

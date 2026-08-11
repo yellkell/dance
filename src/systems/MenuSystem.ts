@@ -1,11 +1,11 @@
 /**
- * MenuSystem — the front desk of THE GILDED ECLIPSE.
+ * MenuSystem — the board at the front desk.
  *
  * While you're on any menu screen the ring, stage and light rig are packed
- * away (ArenaSystem/DiscoSystem hide them) and you're standing in the CLUB
- * (ClubSystem owns the venue; the MC poses on its dance floor) — with one
- * wide BOARD floating in front of the spawn, laid out like a modern
- * live-service lobby:
+ * away (ArenaSystem/DiscoSystem hide them) and you're standing in the
+ * FOYER — or, with a room open, on the club floor (ClubSystem owns both
+ * places) — with one wide BOARD floating in front of the spawn, laid out
+ * like a modern live-service lobby:
  *
  *   ┌────────┬───────────────────────────────┐
  *   │ RAVE   │  HEADER: wordmark · status    │
@@ -51,16 +51,18 @@ import {
   tourNightUnlocked,
 } from '../game/state.js';
 import { cycleRoomDim, roomDimName } from './DiscoSystem.js';
+import { ballSpawnPos } from '../club/ball.js';
 import {
   CODE_ALPHABET,
   autoJoinFromUrl,
+  callBall,
   hostRoom,
   joinRoom,
   leaveRoom,
   net,
-  requestStart,
 } from '../net/session.js';
 import { Panel, UI, type PanelButton } from '../ui/panel.js';
+import { Quaternion } from 'three';
 
 const SEATS_KEY = 'gdr-seats';
 const TRACK_KEY = 'gdr-track';
@@ -270,8 +272,21 @@ export class MenuSystem extends createSystem({}) {
       this.sysMode = true;
       if (match.screen !== 'lobby') toLobby();
     } else if (id === 'raid') {
-      if (net.phase === 'hosting') requestStart(match.seats, match.preferredTrack);
-      else startRaid({ seats: match.seats });
+      if (net.phase === 'hosting' || net.phase === 'joined') {
+        // On the club floor a raid is CALLED, not declared: the ball goes
+        // up ahead of you and whoever touches it rides along at zero.
+        if (!net.ball && net.gamePlayers.size === 0) {
+          const headObj = this.playerHeadEntity?.object3D;
+          if (headObj) {
+            headObj.getWorldPosition(_origin);
+            headObj.getWorldQuaternion(_headQ);
+            _dir.set(0, 0, -1).applyQuaternion(_headQ);
+            callBall(ballSpawnPos(_origin, _dir));
+          }
+        }
+      } else {
+        startRaid({ seats: match.seats });
+      }
     } else if (id.startsWith('night')) {
       const [s, i] = id.slice(5).split('-').map(Number);
       if (tourNightUnlocked(s, i)) startRaid({ seats: match.seats, tour: { set: s, song: i } });
@@ -520,18 +535,28 @@ export class MenuSystem extends createSystem({}) {
   private playContent(buttons: PanelButton[]): void {
     const online = net.phase;
     const cued = trackById(match.preferredTrack);
+    const inRoom = online === 'hosting' || online === 'joined';
+    const ballUp = net.ball !== null;
+    const setOut = net.gamePlayers.size > 0;
 
     buttons.push({
       id: 'raid',
-      label: online === 'hosting' ? 'DROP THE SET' : online === 'joined' ? 'WAITING FOR HOST…' : 'START RAID',
-      sub:
-        online === 'hosting'
-          ? `${net.members.length} human${net.members.length === 1 ? '' : 's'} + groupies · the MC runs the stage`
-          : online === 'joined'
-            ? `room ${net.code}`
-            : `you + ${match.seats - 1} goo-groupies · the MC runs the stage`,
+      label: !inRoom
+        ? 'START RAID'
+        : ballUp
+          ? 'THE BALL IS UP'
+          : setOut
+            ? 'A SET IS OUT'
+            : 'CALL A RAID',
+      sub: !inRoom
+        ? `you + ${match.seats - 1} goo-groupies · the MC runs the stage`
+        : ballUp
+          ? 'touch the ball to dance — it fires at zero'
+          : setOut
+            ? `${net.gamePlayers.size} on the ring — back on the floor soon`
+            : 'the ball goes up before you · 60 s · touchers ride along',
       accent: UI.goop,
-      disabled: online === 'joined' || online === 'connecting',
+      disabled: online === 'connecting' || (inRoom && (ballUp || setOut)),
       x: CONTENT_X,
       y: 152,
       w: CONTENT_W,
@@ -921,3 +946,4 @@ export class MenuSystem extends createSystem({}) {
 const _origin = new Vector3();
 const _dir = new Vector3();
 const _end = new Vector3();
+const _headQ = new Quaternion();

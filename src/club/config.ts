@@ -1,5 +1,6 @@
 /**
- * THE GILDED ECLIPSE — layout + tunables for RAVE RAID's home venue.
+ * THE CLUB — layout + tunables for RAVE RAID's home venue. (It has no
+ * name — the sign over the stage is a moon, not a word.)
  *
  * The club is the room the menus live in (it replaces the bare green room)
  * and the SOCIAL FLOOR for online rooms: everyone in your room stands here

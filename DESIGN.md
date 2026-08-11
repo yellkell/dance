@@ -29,9 +29,11 @@ win condition from "kill the titan" to "outlast the floor".
   (24 decks lighting up as one). The NOVA is the deliberate exception: one
   canonical compass bearing for the whole ring, so the entire club rotates to
   the same safe ground together.
-- **Passthrough is the venue.** No skybox, no floor plane — your room, plus
-  furniture made of neon and a four-metre gel creature where your sofa used
-  to be.
+- **Your floor is the venue; the void is the view.** The dodge game happens
+  on your real floor, always. Around it, the set defaults to THE VOID — an
+  actual environment (see below) — but SET VOID: OFF strips it back to raw
+  passthrough: your room, furniture made of neon, and a four-metre gel
+  creature where your sofa used to be.
 
 ## The set (match structure)
 
@@ -98,23 +100,49 @@ GLOBULON (nova). Clear N reps of the move to pass; progress in localStorage;
 clearing the row flags you RAVE READY. Same ChoreoSystem, same judge — a
 lesson is just a set-list with one song and one move.
 
-## THE GILDED ECLIPSE (the club, and the three places)
+## THE CLUB, THE VOID, and the three places
 
 FIRE FIGHT's pub proved a third thing worth stealing whole: **a social room
 on the same socket** — teleport-only movement, spatial PCM voice fanned out
 by the relay, and local-only mute/block. Carried forward, and dressed up.
+(The club has no name. The sign over the stage is a moon, not a word.)
 
 The law of the land is **three places — where you are is what you're doing**:
 
-1. **THE FOYER** (menu place): a compact antechamber — board, coat check,
-   the MC posing, closed doors to THE FLOOR. Solo players never leave it.
-2. **THE CLUB** (social place): host/join a room and the doors open on the
-   full hall. Everything the pub had, remade elegant; everything the raid
-   needs, foreshadowed (the dance floor's brass inlay is the raid ring's
-   ghost — 24 seat ticks and all).
-3. **THE SET** (game place): passthrough, your real room, exactly as ever.
-   Both interiors pack away; the rig re-plants at the spawn so "my platform
-   IS the world origin" stays true no matter where you teleported.
+1. **THE FOYER** (menu place): a piece of THE VOID — a floating neon-edged
+   platform in the set's own abstract space (deep Beat-Saber-background
+   inspiration: monolith pylons, slow hexes, drifting shards, a horizon
+   with no land under it), with the board, the MC, and a moon-gate PORTAL
+   shimmering shut until a room of yours is open beyond it. Solo players
+   never leave the void.
+2. **THE CLUB** (social place): host/join a room and the portal opens on
+   the full hall — the warm human room between the voids. Everything the
+   pub had, remade elegant; everything the raid needs, foreshadowed (the
+   dance floor's brass inlay is the raid ring's ghost — 24 seat ticks and
+   all).
+3. **THE SET** (game place): the raid, wrapped in THE VOID — an actual
+   environment sharing the foyer's language at arena scale (a pylon circle
+   pulsing on the kick, three great hexes over the stage, grid floor,
+   shards, horizon), or raw passthrough at SET VOID: OFF. Both interiors
+   pack away; the rig re-plants at the spawn so "my platform IS the world
+   origin" stays true no matter where you teleported. The void ducks with
+   the light rig while a telegraph owns your deck — danger never competes
+   with scenery.
+
+### THE BALL (how a raid is called)
+
+The pub's third lesson, invented here: games are OPT-IN, and the invitation
+is physical. Anyone on the floor sends THE BALL up (SOCIAL panel or board;
+their ♪ pick and ring-size preference ride along) and a mirror ball hangs
+before them for sixty seconds — countdown plate, caller's name, one
+orbiting pip per dancer who has touched in. Touch to join, touch again to
+step out, caller's touch cancels. The RELAY owns the clock: at zero it
+deals the caller + touchers onto the ring and tells everyone else who left
+('game'); the floor NEVER closes — stay-behinds keep dancing (away
+players' voices sing from the stage), newcomers still join the room, and
+'game-out' brings each player home to the floor when their podium settles
+(auto-deposited after the reading). One ball or one live set at a time;
+a departing caller takes their ball with them.
 
 Art direction — the opposite pole from the boozer: restrained Art Deco.
 Charcoal lime plaster, smoked oak, champagne brass, oxblood velvet, dark
@@ -134,12 +162,14 @@ real point lights + a hemisphere per interior; everything else is emissive
 or a glow sprite; fog only while indoors. The club renders only on menu
 screens, where no choreography runs — the raid's budget is untouched.
 
-The social wire is three small relay additions, all still just relaying:
-`cp` club poses (world-space head+hands keyed by member idx, 12 Hz), binary
-voice frames tagged with the sender idx (16 kHz Int16 PCM, HRTF-panned at
-the receiver — the pub's exact recipe, because WebCodecs died on Quest and
-this didn't), and `end` — the host reopening the floor so **rooms outlive
-their sets**. A leaving host hands the room to the longest-standing member.
+The social wire stays a handful of relay verbs: `cp` club poses
+(world-space head+hands keyed by member idx, 12 Hz), binary voice frames
+tagged with the sender idx (16 kHz Int16 PCM, HRTF-panned at the receiver —
+the pub's exact recipe, because WebCodecs died on Quest and this didn't),
+and the ball's lifecycle (`ball-up`/`ball-join`/`ball-off`, the server-side
+sixty-second clock, `start` to the players only, `game` to the floor,
+`game-out` on the way home) so **rooms outlive their sets** and never close
+during one. A leaving host hands the room to the longest-standing member.
 Blocking stays strictly local and keys on names, so it survives reconnects;
 BLOCK hides figure + tag and drops their frames at the door.
 

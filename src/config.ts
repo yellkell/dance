@@ -642,16 +642,20 @@ export const PALETTE = {
  */
 
 /**
- * ROOM DIM — the Laser Dance move: darken the passthrough so the neon owns
- * your real room. WebXR can't dim the camera feed itself, so we draw an
- * enormous inside-out black shell behind everything; the compositor
- * alpha-blends it over the passthrough and the whole room drops to club
- * lighting. Three levels, cycled from the lobby panel, persisted.
+ * THE SET VOID — what the world looks like while you dance. OFF rides raw
+ * passthrough (your real room, exactly as it always was). VOID and DEEP
+ * wrap the set in an actual environment — the abstract reactive space in
+ * arena/environment.ts — with DEEP pulling the fog in tighter. The dim
+ * shell (an inside-out black sphere alpha-blended over the passthrough)
+ * still backs both lit levels, so anything the void doesn't cover fades to
+ * darkness instead of kitchen. Cycled from the SYSTEM board, persisted.
  */
 export const ROOM_DIM = {
   levels: [0, 0.45, 0.72],
-  names: ['OFF', 'CLUB', 'CAVE'],
+  names: ['OFF', 'VOID', 'DEEP'],
   defaultLevel: 1,
+  /** Fog density per level (0 = no fog — passthrough stays clean). */
+  fog: [0, 0.02, 0.034],
   /** The lobby keeps a little more of your room than the live set does. */
   lobbyFactor: 0.7,
   /** Subtle breathe on the kick while the set is live (kept tiny). */

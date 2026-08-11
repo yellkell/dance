@@ -3,38 +3,52 @@
  *
  * The game's choreography is deterministic from the seed, so this server is
  * almost embarrassingly small: it mints room codes, tracks who's in the
- * room, and when the host starts it deals every human a ring seat, rolls
- * THE seed, and tells everyone "beat 0 lands in N ms". After that it relays
- * pose ('p') and score ('s') packets to the rest of the room, verbatim.
- * Empty seats are filled with identical seeded groupies by every client —
- * the server never simulates anything.
+ * room, and relays. Empty seats are filled with identical seeded groupies
+ * by every client — the server never simulates anything.
  *
- * THE GILDED ECLIPSE (the club) leans on three small additions, all of them
- * still just relaying:
+ * THE CLUB (the social floor) leans on a handful of verbs, all still just
+ * relaying — and games are called FROM the floor with THE BALL:
  *
- *  - 'cp' club poses: while a room hangs out between sets, members stream
- *    their spot on the club floor; fanned out with the sender's idx.
+ *  - 'cp' club poses: members stream their spot on the floor; fanned out
+ *    with the sender's idx.
  *  - VOICE: binary frames ride the same socket ([8-byte f64 sample rate +
  *    Int16 PCM], see src/club/voice.ts). The relay prepends the sender's
- *    idx as an ascii id and fans them to everyone else — lobby or live.
- *  - Rooms OUTLIVE sets: the host's 'end' reopens the floor (join works
- *    again, another 'start' books another set), and a departing host is
- *    replaced by the longest-standing member instead of folding the party.
+ *    idx as an ascii id and fans them to everyone else — floor or ring.
+ *  - THE BALL: any member sends 'ball-up' (their song pick rides along) and
+ *    a disco ball hangs in the room for BALL_MS. Members touch it to opt in
+ *    ('ball-join'); the caller's touch cancels it ('ball-off'). When the
+ *    timer runs out HERE (the server owns the clock), the caller plus
+ *    everyone who touched get dealt seats, THE seed, and "beat 0 in N ms" —
+ *    and only they leave for the ring. The floor stays open: stay-behinds
+ *    keep dancing, newcomers keep joining, and a 'game' broadcast tells
+ *    everyone who is away playing. Players fold back with 'game-out' when
+ *    their set resolves; when the last one returns the ball may rise again.
+ *  - A departing host is replaced by the longest-standing member instead of
+ *    folding the party.
  *
  *   npm run server            # listens on :8788 (or PORT=…)
  *
  * Point clients at it with ?server=wss://your-host:8788 (ws:// in dev).
+ * BALL_MS=4000 shrinks the ball timer (the two-headset test uses it).
  */
 
 import { createServer } from 'node:http';
 import { WebSocketServer } from 'ws';
 
 const PORT = Number(process.env.PORT || 8788);
+const BALL_MS = Number(process.env.BALL_MS || 60_000);
 const CODE_ALPHABET = 'ABCDEFGH';
 const MAX_ROOM = 24;
 const START_IN_MS = 5500; // count-in cushion: 8 beats at 128 BPM is 3750 ms
 
-/** code → { members: Map<ws, {name, idx, seat}>, host: ws, started } */
+/**
+ * code → {
+ *   members: Map<ws, {name, idx, seat}>,
+ *   host: ws,
+ *   ball: { caller: idx, track, seats, pos, joins: Set<idx>, timer, deadline } | null,
+ *   playing: Set<idx>,   // members currently away on the ring
+ * }
+ */
 const rooms = new Map();
 
 const http = createServer((req, res) => {
@@ -69,6 +83,56 @@ function broadcast(room, obj, except = null) {
   }
 }
 
+function memberByIdx(room, idx) {
+  for (const [ws, info] of room.members.entries()) {
+    if (info.idx === idx) return [ws, info];
+  }
+  return null;
+}
+
+function clearBall(room) {
+  if (!room.ball) return;
+  clearTimeout(room.ball.timer);
+  room.ball = null;
+}
+
+function broadcastGame(room) {
+  broadcast(room, { t: 'game', players: [...room.playing].sort((a, b) => a - b) });
+}
+
+/** The ball's timer ran out — deal the willing onto the ring. */
+function fireBall(code) {
+  const room = rooms.get(code);
+  if (!room?.ball) return;
+  const ball = room.ball;
+  room.ball = null;
+
+  // The caller plus everyone who touched, in join order, still present.
+  const idxs = [ball.caller, ...ball.joins].filter((idx) => memberByIdx(room, idx));
+  broadcast(room, { t: 'ball-off' });
+  if (idxs.length === 0) return; // the caller walked — the ball just fades
+
+  const players = idxs.map((idx) => memberByIdx(room, idx));
+  const seats = Math.min(MAX_ROOM, Math.max(4, Number(ball.seats) || players.length, players.length));
+  players.forEach(([, info], i) => {
+    info.seat = Math.floor((i * seats) / players.length);
+  });
+  const seed = (Math.random() * 0xffffffff) >>> 0;
+  for (const [ws] of players) {
+    send(ws, {
+      t: 'start',
+      seed,
+      seats,
+      track: ball.track,
+      startInMs: START_IN_MS,
+      players: players.map(([m, h]) => ({ seat: h.seat, name: h.name, idx: h.idx, you: m === ws })),
+    });
+  }
+  room.playing = new Set(players.map(([, info]) => info.idx));
+  broadcastGame(room);
+  console.log(`[dance-raid] room ${code}: the ball fired — ${players.length} on a ${seats}-ring, ${room.members.size - players.length} hold the floor`);
+}
+
 function leaveRoom(ws) {
   const code = ws.room;
   if (!code) return;
@@ -79,6 +143,7 @@ function leaveRoom(ws) {
   room.members.delete(ws);
 
   if (room.members.size === 0) {
+    clearBall(room);
     rooms.delete(code);
     return;
   }
@@ -90,8 +155,20 @@ function leaveRoom(ws) {
     send(heir[0], { t: 'room', code, host: true, idx: heir[1].idx });
     console.log(`[dance-raid] room ${code}: host left, ${heir[1].name} inherits`);
   }
-  if (room.started && info) {
-    broadcast(room, { t: 'left', seat: info.seat, idx: info.idx });
+  if (info) {
+    // Their touch on the ball goes with them; a caller's exit cancels it.
+    if (room.ball) {
+      if (room.ball.caller === info.idx) {
+        clearBall(room);
+        broadcast(room, { t: 'ball-off' });
+      } else if (room.ball.joins.delete(info.idx)) {
+        broadcast(room, { t: 'ball-join', idx: info.idx, in: false });
+      }
+    }
+    if (room.playing.delete(info.idx)) {
+      broadcast(room, { t: 'left', seat: info.seat, idx: info.idx });
+      broadcastGame(room);
+    }
   }
   broadcast(room, { t: 'roster', players: roster(room) });
 }
@@ -143,7 +220,7 @@ wss.on('connection', (ws) => {
           send(ws, { t: 'err', m: 'no room codes free' });
           break;
         }
-        const room = { members: new Map(), host: ws, started: false };
+        const room = { members: new Map(), host: ws, ball: null, playing: new Set() };
         room.members.set(ws, { name: sanitizeName(msg.name), idx: 0, seat: 0 });
         rooms.set(code, room);
         ws.room = code;
@@ -157,77 +234,126 @@ wss.on('connection', (ws) => {
         leaveRoom(ws);
         const code = String(msg.code ?? '').toUpperCase();
         const room = rooms.get(code);
-        if (!room || room.started) {
-          send(ws, { t: 'err', m: room ? 'set in progress — try again after the drop' : 'no such room' });
+        if (!room) {
+          send(ws, { t: 'err', m: 'no such room' });
           break;
         }
         if (room.members.size >= MAX_ROOM) {
           send(ws, { t: 'err', m: 'room is full' });
           break;
         }
+        // The floor is ALWAYS open — a set being away on the ring doesn't
+        // bar the door anymore. Latecomers land in the club.
         const idx = Math.max(-1, ...[...room.members.values()].map((m) => m.idx)) + 1;
         room.members.set(ws, { name: sanitizeName(msg.name), idx, seat: idx });
         ws.room = code;
         send(ws, { t: 'room', code, host: false, idx });
         broadcast(room, { t: 'roster', players: roster(room) });
-        break;
-      }
-
-      case 'start': {
-        const room = rooms.get(ws.room);
-        if (!room || room.host !== ws || room.started) break;
-        room.started = true;
-        const humans = [...room.members.entries()].sort((a, b) => a[1].idx - b[1].idx);
-        // Ring size: what the host asked for, never smaller than the humans.
-        const seats = Math.min(MAX_ROOM, Math.max(4, Number(msg.seats) || humans.length, humans.length));
-        // Spread the humans evenly around the ring; groupies fill the gaps.
-        humans.forEach(([, info], i) => {
-          info.seat = Math.floor((i * seats) / humans.length);
-        });
-        const seed = (Math.random() * 0xffffffff) >>> 0;
-        // The host's record choice rides along verbatim ('' = let every
-        // client derive the same one from the seed). The server never looks
-        // inside it — the client registry owns what track ids mean.
-        const track = typeof msg.track === 'string' ? msg.track.slice(0, 32) : '';
-        for (const [member, info] of room.members.entries()) {
-          send(member, {
-            t: 'start',
-            seed,
-            seats,
-            track,
-            startInMs: START_IN_MS,
-            players: humans.map(([m, h]) => ({ seat: h.seat, name: h.name, idx: h.idx, you: m === member })),
+        // Walk them into whatever is mid-air: a hanging ball, a live game.
+        if (room.ball) {
+          send(ws, {
+            t: 'ball-up',
+            idx: room.ball.caller,
+            name: memberByIdx(room, room.ball.caller)?.[1].name ?? '',
+            track: room.ball.track,
+            pos: room.ball.pos,
+            ms: Math.max(500, room.ball.deadline - Date.now()),
+            joins: [...room.ball.joins],
           });
-          void info;
         }
-        console.log(`[dance-raid] room ${ws.room} dropped: ${humans.length} humans on a ${seats}-ring`);
+        if (room.playing.size) send(ws, { t: 'game', players: [...room.playing].sort((a, b) => a - b) });
         break;
       }
 
-      case 'end': {
-        // The set resolved — the host reopens the club floor. Joins work
-        // again and the next 'start' deals fresh seats.
+      /* ── THE BALL ─────────────────────────────────────────────────── */
+
+      case 'ball-up': {
         const room = rooms.get(ws.room);
-        if (!room || room.host !== ws || !room.started) break;
-        room.started = false;
-        broadcast(room, { t: 'roster', players: roster(room) });
-        console.log(`[dance-raid] room ${ws.room} back on the club floor`);
+        const info = room?.members.get(ws);
+        if (!room || !info) break;
+        if (room.ball || room.playing.size) {
+          // A ball is already up or a game is out — clear the asker's UI.
+          send(ws, { t: 'ball-off' });
+          break;
+        }
+        const pos = Array.isArray(msg.pos) && msg.pos.length === 3 ? msg.pos.map(Number) : [0, 1.5, -1.5];
+        const track = typeof msg.track === 'string' ? msg.track.slice(0, 32) : '';
+        // Capture the code now — ws.room clears if the caller walks, and
+        // the timeout must still find the room (fireBall re-checks state).
+        const code = ws.room;
+        room.ball = {
+          caller: info.idx,
+          track,
+          seats: Number(msg.seats) || 0,
+          pos,
+          joins: new Set(),
+          deadline: Date.now() + BALL_MS,
+          timer: setTimeout(() => fireBall(code), BALL_MS),
+        };
+        broadcast(room, {
+          t: 'ball-up',
+          idx: info.idx,
+          name: info.name,
+          track,
+          pos,
+          ms: BALL_MS,
+          joins: [],
+        });
+        console.log(`[dance-raid] room ${code}: ${info.name} sent the ball up (${track || 'shuffle'})`);
+        break;
+      }
+
+      case 'ball-join': {
+        const room = rooms.get(ws.room);
+        const info = room?.members.get(ws);
+        if (!room?.ball || !info || info.idx === room.ball.caller) break;
+        const wantIn = msg.in !== false;
+        const changed = wantIn ? !room.ball.joins.has(info.idx) : room.ball.joins.delete(info.idx);
+        if (wantIn) room.ball.joins.add(info.idx);
+        if (changed || wantIn) broadcast(room, { t: 'ball-join', idx: info.idx, in: wantIn });
+        break;
+      }
+
+      case 'ball-off': {
+        // Only the caller can wave their ball away.
+        const room = rooms.get(ws.room);
+        const info = room?.members.get(ws);
+        if (!room?.ball || !info || room.ball.caller !== info.idx) break;
+        clearBall(room);
+        broadcast(room, { t: 'ball-off' });
+        break;
+      }
+
+      /* ── the set, and coming home from it ─────────────────────────── */
+
+      case 'game-out': {
+        // A player's set resolved (or they bailed) — they're back on the
+        // floor. When the last one returns, the ball may rise again.
+        const room = rooms.get(ws.room);
+        const info = room?.members.get(ws);
+        if (!room || !info) break;
+        if (room.playing.delete(info.idx)) broadcastGame(room);
         break;
       }
 
       case 'p':
       case 's': {
         const room = rooms.get(ws.room);
-        if (!room || !room.started) break;
+        if (!room || !room.playing.size) break;
         const info = room.members.get(ws);
-        if (!info) break;
-        broadcast(room, { t: msg.t, seat: info.seat, d: msg.d }, ws);
+        if (!info || !room.playing.has(info.idx)) break;
+        // Ring traffic concerns the ring: only fellow players receive it.
+        for (const [member, mInfo] of room.members.entries()) {
+          if (member !== ws && room.playing.has(mInfo.idx)) {
+            send(member, { t: msg.t, seat: info.seat, d: msg.d });
+          }
+        }
         break;
       }
 
       case 'cp': {
         // A club-floor pose — relayed with the sender's idx, any time the
-        // room exists (the floor is live before, between and after sets).
+        // room exists (the floor is live before, during and after sets).
         const room = rooms.get(ws.room);
         if (!room) break;
         const info = room.members.get(ws);
@@ -258,5 +384,5 @@ setInterval(() => {
 }, 10_000);
 
 http.listen(PORT, () => {
-  console.log(`[dance-raid] relay listening on :${PORT}`);
+  console.log(`[dance-raid] relay listening on :${PORT} (ball: ${BALL_MS} ms)`);
 });
