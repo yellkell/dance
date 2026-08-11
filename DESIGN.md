@@ -122,24 +122,57 @@ by the relay, and local-only mute/block. Carried forward, and dressed up.
 
 The law of the land is **three places — where you are is what you're doing**:
 
-1. **THE FOYER** (menu place): a piece of THE VOID — a floating neon-edged
-   platform in the set's own abstract space (deep Beat-Saber-background
-   inspiration: monolith pylons, slow hexes, drifting shards, a horizon
-   with no land under it), with the board, the MC, and a moon-gate PORTAL
-   shimmering shut until a room of yours is open beyond it. Solo players
-   never leave the void.
+1. **THE FOYER** (menu place): a piece of THE VOID — a floating platform
+   hanging seven metres above a lit plain, with towers rising off that
+   plain past the deck's edge, a small truss and four arches overhead, and
+   a horizon beyond. The platform is BUILT: a neon-rimmed hex deck with an
+   inlay of hairline rings and a crown of ticks, six radial ribs and a
+   tapered keel underneath (half of what anyone sees of a floating thing
+   is its underside). The board floats at its heart, the MC poses beside
+   it, and a moon-gate PORTAL stands at the north edge, shimmering shut
+   until a room of yours is open beyond it. Solo players never leave.
 2. **THE CLUB** (social place): host/join a room and the portal opens on
    the full hall — the warm human room between the voids. Everything the
    pub had, remade elegant; everything the raid needs, foreshadowed (the
    dance floor's brass inlay is the raid ring's ghost — 24 seat ticks and
    all).
 3. **THE SET** (game place): the raid, wrapped in THE VOID — an actual
-   environment sharing the foyer's language at arena scale (a pylon circle
-   pulsing on the kick, three great hexes over the stage, grid floor,
-   shards, horizon). Both interiors pack away; the rig re-plants at the
-   spawn so "my platform IS the world origin" stays true no matter where
-   you teleported. The void ducks with the light rig while a telegraph
-   owns your deck — danger never competes with scenery.
+   environment sharing the foyer's language at arena scale. Both interiors
+   pack away; the rig re-plants at the spawn so "my platform IS the world
+   origin" stays true no matter where you teleported. The void ducks with
+   the light rig while a telegraph owns your deck — danger never competes
+   with scenery.
+
+### Building the void (what actually buys fidelity)
+
+Four things, in order of how much they return per frame spent:
+
+1. **The mirror.** A polished floor doubling every light is the biggest
+   single signature of the scenes we're chasing, and it needs no render
+   pass: clone the scenery upside down under a black-glass floor and
+   RE-SHARE its instance buffers, so the reflection animates for free. A
+   second camera would cost double in stereo; this costs one draw per bank.
+2. **Depth in layers.** Near towers, mid towers, a far skyline, a horizon —
+   four silhouette scales at four distances. Parallax does the rest.
+3. **Structure, not sticks.** Towers carry pinstripes, panel bands,
+   porthole rows and lit caps; the canopy is a truss with spars and lit
+   joints. Detail at three scales (silhouette / panel / pinprick) is what
+   "high fidelity" looks like from inside a headset.
+4. **Air.** Narrow light shafts, drifting dust, a low horizon glow — an
+   empty black gap reads as a wall until something drifts in it.
+
+And one hard-won rule: **the sky stays black.** Wide additive volumes —
+fog cones, zenith discs, tall horizon cylinders — subtend most of your view
+and flatten the entire room into one colour. The first pass had all three
+and looked worse than what it replaced. Light the STRUCTURE; keep the
+horizon a line with a short gradient over it, never a wall.
+
+Everything repeated is an InstancedMesh, and every animated glow is driven
+through per-instance colour (MeshBasicMaterial multiplies `color` by
+`instanceColor`), so a hundred towers pulsing independently is one draw
+call. Measured: 48 draws, ~24k triangles, 1,521 instances for the set's
+whole world, mirror included — about half the draw calls of the twelve
+hand-built pylon groups it replaced.
 
 ### THE BALL (how a raid is called)
 

@@ -55,10 +55,18 @@ everyone else.
   rest of the room keeps the floor. When the set resolves, the players are
   deposited straight back among their friends.
 - The set itself happens inside **THE VOID** — an actual environment in the
-  Beat-Saber-background bloodline: a circle of monolith pylons pulsing on
-  the kick, huge hexagonal rings turning overhead, a grid floor dissolving
-  into fog, shards adrift, a horizon of light. The whole game is **full
-  VR** — the void is always on, and there is no passthrough mode.
+  Beat-Saber-background bloodline, built in four depth layers so a black
+  room reads as a vast one: **18 monolith towers** at 17 m carrying
+  pinstripes, panel bands, porthole rows and lit caps; **26 bigger ones**
+  at 31 m; a **58-slab skyline** out to 88 m; and a low horizon band beyond
+  that. Overhead, a four-ring **truss** with radial spars and lit joints,
+  and six great **arcs** springing over the floor. Underfoot, black glass
+  with a two-scale grid, 28 radial rays chasing the beat, concentric rings
+  swelling outward — and **a mirror**: every tower and slab has a twin
+  under the floor, sharing the same instance buffers, so the reflection
+  pulses with the original for one extra draw call. The whole world is 48
+  draws and ~24k triangles. The game is **full VR** — the void is always
+  on, and there is no passthrough mode.
 
 Built on Meta's [Immersive Web SDK](https://developers.meta.com/horizon/documentation/web/immersive-web-sdk/)
 (`@iwsdk/core`) + Three.js. The gel creature, the telegraph language and the

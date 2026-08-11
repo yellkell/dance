@@ -151,6 +151,8 @@ declare global {
       toTour: typeof toTour;
       /** Drop the needle early: jump a live set straight to its grade. */
       endSet: typeof finishRaid;
+      /** Draw calls / triangles this frame — the scenery's budget check. */
+      info: () => { calls: number; triangles: number } | null;
       match: typeof match;
       arena: typeof arena;
       choreo: typeof choreoView;
@@ -176,6 +178,11 @@ window.__gdr = {
   toMap,
   toTour,
   endSet: finishRaid,
+  info: () => {
+    const r = (worldRef as unknown as { renderer?: { info: { render: { calls: number; triangles: number } } } } | null)
+      ?.renderer;
+    return r ? { calls: r.info.render.calls, triangles: r.info.render.triangles } : null;
+  },
   match,
   arena,
   choreo: choreoView,

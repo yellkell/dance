@@ -77,6 +77,24 @@ await page.waitForFunction(
   { timeout: 90000, polling: 200 },
 );
 await page.waitForTimeout(400);
+
+// A capture player stands perfectly still and gets clipped out of a live
+// set in under a minute, which ends the tour early. Keep it on its feet
+// for the shot list; `__keepAlive = false` hands it back to the judge.
+await page.evaluate(() => {
+  window.__keepAlive = true;
+  const m = window.__gdr.match;
+  setInterval(() => {
+    if (!window.__keepAlive) return;
+    const d = m.players.find((p) => p.kind === 'local');
+    if (d) {
+      d.missChain = 0;
+      d.alive = true;
+      d.elimAtBeat = -1;
+    }
+  }, 80);
+});
+
 await rig(0, 0.4, 0);
 await shot('vr-set-live'); // the void, the ring, the show
 
@@ -108,6 +126,7 @@ await page.evaluate(() => {
 // the chain before the shutter — which is exactly the rule (a dodge is an
 // eraser, not a bandage), but it makes the state impossible to photograph.
 await page.evaluate(() => {
+  window.__keepAlive = false;
   window.__gdr.match.playing = false;
   const d = window.__gdr.match.players.find((p) => p.kind === 'local');
   d.hits = 2;
@@ -117,6 +136,7 @@ await page.waitForTimeout(300);
 await shot('vr-chain-warning');
 await page.evaluate(() => {
   window.__gdr.match.playing = true;
+  window.__keepAlive = true;
 });
 await page.evaluate(() => {
   const d = window.__gdr.match.players.find((p) => p.kind === 'local');
@@ -129,19 +149,40 @@ await rig(0, 0.4, 0, 0);
 console.log('routine:');
 await page.evaluate(() => window.__gdr.choreo.dropRoutine());
 // Wait for the first block set to go visible (the beat-locked drop began).
-await page.waitForFunction(
-  () => window.__gdr.choreo.zones.some((z) => z.blocks && z.blocks.root.visible),
-  { timeout: 30000, polling: 100 },
-);
+try {
+  await page.waitForFunction(
+    () => window.__gdr.choreo.zones.some((z) => z.blocks && z.blocks.root.visible),
+    { timeout: 30000, polling: 100 },
+  );
+} catch (err) {
+  console.error('no blockfall:', JSON.stringify(await page.evaluate(() => ({
+    screen: window.__gdr.match.screen,
+    playing: window.__gdr.match.playing,
+    beat: window.__gdr.match.beat,
+    alive: window.__gdr.match.players.filter((p) => p.alive).length,
+    zones: window.__gdr.choreo.zones.length,
+  }))));
+  throw err;
+}
 await page.waitForTimeout(450); // roughly a beat into the two-beat fall
 await shot('vr-blockfall-mid');
 await page.waitForTimeout(700); // the landing + crush
 await shot('vr-blockfall-crush');
 
-// One wide look from the deck's rear rim — decks, giant, pylons, horizon.
+// One wide look from the deck's rear rim — the architecture shot. Freeze
+// the judge first: a strike landing at point-blank is meant to blind you,
+// and it does, which makes for a useless review frame.
+await page.evaluate(() => {
+  window.__keepAlive = false;
+  window.__gdr.match.playing = false;
+});
 await rig(0, 1.3, 0);
-await page.waitForTimeout(600);
+await page.waitForTimeout(900);
 await shot('vr-set-wide');
+await page.evaluate(() => {
+  window.__gdr.match.playing = true;
+  window.__keepAlive = true;
+});
 
 // ── THE GRADE ────────────────────────────────────────────────────────────
 console.log('grade:');

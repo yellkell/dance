@@ -53,16 +53,7 @@ import {
 } from 'three';
 import { PALETTE, hueToColor } from '../config.js';
 import { glowTexture } from '../materials/glow.js';
-import {
-  buildGridFloor,
-  buildHorizon,
-  buildPylon,
-  buildRingStack,
-  buildShards,
-  type Pylon,
-  type Shard,
-  type VoidRing,
-} from '../arena/voidkit.js';
+import { FoyerEnvironment } from '../arena/environment.js';
 import { CLUB, DECOR } from './config.js';
 import {
   blackSteelMat,
@@ -96,10 +87,8 @@ export interface FoyerRefs {
   portalMat: MeshBasicMaterial;
   /** The portal ring's glow. */
   portalRingMat: MeshStandardMaterial;
-  pylons: Pylon[];
-  rings: VoidRing[];
-  shards: Shard[];
-  gridMat: MeshBasicMaterial;
+  /** The world around the platform — ClubSystem idles it on the loop. */
+  env: FoyerEnvironment;
 }
 
 /** Everything the systems animate or query — kept out of the static bake. */
@@ -1274,6 +1263,72 @@ export function buildFoyer(scene: Scene): FoyerRefs {
   rim.rotation.z = Math.PI / 6; // flats align with the deck's
   rim.position.y = 0.012;
   root.add(rim);
+
+  // The platform is FLOATING, so its underside is half of what anyone sees
+  // of it — give it a build: six radial ribs under the deck and a tapered
+  // keel hanging below, lit along their lower edges.
+  const structMat = new MeshStandardMaterial({ color: 0x090810, metalness: 0.8, roughness: 0.4 });
+  const ribGlow = new MeshStandardMaterial({
+    color: 0x0b0a12,
+    emissive: hueToColor(0.75, 0.5),
+    emissiveIntensity: 0.7,
+    metalness: 0.3,
+    roughness: 0.5,
+  });
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2 + Math.PI / 6;
+    const rib = new Mesh(new BoxGeometry(0.2, 0.62, R * 1.68), structMat);
+    rib.position.set(0, -0.52, 0);
+    rib.rotation.y = a;
+    root.add(rib);
+    const lip = new Mesh(new BoxGeometry(0.07, 0.05, R * 1.62), ribGlow);
+    lip.position.set(0, -0.83, 0);
+    lip.rotation.y = a;
+    root.add(lip);
+  }
+  const keel = new Mesh(new CylinderGeometry(R * 0.52, 0.18, 2.6, 6), structMat);
+  keel.position.y = -2.0;
+  root.add(keel);
+  const keelTip = new Mesh(new CylinderGeometry(0.2, 0.02, 0.5, 6), ribGlow);
+  keelTip.position.y = -3.4;
+  root.add(keelTip);
+
+  // Deck inlay: two hairline rings and a crown of radial ticks near the
+  // rim. Near-field detail is what the eye actually audits — you stand on
+  // this thing for the whole menu.
+  for (const [ir, op] of [
+    [R * 0.55, 0.4],
+    [R * 0.82, 0.28],
+  ] as const) {
+    const ring = new Mesh(
+      new RingGeometry(ir - 0.02, ir + 0.02, 72),
+      new MeshBasicMaterial({
+        color: hueToColor(0.55, 0.5),
+        transparent: true,
+        opacity: op,
+        blending: AdditiveBlending,
+        depthWrite: false,
+      }),
+    );
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.y = 0.006;
+    root.add(ring);
+  }
+  const tickMat = new MeshBasicMaterial({
+    color: hueToColor(0.75, 0.5),
+    transparent: true,
+    opacity: 0.35,
+    blending: AdditiveBlending,
+    depthWrite: false,
+  });
+  for (let i = 0; i < 24; i++) {
+    const a = (i / 24) * Math.PI * 2;
+    const tick = new Mesh(new PlaneGeometry(0.045, i % 4 === 0 ? 0.34 : 0.17), tickMat);
+    tick.rotation.set(-Math.PI / 2, 0, -a);
+    tick.position.set(Math.sin(a) * (R * 0.9), 0.006, Math.cos(a) * (R * 0.9));
+    root.add(tick);
+  }
+
   // Two step-slabs trailing off behind the spawn — the way you "came in".
   for (const [sx, sy, sz, sr] of [
     [0.5, -0.5, 5.1, 0.9],
@@ -1287,34 +1342,10 @@ export function buildFoyer(scene: Scene): FoyerRefs {
     root.add(slab);
   }
 
-  // ── the void around: grid far below, horizon, pylons, hexes, shards ───
-  const grid = buildGridFloor(40, hueToColor(0.75, 0.5), 2.2, 0.1);
-  grid.group.name = 'live-foyer-grid';
-  grid.group.position.y = -7;
-  root.add(grid.group);
-
-  const horizon = buildHorizon(46, 20, hueToColor(0.9, 0.5), 0.38);
-  root.add(horizon.mesh);
-
-  const pylons: Pylon[] = [];
-  const pylonHues = [0.55, 0.75, 0.9, 0.55, 0.75];
-  for (let i = 0; i < 5; i++) {
-    const a = (i / 5) * Math.PI * 2 + 0.45;
-    const pylon = buildPylon(5 + (i % 3) * 1.6, hueToColor(pylonHues[i], 0.55), 0.8);
-    pylon.group.name = `live-foyer-pylon-${i}`;
-    pylon.group.position.set(Math.sin(a) * 10, -1.6, Math.cos(a) * 10);
-    pylon.group.rotation.y = a + Math.PI;
-    root.add(pylon.group);
-    pylons.push(pylon);
-  }
-
-  const stack = buildRingStack(2, 4.6, 0.9, 4.4, 1.5, hueToColor(0.55, 0.55));
-  stack.group.name = 'live-foyer-rings';
-  root.add(stack.group);
-
-  const drift = buildShards(8, 6.5, 9.5, 1, 6, hueToColor(0.75, 0.5), 0x1f);
-  drift.group.name = 'live-foyer-shards';
-  root.add(drift.group);
+  // ── the void around: a lit plain far below with a world standing on it
+  const env = new FoyerEnvironment(-7);
+  env.root.name = 'live-foyer-void';
+  root.add(env.root);
 
   // ── THE PORTAL: the moon-gate to the club floor ───────────────────────
   // A ring of light standing on the deck's north edge; its inner shimmer
@@ -1412,15 +1443,7 @@ export function buildFoyer(scene: Scene): FoyerRefs {
     return false;
   });
 
-  return {
-    root,
-    portalMat,
-    portalRingMat,
-    pylons,
-    rings: stack.rings,
-    shards: drift.shards,
-    gridMat: grid.mat,
-  };
+  return { root, portalMat, portalRingMat, env };
 }
 
 /* ── real lights: four points + a hemisphere, and not one more ──────────── */

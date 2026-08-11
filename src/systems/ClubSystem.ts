@@ -106,21 +106,9 @@ export class ClubSystem extends createSystem({}) {
       const reaching = net.phase === 'connecting';
       foyer.portalMat.opacity = reaching ? 0.3 + Math.sin(t * 7) * 0.16 : 0.12 + Math.sin(t * 0.9) * 0.05 + pulse * 0.04;
       foyer.portalRingMat.emissiveIntensity = reaching ? 1.6 + Math.sin(t * 7) * 0.5 : 1.05 + pulse * 0.2;
-      // The void idles: a slow wave rolls the pylons, the hexes turn,
-      // shards drift, the far grid breathes.
-      foyer.pylons.forEach((p, i) => {
-        const wave = Math.sin(t * 0.6 + i * 1.3);
-        for (const m of p.glowMats) m.emissiveIntensity = 0.75 + Math.max(0, wave) * 0.4 + pulse * 0.18;
-      });
-      for (const r of foyer.rings) {
-        r.mesh.rotation.z += r.speed * delta;
-        r.mat.emissiveIntensity = 0.7 + pulse * 0.25;
-      }
-      for (const s of foyer.shards) {
-        s.mesh.rotation.y += s.spin * delta;
-        s.mesh.position.y = s.baseY + Math.sin(t * 0.4 + s.phase) * s.bob;
-      }
-      foyer.gridMat.opacity = 0.07 + pulse * 0.03;
+      // The world around the platform idles on the lobby loop: waves roll
+      // the towers, the truss turns, shards drift, the plain breathes.
+      foyer.env.update(delta, t, pulse);
     }
 
     if (wantClub) {
