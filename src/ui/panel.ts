@@ -118,6 +118,14 @@ export class Panel {
       }
       g.stroke();
       g.shadowBlur = 0;
+      // OWN the text state. The body callback is free to leave any
+      // alignment behind (headings go left, statuses go right) — drawing
+      // centre-anchored labels under an inherited 'right' shifts every
+      // label half its width off its plate, which is exactly the "text
+      // escaping the panels" bug on every tab whose body didn't happen to
+      // end centre-aligned.
+      g.textAlign = 'center';
+      g.textBaseline = 'middle';
       g.fillStyle = b.disabled ? 'rgba(150,154,168,0.5)' : UI.text;
       g.font = `900 ${b.small ? 30 : 42}px 'Arial Black', system-ui, sans-serif`;
       g.fillText(b.label, b.x + b.w / 2, b.y + b.h / 2 - (b.sub ? 14 : 0), b.w - 24);

@@ -38,6 +38,7 @@ import dynastyUrl from '../assets/music/dynasty.mp3';
 import spreadUrl from '../assets/music/spread.m4a';
 import morningUrl from '../assets/music/morning.mp3';
 import assembleUrl from '../assets/music/assemble.m4a';
+import discoballUrl from '../assets/music/discoball.mp3';
 import eclipseUrl from '../assets/music/eclipse.mp3';
 import type { MoveKind } from '../config.js';
 
@@ -93,8 +94,24 @@ export const TRACKS: Track[] = [
     seconds: 186.67,
     lufs: -13.2,
     // Also the last rehearsal's record: the lesson row steps 91 → 117 → 135
-    // so the final goopling already moves at raid tempo.
+    // so the final goopling already moves at raid tempo. Gave its PEAK
+    // HOURS slot to DISCO BALL and joined the quick-raid pool — the MONEY
+    // precedent.
     roles: ['raid', 'rehearsal'],
+  },
+  {
+    id: 'discoball',
+    title: 'DISCO BALL',
+    url: discoballUrl,
+    bpm: 73.33,
+    downbeat: 2.1763,
+    seconds: 126.62,
+    lufs: -12.6,
+    // The night after the first goop falls: PEAK HOURS opens on a slow
+    // strut — the tour's victory lap before LOOP kicks the doors in. At
+    // 73 BPM nobody should be ducking; the groove is the point.
+    roles: ['raid'],
+    banned: ['sweep'],
   },
   {
     id: 'loop',

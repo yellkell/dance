@@ -482,6 +482,11 @@ export const RANK = {
   topTenLift: 0.32,
   /** Height easing rate (per second). */
   lerp: 1.6,
+  /** THE RISE: how fast the world sinks under a leading player. The
+   *  slowest ease in the game on purpose — taking the lead should feel
+   *  like a swell arriving, and losing it like the tide going out, never
+   *  an elevator. */
+  riseLerp: 0.45,
   /** Rank recompute cadence (seconds). */
   refresh: 0.25,
 };
@@ -639,10 +644,12 @@ export const TOUR: { sets: TourSet[]; freeSets: number; maxPhrases: number } = {
     {
       id: 'peak',
       name: 'PEAK HOURS',
-      // DYNASTY takes SAKUPENED's place on the tour (SAKUPENED stays in the
-      // quick-raid pool). At 155 it's the fastest of the three, so it closes
-      // the set — every set still climbs.
-      songs: ['combat', 'loop', 'dynasty'], // 135 → 150 → 155 BPM
+      // The night after the first goop falls opens on DISCO BALL — a slow
+      // 73 BPM strut, the victory lap — then LOOP and DYNASTY kick the
+      // doors in, so the set still climbs harder than any other. COMBAT
+      // gave up the slot and joined the quick-raid pool (the MONEY
+      // precedent); it keeps its rehearsal seat.
+      songs: ['discoball', 'loop', 'dynasty'], // 73 → 150 → 155 BPM
       tint: { shallow: 0xff6ee0, deep: 0x571040, nucleus: 0xff9ff0 }, // hot magenta
     },
     {

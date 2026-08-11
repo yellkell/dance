@@ -212,7 +212,7 @@ production default is `wss://rave-raid-relay.onrender.com` — deploy
 
 ## The music
 
-Fourteen real tracks drive the game (`src/assets/music/`, registry in
+Fifteen real tracks drive the game (`src/assets/music/`, registry in
 `src/audio/tracks.ts`). Every number in that registry was **measured from the
 files**, not guessed — the whole game is quantized to them, so they had to be:
 
@@ -221,7 +221,8 @@ files**, not guessed — the whole game is quantized to them, so they had to be:
 | MORNING | 96.665 | 5 phrases | −11.1 LUFS | tour: opening night · no ducking |
 | TARGET | 91 | 11 phrases | −9.5 LUFS | tour · rehearsal |
 | CAPTURE | 117 | 13 phrases | −15.0 LUFS | tour: first goop finale · rehearsal |
-| COMBAT | 135 | 12 phrases | −13.2 LUFS | tour: peak hours · rehearsal |
+| DISCO BALL | 73.33 | 4 phrases | −12.6 LUFS | tour: peak-hours opener — the night after the first goop falls · no ducking |
+| COMBAT | 135 | 12 phrases | −13.2 LUFS | quick raid · rehearsal |
 | LOOP | 150 | 17 phrases | −11.2 LUFS | tour: peak hours |
 | DYNASTY | 155 | 10 phrases | −9.6 LUFS | tour: peak-hours finale |
 | INFECTION | 138 | 15 phrases | −10.9 LUFS | tour: after hours |

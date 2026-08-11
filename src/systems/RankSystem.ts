@@ -2,14 +2,21 @@
  * RankSystem — who's winning the night.
  *
  * The law: the living rank above the fallen; the living rank by score; the
- * fallen rank by who lasted longest. The VR HEIGHT LAW: nobody ever renders
- * below the floor, and nobody ever reads as SHORT — decks only rise. Lifts
- * are ABSOLUTE: the top ten ride raised platforms and the champion rides
- * highest, whoever you are, so the spectacle never switches off just
- * because you happen to be winning. The one deck that can never move is
- * YOURS — it is your real floor — so your own lift is something only the
- * others see (their clients raise your platform). Eliminated decks dim
- * instead of dropping. The holo board over the stage carries the numbers.
+ * fallen rank by who lasted longest. Lifts are ABSOLUTE: the top ten ride
+ * raised platforms and the champion rides highest, whoever you are, so the
+ * spectacle never switches off just because you happen to be winning.
+ *
+ * THE RISE: your own deck can never move — it is your real floor — so when
+ * YOU carry a tier, the WORLD sinks instead: the stage eases down by your
+ * lift and everything anchored to it follows (the giant, the light rig,
+ * the whole void, the board, every other deck). The world stays coherent —
+ * the glass floor drops WITH the decks, so nothing ever punches through
+ * anything, every avatar keeps its full height, and a pedestal grows under
+ * your own rim as the gap opens. It is deliberately the SLOWEST ease in
+ * the game: a gentle swell you feel before you notice it.
+ *
+ * Eliminated decks dim instead of dropping. The holo board over the stage
+ * carries the numbers.
  *
  * Also runs the podium: freeze the board, crown the winner, confetti, and
  * walk everyone back to the lobby.
@@ -69,23 +76,31 @@ export class RankSystem extends createSystem({}) {
       this.recompute();
     }
 
-    // Platform lifts — eased, absolute, and NEVER below the floor: leaders
-    // rise by their tier wherever you rank, so the raising effect is always
-    // on. Only MY deck is pinned (it is my real floor), and the stage stays
-    // grounded always (the show never sinks away from anyone).
-    a.stage.position.y += (0 - a.stage.position.y) * Math.min(1, delta * RANK.lerp);
+    // THE RISE: when I carry a tier the whole world eases down by it — the
+    // stage sinks and the giant, rig, void and board all ride it. Slow on
+    // purpose; a lift you feel, not a lurch.
+    const meSink = inShow ? tierOf(match.players.find((p) => p.kind === 'local')) : 0;
+    a.stage.position.y += (-meSink - a.stage.position.y) * Math.min(1, delta * RANK.riseLerp);
+    const sunk = -a.stage.position.y; // the eased world drop, shared by all
+
+    // Platform lifts — eased and ABSOLUTE against the world floor: leaders
+    // ride their tier wherever you rank. Other decks sink with the world;
+    // only MY deck is pinned (it is my real floor).
     for (const handle of a.platforms) {
       const d = match.players.find((p) => p.seat === handle.seat);
-      const target = inShow && d?.kind !== 'local' ? tierOf(d) : 0;
+      const mine = d?.kind === 'local';
+      const target = inShow && !mine ? tierOf(d) - sunk : 0;
       handle.lift += (target - handle.lift) * Math.min(1, delta * RANK.lerp);
       handle.root.position.y = handle.lift;
       // A raised deck shows its underside — the pedestal column fills the
-      // gap down to the common floor so leaders stand on something.
+      // gap down to the WORLD floor (which is `sunk` below my own), so
+      // every deck above it stands on something. Mine included: the column
+      // growing under your own rim is the rise made visible.
       if (handle.pedestal) {
-        handle.pedestal.visible = handle.lift > 0.06;
-        const s = Math.max(0.02, handle.lift);
-        handle.pedestal.scale.y = s;
-        handle.pedestal.position.y = -PLATFORM.thickness - s;
+        const span = Math.max(0.02, handle.lift + sunk);
+        handle.pedestal.visible = span > 0.06;
+        handle.pedestal.scale.y = span;
+        handle.pedestal.position.y = -PLATFORM.thickness - span;
       }
       // Elimination dims the deck's neon.
       const rimTarget = d && !d.alive ? 0.12 : 0.9;
