@@ -7,11 +7,14 @@
  * moves that mark EVERY platform at the same time. You don't fight back.
  * You read the floor, move with the rhythm, and outlast everyone else.
  *
- * Dodge → the chain climbs → points multiply. Get clipped → the
- * chain dies, one of three lives gone. Three hits and you're off the
- * floor. Dancing in rhythm builds the COMBO meter for bonus points. A live
- * holo leaderboard rings the stage; the top ten dance on raised platforms
- * and the current champion above them all.
+ * Dodge → the chain climbs → points multiply. Get clipped → the chain
+ * dies. There are no lives: you dance the whole record and the night
+ * GRADES you at the end, S to F, on the share of landings you survived.
+ * The one way to end early is three clipped landings BACK TO BACK — a
+ * dodge wipes that count, so it's a chain, not a budget. Dancing in
+ * rhythm builds the COMBO for bonus points. A live holo leaderboard rings
+ * the stage; the top ten dance on raised platforms and the current
+ * champion above them all.
  *
  * Dimensions are metres. Times are expressed in BEATS wherever the music
  * rules (the whole game is quantized to the track).
@@ -410,13 +413,51 @@ export const SCORE = {
   perfectMult: 1.5,
   comboStep: 0.1, // multiplier = 1 + comboStep × min(combo, comboCap)
   comboCap: 30, // → ×4 ceiling
-  lives: 3,
   invulnBeats: 2,
   /** Sample "were you inside the zone" this many beats before impact. */
   perfectProbeBeats: 1,
   /** Survival tick: staying alive pays a trickle every bar so late-game
    *  rankings separate even between flawless dancers. */
   aliveBarBonus: 10,
+};
+
+/* ───────────────────────────── THE GRADE ─────────────────────────────────
+ * No lives. You dance the whole record and the night grades you at the
+ * end — S down to F, off the share of landings you survived, with the
+ * top letter reserved for a clean set danced on the last beat.
+ *
+ * The one way to end early is a CHAIN: three clipped landings back to
+ * back and you're off the floor. It is not a budget of three hits — any
+ * dodge wipes the count clean. Being clipped costs you your grade; being
+ * clipped three times running costs you the night, and takes the letter
+ * with it.
+ */
+export const GRADE = {
+  /** Consecutive clipped landings that end your night. A dodge clears it. */
+  chainOut: 3,
+  /** Beats between a solo game over and the results card — long enough for
+   *  the last crush and the flair to land, short enough to feel like an
+   *  ending rather than a wait. */
+  overBeats: 3,
+  /** The letter cuts, best first. `rate` is the share of landings you
+   *  survived; `perfect` is the share of those taken on the last beat —
+   *  only S asks for it, so the crown means clean AND late. */
+  cuts: [
+    { letter: 'S', rate: 0.999, perfect: 0.25 },
+    { letter: 'A', rate: 0.93, perfect: 0 },
+    { letter: 'B', rate: 0.82, perfect: 0 },
+    { letter: 'C', rate: 0.62, perfect: 0 },
+  ],
+  /** Below the last cut — and always, if the chain took you out. */
+  fail: 'F',
+  /** Letter colours, so the card and the board agree. */
+  colors: {
+    S: '#ffd75e',
+    A: '#b9ffc4',
+    B: '#4fb7ff',
+    C: '#b06bff',
+    F: '#ff5040',
+  } as Record<string, string>,
 };
 
 /* ─────────────────────────────── THE RANK ────────────────────────────────

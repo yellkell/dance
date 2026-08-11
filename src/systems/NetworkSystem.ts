@@ -25,7 +25,7 @@ const _f = new Vector3();
 export class NetworkSystem extends createSystem({}) {
   private poseT = 0;
   private scoreT = 0;
-  private lastLives = -1;
+  private lastHits = -1;
   private prevScreen: Screen | '' = '';
   private podiumT = 0;
 
@@ -52,7 +52,9 @@ export class NetworkSystem extends createSystem({}) {
         sendScore({
           score: d.score,
           combo: d.combo,
-          lives: 0,
+          dodges: d.dodges,
+          hits: d.hits,
+          perfects: d.perfects,
           alive: false,
           elim: Number.isFinite(match.beat) ? match.beat : 0,
         });
@@ -72,11 +74,21 @@ export class NetworkSystem extends createSystem({}) {
     const d = me();
     if (!d) return;
     this.scoreT -= delta;
-    const livesChanged = d.lives !== this.lastLives;
-    if (this.scoreT <= 0 || livesChanged) {
+    // A hit jumps the queue — the ring should see a clip the instant it
+    // lands, not up to a third of a second later.
+    const hitLanded = d.hits !== this.lastHits;
+    if (this.scoreT <= 0 || hitLanded) {
       this.scoreT = 1 / NET.scoreRateHz;
-      this.lastLives = d.lives;
-      sendScore({ score: d.score, combo: d.combo, lives: d.lives, alive: d.alive, elim: d.elimAtBeat });
+      this.lastHits = d.hits;
+      sendScore({
+        score: d.score,
+        combo: d.combo,
+        dodges: d.dodges,
+        hits: d.hits,
+        perfects: d.perfects,
+        alive: d.alive,
+        elim: d.elimAtBeat,
+      });
     }
   }
 

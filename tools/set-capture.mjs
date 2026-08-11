@@ -102,6 +102,27 @@ await page.evaluate(() => {
   window.__gdr.match.grooveStreak = 0;
   window.__gdr.match.grooveScore = 0;
 });
+
+// The chain warning: two clipped landings back to back, one to go.
+// Freeze the judge first: left running, the very next clean landing wipes
+// the chain before the shutter — which is exactly the rule (a dodge is an
+// eraser, not a bandage), but it makes the state impossible to photograph.
+await page.evaluate(() => {
+  window.__gdr.match.playing = false;
+  const d = window.__gdr.match.players.find((p) => p.kind === 'local');
+  d.hits = 2;
+  d.missChain = 2;
+});
+await page.waitForTimeout(300);
+await shot('vr-chain-warning');
+await page.evaluate(() => {
+  window.__gdr.match.playing = true;
+});
+await page.evaluate(() => {
+  const d = window.__gdr.match.players.find((p) => p.kind === 'local');
+  d.hits = 0;
+  d.missChain = 0;
+});
 await rig(0, 0.4, 0, 0);
 
 // ── THE ROUTINE's blocks, on demand ──────────────────────────────────────
@@ -121,6 +142,28 @@ await shot('vr-blockfall-crush');
 await rig(0, 1.3, 0);
 await page.waitForTimeout(600);
 await shot('vr-set-wide');
+
+// ── THE GRADE ────────────────────────────────────────────────────────────
+console.log('grade:');
+// A clean finish: end the record early and read the letter. (A capture
+// player stands perfectly still, so it may well have been clipped out of
+// the live set by now — put it back on its feet first.)
+await page.evaluate(() => {
+  const m = window.__gdr.match;
+  const d = m.players.find((p) => p.kind === 'local');
+  d.alive = true;
+  d.elimAtBeat = -1;
+  d.dodges = 48;
+  d.perfects = 14;
+  d.hits = 0;
+  d.missChain = 0;
+  if (m.screen === 'podium') m.screen = 'raid';
+  window.__gdr.endSet();
+});
+await page.waitForFunction(() => window.__gdr.match.screen === 'podium', { timeout: 15000, polling: 100 });
+await rig(0, 0.4, 0);
+await page.waitForTimeout(900);
+await shot('vr-grade-card');
 
 await browser.close();
 

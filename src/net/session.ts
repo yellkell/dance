@@ -303,13 +303,17 @@ function handle(msg: Record<string, unknown>): void {
     }
     case 's': {
       const seat = Number(msg.seat);
-      const d = msg.d as { score: number; combo: number; lives: number; alive: boolean; elim: number };
+      const d = msg.d as ScoreWire;
       const dancer = dancerAtSeat(seat);
       if (dancer && dancer.kind === 'remote' && d) {
         dancer.score = d.score;
         dancer.combo = d.combo;
         dancer.bestCombo = Math.max(dancer.bestCombo, d.combo);
-        dancer.lives = d.lives;
+        // Dodges and hits ride along so every client can grade every
+        // dancer at the podium without asking anyone.
+        dancer.dodges = d.dodges;
+        dancer.hits = d.hits;
+        dancer.perfects = d.perfects;
         if (dancer.alive && !d.alive) {
           dancer.alive = false;
           dancer.elimAtBeat = Number.isFinite(d.elim) ? d.elim : match.beat;
@@ -415,7 +419,18 @@ export function sendVoice(frame: ArrayBuffer): void {
   if (ws?.readyState === WebSocket.OPEN && net.phase !== 'off' && net.phase !== 'error') ws.send(frame);
 }
 
-export function sendScore(d: { score: number; combo: number; lives: number; alive: boolean; elim: number }): void {
+/** The 3 Hz score line: enough for the live board AND the final grade. */
+export interface ScoreWire {
+  score: number;
+  combo: number;
+  dodges: number;
+  hits: number;
+  perfects: number;
+  alive: boolean;
+  elim: number;
+}
+
+export function sendScore(d: ScoreWire): void {
   if (net.phase === 'live') send({ t: 's', d });
 }
 

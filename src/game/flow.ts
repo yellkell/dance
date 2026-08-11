@@ -13,7 +13,7 @@
 import { GOOPLINGS, MUSIC, RING, TOUR, countInBeatsFor } from '../config.js';
 import { pickRaidTrack, trackById, trackPhrases, tracksFor, type Track } from '../audio/tracks.js';
 import { freshSeed } from './rng.js';
-import { buildRoster, markGooplingCleared, markTourNightCleared, match, pushFlair } from './state.js';
+import { buildRoster, gradeOf, markGooplingCleared, markTourNightCleared, match, pushFlair } from './state.js';
 
 const phraseBeats = MUSIC.beatsPerBar * MUSIC.barsPerPhrase;
 
@@ -110,12 +110,12 @@ export function startTutorial(gooplingIndex: number): void {
 /** The set resolves — freeze the board, raise the champion, pop confetti. */
 export function finishRaid(): void {
   if (match.screen !== 'raid') return;
-  // A tour night is CLEARED by surviving it — rank is for bragging.
+  // A tour night is CLEARED by surviving it — the letter is for bragging.
   if (match.tour) {
     const me = match.players.find((p) => p.kind === 'local');
     if (me?.alive) {
       markTourNightCleared(match.tour.set, match.tour.song);
-      pushFlair('NIGHT CLEARED', 'milestone');
+      pushFlair(`NIGHT CLEARED — ${gradeOf(me)}`, 'milestone');
     }
   }
   match.screen = 'podium';

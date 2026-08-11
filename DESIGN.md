@@ -54,7 +54,17 @@ Ends at the final downbeat — or the moment one dancer remains.
 - Dodge: `100 × (1 + 0.1 × min(combo, 30))` → ×4 ceiling.
 - PERFECT (inside the zone at T−1 beat, clear at T): ×1.5 on top.
 - Survival trickle: +10 per bar alive (separates flawless dancers late).
-- Hit: combo → 0, one of 3 lives, 2 beats of i-frames.
+- Hit: combo → 0, miss-chain +1, 2 beats of i-frames.
+- **No lives — a grade.** The night ends with a letter: S (clean, and a
+  quarter of the dodges taken on the last beat) / A ≥93% / B ≥82% /
+  C ≥62% / F below. Points reward flair; the letter rewards not being hit,
+  so the two say different things about the same set.
+- **Game over = three clipped landings in a row.** A chain, not a budget:
+  any dodge wipes it. It ends your night at an F and, on your own, ends
+  the record then and there — with friends on the ring the set plays on
+  without you, because their night isn't over. This is the only sudden
+  death in the game, and it is the only thing the HUD ever interrupts
+  itself to show.
 - Rank law: alive > eliminated; alive by score; eliminated by who fell last.
 
 ## The rank made physical

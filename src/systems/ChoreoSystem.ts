@@ -11,12 +11,12 @@
  *   real tracked body, the groupies by seeded rolls every client computes
  *   identically, the remote humans by their own report (never guessed here).
  *
- * Also owns the score/combo/lives bookkeeping, tutorial clear counting, and
+ * Also owns the score/combo/miss-chain bookkeeping, tutorial clear counting, and
  * the end of the set (song out, or one dancer left standing).
  */
 
 import { createSystem } from '@iwsdk/core';
-import { BOTS, CHOREO, MOVES, SCORE, type MoveKind } from '../config.js';
+import { BOTS, CHOREO, GRADE, MOVES, SCORE, type MoveKind } from '../config.js';
 import * as sfx from '../audio/sfx.js';
 import { trackById } from '../audio/tracks.js';
 import { platformRoot } from '../arena/arena.js';
@@ -328,7 +328,15 @@ export class ChoreoSystem extends createSystem({}) {
     if (match.screen === 'raid' && !this.ended) {
       const songOver = beat >= setEndBeat() + 8;
       const floorCleared = match.seats > 1 && aliveCount() <= 1 && beat > 0;
-      if (songOver || floorCleared) {
+      // GAME OVER: the chain took you out. On your own that's the end of
+      // the record — go and read the letter, don't watch bots finish it.
+      // With friends on the ring the set plays on and you spectate: their
+      // night isn't over because yours is.
+      const mine = match.players.find((p) => p.kind === 'local');
+      const online = match.players.some((p) => p.kind === 'remote');
+      const gameOver =
+        !online && mine !== undefined && !mine.alive && beat >= mine.elimAtBeat + GRADE.overBeats;
+      if (songOver || floorCleared || gameOver) {
         this.ended = true;
         finishRaid();
       }
@@ -676,6 +684,9 @@ export class ChoreoSystem extends createSystem({}) {
     d.combo += 1;
     d.bestCombo = Math.max(d.bestCombo, d.combo);
     d.dodges += 1;
+    // One clean landing wipes the chain — the sudden death is three in a
+    // ROW, never a budget of three across the night.
+    d.missChain = 0;
     if (perfect) d.perfects += 1;
     const mult = 1 + SCORE.comboStep * Math.min(d.combo, SCORE.comboCap);
     d.score += Math.round(SCORE.base * mult * (perfect ? SCORE.perfectMult : 1));
@@ -700,12 +711,16 @@ export class ChoreoSystem extends createSystem({}) {
       return;
     }
 
-    d.lives -= 1;
+    d.hits += 1;
+    d.missChain += 1;
+    const out = d.missChain >= GRADE.chainOut;
     if (d.kind === 'local') {
-      pushFlair(d.lives > 0 ? `HIT — ${d.lives} LEFT` : 'YOU ARE OUT', 'hit');
+      // The chain counts up out loud: the last warning before the night
+      // ends has to be unmissable.
+      pushFlair(out ? 'GAME OVER' : d.missChain === GRADE.chainOut - 1 ? 'HIT — ONE MORE' : 'HIT', 'hit');
       sfx.hitTaken();
     }
-    if (d.lives <= 0) {
+    if (out) {
       d.alive = false;
       d.elimAtBeat = z.dueBeat;
       // Their outstanding telegraphs fold with them.

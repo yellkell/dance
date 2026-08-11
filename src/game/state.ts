@@ -4,7 +4,7 @@
  * a couple of tiny queues ("buses") for cross-system one-shots.
  */
 
-import { BOTS, GOOPLINGS, MUSIC, RING, SCORE, seatHue, type GooplingDef, type MoveKind } from '../config.js';
+import { BOTS, GOOPLINGS, GRADE, MUSIC, RING, seatHue, type GooplingDef, type MoveKind } from '../config.js';
 import { mix, mulberry32 } from './rng.js';
 
 export type Screen =
@@ -23,7 +23,6 @@ export interface Dancer {
   hue: number;
   /** Bot dodge chance (rolled from the seed; meaningless for humans). */
   skill: number;
-  lives: number;
   score: number;
   /** Consecutive dodges — the chain behind the HUD's ×N. (The field
    *  keeps its old name: it rides the score wire between clients.) */
@@ -31,6 +30,12 @@ export interface Dancer {
   bestCombo: number;
   dodges: number;
   perfects: number;
+  /** Landings that clipped this dancer, all night — the grade's denominator
+   *  along with `dodges`. */
+  hits: number;
+  /** Clipped landings BACK TO BACK. Any dodge wipes it; reaching
+   *  GRADE.chainOut ends the night. Not a life count — a chain count. */
+  missChain: number;
   alive: boolean;
   /** Song beat this dancer fell on (−1 while alive) — later = ranks higher. */
   elimAtBeat: number;
@@ -206,12 +211,13 @@ export function buildRoster(seats: number, seed: number, mySeat: number, humans?
       name: human?.name ?? botName,
       hue: seatHue(seat),
       skill: BOTS.skillMin + rng() * (BOTS.skillMax - BOTS.skillMin),
-      lives: SCORE.lives,
       score: 0,
       combo: 0,
       bestCombo: 0,
       dodges: 0,
       perfects: 0,
+      hits: 0,
+      missChain: 0,
       alive: true,
       elimAtBeat: -1,
       rank: seat + 1,
@@ -230,6 +236,34 @@ export function dancerAtSeat(seat: number): Dancer | undefined {
 
 export function aliveCount(): number {
   return match.players.reduce((n, p) => n + (p.alive ? 1 : 0), 0);
+}
+
+/**
+ * The night's letter for one dancer — the thing you actually take home.
+ *
+ * It reads the SET, not the scoreboard: what share of the landings thrown
+ * at you did you survive, and how many of those did you leave to the last
+ * beat. Points reward flair and dancing; the grade rewards not being hit.
+ *
+ * Falling to the chain is an F no matter how clean the night was up to it —
+ * you didn't finish the record, and the letter says so.
+ */
+export function gradeOf(d: Dancer): string {
+  if (!d.alive) return GRADE.fail;
+  const faced = d.dodges + d.hits;
+  if (faced === 0) return GRADE.fail; // nothing danced, nothing earned
+  const rate = d.dodges / faced;
+  const perfectRate = d.perfects / faced;
+  for (const cut of GRADE.cuts) {
+    if (rate >= cut.rate && perfectRate >= cut.perfect) return cut.letter;
+  }
+  return GRADE.fail;
+}
+
+/** The share of landings survived, 0..1 — the grade's raw number. */
+export function dodgeRate(d: Dancer): number {
+  const faced = d.dodges + d.hits;
+  return faced === 0 ? 0 : d.dodges / faced;
 }
 
 export function pushFlair(text: string, tone: Flair['tone']): void {

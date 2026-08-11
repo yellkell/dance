@@ -15,10 +15,10 @@
  */
 
 import { createSystem, Vector3 } from '@iwsdk/core';
-import { PLATFORM, PODIUM, RANK, hueToColor } from '../config.js';
+import { GRADE, PLATFORM, PODIUM, RANK, hueToColor } from '../config.js';
 import { arena } from '../arena/arena.js';
 import { toLobby, toTour } from '../game/flow.js';
-import { match, type Dancer } from '../game/state.js';
+import { gradeOf, match, type Dancer } from '../game/state.js';
 import { HoloBoard, type BoardRow } from '../ui/board.js';
 import { discoRig } from './DiscoSystem.js';
 import * as sfx from '../audio/sfx.js';
@@ -133,12 +133,12 @@ export class RankSystem extends createSystem({}) {
     this.lastHash = hash;
 
     const me = match.players.find((p) => p.kind === 'local');
+    const podium = match.screen === 'podium';
     const rows: BoardRow[] = [];
     const top = order.slice(0, 10);
-    for (const d of top) rows.push(this.row(d));
-    if (me && !top.includes(me)) rows.push(this.row(me));
+    for (const d of top) rows.push(this.row(d, podium));
+    if (me && !top.includes(me)) rows.push(this.row(me, podium));
 
-    const podium = match.screen === 'podium';
     const winner = order[0];
     this.board.redraw(
       podium ? '🏆 FINAL' : 'LIVE RANKING',
@@ -148,7 +148,8 @@ export class RankSystem extends createSystem({}) {
     );
   }
 
-  private row(d: Dancer): BoardRow {
+  private row(d: Dancer, podium: boolean): BoardRow {
+    const grade = podium ? gradeOf(d) : undefined;
     return {
       rank: d.rank,
       name: d.name,
@@ -157,6 +158,8 @@ export class RankSystem extends createSystem({}) {
       alive: d.alive,
       isMe: d.kind === 'local',
       colorCss: `#${hueToColor(d.hue, 0.62).toString(16).padStart(6, '0')}`,
+      grade,
+      gradeCss: grade ? (GRADE.colors[grade] ?? '#f0f3f8') : undefined,
     };
   }
 }

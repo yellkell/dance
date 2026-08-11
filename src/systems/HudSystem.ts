@@ -2,8 +2,17 @@
  * HudSystem — your numbers, OUT of your sightline. A small readout floats
  * off to your LEFT at a natural glance height, turned toward you like a
  * monitor wedge at a gig: the score, the ×multiplier (only while a chain
- * is alive), the GROOVE row, and three lives. No labels, no words. The
- * centre of your view belongs to the giant and the blocks.
+ * is alive) and the GROOVE row. No labels, no words, and NO LIFE COUNTER —
+ * you dance the whole record. The centre of your view belongs to the
+ * giant and the blocks.
+ *
+ * THE CHAIN WARNING is the exception, and it is silent until it matters:
+ * take a hit and a row of marks appears, one lit per clipped landing back
+ * to back. Three and the night is over. Dodge once and the row vanishes
+ * as if it never happened — because the count didn't survive either.
+ *
+ * THE GRADE takes the centre when the record ends: one big letter, S to
+ * F, with the share of landings you survived under it.
  *
  * THE GROOVE ROW is how you see the combo catch: four pips light one per
  * rhythmic swap as it winds up, and once it's running they give way to a
@@ -29,9 +38,9 @@ import {
   MeshBasicMaterial,
   PlaneGeometry,
 } from 'three';
-import { GROOVE, SCORE, TOUR, hueToColor, seatHue } from '../config.js';
+import { GRADE, GROOVE, SCORE, TOUR, hueToColor, seatHue } from '../config.js';
 import { trackById } from '../audio/tracks.js';
-import { match, me } from '../game/state.js';
+import { dodgeRate, gradeOf, match, me } from '../game/state.js';
 
 const SET_COLORS = ['#8cff70', '#ff6ee0', '#ffd24a'];
 
@@ -131,6 +140,9 @@ export class HudSystem extends createSystem({}) {
 
   update(delta: number): void {
     const inSet = match.screen === 'countdown' || match.screen === 'raid' || match.screen === 'tutorial';
+    // The record is over: the grade owns the centre while the board reads
+    // out the ranks behind it.
+    const podium = match.screen === 'podium' && !match.goopling;
     _head.set(match.headX, match.headY, match.headZ);
 
     // Flair pops.
@@ -148,14 +160,27 @@ export class HudSystem extends createSystem({}) {
     this.flair.scale.set(pop, pop, 1);
     this.flairMat.opacity = fade;
 
-    // The lesson and the count-in take the centre; the live game gets the
-    // wedge. (The goopling card owns the whole tutorial.)
-    const cardUp = inSet && (match.goopling !== null || match.screen === 'countdown');
+    // The lesson, the count-in and the final grade take the centre; the
+    // live game gets the wedge. (The goopling card owns the whole tutorial.)
+    const cardUp = podium || (inSet && (match.goopling !== null || match.screen === 'countdown'));
     this.card.visible = cardUp;
     this.strip.visible = inSet && !cardUp;
     if (this.strip.visible) this.strip.lookAt(_head);
+    if (cardUp) {
+      if (podium) {
+        // The letter is the moment — hang it at eye line, big, facing you.
+        this.card.position.set(0, 1.34, -1.55);
+        this.card.scale.setScalar(1.5);
+        this.card.lookAt(_head);
+      } else {
+        // A card you read with the chin down while the record cues.
+        this.card.position.set(0, 0.62, -1.06);
+        this.card.scale.setScalar(1);
+        this.card.rotation.set(-0.5, 0, 0);
+      }
+    }
 
-    if (!inSet) return;
+    if (!inSet && !podium) return;
 
     const d = me();
     const beat = match.beat;
@@ -169,7 +194,9 @@ export class HudSystem extends createSystem({}) {
       match.mySeat,
       d?.score,
       d?.combo,
-      d?.lives,
+      d?.hits,
+      d?.missChain,
+      d?.dodges,
       d?.alive,
       match.grooveStreak,
       match.grooveScore,
@@ -178,9 +205,46 @@ export class HudSystem extends createSystem({}) {
     ].join(':');
     if (key !== this.lastKey) {
       this.lastKey = key;
-      if (cardUp) this.drawCard(count);
+      if (podium) this.drawGrade();
+      else if (cardUp) this.drawCard(count);
       else this.drawStrip();
     }
+  }
+
+  /* ── the grade: what the night actually earned you ────────────────────── */
+
+  private drawGrade(): void {
+    const g = this.cardCanvas.getContext('2d')!;
+    g.clearRect(0, 0, CW, CH);
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+
+    const d = me();
+    if (!d) {
+      this.cardTex.needsUpdate = true;
+      return;
+    }
+    const letter = gradeOf(d);
+    const color = GRADE.colors[letter] ?? '#f4f6fb';
+    const faced = d.dodges + d.hits;
+
+    ink(g, d.alive ? 'THE NIGHT SAYS' : 'GAME OVER', CW / 2, 46, 32, d.alive ? 'rgba(232,236,242,0.85)' : '#ff5040');
+    // The letter, huge, with its own halo.
+    g.shadowColor = color;
+    g.shadowBlur = 40;
+    ink(g, letter, CW / 2, CH / 2 + 6, 190, color);
+    g.shadowBlur = 0;
+    // The number behind the letter, so the grade is never a mystery.
+    ink(
+      g,
+      faced > 0 ? `${d.dodges}/${faced} CLEAN · ${Math.round(dodgeRate(d) * 100)}%` : 'NOTHING THROWN',
+      CW / 2,
+      CH - 66,
+      30,
+      'rgba(232,236,242,0.9)',
+    );
+    if (d.perfects > 0) ink(g, `${d.perfects} PERFECT`, CW / 2, CH - 28, 26, '#ffd75e');
+    this.cardTex.needsUpdate = true;
   }
 
   /* ── the centre card: things you READ while nothing hunts you ─────────── */
@@ -254,20 +318,30 @@ export class HudSystem extends createSystem({}) {
 
     if (d?.alive === false) {
       ink(g, 'SPECTATING', cx, 252, 34, 'rgba(232,236,242,0.8)');
-    } else {
-      // Lives as goo drops.
-      const lives = d?.lives ?? 0;
-      const r = 15;
-      const gapX = 48;
-      const x0 = cx - (gapX * (SCORE.lives - 1)) / 2;
-      for (let i = 0; i < SCORE.lives; i++) {
+    } else if (d && d.missChain > 0) {
+      // THE CHAIN WARNING — nothing at all until you're clipped, then a
+      // row of marks counting toward the end of the night. One dodge and
+      // the whole row disappears.
+      const r = 14;
+      const gapX = 46;
+      const x0 = cx - (gapX * (GRADE.chainOut - 1)) / 2;
+      const last = d.missChain === GRADE.chainOut - 1;
+      for (let i = 0; i < GRADE.chainOut; i++) {
+        const lit = i < d.missChain;
         g.beginPath();
         g.arc(x0 + i * gapX, 254, r, 0, Math.PI * 2);
         g.lineWidth = 7;
         g.strokeStyle = 'rgba(0,2,6,0.96)';
         g.stroke();
-        g.fillStyle = i < lives ? '#36e05a' : 'rgba(70,78,92,0.85)';
+        if (lit) {
+          g.shadowColor = '#ff5040';
+          g.shadowBlur = last ? 22 : 12;
+          g.fillStyle = '#ff5040';
+        } else {
+          g.fillStyle = 'rgba(70,78,92,0.85)';
+        }
         g.fill();
+        g.shadowBlur = 0;
       }
     }
 

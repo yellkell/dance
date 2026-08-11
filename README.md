@@ -21,8 +21,16 @@ everyone else.
   four pips light one per swap as it catches, then give way to a fill bar
   and the points that streak has paid. Stop, or swap off-rhythm, and it
   lets go — row and all.
-- Get clipped → the chain dies and you lose one of **three lives**. Three
-  hits and you're off the floor, spectating from a dimmed deck.
+- Get clipped → the chain dies. **There are no lives** — you dance the
+  whole record and the night **grades** you at the end: **S / A / B / C /
+  F**, off the share of landings you survived, with S reserved for a clean
+  set danced late (a quarter of your dodges on the last beat). Every
+  dancer's letter lands on the final board.
+- **GAME OVER** is the one early exit: three clipped landings **back to
+  back**. It isn't a budget of three hits — a single dodge wipes the count
+  clean. The HUD says nothing about it until you're hit, then a row of red
+  marks counts toward the end of your night. Falling to it is an **F**,
+  however clean the set was up to then.
 - A **live holo leaderboard** over the stage shows everyone's rank, score and
   chain. The **top ten** dance on raised platforms, and the current **champion
   above them all** — but nobody ever renders below your real floor: leaders

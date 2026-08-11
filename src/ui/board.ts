@@ -52,6 +52,10 @@ export interface BoardRow {
   alive: boolean;
   isMe: boolean;
   colorCss: string;
+  /** Final letter, podium only — the live board has no business grading
+   *  a night that isn't over. */
+  grade?: string;
+  gradeCss?: string;
 }
 
 export class HoloBoard {
@@ -93,7 +97,13 @@ export class HoloBoard {
       ink(g, `${row.rank}`, 66, y, 38, rankFill, 'left');
       ink(g, row.name.slice(0, 13), 140, y, 38, row.alive ? row.colorCss : dim, 'left', 356);
       ink(g, `${row.score}`, W - 150, y, 38, row.alive ? '#ffffff' : dim, 'right');
-      ink(g, row.alive ? `×${row.combo}` : 'OUT', W - 34, y, 28, row.alive && row.combo > 0 ? '#ffb000' : dim, 'right');
+      if (row.grade) {
+        // The night's letter replaces the live chain — the chain was only
+        // ever a live reading, and this is the reading that lasts.
+        ink(g, row.grade, W - 34, y, 40, row.gradeCss ?? '#f0f3f8', 'right');
+      } else {
+        ink(g, row.alive ? `×${row.combo}` : 'OUT', W - 34, y, 28, row.alive && row.combo > 0 ? '#ffb000' : dim, 'right');
+      }
     });
 
     this.tex.needsUpdate = true;

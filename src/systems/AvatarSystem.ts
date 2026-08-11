@@ -39,7 +39,7 @@ interface Puppet {
   tx: number;
   tz: number;
   duck: boolean;
-  lastLives: number;
+  lastHits: number;
   flash: number;
   slump: number;
 }
@@ -76,7 +76,7 @@ export class AvatarSystem extends createSystem({}) {
         tx: 0,
         tz: 0,
         duck: false,
-        lastLives: d.lives,
+        lastHits: d.hits,
         flash: 0,
         slump: 0,
       });
@@ -91,9 +91,9 @@ export class AvatarSystem extends createSystem({}) {
       const d = match.players.find((x) => x.seat === p.seat);
       if (!d) continue;
 
-      // Hit flash: lives dropped since last frame.
-      if (d.lives < p.lastLives) p.flash = 0.45;
-      p.lastLives = d.lives;
+      // Hit flash: a landing clipped them since last frame.
+      if (d.hits > p.lastHits) p.flash = 0.45;
+      p.lastHits = d.hits;
       p.flash = Math.max(0, p.flash - delta);
 
       // Melt on elimination (and reform if a new match revives the rig).
