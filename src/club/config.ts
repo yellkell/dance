@@ -5,7 +5,7 @@
  * The club is the room the menus live in (it replaces the bare green room)
  * and the SOCIAL FLOOR for online rooms: everyone in your room stands here
  * between sets, voices carried spatially, teleporting around the venue. When
- * the host drops the set the club packs away and the passthrough raid takes
+ * the host drops the set the club packs away and the raid's void takes
  * the room; when the set resolves everyone lands back here together.
  *
  * The look is deliberately the opposite pole from FIRE FIGHT's steel boozer:
@@ -40,8 +40,8 @@ export const CLUB = {
   ceilH: 3.4,
   domeH: 5.1,
 
-  /** The dance floor: a circle the raid ring roughly re-occupies in
-   *  passthrough — the club and the game share a centre of gravity. */
+  /** The dance floor: a circle the raid ring roughly re-occupies —
+   *  the club and the game share a centre of gravity. */
   floor: { x: 0, z: -4.2, r: 4.3 },
 
   /** Where you arrive (and are re-planted when a set books the room). */

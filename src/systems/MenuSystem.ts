@@ -50,7 +50,6 @@ import {
   match,
   tourNightUnlocked,
 } from '../game/state.js';
-import { cycleRoomDim, roomDimName } from './DiscoSystem.js';
 import { ballSpawnPos } from '../club/ball.js';
 import {
   CODE_ALPHABET,
@@ -301,8 +300,6 @@ export class MenuSystem extends createSystem({}) {
       }
     } else if (id === 'vol-' || id === 'vol+') {
       setMusicVolume(musicVolume() + (id === 'vol+' ? 0.1 : -0.1));
-    } else if (id === 'dim') {
-      cycleRoomDim();
     } else if (id === 'track') {
       // Cycle: SHUFFLE → each raid record → back. Picking one warms it so
       // the drop is instant; SHUFFLE lets the match seed choose (and every
@@ -356,7 +353,6 @@ export class MenuSystem extends createSystem({}) {
       this.joinCode.join(''),
       match.seats,
       Math.round(musicVolume() * 10),
-      roomDimName(),
       net.phase,
       net.code,
       net.members.length,
@@ -490,7 +486,7 @@ export class MenuSystem extends createSystem({}) {
       g.textAlign = 'left';
       g.font = "700 24px 'Arial Black', system-ui, sans-serif";
       g.fillStyle = UI.dim;
-      g.fillText('RAVE RAID · a passthrough rhythm raid', CONTENT_X, 560);
+      g.fillText('RAVE RAID · a full-VR rhythm raid', CONTENT_X, 560);
       g.fillText('records measured to the beat · every client dances the same set', CONTENT_X, 600);
     }
     if (tab === 'play' && !this.joinMode) {
@@ -929,17 +925,6 @@ export class MenuSystem extends createSystem({}) {
       small: true,
     });
     buttons.push({ id: 'vol+', label: '+', x: CONTENT_X + 472, y: 172, w: 110, h: 110 });
-    buttons.push({
-      id: 'dim',
-      label: `ROOM ${roomDimName()}`,
-      sub: 'darken your passthrough — OFF / CLUB / CAVE',
-      accent: UI.violet,
-      x: CONTENT_X,
-      y: 322,
-      w: 582,
-      h: 110,
-      small: true,
-    });
   }
 }
 

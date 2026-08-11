@@ -20,6 +20,7 @@ import { BOTS, CHOREO, MOVES, SCORE, type MoveKind } from '../config.js';
 import * as sfx from '../audio/sfx.js';
 import { trackById } from '../audio/tracks.js';
 import { platformRoot } from '../arena/arena.js';
+import { RoutineBlockfall } from '../choreo/blockfall.js';
 import { StrikeFx } from '../choreo/strikes.js';
 import {
   beamTelegraph,
@@ -75,10 +76,15 @@ export interface LiveZone {
    *  armed, and the furthest it has strayed since. Judgement is that drift,
    *  not a position — the web has no safe ground to stand on. */
   wire?: { x0: number; z0: number; armed: boolean; moved: number };
+  /** THE ROUTINE's falling blocks (per seat, per step) — the DOWN-style
+   *  descent that made the move readable. Lives past resolve for its crush. */
+  blocks?: RoutineBlockfall;
 }
 
-/** Read-only window for other systems (bot movement mirrors the judging). */
-export const choreoView: { zones: readonly LiveZone[] } = { zones: [] };
+/** Read-only window for other systems (bot movement mirrors the judging) —
+ *  plus a dev hook: `__gdr.choreo.dropRoutine()` injects a routine NOW so the
+ *  blockfall can be seen without waiting for the set-list to roll one. */
+export const choreoView: { zones: readonly LiveZone[]; dropRoutine?: () => void } = { zones: [] };
 
 const HEAD_R = 0.1; // projected head radius for floor-zone tests
 
@@ -124,6 +130,8 @@ export class ChoreoSystem extends createSystem({}) {
   private setlist: SetMove[] = [];
   private nextMove = 0;
   private zones: LiveZone[] = [];
+  /** Blockfalls playing out their landing crush after their zone resolved. */
+  private crushing: RoutineBlockfall[] = [];
   private strikes = new StrikeFx();
   private lastBar = -1;
   private landedSfx = new Set<string>();
@@ -134,6 +142,25 @@ export class ChoreoSystem extends createSystem({}) {
 
   init(): void {
     this.strikesRoot();
+    // Dev: drop a routine RIGHT NOW (blockfall inspection without waiting
+    // for the set-list to roll one). Harmless outside a live set.
+    choreoView.dropRoutine = () => {
+      if (!match.playing || !Number.isFinite(match.beat)) return;
+      const tele = match.beat + 0.25;
+      const land = tele + MOVES.routine.chargeBeats;
+      const routine = [0, 3, 1] as const;
+      this.begin({
+        index: 9000 + this.nextMove,
+        kind: 'routine',
+        telegraphBeat: tele,
+        landBeat: land,
+        act: 2,
+        landings: routine.map((corner, step) => ({
+          beat: land + step * CHOREO.routineStepBeats,
+          zone: { kind: 'quad', corner, step, routine },
+        })),
+      });
+    };
   }
 
   private strikesRoot(): void {
@@ -142,7 +169,12 @@ export class ChoreoSystem extends createSystem({}) {
 
   private rebuild(): void {
     this.generation = match.generation;
-    for (const z of this.zones) z.tg?.dispose();
+    for (const z of this.zones) {
+      z.tg?.dispose();
+      z.blocks?.dispose();
+    }
+    for (const b of this.crushing) b.dispose();
+    this.crushing = [];
     this.zones = [];
     this.nextMove = 0;
     this.lastBar = -1;
@@ -163,8 +195,15 @@ export class ChoreoSystem extends createSystem({}) {
     const inSet = match.screen === 'countdown' || match.screen === 'raid' || match.screen === 'tutorial';
     if (!inSet) {
       if (this.zones.length) {
-        for (const z of this.zones) z.tg?.dispose();
+        for (const z of this.zones) {
+          z.tg?.dispose();
+          z.blocks?.dispose();
+        }
         this.zones = [];
+      }
+      if (this.crushing.length) {
+        for (const b of this.crushing) b.dispose();
+        this.crushing = [];
       }
       return;
     }
@@ -270,10 +309,20 @@ export class ChoreoSystem extends createSystem({}) {
         z.probed = true;
         z.wasInside = this.touchesLocal(z);
       }
+      // THE ROUTINE's blocks ride the same clock as everything else.
+      z.blocks?.update(beat, delta);
       if (beat >= z.dueBeat) this.resolve(z);
     }
     this.zones = this.zones.filter((z) => !z.resolved);
     choreoView.zones = this.zones;
+
+    // Landed blockfalls finish their crush, then go.
+    for (const b of this.crushing) b.update(beat, delta);
+    this.crushing = this.crushing.filter((b) => {
+      if (!b.spent) return true;
+      b.dispose();
+      return false;
+    });
 
     // End of the set.
     if (match.screen === 'raid' && !this.ended) {
@@ -324,6 +373,12 @@ export class ChoreoSystem extends createSystem({}) {
             : landing.zone.kind === 'donut' && landingIdx > 0
               ? landing.beat - CHOREO.donutFollowBeats
               : move.telegraphBeat;
+        // THE ROUTINE's danger is DOWN blocks descending from above — one
+        // per doomed quarter, beat-locked so the landing is the downbeat.
+        const blocks =
+          landing.zone.kind === 'quad'
+            ? new RoutineBlockfall(parent, landing.zone.corner, landing.beat, match.seed, move.index, landing.zone.step)
+            : undefined;
         this.zones.push({
           moveIdx: move.index,
           landingIdx,
@@ -340,6 +395,7 @@ export class ChoreoSystem extends createSystem({}) {
           chase,
           wire:
             landing.zone.kind === 'wire' ? { x0: 0, z0: 0, armed: false, moved: 0 } : undefined,
+          blocks,
         });
       });
     }
@@ -490,6 +546,12 @@ export class ChoreoSystem extends createSystem({}) {
     z.resolved = true;
     z.tg?.dispose();
     z.tg = null;
+    if (z.blocks) {
+      // The crush plays out past the zone's death, then disposes itself.
+      z.blocks.land();
+      this.crushing.push(z.blocks);
+      z.blocks = undefined;
+    }
 
     const parent = platformRoot(z.seat);
     const dancer = dancerAtSeat(z.seat);
@@ -578,7 +640,7 @@ export class ChoreoSystem extends createSystem({}) {
         this.strikes.donut(parent, z.zone.innerR);
         break;
       case 'quad':
-        this.strikes.quadBlocks(parent, z.zone.corner);
+        // The blockfall IS the strike — its crush was armed in resolve().
         break;
       case 'nova': {
         const local = z.zone.bearing - seatBearing(z.seat, match.seats);
@@ -618,16 +680,11 @@ export class ChoreoSystem extends createSystem({}) {
     const mult = 1 + SCORE.comboStep * Math.min(d.combo, SCORE.comboCap);
     d.score += Math.round(SCORE.base * mult * (perfect ? SCORE.perfectMult : 1));
 
-    if (d.kind === 'local') {
-      if (perfect) {
-        pushFlair('PERFECT!', 'perfect');
-        sfx.glassClink();
-      }
-      if (d.combo > 0 && d.combo % 10 === 0) {
-        pushFlair(`DODGE STREAK ${d.combo} — ×${mult.toFixed(1)}`, 'milestone');
-        sfx.uiClick();
-      }
+    if (d.kind === 'local' && perfect) {
+      pushFlair('PERFECT!', 'perfect');
+      sfx.glassClink();
     }
+    void mult;
   }
 
   private applyHit(z: LiveZone, d: Dancer): void {
@@ -657,6 +714,8 @@ export class ChoreoSystem extends createSystem({}) {
           other.resolved = true;
           other.tg?.dispose();
           other.tg = null;
+          other.blocks?.dispose();
+          other.blocks = undefined;
         }
       }
       if (d.kind === 'bot') sfx.koSplat();

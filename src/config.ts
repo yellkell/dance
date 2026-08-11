@@ -1,14 +1,14 @@
 /**
  * GOOPLIATH: DANCE RAID — every number the feel depends on.
  *
- * The game: a passthrough techno rave in your real room. Up to 24 dancers
+ * The game: a full-VR techno rave over your real floor. Up to 24 dancers
  * stand on octagonal platforms ringed around one giant gel creature — the
  * GOOPLIATH — who dances on a stage in the middle and throws beat-quantized
  * moves that mark EVERY platform at the same time. You don't fight back.
  * You read the floor, move with the rhythm, and outlast everyone else.
  *
- * Dodge → the DODGE STREAK climbs → points multiply. Get clipped → the
- * streak dies, one of three lives gone. Three hits and you're off the
+ * Dodge → the chain climbs → points multiply. Get clipped → the
+ * chain dies, one of three lives gone. Three hits and you're off the
  * floor. Dancing in rhythm builds the COMBO meter for bonus points. A live
  * holo leaderboard rings the stage; the top ten dance on raised platforms
  * and the current champion above them all.
@@ -274,6 +274,12 @@ export const CHOREO = {
    *  which is the point: the memory has to be ready before the tick. */
   routineSteps: [2, 2, 3, 4],
   routineStepBeats: 2,
+  /** How many beats before each routine step its blocks are already VISIBLY
+   *  falling — the DOWN language, upside down: spinning neon polyhedra
+   *  descend onto the three quarters you weren't taught, deck rings
+   *  brightening under them as they close. The descent is beat-locked, so
+   *  the landing IS the downbeat. */
+  routineDropBeats: 2,
   /** How far PAST the quarter line you must stand for a corner to count.
    *  Without it, loitering at dead centre would satisfy all four corners
    *  at once and the whole move would be free — so the routine asks you to
@@ -328,7 +334,7 @@ export const CHOREO = {
   latticeFromAct: 2,
   /** THE TRIP WEB: wire height (shin), how many beats before the landing the
    *  sensor arms, and how much drift is forgiven while it's live. The slack
-   *  is generous on purpose — a passthrough dancer sways, and the move
+   *  is generous on purpose — a dancer sways, and the move
    *  punishes STEPPING, not breathing. */
   wireY: 0.36,
   wireHoldBeats: 2,
@@ -359,10 +365,10 @@ export const CHOREO = {
  * the longer you keep the motion going. It never rivals a dodge; it's the
  * tax refund for actually dancing between them.
  *
- * NAMING: on screen this meter is the COMBO (COMBO ×n and the wind-up
- * pips), and the dodge counter is the DODGE STREAK. The code keeps its
- * groove-flavoured identifiers so the two streaks can never be confused
- * in here.
+ * NAMING: neither meter wears a word on screen anymore — the groove
+ * answers through the glowsticks (spark bursts off the paying tip), the
+ * dodge chain through the wedge's ×N. The code keeps its groove-flavoured
+ * identifiers so the two streaks can never be confused in here.
  */
 export const GROOVE = {
   /** Vertical hand separation (m) that counts as "one up, one down". */
@@ -390,10 +396,10 @@ export const GROOVE = {
 };
 
 /* ────────────────────────────── THE SCORE ────────────────────────────────
- * Survive a landing → a DODGE: points × the DODGE STREAK multiplier, and
- * the streak climbs one. Get clipped → lose a life, the streak dies, brief
- * i-frames. Three and out. (The streak is `combo` in code — the field rides
- * the score wire; on screen it's always the DODGE STREAK.)
+ * Survive a landing → a DODGE: points × the chain multiplier, and the
+ * chain climbs one. Get clipped → lose a life, the chain dies, brief
+ * i-frames. Three and out. (The chain is `combo` in code — the field rides
+ * the score wire; on screen it's just the ×N in your colour.)
  * A PERFECT is a last-instant dodge: you were still inside the doomed zone
  * one beat before impact and clear when it landed — riding the beat.
  */
@@ -413,15 +419,15 @@ export const SCORE = {
 
 /* ─────────────────────────────── THE RANK ────────────────────────────────
  * Alive beats eliminated; among the living, score; among the fallen, who
- * lasted longest. The top ten dance raised above the floor and the current
- * champion above them — platform heights are rendered RELATIVE to your own
- * (your real floor never moves; the ring moves around you).
+ * lasted longest. VR height law: NOBODY EVER RENDERS BELOW THE FLOOR.
+ * Dancers who outrank you rise above you by the tier gap; your own lift is
+ * something only OTHERS see (their clients raise your platform — you can't
+ * feel a floor you're not standing on, and nobody has to look at sunken,
+ * shortened dancers anymore). Eliminated platforms dim; they don't sink.
  */
 export const RANK = {
-  championLift: 0.85,
-  topTenLift: 0.42,
-  /** Eliminated platforms sink and dim. */
-  outSink: -0.35,
+  championLift: 0.7,
+  topTenLift: 0.32,
   /** Height easing rate (per second). */
   lerp: 1.6,
   /** Rank recompute cadence (seconds). */
@@ -616,8 +622,8 @@ export const BOTS = {
 };
 
 /* ─────────────────────────────── THE LOOK ────────────────────────────────
- * An absolute disco: neon on passthrough. Everything additive — a bloom-ish
- * glow without post-processing.
+ * An absolute disco: neon on the void's black. Everything additive — a
+ * bloom-ish glow without post-processing.
  */
 export const PALETTE = {
   goopGreen: 0x36e05a,
@@ -641,27 +647,9 @@ export const PALETTE = {
  * warning owns the room.
  */
 
-/**
- * THE SET VOID — what the world looks like while you dance. OFF rides raw
- * passthrough (your real room, exactly as it always was). VOID and DEEP
- * wrap the set in an actual environment — the abstract reactive space in
- * arena/environment.ts — with DEEP pulling the fog in tighter. The dim
- * shell (an inside-out black sphere alpha-blended over the passthrough)
- * still backs both lit levels, so anything the void doesn't cover fades to
- * darkness instead of kitchen. Cycled from the SYSTEM board, persisted.
- */
-export const ROOM_DIM = {
-  levels: [0, 0.45, 0.72],
-  names: ['OFF', 'VOID', 'DEEP'],
-  defaultLevel: 1,
-  /** Fog density per level (0 = no fog — passthrough stays clean). */
-  fog: [0, 0.02, 0.034],
-  /** The lobby keeps a little more of your room than the live set does. */
-  lobbyFactor: 0.7,
-  /** Subtle breathe on the kick while the set is live (kept tiny). */
-  beatPulse: 0.05,
-  key: 'gdr-room-dim',
-};
+/* (The old ROOM DIM / SET VOID passthrough toggle is gone: the game is FULL
+ * VR now — the void environment IS the set's world, always, and the scene
+ * carries an opaque backdrop everywhere. No halfway states.) */
 
 /** Laser fan hues cycled by the light rig. */
 export const LASER_HUES = [0.9, 0.55, 0.75, 0.33, 0.12];

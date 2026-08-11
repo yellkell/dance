@@ -1,27 +1,30 @@
 # RAVE RAID 🪩🕺💃
 
-A **WebXR passthrough rhythm battle royale**. Up to **24 dancers** stand on
+A **full-VR WebXR rhythm battle royale**. Up to **24 dancers** stand on
 octagonal platforms ringed around one giant gel creature — the **GOOPLIATH** —
-who dances on a stage in the middle of your real room and throws beat-quantized
-moves that mark **every platform at the same time**.
+who dances on a centre stage inside THE VOID and throws beat-quantized
+moves that mark **every platform at the same time**. Your real floor is
+still the floor you dodge on; everything you see is the show's.
 
 You don't fight back. You read the floor, move with the rhythm, and outlast
 everyone else.
 
-- **Dodge** a landing → your **DODGE STREAK** climbs → your points multiply
-  (up to ×4).
+- **Dodge** a landing → your **chain** climbs → your points multiply (up to
+  ×4). The HUD never says a word about it: a small **×N** in your seat's
+  colour rides low off your deck's front rim, out of your sightline.
 - Nail a **last-instant dodge** (still in the fire one beat out, clear on the
   drop) → **PERFECT!**, ×1.5.
 - **COMBO**: dance like the groupies — one hand up, one hand down, swapping
-  on the beat. Every rhythmic swap pays a little, and the payout creeps up
-  the longer you keep the motion going. Stop, or swap off-rhythm, and the
-  combo lets go.
-- Get clipped → the dodge streak dies and you lose one of **three lives**.
-  Three hits and you're off the floor, spectating from a sunken deck.
+  on the beat. Every rhythmic swap pays a little and throws **sparks off the
+  glowstick** that went up — a few faint motes at first, a hotter, denser
+  fountain the deeper the groove. Stop, or swap off-rhythm, and it lets go.
+- Get clipped → the chain dies and you lose one of **three lives**. Three
+  hits and you're off the floor, spectating from a dimmed deck.
 - A **live holo leaderboard** over the stage shows everyone's rank, score and
-  dodge streak. The **top ten** dance on raised platforms, and the current **champion
-  above them all** — heights rendered relative to *your* platform, because your
-  real floor never moves: when you lead, the ring drops away beneath you.
+  chain. The **top ten** dance on raised platforms, and the current **champion
+  above them all** — but nobody ever renders below your real floor: leaders
+  float overhead on lit pedestals, your own lift is something only the
+  others see, and the fallen dim instead of sinking.
 - Every other dancer is a **slender humanoid figure** — gloss-black mannequin,
   neon collar/waist/wrist trim and visor in their seat colour, glowsticks in
   hand — solved live from just a head and two hands (which is all VR knows).
@@ -43,8 +46,8 @@ everyone else.
 - The set itself happens inside **THE VOID** — an actual environment in the
   Beat-Saber-background bloodline: a circle of monolith pylons pulsing on
   the kick, huge hexagonal rings turning overhead, a grid floor dissolving
-  into fog, shards adrift, a horizon of light. (SET VOID in SYSTEM cycles
-  OFF / VOID / DEEP — OFF rides raw passthrough exactly as before.)
+  into fog, shards adrift, a horizon of light. The whole game is **full
+  VR** — the void is always on, and there is no passthrough mode.
 
 Built on Meta's [Immersive Web SDK](https://developers.meta.com/horizon/documentation/web/immersive-web-sdk/)
 (`@iwsdk/core`) + Three.js. The gel creature, the telegraph language and the
@@ -64,8 +67,9 @@ npm install
 npm run dev          # → http://localhost:5173
 ```
 
-- **Quest browser**: open the page, tap **ENTER THE RAVE** → passthrough AR.
-  Your platform appears under your feet, the club around your room.
+- **Quest browser**: open the page, tap **ENTER THE RAVE** → full VR. Your
+  platform appears under your feet with the void all around — your real
+  floor is still the floor you play on.
 - **Desktop**: the IWSDK dev plugin injects a WebXR emulator (IWER) — click
   ENTER THE RAVE and fly with WASD + mouse; the emulated controllers click the
   menus.
@@ -89,7 +93,7 @@ There's also a debug hook in the console:
 | **CROSSFIRE** | a laser is loaded on one side rail and a strip fills **across** the deck (late on, a stage lane crosses it) | **step forward or back** off the strip — diagonally, once it's a lattice |
 | **TRIP WEB** | shin-high laser wire strung over the whole deck; nothing safe is drawn, because nothing is | **hold still** until it discharges |
 | **DONUT** | usually a laser straight down the middle, and a bar later the rim closes with chevrons marching **inward** | **step off** the middle, then **run back into it** |
-| **ROUTINE** | the deck splits into quarters and the boss **teaches** a corner sequence — each marked with its step number, each pointed out in turn — then the marks go out | **remember it**, and hit each corner on its tick |
+| **ROUTINE** | the deck splits into quarters and the boss **teaches** a corner sequence — each marked with its step number, each pointed out in turn — then the marks go out and, on every step, three spinning neon blocks **fall from above** onto the quarters you weren't taught | **remember it**, and stand in the taught corner on each tick |
 
 The telegraph is the whole instruction: whatever fills amber→red, don't be
 in it; wherever the doorpost rails and chevrons point, be there. Windups are
@@ -103,10 +107,15 @@ says drop; the **trip web** says freeze.
 
 The **routine** is the one move that isn't read at all — it's learned. Two
 to four corners, never the same one twice, taught during a two-bar wind-up
-and then hidden; from there the only cue is a bell a beat ahead of each
-step, pitched up an arpeggio so the sound says *which* step as well as
-*when*. The quarter lines stay lit the whole way through, because the floor
-should always tell you where the boxes land — never which one is yours.
+and then hidden. From there the danger is visible the whole way down: on
+each step, three spinning neon polyhedra (the
+[DOWN](https://yellkell.github.io/down) bloodline, upside down — dark core,
+glowing shell, blazing wireframe, a deck ring brightening underneath)
+descend on a beat-locked path onto the three quarters you must not be in,
+crushing flat exactly on the tick. A bell rings a beat ahead of each step,
+pitched up an arpeggio so the sound says *which* step as well as *when*.
+The quarter lines stay lit the whole way through, because the floor should
+always tell you where the boxes land — never which one is yours.
 
 Nothing else is placed at random either. Lasers land on slots and doubles
 come in two shapes only, so a glance is enough to know whether you're
@@ -165,8 +174,8 @@ There are **three places**, and where you are is what you're doing:
    caller, who's touched in. **Touch the ball** (hand close + trigger) to
    join; touch again to step out; the caller's touch cancels. At zero the
    relay deals the caller + touchers onto the ring and the raid takes
-   over, wrapped in the void environment (or raw passthrough at SET VOID:
-   OFF). **The floor never closes**: stay-behinds keep dancing and
+   over, wrapped in the void environment. **The floor never closes**:
+   stay-behinds keep dancing and
    talking (players' voices sing from the stage while they're away),
    newcomers can still join the room, and when the podium settles every
    player is deposited back on the floor automatically. A departing host

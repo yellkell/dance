@@ -15,10 +15,9 @@
  * the rig while a hazard owns your deck — `energy` arrives pre-ducked from
  * DiscoSystem, so danger dims the whole world, never competes with it.
  *
- * The SYSTEM board's SET VOID row decides whether this exists at all:
- * OFF rides raw passthrough exactly as before; VOID and DEEP wrap the set
- * (DEEP pulls the fog in tighter). DiscoSystem owns the switch, the beat
- * and the fog handoff.
+ * Always on while a set (or its podium) is up — the game is full VR and
+ * this IS the set's world. DiscoSystem owns the lifecycle, the beat and
+ * the fog handoff.
  */
 
 import { Group, type MeshBasicMaterial, type Scene } from 'three';

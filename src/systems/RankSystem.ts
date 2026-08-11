@@ -2,11 +2,13 @@
  * RankSystem — who's winning the night.
  *
  * The law: the living rank above the fallen; the living rank by score; the
- * fallen rank by who lasted longest. The top ten dance on RAISED platforms
- * and the current champion above them all — heights rendered RELATIVE to my
- * own tier, because my platform is my real floor and can never move. When
- * I'm champion the ring drops away below me; when I'm out, the leaders
- * tower overhead. The holo board over the stage carries the numbers.
+ * fallen rank by who lasted longest. The VR HEIGHT LAW: nobody ever renders
+ * below the floor. A dancer who outranks you rises above you by the tier
+ * gap; when YOU lead, everyone simply stands at floor level — your own lift
+ * is something only the others see (their clients raise your platform).
+ * Nobody sinks, nobody reads as short, and no platform ever punches through
+ * the void's grid. Eliminated decks dim instead of dropping. The holo board
+ * over the stage carries the numbers.
  *
  * Also runs the podium: freeze the board, crown the winner, confetti, and
  * walk everyone back to the lobby.
@@ -30,8 +32,7 @@ function standing(): Dancer[] {
 }
 
 function tierOf(d: Dancer | undefined): number {
-  if (!d) return 0;
-  if (!d.alive) return RANK.outSink;
+  if (!d || !d.alive) return 0;
   if (d.rank === 1) return RANK.championLift;
   if (d.rank <= 10) return RANK.topTenLift;
   return 0;
@@ -67,18 +68,25 @@ export class RankSystem extends createSystem({}) {
       this.recompute();
     }
 
-    // Platform lifts — eased, relative to my own tier. The GOOPLIATH's
-    // stage does NOT rise with you: as you climb, it sinks by your tier,
-    // staying down at floor level with the rest of the ring — the champion
-    // looks DOWN on the show. (Boss, disco rig and board all ride it.)
+    // Platform lifts — eased, and NEVER below the floor: only the tier gap
+    // above me renders, so leaders float overhead and everyone else stands
+    // level with my real floor. The stage stays grounded always (the show
+    // never sinks away from anyone).
     const meTier = tierOf(match.players.find((p) => p.kind === 'local'));
-    const stageTarget = inShow ? -meTier : 0;
-    a.stage.position.y += (stageTarget - a.stage.position.y) * Math.min(1, delta * RANK.lerp);
+    a.stage.position.y += (0 - a.stage.position.y) * Math.min(1, delta * RANK.lerp);
     for (const handle of a.platforms) {
       const d = match.players.find((p) => p.seat === handle.seat);
-      const target = inShow ? tierOf(d) - meTier : 0;
+      const target = inShow ? Math.max(0, tierOf(d) - meTier) : 0;
       handle.lift += (target - handle.lift) * Math.min(1, delta * RANK.lerp);
       handle.root.position.y = handle.lift;
+      // A raised deck shows its underside — the pedestal column fills the
+      // gap down to the common floor so leaders stand on something.
+      if (handle.pedestal) {
+        handle.pedestal.visible = handle.lift > 0.06;
+        const s = Math.max(0.02, handle.lift);
+        handle.pedestal.scale.y = s;
+        handle.pedestal.position.y = -PLATFORM.thickness - s;
+      }
       // Elimination dims the deck's neon.
       const rimTarget = d && !d.alive ? 0.12 : 0.9;
       handle.rimMat.opacity += (rimTarget - handle.rimMat.opacity) * Math.min(1, delta * 3);
@@ -90,18 +98,6 @@ export class RankSystem extends createSystem({}) {
       handle.nameTag.getWorldPosition(_tag);
       handle.nameTag.rotation.y =
         Math.atan2(match.headX - _tag.x, match.headZ - _tag.z) - handle.root.rotation.y;
-
-      // MY pedestal (only my handle carries one): stretch the column from my
-      // slab's underside down to the common floor — the plane the stage base
-      // eases to — so looking over the rim SHOWS the climb. Its base lands
-      // flush with the unraised decks' slab bottoms.
-      if (handle.pedestal) {
-        const drop = Math.max(0, -a.stage.position.y);
-        handle.pedestal.visible = drop > 0.06;
-        const s = Math.max(0.02, drop);
-        handle.pedestal.scale.y = s;
-        handle.pedestal.position.y = -PLATFORM.thickness - s;
-      }
     }
 
     // Podium choreography.

@@ -14,8 +14,7 @@
  *     (ClubSocialSystem) and teleport movement (ClubTeleportSystem).
  *  3. THE SET — the game place. The ball fires (or a solo set starts),
  *     both rooms pack away, and the raid takes over — wrapped in the void
- *     environment at SET VOID levels (DiscoSystem's business), or raw
- *     passthrough at OFF.
+ *     environment (DiscoSystem's business).
  *
  * This system builds both interiors once, swaps them per frame, and keeps
  * whichever is open breathing:

@@ -25,7 +25,7 @@ export interface Dancer {
   skill: number;
   lives: number;
   score: number;
-  /** Consecutive dodges — the HUD calls this the DODGE STREAK. (The field
+  /** Consecutive dodges — the chain behind the HUD's ×N. (The field
    *  keeps its old name: it rides the score wire between clients.) */
   combo: number;
   bestCombo: number;
@@ -64,7 +64,7 @@ export interface GestureCue {
   dueBeat?: number;
 }
 
-/** A transient HUD flair (DODGE! / PERFECT! / dodge-streak milestones / OUT). */
+/** A transient HUD flair (PERFECT! / HIT / NIGHT CLEARED). */
 export interface Flair {
   text: string;
   tone: 'dodge' | 'perfect' | 'hit' | 'milestone' | 'info';
@@ -111,7 +111,7 @@ export interface MatchState {
   /** True while the head is below the duck line. */
   ducked: boolean;
   /** Live rhythm-swap streak (one hand up, one down, swap on the beat) —
-   *  the HUD calls this the COMBO (the dodge counter is the DODGE STREAK). */
+   *  no meter on screen: the glowstick spark bursts are its voice. */
   grooveStreak: number;
 
   /* ── buses ── */

@@ -250,57 +250,9 @@ export class StrikeFx {
     );
   }
 
-  /** THE ROUTINE lands: three slabs of goo drop into the three quarters you
-   *  weren't told to stand in, and the one you learned is left bare. They
-   *  arrive already falling and hit within a frame or two of the beat — the
-   *  warning was the tick, and before that the lesson; a block you can
-   *  watch descend would just be a telegraph with extra steps. */
-  quadBlocks(parent: Object3D, safeCorner: number): void {
-    const w = OCTAGON_HALF_WIDTH;
-    const d = OCTAGON_HALF_DEPTH;
-    const sparks = new Sparks(36, GOO);
-    const spots: Array<[number, number]> = [];
-    for (let c = 0; c < 4; c++) {
-      if (c === safeCorner) continue;
-      spots.push([((c & 1 ? 1 : -1) * w) / 2, ((c & 2 ? 1 : -1) * d) / 2]);
-    }
-    let landed = false;
-    this.spawn(
-      parent,
-      0.55,
-      (k, g) => {
-        const drop = Math.min(1, k / 0.14);
-        const after = Math.max(0, (k - 0.14) / 0.86);
-        for (let i = 0; i < spots.length; i++) {
-          const block = g.children[i] as Mesh;
-          block.position.y = 1.55 - drop * 1.28;
-          block.scale.y = Math.max(0.18, 1 - after * 1.2); // squashes flat
-          (block.material as MeshBasicMaterial).opacity = 0.8 * (1 - after * after);
-          const flash = g.children[spots.length + i] as Mesh;
-          (flash.material as MeshBasicMaterial).opacity = drop >= 1 ? 0.9 * (1 - after) : 0;
-        }
-        if (!landed && drop >= 1) {
-          landed = true;
-          for (const [x, z] of spots) sparks.emit(x, 0.1, z, 8, 1.4);
-        }
-      },
-      (g) => {
-        for (const [x, z] of spots) {
-          const block = new Mesh(new BoxGeometry(w * 0.84, 0.54, d * 0.84), basic(GOO, 0.8));
-          block.position.set(x, 1.55, z);
-          g.add(block);
-        }
-        // Impact plates under each slab — the deck answering.
-        for (const [x, z] of spots) {
-          const flash = new Mesh(new BoxGeometry(w * 0.88, 0.02, d * 0.88), basic(HOT, 0));
-          flash.position.set(x, DECAL_Y + 0.01, z);
-          g.add(flash);
-        }
-        g.add(sparks.points);
-      },
-      (dt) => sparks.step(dt),
-    );
-  }
+  // (THE ROUTINE's landing is no longer a strike here: the DOWN-style
+  // blockfall in choreo/blockfall.ts carries the whole descent AND the
+  // crush — see ChoreoSystem.resolve.)
 
   /** THE DONUT closes: the rim goes up as a wall of light and RUSHES IN,
    *  stopping dead on the doorpost circle — the opposite motion to the

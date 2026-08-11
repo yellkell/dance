@@ -1,8 +1,8 @@
 /**
  * The holo leaderboard — free-floating ranking text over the stage that
- * every dancer can read: live rank, name, score, dodge streak. NO PANEL: no glass,
+ * every dancer can read: live rank, name, score, chain. NO PANEL: no glass,
  * no frame — every glyph wears a thick black outline instead, so the board
- * reads over the gel, the lasers and whatever your real room is doing.
+ * reads over the gel, the lasers and the void behind them all.
  * Canvas-drawn, redrawn only when the standings actually change,
  * billboarded by RankSystem.
  */
@@ -47,8 +47,7 @@ export interface BoardRow {
   rank: number;
   name: string;
   score: number;
-  /** Live dodge streak — the amber ×n on the right, same amber the HUD
-   *  gives the DODGE STREAK line. */
+  /** Live dodge chain — the amber ×n on the right. */
   combo: number;
   alive: boolean;
   isMe: boolean;

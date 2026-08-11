@@ -1,7 +1,7 @@
 {
   "name": "rave-raid",
   "version": "0.1.0",
-  "description": "GOOPLIATH: DANCE RAID — a WebXR passthrough rhythm battle royale. Up to 24 dancers ring one giant dancing gel boss; every move he throws marks every platform at once. Dodge on the beat, build combos, outlast the floor. Built on the Immersive Web SDK.",
+  "description": "RAVE RAID — a full-VR WebXR rhythm battle royale. Up to 24 dancers ring one giant dancing gel boss inside THE VOID; every move he throws marks every platform at once. Dodge on the beat, build combos, outlast the floor. Built on the Immersive Web SDK.",
   "type": "module",
   "private": true,
   "scripts": {

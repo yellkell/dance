@@ -1,10 +1,11 @@
 /**
  * RAVE RAID — entry point.
  *
- * Boots an IWSDK World with a WebXR passthrough (immersive-AR) session: the
- * platform ring, the centre stage, the mirror ball and the giant dancing gel
- * creature all land in your real room. If the device can't do AR, IWSDK
- * falls back to VR.
+ * Boots an IWSDK World as a FULL VR (immersive-VR) session. Nothing here is
+ * halfway anymore: the foyer is a platform in the void, the club is a sealed
+ * hall, and the set plays inside the void environment — your real floor is
+ * still the platform you dodge on (roomscale reference space keeps y = 0 at
+ * your actual floor), but your room itself is never shown.
  *
  * `npm run dev` and open the page: a headset offers ENTER THE RAVE; on
  * desktop the IWSDK dev plugin provides a WebXR emulator (WASD + mouse).
@@ -12,7 +13,9 @@
  */
 
 import { launchXR, SessionMode, World } from '@iwsdk/core';
+import { Color } from 'three';
 import { ensureAudio } from './audio/sfx.js';
+import { VOID_BG } from './arena/voidkit.js';
 import { ArenaSystem } from './systems/ArenaSystem.js';
 import { AvatarSystem } from './systems/AvatarSystem.js';
 import { ChoreoSystem } from './systems/ChoreoSystem.js';
@@ -51,24 +54,27 @@ World.create(container, {
   // The landing button calls IWSDK's explicit WebXR launcher from the user's
   // tap. Quest Browser needs that direct requestSession gesture path.
   xr: {
-    sessionMode: SessionMode.ImmersiveAR,
+    sessionMode: SessionMode.ImmersiveVR,
     offer: 'none',
   },
   // A stationary dodge game: you never leave your platform, and nothing is
-  // grabbed — your body IS the controller.
+  // grabbed — your body IS the controller. (The club's teleport is our own.)
   features: {
     grabbing: false,
     locomotion: false,
     spatialUI: false,
   },
   render: {
-    // Passthrough is the backdrop; we bring only the furniture and the light.
+    // The void is the backdrop, everywhere and always.
     defaultLighting: false,
-    far: 120,
+    far: 160,
     camera: { position: [0, 1.65, 0] },
   },
 }).then(async (world) => {
   worldRef = world;
+  // FULL VR: an opaque backdrop behind every place. The club's walls stand
+  // in front of it; the foyer and the set live inside it.
+  world.scene.background = new Color(VOID_BG);
   // Order matters lightly: player pose first, then the floor, then everything
   // that reads both. Music owns the clock; choreo owns the judgement.
   world.registerSystem(PlayerSystem);
@@ -93,14 +99,14 @@ World.create(container, {
   world.registerSystem(NetworkSystem);
 
   const xrSupported =
-    (await navigator.xr?.isSessionSupported(SessionMode.ImmersiveAR).catch(() => false)) === true;
+    (await navigator.xr?.isSessionSupported(SessionMode.ImmersiveVR).catch(() => false)) === true;
 
   if (enterButton && xrSupported) {
     enterButton.removeAttribute('disabled');
     enterButton.addEventListener('click', () => {
       enterButton.setAttribute('disabled', '');
       ensureAudio(); // unlock the AudioContext inside the tap gesture
-      launchXR(world, { sessionMode: SessionMode.ImmersiveAR });
+      launchXR(world, { sessionMode: SessionMode.ImmersiveVR });
 
       const watchForSession = (): void => {
         if (world.session) {

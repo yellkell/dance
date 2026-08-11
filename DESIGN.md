@@ -30,10 +30,10 @@ win condition from "kill the titan" to "outlast the floor".
   canonical compass bearing for the whole ring, so the entire club rotates to
   the same safe ground together.
 - **Your floor is the venue; the void is the view.** The dodge game happens
-  on your real floor, always. Around it, the set defaults to THE VOID — an
-  actual environment (see below) — but SET VOID: OFF strips it back to raw
-  passthrough: your room, furniture made of neon, and a four-metre gel
-  creature where your sofa used to be.
+  on your real floor, always — but the game is FULL VR: THE VOID (an actual
+  environment, below) is the only world, opaque backdrop and all. There is
+  no passthrough mode and no dim slider; anything half-transparent read as
+  neither AR nor VR and got cut.
 
 ## The set (match structure)
 
@@ -59,11 +59,14 @@ Ends at the final downbeat — or the moment one dancer remains.
 
 ## The rank made physical
 
-Top ten platforms rise (+0.42 m), the champion higher (+0.85 m), the fallen
-sink (−0.35 m) and dim. Rendered **relative to your own tier** — your platform
-is your real floor and can never move, so leading feels like the ring dropping
-away, and being out feels like the winners towering overhead. Same trick as
-the seat transforms: subtract yourself from the world.
+Top ten platforms rise (+0.32 m), the champion higher (+0.7 m). Rendered
+**relative to your own tier**, then clamped at the floor — the VR height
+law: your platform is your real floor and can never move, and nothing may
+render below it (a deck punching through the void grid reads as a bug, and
+"everyone got short" reads as *you* got tall in the worst way). So only the
+positive gaps show: out-rankers float overhead on lit pedestal columns,
+your own lift is something only the others see, the stage never sinks, and
+the eliminated dim out instead of dropping.
 
 ## Determinism (the multiplayer model)
 
@@ -123,11 +126,10 @@ The law of the land is **three places — where you are is what you're doing**:
 3. **THE SET** (game place): the raid, wrapped in THE VOID — an actual
    environment sharing the foyer's language at arena scale (a pylon circle
    pulsing on the kick, three great hexes over the stage, grid floor,
-   shards, horizon), or raw passthrough at SET VOID: OFF. Both interiors
-   pack away; the rig re-plants at the spawn so "my platform IS the world
-   origin" stays true no matter where you teleported. The void ducks with
-   the light rig while a telegraph owns your deck — danger never competes
-   with scenery.
+   shards, horizon). Both interiors pack away; the rig re-plants at the
+   spawn so "my platform IS the world origin" stays true no matter where
+   you teleported. The void ducks with the light rig while a telegraph
+   owns your deck — danger never competes with scenery.
 
 ### THE BALL (how a raid is called)
 

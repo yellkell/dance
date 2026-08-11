@@ -1,7 +1,7 @@
 /**
  * The rave floor — a ring of octagonal dancer platforms around the
- * GOOPLIATH's centre stage, floating in your real room (passthrough is the
- * backdrop; we only bring the furniture and the light).
+ * GOOPLIATH's centre stage, floating in THE VOID (the environment is
+ * DiscoSystem's; we bring the furniture and the light).
  *
  * Rendered ME-RELATIVE: my platform is always at the world origin on my real
  * floor, the stage is dead ahead at (0,0,−R), and everyone else's platforms
@@ -224,7 +224,7 @@ export function buildArena(scene: Scene, seats: number, mySeat: number, names: (
   const root = new Group();
   root.name = 'rave-floor';
 
-  // Passthrough brings no light — we bring the club's.
+  // The void brings no light — we bring the club's.
   const hemi = new HemisphereLight(0xbfd4ff, 0x0c0a14, 0.75);
   root.add(hemi);
   const stageLight = new PointLight(0xffffff, 1.4, 26, 1.6);

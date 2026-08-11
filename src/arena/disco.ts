@@ -4,9 +4,8 @@
  * confetti cannons for the podium. Everything additive, everything cheap,
  * everything moving ON THE BEAT (DiscoSystem feeds the song clock in).
  *
- * Passthrough note: no fog, no fullscreen post — the "bloom" is additive
- * sprites and cones layered over your real room, which reads shockingly
- * disco on a Quest.
+ * Perf note: no fullscreen post — the "bloom" is additive sprites and
+ * cones over the void's black, which reads shockingly disco on a Quest.
  */
 
 import {
@@ -61,7 +60,7 @@ export class DiscoRig {
     this.ball = new Group();
     this.ball.position.y = BALL_Y;
 
-    // Faceted mirror ball. No env map to reflect in passthrough, so the
+    // Faceted mirror ball. There is no env map to reflect, so the
     // facets are painted on: a bright checker texture over a flat-shaded
     // sphere reads as glitter from across the room (and never goes black).
     const facets = document.createElement('canvas');
