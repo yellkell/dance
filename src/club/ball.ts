@@ -160,26 +160,28 @@ export function buildBallVisual(): BallVisual {
     g.fillText(`♪ ${track ? track.title : 'SHUFFLE'}`, 256, 140);
     g.font = "700 24px 'Arial Black', system-ui, sans-serif";
     g.fillStyle = 'rgba(232,236,242,0.75)';
-    g.fillText(`${callerName} calls the raid`, 256, 176);
+    g.fillText(`${callerName} calls`, 256, 176);
 
-    // The instruction line — the plate teaches the whole mechanic.
+    // One short state line — the touch teaches the rest.
     g.font = "800 26px 'Arial Black', system-ui, sans-serif";
     if (mine) {
       g.fillStyle = '#ff5040';
-      g.fillText('your ball — touch it to call it off', 256, 218);
+      g.fillText('touch to call it off', 256, 218);
     } else if (joined) {
       g.fillStyle = '#36e05a';
-      g.fillText("YOU'RE ON — touch again to step out", 256, 218);
+      g.fillText('ON — touch to step out', 256, 218);
     } else {
       g.fillStyle = '#ffd24a';
-      g.fillText('TOUCH THE BALL TO DANCE', 256, 218);
+      g.fillText('touch to dance', 256, 218);
     }
 
-    g.font = "700 22px 'Arial Black', system-ui, sans-serif";
-    g.fillStyle = 'rgba(232,236,242,0.6)';
-    const names = joinNames.slice(0, 6).join(' · ');
-    const extra = joinNames.length > 6 ? ` +${joinNames.length - 6}` : '';
-    g.fillText(joinNames.length ? `${names}${extra}` : 'nobody on it yet — the caller rides regardless', 256, 258, 480);
+    if (joinNames.length) {
+      g.font = "700 22px 'Arial Black', system-ui, sans-serif";
+      g.fillStyle = 'rgba(232,236,242,0.6)';
+      const names = joinNames.slice(0, 6).join(' · ');
+      const extra = joinNames.length > 6 ? ` +${joinNames.length - 6}` : '';
+      g.fillText(`${names}${extra}`, 256, 258, 480);
+    }
     tex.needsUpdate = true;
   };
 

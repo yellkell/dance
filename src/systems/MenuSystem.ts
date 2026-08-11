@@ -462,7 +462,7 @@ export class MenuSystem extends createSystem({}) {
       g.fillText('REACHING THE RELAY…', W - 40, 56);
     } else {
       g.fillStyle = UI.dim;
-      g.fillText('OFFLINE · SOLO + GROUPIES', W - 40, 56);
+      g.fillText('OFFLINE', W - 40, 56);
     }
 
     // Rail plate + active accent bar.
@@ -480,49 +480,23 @@ export class MenuSystem extends createSystem({}) {
     g.fillStyle = 'rgba(255,42,213,0.35)';
     g.fillRect(28, 130, W - 56, 2);
 
-    // Tab-specific body decoration.
+    // Tab-specific body decoration. No slogans, no manuals — the boards
+    // carry buttons and progress, and the game teaches itself.
     if (tab === 'tour') this.drawTreasureMap(g);
-    if (tab === 'sys') {
-      g.textAlign = 'left';
-      g.font = "700 24px 'Arial Black', system-ui, sans-serif";
-      g.fillStyle = UI.dim;
-      g.fillText('RAVE RAID · a full-VR rhythm raid', CONTENT_X, 560);
-      g.fillText('records measured to the beat · every client dances the same set', CONTENT_X, 600);
-    }
     if (tab === 'play' && !this.joinMode) {
-      // Tonight strip.
-      g.textAlign = 'left';
-      g.font = "900 26px 'Arial Black', system-ui, sans-serif";
-      g.fillStyle = UI.cyan;
-      g.fillText('TONIGHT', CONTENT_X, 700);
-      g.font = "700 23px 'Arial Black', system-ui, sans-serif";
-      g.fillStyle = UI.dim;
-      g.fillText('dodge the moves · ride the beat · outlast the floor', CONTENT_X, 740);
-      g.fillText('combo pays: one stick up, one down, swap on the kick', CONTENT_X, 776);
       const done = clearedTourNights().size;
-      g.fillStyle = done ? UI.goop : UI.dim;
-      g.fillText(
-        done ? `tour: ${done}/${TOUR.sets.length * 3} nights cleared` : 'the TOUR awaits — three sets, three records each',
-        CONTENT_X,
-        812,
-      );
+      if (done > 0) {
+        g.textAlign = 'left';
+        g.font = "700 23px 'Arial Black', system-ui, sans-serif";
+        g.fillStyle = UI.goop;
+        g.fillText(`tour ${done}/${TOUR.sets.length * 3}`, CONTENT_X, 740);
+      }
     }
-
-    // Footer — the rehearsal reports its row, PLAY gets the controls hint.
-    // The map carries none: the chart speaks for itself.
-    if (tab !== 'tour') {
+    if (tab === 'map' && allGooplingsCleared()) {
       g.textAlign = 'center';
       g.font = "700 21px 'Arial Black', system-ui, sans-serif";
-      g.fillStyle = tab === 'map' && allGooplingsCleared() ? UI.goop : 'rgba(232,236,242,0.4)';
-      g.fillText(
-        tab === 'map'
-          ? allGooplingsCleared()
-            ? 'RAVE READY — every move in your feet'
-            : `${GOOPLINGS.length} gooplings · one move each · clear the row`
-          : 'trigger clicks · thumbstick teleports the club · right Ⓐ social panel · mid-set, right Ⓐ bails',
-        W / 2,
-        992,
-      );
+      g.fillStyle = UI.goop;
+      g.fillText('RAVE READY', W / 2, 992);
     }
   }
 
@@ -662,9 +636,6 @@ export class MenuSystem extends createSystem({}) {
     g.font = "900 34px 'Arial Black', system-ui, sans-serif";
     g.fillStyle = UI.goop;
     g.fillText('THE TOUR', CONTENT_X, 158);
-    g.font = "700 21px 'Arial Black', system-ui, sans-serif";
-    g.fillStyle = UI.dim;
-    g.fillText('follow the trail · survive a night to book the next · the goop guards every third', CONTENT_X + 224, 160);
 
     // Map frame: a dashed chart border with bright corner ticks.
     g.setLineDash([10, 14]);

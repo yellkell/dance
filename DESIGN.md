@@ -69,14 +69,13 @@ Ends at the final downbeat — or the moment one dancer remains.
 
 ## The rank made physical
 
-Top ten platforms rise (+0.32 m), the champion higher (+0.7 m). Rendered
-**relative to your own tier**, then clamped at the floor — the VR height
-law: your platform is your real floor and can never move, and nothing may
-render below it (a deck punching through the void grid reads as a bug, and
-"everyone got short" reads as *you* got tall in the worst way). So only the
-positive gaps show: out-rankers float overhead on lit pedestal columns,
-your own lift is something only the others see, the stage never sinks, and
-the eliminated dim out instead of dropping.
+Top ten platforms rise (+0.32 m), the champion higher (+0.7 m) — and the
+lifts are **absolute**, so the raising effect never switches off just
+because you happen to be winning. The VR height law holds: your platform
+is your real floor and can never move, nothing ever renders below the
+common floor, and nobody ever reads as SHORT — decks only rise, on lit
+pedestal columns. Your own lift is something only the others see, the
+stage never sinks, and the eliminated dim out instead of dropping.
 
 ## Determinism (the multiplayer model)
 

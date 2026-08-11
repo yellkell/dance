@@ -146,13 +146,16 @@ function buildPlatform(seat: number, name: string, isMine: boolean): PlatformHan
   nameTag.renderOrder = 24; // over the gel, under the board
   root.add(nameTag);
 
-  // MY pedestal: a unit-height octagonal column (slightly inset) with a
-  // neon foot ring, hidden until the ranks raise me. RankSystem stretches
-  // it from the slab's underside down to the common floor each frame.
+  // EVERY deck carries a pedestal: a unit-height octagonal column (slightly
+  // inset) with a neon foot ring, hidden until the ranks raise that deck.
+  // RankSystem stretches it from the slab's underside down to the common
+  // floor each frame — lifts are absolute now, so any deck but your own
+  // can be up at any moment, and a raised slab with nothing under it reads
+  // as a rendering bug rather than a podium.
   let pedestal: Group | null = null;
-  if (isMine) {
+  {
     pedestal = new Group();
-    pedestal.name = 'my-pedestal';
+    pedestal.name = `pedestal-${seat}`;
     const column = new Mesh(
       octagonSlab(OCTAGON_VERTICES, 1),
       new MeshStandardMaterial({ color: 0x14181f, metalness: 0.85, roughness: 0.4 }),

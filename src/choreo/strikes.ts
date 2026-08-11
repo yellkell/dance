@@ -21,6 +21,7 @@
 import {
   AdditiveBlending,
   BoxGeometry,
+  PlaneGeometry,
   BufferAttribute,
   BufferGeometry,
   CylinderGeometry,
@@ -347,6 +348,92 @@ export class StrikeFx {
         const flare = glowSprite(HOT, 0.5, 0.9);
         flare.position.set(from * (OCTAGON_HALF_WIDTH + 0.3), 1.1, z);
         g.add(flare);
+        g.add(sparks.points);
+      },
+      (dt) => sparks.step(dt),
+    );
+  }
+
+  /** THE TRIP WEB discharges: every wire in the lattice goes white-hot at
+   *  once and blows apart into embers at shin height. Nothing sweeps and
+   *  nothing lands — the whole deck simply answers, which is what makes
+   *  having stood still feel like getting away with something. */
+  wire(parent: Object3D, y: number, filled: readonly { x0: number; x1: number; z0: number; z1: number }[] = []): void {
+    const span = OCTAGON_HALF_WIDTH * 2 + 0.5;
+    const depth = OCTAGON_HALF_DEPTH * 2 + 0.4;
+    const top = 1.6; // WIRE_TOP — the hitbox's honest ceiling
+    const rise = top - y;
+    const sparks = new Sparks(48, WARN);
+    let snapped = false;
+    this.spawn(
+      parent,
+      0.48,
+      (k, g) => {
+        const fade = 1 - k * k;
+        // Children in build order: 6 wires, 6 curtains, filled columns,
+        // then the spark cloud running its own fade.
+        for (let i = 0; i < 6; i++) {
+          const w = g.children[i] as Mesh;
+          (w.material as MeshBasicMaterial).opacity = 0.9 * fade;
+          w.scale.y = 1 + k * 2.4; // each wire whips as it lets go
+        }
+        // THE SWEEP UP: the lattice's true hitbox revealed — a curtain of
+        // light rises off every wire to eye level in the first third of the
+        // flash, then burns out with the rest.
+        const reach = Math.min(1, k * 3);
+        for (let i = 0; i < 6; i++) {
+          const c = g.children[6 + i] as Mesh;
+          c.scale.y = Math.max(0.02, reach);
+          c.position.y = y + (rise * reach) / 2;
+          (c.material as MeshBasicMaterial).opacity = 0.5 * fade;
+        }
+        for (let i = 0; i < filled.length; i++) {
+          const c = g.children[12 + i] as Mesh;
+          (c.material as MeshBasicMaterial).opacity = 0.7 * fade;
+        }
+        if (!snapped) {
+          snapped = true;
+          for (let i = 0; i < 8; i++) {
+            const a = (i / 8) * Math.PI * 2;
+            sparks.emit(Math.sin(a) * OCTAGON_HALF_WIDTH * 0.7, y, Math.cos(a) * OCTAGON_HALF_DEPTH * 0.7, 6, 1.5);
+          }
+        }
+      },
+      (g) => {
+        for (const dz of [-depth * 0.34, 0, depth * 0.34]) {
+          const w = new Mesh(new BoxGeometry(span, 0.05, 0.05), basic(HOT, 0.9));
+          w.position.set(0, y, dz);
+          g.add(w);
+        }
+        for (const dx of [-span * 0.32, 0, span * 0.32]) {
+          const w = new Mesh(new BoxGeometry(0.05, 0.05, depth), basic(HOT, 0.9));
+          w.position.set(dx, y, 0);
+          g.add(w);
+        }
+        // The rising curtains, one per wire (unit height, scaled live).
+        for (const dz of [-depth * 0.34, 0, depth * 0.34]) {
+          const c = new Mesh(new PlaneGeometry(span, rise), basic(HOT, 0));
+          c.position.set(0, y, dz);
+          c.scale.y = 0.02;
+          g.add(c);
+        }
+        for (const dx of [-span * 0.32, 0, span * 0.32]) {
+          const c = new Mesh(new PlaneGeometry(depth, rise), basic(HOT, 0));
+          c.position.set(dx, y, 0);
+          c.rotation.y = Math.PI / 2;
+          c.scale.y = 0.02;
+          g.add(c);
+        }
+        // Filled cells flare as solid columns — the squares that were
+        // painted go off like the danger they were.
+        for (const r of filled) {
+          const c = new Mesh(
+            new BoxGeometry(r.x1 - r.x0, top, r.z1 - r.z0),
+            basic(WARN, 0),
+          );
+          c.position.set((r.x0 + r.x1) / 2, top / 2, (r.z0 + r.z1) / 2);
+          g.add(c);
+        }
         g.add(sparks.points);
       },
       (dt) => sparks.step(dt),

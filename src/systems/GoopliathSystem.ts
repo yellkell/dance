@@ -50,6 +50,7 @@ const GESTURE: Record<MoveKind, AttackName> = {
   chase: 'cross', // the straight hunting punch, eyes on you
   nova: 'uppercut',
   cross: 'backfist', // thrown sideways, across the body — the side laser
+  wire: 'clap', // both limbs snapping shut: the web goes taut
   donut: 'clap', // both arms hauling the rim in on the middle
   routine: 'overhand', // the slabs coming down on three quarters
 };
@@ -65,6 +66,7 @@ const STEP_GESTURE: Record<MoveKind, AttackName> = {
   chase: 'jab',
   nova: 'jab',
   cross: 'backfist',
+  wire: 'jab',
   donut: 'hook', // the wide arm sweeping the rim inward
   routine: 'overhand', // one drop per step of the routine
 };

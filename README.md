@@ -110,6 +110,7 @@ There's also a debug hook in the console:
 | **CHASE** | a disc glued to your feet, following you — then it **freezes** | **juke** after the freeze |
 | **NOVA** | everything burns except one wedge — same compass bearing for the whole ring | **stand** in the safe ground, together |
 | **CROSSFIRE** | a laser is loaded on one side rail and a strip fills **across** the deck (late on, a stage lane crosses it) | **step forward or back** off the strip — diagonally, once it's a lattice |
+| **TRIP WEB** | a shin-high lattice cuts the deck into a 4×4 grid — and from act 2, chosen cells arrive **filled**: columns of danger rising floor to eye level | **leave the filled squares early**, then **hold still**; on the discharge the whole lattice sweeps up to eye level — the hitbox it always was |
 | **DONUT** | usually a laser straight down the middle, and a bar later the rim closes with chevrons marching **inward** | **step off** the middle, then **run back into it** |
 | **ROUTINE** | the deck splits into quarters and the boss **teaches** a corner sequence — each marked with its step number, each pointed out in turn — then the marks go out and, on every step, three spinning neon blocks **fall from above** onto the quarters you weren't taught | **remember it**, and stand in the taught corner on each tick |
 
@@ -118,9 +119,12 @@ in it; wherever the doorpost rails and chevrons point, be there. Windups are
 sacred — escalation compresses the gaps between moves, never the read — and
 landings always hit bar downbeats.
 
-One answer is a deliberate exception, and it is drawn in the AIR rather
-than on the deck — floor paint means "move your feet" everywhere else, so
-a move whose answer is *don't* must never use it. The **sweep** says drop.
+Two of those answers are deliberate exceptions, and both are drawn in the
+AIR rather than on the deck — floor paint means "move your feet" everywhere
+else, so a move whose answer is *don't* must never use it. The **sweep**
+says drop; the **trip web** says freeze. The late web's filled cells are
+the exception's exception, and they follow the law exactly: those squares
+ARE painted, because those squares want your feet gone.
 
 The **routine** is the one move that isn't read at all — it's learned. Two
 to four corners, never the same one twice, taught during a two-bar wind-up
@@ -147,8 +151,9 @@ The lobby's **REHEARSAL** map is a row of goop creatures, each drilling one
 move at a gentle BPM: **GOOPLET** (step), **DRIZZLE** (sidestep), **SLOSHA**
 (duck), **BIG SPILL** (cross the line), **BOUNCER** (the gate), **SMITTEN**
 (the chase juke), **GLOBULON** (the nova wedge). Clear the row and you're
-**RAVE READY**. Progress saves locally. Surge and crossfire have no tutor
-yet — they arrive in a set and teach themselves off the telegraph.
+**RAVE READY**. Progress saves locally. Surge, crossfire and the trip web
+have no tutor yet — they arrive in a set and teach themselves off the
+telegraph.
 
 ## Multiplayer — and the club
 

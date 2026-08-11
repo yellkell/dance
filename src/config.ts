@@ -181,6 +181,15 @@ export const GOOP = {
  *           an emitter at one rail — step FORWARD or BACK off it (the beam's
  *           quarter-turn cousin: same read, the other axis). Late on it
  *           lays a stage lane across itself and the safe ground is a cell.
+ *  wire   : the trip web — a shin-high lattice of laser wire cutting the
+ *           deck into a 4×4 grid. Base form: no safe ground drawn, because
+ *           there isn't any — HOLD STILL until it clears (the one dodge
+ *           that is stillness, so the base web never paints the floor).
+ *           From act 2, cells of the grid arrive FILLED: columns of danger
+ *           floor-to-eye that you must vacate BEFORE you freeze — filled
+ *           squares are painted, because paint always means move. On the
+ *           discharge the whole lattice sweeps upward to eye level: the
+ *           hitbox you were always inside, made honest.
  */
 export type MoveKind =
   | 'slam'
@@ -192,6 +201,7 @@ export type MoveKind =
   | 'chase'
   | 'nova'
   | 'cross'
+  | 'wire'
   | 'donut'
   | 'routine';
 
@@ -227,7 +237,10 @@ export const MOVES: Record<
   // the only move that regularly asks for a step toward or away from the
   // stage — the ring stops being a left/right game.
   cross: { chargeBeats: 4, weights: [2, 3, 3, 3] },
+  // The TRIP WEB needs a long fuse: you have to see the wires, plant, and
   // commit to standing still. Held back until the floor is warm, and never
+  // common — stillness is a punchline that stops working if it's constant.
+  wire: { chargeBeats: 6, weights: [0, 2, 2, 2] },
   // The DONUT is the nova's opposite number and mostly arrives as a
   // one-two, so it charges like one: long enough to read the middle laser,
   // clear it, and still get home.
@@ -310,10 +323,11 @@ export const CHOREO = {
   /** THE CHAIN (late-act nova): three SINGULAR pies, one after the other,
    *  each safe wedge a third of the compass further on — three dodges walk
    *  you the whole way around the ring. Only ONE pie is ever on the floor
-   *  (the next disc doesn't even appear until the last one has gone off),
-   *  and each rides the same short fuse, so the chain reads as three clean
-   *  beats instead of a slow stack of overlapping discs. */
-  novaChainBeats: 3,
+   *  (the next disc doesn't even appear until the last one has gone off).
+   *  A full BAR between discharges: at 3 beats the walk felt like a shove
+   *  (and drifted off the downbeat law) — 4 keeps every detonation on a
+   *  bar line and gives the turn its breath. */
+  novaChainBeats: 4,
   novaChainTurn: (Math.PI * 2) / 3,
   /** CROSSFIRE: half-depth of the side-laser strip (a shade tighter than the
    *  beam's — the deck is shallower front-to-back than it is wide, so the
@@ -326,6 +340,17 @@ export const CHOREO = {
   /** From this act on, the crossfire lays a stage lane ACROSS the rail: the
    *  safe ground becomes a quarter of the deck and the dodge is diagonal. */
   latticeFromAct: 2,
+  /** THE TRIP WEB: wire height (shin), how many beats before the landing the
+   *  sensor arms, and how much drift is forgiven while it's live. The slack
+   *  is generous on purpose — a dancer sways, and the move punishes
+   *  STEPPING, not breathing. */
+  wireY: 0.36,
+  wireHoldBeats: 2,
+  wireSlack: 0.24,
+  /** How many of the web's 16 grid cells arrive FILLED, by act — columns of
+   *  danger you must be out of before you freeze. Acts 0–1 keep the pure
+   *  stillness test; the late web asks for both verbs in order. */
+  wireFillCells: [0, 0, 3, 5],
   /** Gate: half-width of the safe column; tightens in the last act. */
   gateHalfW: 0.3,
   gateHalfWLate: 0.22,

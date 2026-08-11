@@ -3,12 +3,13 @@
  *
  * The law: the living rank above the fallen; the living rank by score; the
  * fallen rank by who lasted longest. The VR HEIGHT LAW: nobody ever renders
- * below the floor. A dancer who outranks you rises above you by the tier
- * gap; when YOU lead, everyone simply stands at floor level — your own lift
- * is something only the others see (their clients raise your platform).
- * Nobody sinks, nobody reads as short, and no platform ever punches through
- * the void's grid. Eliminated decks dim instead of dropping. The holo board
- * over the stage carries the numbers.
+ * below the floor, and nobody ever reads as SHORT — decks only rise. Lifts
+ * are ABSOLUTE: the top ten ride raised platforms and the champion rides
+ * highest, whoever you are, so the spectacle never switches off just
+ * because you happen to be winning. The one deck that can never move is
+ * YOURS — it is your real floor — so your own lift is something only the
+ * others see (their clients raise your platform). Eliminated decks dim
+ * instead of dropping. The holo board over the stage carries the numbers.
  *
  * Also runs the podium: freeze the board, crown the winner, confetti, and
  * walk everyone back to the lobby.
@@ -68,15 +69,14 @@ export class RankSystem extends createSystem({}) {
       this.recompute();
     }
 
-    // Platform lifts — eased, and NEVER below the floor: only the tier gap
-    // above me renders, so leaders float overhead and everyone else stands
-    // level with my real floor. The stage stays grounded always (the show
-    // never sinks away from anyone).
-    const meTier = tierOf(match.players.find((p) => p.kind === 'local'));
+    // Platform lifts — eased, absolute, and NEVER below the floor: leaders
+    // rise by their tier wherever you rank, so the raising effect is always
+    // on. Only MY deck is pinned (it is my real floor), and the stage stays
+    // grounded always (the show never sinks away from anyone).
     a.stage.position.y += (0 - a.stage.position.y) * Math.min(1, delta * RANK.lerp);
     for (const handle of a.platforms) {
       const d = match.players.find((p) => p.seat === handle.seat);
-      const target = inShow ? Math.max(0, tierOf(d) - meTier) : 0;
+      const target = inShow && d?.kind !== 'local' ? tierOf(d) : 0;
       handle.lift += (target - handle.lift) * Math.min(1, delta * RANK.lerp);
       handle.root.position.y = handle.lift;
       // A raised deck shows its underside — the pedestal column fills the
@@ -141,8 +141,8 @@ export class RankSystem extends createSystem({}) {
 
     const winner = order[0];
     this.board.redraw(
-      podium ? '🏆 FINAL' : 'LIVE RANKING',
-      podium && winner ? `${winner.name} OWNS THE NIGHT` : `${match.players.filter((p) => p.alive).length} ON THE FLOOR`,
+      podium ? '🏆 FINAL' : '',
+      podium && winner ? `${winner.name} OWNS THE NIGHT` : '',
       rows,
       podium ? '#ffd75e' : '#ff2ad5',
     );

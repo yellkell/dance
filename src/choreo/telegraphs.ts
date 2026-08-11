@@ -318,6 +318,43 @@ const BLADE_FRAG = /* glsl */ `
   }
 `;
 
+/**
+ * THE TRIP WEB's filled cell, floor: an ordinary danger flood with a hard
+ * border — paint means "move your feet", and this square means exactly that
+ * even while every wire around it means the opposite.
+ */
+const CELL_FRAG = /* glsl */ `
+  ${COMMON}
+  void main(){
+    vec3 col = warnColor();
+    float a = 0.07 + 0.5 * uFill;
+    float e = min(min(vUv.x, 1.0 - vUv.x), min(vUv.y, 1.0 - vUv.y));
+    a += (1.0 - smoothstep(0.02, 0.06, e)) * (0.3 + 0.6 * uFill);
+    a *= pulse();
+    gl_FragColor = vec4(col, a);
+  }
+`;
+
+/**
+ * THE TRIP WEB's filled cell, walls: a column of the same danger rising to
+ * the web's true ceiling — dense at the floor, thinning as it climbs, with
+ * slow bands drifting UP so the volume reads as rising rather than hanging.
+ * vUv.y runs 0 at the floor to 1 at WIRE_TOP.
+ */
+const CELLWALL_FRAG = /* glsl */ `
+  ${COMMON}
+  void main(){
+    vec3 col = warnColor();
+    float a = mix(0.34, 0.05, vUv.y) * (0.25 + 0.75 * uFill);
+    float band = step(0.78, fract(vUv.y * 4.0 - uTime * 0.9));
+    a += band * 0.08 * uFill;
+    // A bright lip at the very top — the hitbox's honest ceiling.
+    a += (1.0 - smoothstep(0.0, 0.05, 1.0 - vUv.y)) * 0.3 * uFill;
+    a *= pulse();
+    gl_FragColor = vec4(col, a);
+  }
+`;
+
 function warnMat(frag: string, extra: Record<string, { value: number }> = {}): ShaderMaterial {
   return new ShaderMaterial({
     uniforms: { uFill: { value: 0 }, uTime: { value: 0 }, ...extra },
@@ -526,6 +563,117 @@ export function railTelegraph(halfDepth: number, length: number, from: 1 | -1): 
   // The sign puts v = 1, where the fill front starts, on the emitter side.
   strip.rotation.set(-Math.PI / 2, 0, (from * Math.PI) / 2);
   return makeTelegraph([strip], [mat]);
+}
+
+/* ── THE TRIP WEB's grid ────────────────────────────────────────────────
+ * The six wires cut the deck into a 4×4 of CELLS. Both the telegraph (a
+ * filled cell is a column of danger) and the judge (standing in one at the
+ * discharge is a hit) need the same rectangles, so the cell math lives
+ * here, next to the wires that define it. Index = cx + cz * 4.
+ */
+const WIRE_FRACS = [-0.5, -0.32, 0, 0.32, 0.5] as const;
+/** The web's hitbox is honest to here — eye level, where the discharge
+ *  visibly sweeps. */
+export const WIRE_TOP = 1.6;
+
+export interface CellRect {
+  x0: number;
+  x1: number;
+  z0: number;
+  z1: number;
+}
+
+export function wireCellRect(idx: number, width: number, depth: number): CellRect {
+  const cx = idx % 4;
+  const cz = Math.floor(idx / 4);
+  return {
+    x0: WIRE_FRACS[cx] * width,
+    x1: WIRE_FRACS[cx + 1] * width,
+    z0: WIRE_FRACS[cz] * depth,
+    z1: WIRE_FRACS[cz + 1] * depth,
+  };
+}
+
+/**
+ * THE TRIP WEB: a shin-high lattice of laser wire strung across the whole
+ * deck. The base move draws NO safe ground, because there isn't any: the
+ * answer is to stop moving. Deliberately air-only (floor paint says "move
+ * your feet" in every other move) and deliberately dense: from anywhere on
+ * the deck a wire crosses your view, so "stepping breaks one of these"
+ * needs no explaining. Each wire is a short vertical ribbon — a flat one
+ * at shin height is edge-on from standing and renders as nothing.
+ *
+ * From act 2 the web starts arriving with CELLS FILLED IN: columns of
+ * danger rising off chosen squares of the grid, floor to eye level, amber
+ * filling to red like every other zone. A filled cell is ground you must
+ * NOT be standing on when the web goes off — so the late-act web asks for
+ * both verbs in order: get out of the filled squares while the charge is
+ * young, then freeze where you stand. The floor paint under each column
+ * keeps the law: paint means move.
+ */
+export function wireTelegraph(width: number, depth: number, y: number, filled: readonly number[] = []): Telegraph {
+  const meshes: Mesh[] = [];
+  const mats: ShaderMaterial[] = [];
+  const h = 0.075;
+  // Wires across (facing the stage) and wires down the deck, woven into a
+  // grid — the crossings are what make it read as a web and not as rails.
+  for (const dz of [-depth * 0.34, 0, depth * 0.34]) {
+    const mat = warnMat(BLADE_FRAG);
+    const wire = new Mesh(new PlaneGeometry(width, h), mat);
+    wire.position.set(0, y, dz);
+    meshes.push(wire);
+    mats.push(mat);
+  }
+  for (const dx of [-width * 0.32, 0, width * 0.32]) {
+    const mat = warnMat(BLADE_FRAG);
+    const wire = new Mesh(new PlaneGeometry(depth, h), mat);
+    wire.position.set(dx, y, 0);
+    wire.rotation.y = Math.PI / 2;
+    meshes.push(wire);
+    mats.push(mat);
+  }
+  // The emitter posts the web is strung between — off at the deck corners,
+  // so the danger still owns the air and nothing paints the ground.
+  for (const sx of [-1, 1] as const) {
+    for (const sz of [-1, 1] as const) {
+      const mat = warnMat(BLADE_FRAG);
+      const post = new Mesh(new PlaneGeometry(0.06, y * 2), mat);
+      post.position.set((sx * width) / 2, y, (sz * depth) / 2);
+      post.rotation.y = Math.PI / 4;
+      meshes.push(post);
+      mats.push(mat);
+    }
+  }
+  // The filled cells: a floor pane (paint = move) and a four-walled open
+  // column running the full height of the web's hitbox.
+  for (const idx of filled) {
+    const r = wireCellRect(idx, width, depth);
+    const cw = r.x1 - r.x0;
+    const cd = r.z1 - r.z0;
+    const cx = (r.x0 + r.x1) / 2;
+    const cz = (r.z0 + r.z1) / 2;
+    const floorMat = warnMat(CELL_FRAG);
+    const pane = new Mesh(new PlaneGeometry(cw, cd), floorMat);
+    pane.rotation.x = -Math.PI / 2;
+    pane.position.set(cx, 0.045, cz);
+    meshes.push(pane);
+    mats.push(floorMat);
+    const wallH = WIRE_TOP;
+    for (const [wx, wz, ww, yaw] of [
+      [cx, r.z0, cw, 0],
+      [cx, r.z1, cw, 0],
+      [r.x0, cz, cd, Math.PI / 2],
+      [r.x1, cz, cd, Math.PI / 2],
+    ] as const) {
+      const wallMat = warnMat(CELLWALL_FRAG);
+      const wall = new Mesh(new PlaneGeometry(ww, wallH), wallMat);
+      wall.position.set(wx, wallH / 2, wz);
+      wall.rotation.y = yaw;
+      meshes.push(wall);
+      mats.push(wallMat);
+    }
+  }
+  return makeTelegraph(meshes, mats);
 }
 
 /**

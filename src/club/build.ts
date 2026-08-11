@@ -1386,11 +1386,8 @@ export function buildFoyer(scene: Scene): FoyerRefs {
     g.shadowColor = 'rgba(255,196,110,0.85)';
     g.shadowBlur = 16;
     g.font = `500 74px Georgia, serif`;
-    g.fillText('T H E   F L O O R', sw / 2, sh * 0.4);
+    g.fillText('T H E   F L O O R', sw / 2, sh * 0.55);
     g.shadowBlur = 0;
-    g.font = `400 30px Georgia, serif`;
-    g.fillStyle = 'rgba(232,217,176,0.7)';
-    g.fillText('host or join a room — the portal does the rest', sw / 2, sh * 0.82);
   });
   floorSign.name = 'live-floor-sign';
   floorSign.position.set(0, 3.05, -3.4);
@@ -1415,13 +1412,8 @@ export function buildFoyer(scene: Scene): FoyerRefs {
     g.fillStyle = 'rgba(232,236,242,0.88)';
     g.font = `900 32px 'Arial Black', system-ui, sans-serif`;
     ['OPENING SET', 'PEAK HOURS', 'AFTER HOURS'].forEach((line, i) => {
-      g.fillText(line, sw / 2, 200 + i * 92);
+      g.fillText(line, sw / 2, 220 + i * 100);
     });
-    g.fillStyle = css(PALETTE.magenta);
-    g.shadowColor = css(PALETTE.magenta);
-    g.shadowBlur = 10;
-    g.font = `700 24px 'Arial Black', system-ui, sans-serif`;
-    g.fillText('THE GOOP GUARDS EVERY THIRD', sw / 2, sh - 74, sw - 70);
   });
   bill.name = 'live-bill';
   bill.rotation.y = -0.7;

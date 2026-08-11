@@ -167,16 +167,18 @@ export class HudSystem extends createSystem({}) {
     this.strip.visible = inSet && !cardUp;
     if (this.strip.visible) this.strip.lookAt(_head);
     if (cardUp) {
-      if (podium) {
-        // The letter is the moment — hang it at eye line, big, facing you.
-        this.card.position.set(0, 1.34, -1.55);
-        this.card.scale.setScalar(1.5);
-        this.card.lookAt(_head);
-      } else {
-        // A card you read with the chin down while the record cues.
+      if (match.goopling && !podium) {
+        // The lesson stays LOW — it hangs around while you dodge, and eye
+        // level would stand between you and the goopling teaching it.
         this.card.position.set(0, 0.62, -1.06);
         this.card.scale.setScalar(1);
         this.card.rotation.set(-0.5, 0, 0);
+      } else {
+        // The count-in and the grade are MOMENTS — hang them at eye line,
+        // big, facing you. Nothing else is happening; nothing is blocked.
+        this.card.position.set(0, 1.42, -1.55);
+        this.card.scale.setScalar(podium ? 1.5 : 1.3);
+        this.card.lookAt(_head);
       }
     }
 
@@ -270,27 +272,26 @@ export class HudSystem extends createSystem({}) {
     if (!Number.isFinite(match.beat)) {
       // The record is still decoding — the clock stays parked until it's
       // ready, so nothing can land early.
-      ink(g, 'CUEING THE RECORD…', CW / 2, CH / 2, 46, '#ffd9f6', CW - 60);
+      ink(g, 'CUEING…', CW / 2, CH / 2, 46, '#ffd9f6');
       this.cardTex.needsUpdate = true;
       return;
     }
 
+    // Clean: the number, the record, and (on tour) the night. No slogan.
     const cued = trackById(match.trackId);
-    ink(g, 'THE SET DROPS IN', CW / 2, 64, 40, '#ffd9f6');
-    // Tour nights announce themselves on the card.
     if (match.tour) {
       const set = TOUR.sets[match.tour.set];
       ink(
         g,
-        `${set?.name ?? 'THE TOUR'} — NIGHT ${match.tour.song + 1}`,
+        `${set?.name ?? 'THE TOUR'} · ${match.tour.song + 1}`,
         CW / 2,
-        112,
+        58,
         26,
         SET_COLORS[match.tour.set % SET_COLORS.length],
       );
     }
-    ink(g, `${Math.max(1, count)}`, CW / 2, CH / 2 + 22, 144, '#ff2ad5');
-    if (cued) ink(g, `♪ ${cued.title}`, CW / 2, CH - 44, 38, '#b9ffc4');
+    ink(g, `${Math.max(1, count)}`, CW / 2, CH / 2 - 4, 150, '#ff2ad5');
+    if (cued) ink(g, `♪ ${cued.title}`, CW / 2, CH - 52, 36, '#b9ffc4');
     this.cardTex.needsUpdate = true;
   }
 

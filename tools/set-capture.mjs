@@ -72,6 +72,17 @@ await shot('vr-foyer');
 // ── the SET: a full ring, live ────────────────────────────────────────────
 console.log('set:');
 await page.evaluate(() => window.__gdr.startRaid({ seats: 24 }));
+// The count-in card, at eye level, while the record cues.
+await page
+  .waitForFunction(
+    () => window.__gdr.match.screen === 'countdown' && Number.isFinite(window.__gdr.match.beat) && window.__gdr.match.beat < -0.6,
+    { timeout: 30000, polling: 100 },
+  )
+  .then(async () => {
+    await page.waitForTimeout(150);
+    await shot('vr-countin');
+  })
+  .catch(() => console.log('  (count-in too quick to catch)'));
 await page.waitForFunction(
   () => window.__gdr.match.screen === 'raid' && Number.isFinite(window.__gdr.match.beat) && window.__gdr.match.beat > 1,
   { timeout: 90000, polling: 200 },
@@ -168,6 +179,26 @@ await page.waitForTimeout(450); // roughly a beat into the two-beat fall
 await shot('vr-blockfall-mid');
 await page.waitForTimeout(700); // the landing + crush
 await shot('vr-blockfall-crush');
+
+// ── THE TRIP WEB v2: filled columns, then the upward discharge ───────────
+console.log('web:');
+await page.evaluate(() => window.__gdr.choreo.dropWire(3));
+// Mid-charge: the lattice plus the filled columns rising to eye level.
+await page.waitForTimeout(1400);
+await shot('vr-web-filled');
+// The discharge: a 0.48 s flash, so BURST — start just before the due
+// beat and take three quick frames; headless screenshot latency decides
+// which one lands mid-sweep.
+const wireWait = await page.evaluate(() => {
+  const z = window.__gdr.choreo.zones.find((q) => q.zone.kind === 'wire');
+  if (!z) return 0;
+  return Math.max(0, (z.dueBeat - window.__gdr.match.beat) * window.__gdr.match.beatLen * 1000);
+});
+await page.waitForTimeout(Math.max(0, wireWait - 40));
+await shot('vr-web-discharge');
+await shot('vr-web-discharge2');
+await shot('vr-web-discharge3');
+await page.waitForTimeout(700);
 
 // One wide look from the deck's rear rim — the architecture shot. Freeze
 // the judge first: a strike landing at point-blank is meant to blind you,

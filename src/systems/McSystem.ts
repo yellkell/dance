@@ -404,6 +404,26 @@ export class McSystem extends createSystem({}) {
         p.yaw = s * 0.18;
         break;
       }
+      case 'wire': {
+        // THE TRIP WEB: one flat palm out — STOP — and then he goes utterly
+        // rigid. Everything else on this stage eases and sways; a giant who
+        // has stopped dead is the loudest instruction in the show. He holds
+        // it through the snap, then lets go.
+        const settle = Math.min(1, u * 2.2); // arm rises once, early
+        p.lx = -0.34; p.ly = 0.8; p.lz = -0.06;
+        p.rx = 0.06 + settle * 0.1;
+        p.ry = 0.95 + settle * 0.42;
+        p.rz = -0.3 - settle * 0.3;
+        p.hy = STAND;
+        p.yaw = 0;
+        // Not one part of him moves with the beat — no pump term anywhere.
+        if (strike > 0.6) {
+          // The web lets go and the giant unclenches with it.
+          p.ry -= (strike - 0.6) * 0.5;
+          p.rz += (strike - 0.6) * 0.25;
+        }
+        break;
+      }
       case 'routine': {
         // TEACHING THE ROUTINE: he walks the corners in order, stabbing a
         // stick at each one in turn, so a dancer who never looks down can

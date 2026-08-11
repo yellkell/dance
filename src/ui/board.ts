@@ -81,10 +81,14 @@ export class HoloBoard {
     g.clearRect(0, 0, W, H);
     g.textBaseline = 'middle';
 
-    g.shadowColor = accentCss;
-    g.shadowBlur = 18;
-    ink(g, title, W / 2, 64, 64, accentCss, 'center');
-    g.shadowBlur = 0;
+    // A live board carries NO header — the rows are self-evident and the
+    // words were noise. The podium still gets its moment (title + winner).
+    if (title) {
+      g.shadowColor = accentCss;
+      g.shadowBlur = 18;
+      ink(g, title, W / 2, 64, 64, accentCss, 'center');
+      g.shadowBlur = 0;
+    }
     if (subtitle) ink(g, subtitle, W / 2, 126, 28, 'rgba(240,243,248,0.95)', 'center', W - 60);
 
     const top = 176;

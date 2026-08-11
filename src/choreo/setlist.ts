@@ -33,6 +33,9 @@ export type Zone =
   /** The crossfire's side laser: a strip ACROSS the deck at local z, fed
    *  from the rail on `from` — step forward or back off it. */
   | { kind: 'rail'; z: number; halfD: number; from: 1 | -1 }
+  /** The trip web: no ground to move to — the whole deck is strung with
+   *  laser wire and the dodge is holding still until it clears. */
+  | { kind: 'wire'; hold: number; filled: readonly number[] }
   /** The rim burns, the middle lives — everything outside `innerR` is
    *  doomed, so the whole ring collapses toward its own centre. */
   | { kind: 'donut'; innerR: number }
@@ -200,7 +203,18 @@ function buildLandings(kind: MoveKind, landBeat: number, act: number, rng: () =>
         zone: { kind: 'quad', corner, step, routine },
       });
     });
-    } else if (kind === 'sweep') {
+  } else if (kind === 'wire') {
+    // From act 2 the web arrives with cells FILLED IN — columns you must
+    // vacate before you freeze. Distinct squares of the 4×4 grid, rolled
+    // off the same seeded stream as everything else.
+    const fillCount = CHOREO.wireFillCells[Math.min(act, CHOREO.wireFillCells.length - 1)];
+    const filled: number[] = [];
+    while (filled.length < fillCount) {
+      const c = Math.floor(rng() * 16);
+      if (!filled.includes(c)) filled.push(c);
+    }
+    landings.push({ beat: landBeat, zone: { kind: 'wire', hold: CHOREO.wireHoldBeats, filled } });
+  } else if (kind === 'sweep') {
     landings.push({ beat: landBeat, zone: { kind: 'sweep' } });
   } else if (kind === 'gate') {
     landings.push({
