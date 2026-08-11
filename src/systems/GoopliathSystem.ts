@@ -34,40 +34,38 @@ import * as sfx from '../audio/sfx.js';
 import { arena } from '../arena/arena.js';
 import { GelCreature } from '../goopliath/GelCreature.js';
 import { CREATURE, ATTACKS, type AttackName } from '../goopliath/goopConfig.js';
-import { DANCE_COMBOS, LESSON_COMBO } from '../goopliath/dancePoses.js';
+import { DANCE_COMBOS } from '../goopliath/dancePoses.js';
 import { GooFx } from '../goopliath/splats.js';
 import { roll } from '../game/rng.js';
 import { match, phraseBeats, type GestureCue } from '../game/state.js';
 import { choreoView } from './ChoreoSystem.js';
 
 const GESTURE: Record<MoveKind, AttackName> = {
-  slam: 'overhand',
   beam: 'cross',
   sweep: 'backfist',
   seesaw: 'clap',
   surge: 'spinkick',
   gate: 'hook', // the wide arm swinging the doors shut
-  chase: 'cross', // the straight hunting punch, eyes on you
   nova: 'uppercut',
   cross: 'backfist', // thrown sideways, across the body — the side laser
   wire: 'clap', // both limbs snapping shut: the web goes taut
   donut: 'clap', // both arms hauling the rim in on the middle
+  duckdonut: 'clap', // rim hauled in while the blade swings
   routine: 'overhand', // the slabs coming down on three quarters
 };
 
 /** The quick follow-up strikes inside a multi-landing move. */
 const STEP_GESTURE: Record<MoveKind, AttackName> = {
-  slam: 'jab',
   beam: 'jab',
   sweep: 'hook',
   seesaw: 'hook',
   surge: 'roundhouse',
   gate: 'jab',
-  chase: 'jab',
   nova: 'jab',
   cross: 'backfist',
   wire: 'jab',
   donut: 'hook', // the wide arm sweeping the rim inward
+  duckdonut: 'hook',
   routine: 'overhand', // one drop per step of the routine
 };
 
@@ -113,7 +111,7 @@ export class GoopliathSystem extends createSystem({}) {
 
   private rebuild(): void {
     this.generation = match.generation;
-    const scale = match.goopling ? match.goopling.scale : GOOP.scale;
+    const scale = GOOP.scale;
     const z = -ringRadius(match.seats);
 
     if (!this.goop) {
@@ -150,7 +148,7 @@ export class GoopliathSystem extends createSystem({}) {
     // The green room is goop-free: the raymarched gel is the most expensive
     // draw in the game, and idling it on a menu was pure lag. He appears
     // where he performs — rehearsals, finales, the eat — and nowhere else.
-    const menuRoom = match.screen === 'lobby' || match.screen === 'map' || match.screen === 'tour';
+    const menuRoom = match.screen === 'lobby' || match.screen === 'tour';
     if (menuRoom || (raidish && match.bossKind !== 'goop')) {
       root.visible = false;
       return;
@@ -226,10 +224,7 @@ export class GoopliathSystem extends createSystem({}) {
       if (bar !== this.lastBar && !melting) {
         this.lastBar = bar;
         const block = Math.floor(bar / 4);
-        const combo =
-          match.screen === 'tutorial'
-            ? LESSON_COMBO
-            : DANCE_COMBOS[Math.floor(roll(match.seed, 0xda9ce, block) * DANCE_COMBOS.length)];
+        const combo = DANCE_COMBOS[Math.floor(roll(match.seed, 0xda9ce, block) * DANCE_COMBOS.length)];
         goop.setFightStyle(combo[((bar % 2) + 2) % 2].pose);
       }
 

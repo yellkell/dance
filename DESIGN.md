@@ -42,10 +42,10 @@ win condition from "kill the titan" to "outlast the floor".
 | Phrases | Act | Moves/phrase | Rest | New |
 | --- | --- | --- | --- | --- |
 | 0 | intro | 0 | — | count-in, dance, calibrate |
-| 1–3 | 0 | 2 | 4 beats | slam, sweep |
-| 4–7 | 1 | 3 | 3 beats | beam, seesaw, 2-disc slams, claps on 2 & 4 |
-| 8–10 | 2 | 4 | 2 beats | surge, nova, double beams, rave stabs |
-| 11–13 | 3 | 5 | 1 beat | 3-disc slams, 5-stage seesaws, tight novas |
+| 1–3 | 0 | 2 | 4 beats | beam, sweep, seesaw, gate, crossfire |
+| 4–7 | 1 | 3 | 3 beats | trip web, donut one-twos, the routine |
+| 8–10 | 2 | 4 | 2 beats | surge, nova, rail traps, double beams |
+| 11–13 | 3 | 5 | 1 beat | duck donut, 5-stage seesaws, tight novas |
 
 Ends at the final downbeat — or the moment one dancer remains.
 
@@ -74,8 +74,15 @@ lifts are **absolute**, so the raising effect never switches off just
 because you happen to be winning. The VR height law holds: your platform
 is your real floor and can never move, nothing ever renders below the
 common floor, and nobody ever reads as SHORT — decks only rise, on lit
-pedestal columns. Your own lift is something only the others see, the
-stage never sinks, and the eliminated dim out instead of dropping.
+pedestal columns, and the eliminated dim out instead of dropping.
+
+Your own lift can't move your floor, so it moves **everything else**:
+when you lead, the whole show — stage, boss, board, void — eases DOWN by
+your tier (THE RISE), and for as long as you hold #1 it keeps sinking at
+0.09 m/s, up to +4.4 m (THE CLIMB), until the boss's crown is below your
+eye line. Other decks ride the same drop (`tier − sunk`), so relative
+heights stay honest on every client; lose the lead and it drains back at
+double speed.
 
 ## Determinism (the multiplayer model)
 
@@ -99,18 +106,10 @@ its clock at 0.55× so it reads as tons, not jelly. Dance layer: agitation
 pulses on every kick; each phrase he re-pours into a different FIRE FIGHT
 fighting-style silhouette (the styles make excellent dance stances); he
 drifts a lazy orbit and always faces you (every client sees him watching
-them). Move gestures reuse the boxing moveset as tells: overhand = slam,
+them). Move gestures reuse the boxing moveset as tells:
 cross = beam, backfist spin = sweep, clap = seesaw, spin-kick = surge,
 uppercut = nova. Raymarch budget drops while a limb is extended (the exact
 frame-spike moment), exactly as in FIRE FIGHT.
-
-## Rehearsal campaign
-
-Five gooplings, one move each, at 100–112 BPM, on a private one-seat ring:
-GOOPLET (slam) → DRIZZLE (beam) → SLOSHA (sweep) → BIG SPILL (seesaw) →
-GLOBULON (nova). Clear N reps of the move to pass; progress in localStorage;
-clearing the row flags you RAVE READY. Same ChoreoSystem, same judge — a
-lesson is just a set-list with one song and one move.
 
 ## THE CLUB, THE VOID, and the three places
 

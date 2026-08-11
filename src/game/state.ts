@@ -4,7 +4,7 @@
  * a couple of tiny queues ("buses") for cross-system one-shots.
  */
 
-import { BOTS, GOOPLINGS, GRADE, MUSIC, RING, seatHue, type GooplingDef, type MoveKind } from '../config.js';
+import { BOTS, GRADE, MUSIC, RING, seatHue, type MoveKind } from '../config.js';
 import { mix, mulberry32 } from './rng.js';
 
 export type Screen =
@@ -12,9 +12,7 @@ export type Screen =
   | 'countdown' // seats locked, music counting in
   | 'raid' // the set is live
   | 'podium' // set over — winner on high, board frozen
-  | 'map' // rehearsal map (move lessons)
-  | 'tour' // the campaign screen: sets of nights
-  | 'tutorial'; // one goopling teaching one move
+  | 'tour'; // the campaign screen: sets of nights
 
 export interface Dancer {
   seat: number;
@@ -51,8 +49,8 @@ export interface Dancer {
 export interface GestureCue {
   kind: MoveKind;
   chargeBeats: number;
-  /** A follow-up strike inside a multi-landing move (seesaw halves, slam
-   *  drumline steps) — a quick jab/hook, not the full wind-up. */
+  /** A follow-up strike inside a multi-landing move (seesaw halves,
+   *  routine steps) — a quick jab/hook, not the full wind-up. */
   step?: boolean;
   /** Directional payload so the MC's body can ACT the move out: sweep entry
    *  side / seesaw-surge doomed side (platform-local sign). */
@@ -65,7 +63,7 @@ export interface GestureCue {
    *  he points each one out in turn while the marks are still lit. */
   routine?: readonly number[];
   /** The landing this cue charges toward (song beats) — lets the MC time
-   *  its strike snap and the chase lock without re-deriving the set-list. */
+   *  its strike snap without re-deriving the set-list. */
   dueBeat?: number;
 }
 
@@ -78,7 +76,7 @@ export interface Flair {
 export interface MatchState {
   screen: Screen;
   /** What the countdown counts into. */
-  after: 'raid' | 'tutorial';
+  after: 'raid';
   /** Bumped whenever the roster/seed/mode changes — systems that build
    *  things (arena, set-list, music) rebuild when they see a new number. */
   generation: number;
@@ -127,13 +125,10 @@ export interface MatchState {
   gestures: GestureCue[];
   flairs: Flair[];
 
-  /* ── tutorial ── */
-  goopling: GooplingDef | null;
-  tutorialClears: number;
 
   /* ── the headliner ── */
   /** Who runs the stage this match: the MC most nights, the GOOP on
-   *  finales (and in every tutorial, as a goopling). */
+   *  finales. */
   bossKind: 'mc' | 'goop';
   /** Finale gel recolour (null = classic green). */
   goopTint: { shallow: number; deep: number; nucleus: number } | null;
@@ -176,8 +171,6 @@ export const match: MatchState = {
   grooveScore: 0,
   gestures: [],
   flairs: [],
-  goopling: null,
-  tutorialClears: 0,
   bossKind: 'mc',
   goopTint: null,
   eatIntro: false,
@@ -273,14 +266,14 @@ export function pushFlair(text: string, tone: Flair['tone']): void {
 
 /**
  * Where each NON-LOCAL dancer currently stands on their own deck
- * (platform-local x/z), written by AvatarSystem every frame — the chase
- * discs hunt these. The local player's spot is match.headX/Z directly.
+ * (platform-local x/z), written by AvatarSystem every frame — zone judges
+ * read these. The local player's spot is match.headX/Z directly.
  */
 export const liveSpots = new Map<number, { x: number; z: number }>();
 
 /* ── tour progress (localStorage) ─────────────────────────────────────── */
 
-import { CAMPAIGN_KEY, TOUR, TOUR_KEY } from '../config.js';
+import { TOUR, TOUR_KEY } from '../config.js';
 
 export function clearedTourNights(): Set<string> {
   try {
@@ -314,35 +307,3 @@ export function tourNightUnlocked(set: number, song: number): boolean {
   return true;
 }
 
-/* ── rehearsal progress (localStorage) ────────────────────────────────── */
-
-export function clearedGooplings(): Set<string> {
-  try {
-    const raw = localStorage.getItem(CAMPAIGN_KEY);
-    if (!raw) return new Set();
-    return new Set(JSON.parse(raw) as string[]);
-  } catch {
-    return new Set();
-  }
-}
-
-export function markGooplingCleared(id: string): void {
-  const set = clearedGooplings();
-  set.add(id);
-  try {
-    localStorage.setItem(CAMPAIGN_KEY, JSON.stringify([...set]));
-  } catch {
-    /* storage may be unavailable */
-  }
-}
-
-export function gooplingUnlocked(index: number): boolean {
-  if (index <= 0) return true;
-  const cleared = clearedGooplings();
-  return GOOPLINGS.slice(0, index).every((g) => cleared.has(g.id));
-}
-
-export function allGooplingsCleared(): boolean {
-  const cleared = clearedGooplings();
-  return GOOPLINGS.every((g) => cleared.has(g.id));
-}

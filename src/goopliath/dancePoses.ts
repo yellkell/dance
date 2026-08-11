@@ -159,6 +159,3 @@ export const DANCE_COMBOS: ReadonlyArray<readonly [DanceStance, DanceStance]> = 
   [STRUT, RAVE_Y],
   [POINT_R, FLOOR_STOMP],
 ];
-
-/** The gentle pair a goopling teaches to (rehearsals keep it readable). */
-export const LESSON_COMBO: readonly [DanceStance, DanceStance] = [POINT_L, POINT_R];

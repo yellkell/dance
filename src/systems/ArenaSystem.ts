@@ -20,7 +20,7 @@ export class ArenaSystem extends createSystem({}) {
     if (this.generation !== match.generation) this.rebuild();
     // The club is packed away while you're in the menus — the green room is
     // its own space; the ring materialises when a set is booked.
-    const menuRoom = match.screen === 'lobby' || match.screen === 'map' || match.screen === 'tour';
+    const menuRoom = match.screen === 'lobby' || match.screen === 'tour';
     const a = arena();
     if (a) a.root.visible = !menuRoom;
   }

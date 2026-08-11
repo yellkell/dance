@@ -4,10 +4,9 @@
  * The sweep, nova and flood are ported from FIRE FIGHT's latest strike kit
  * (the blade you can WATCH travel, the expanding shock ring, the settling
  * tide) — that readability contract survived a lot of playtesting and we
- * take it as-is. Two deliberate departures, kept because ours read better
- * for this game:
- *  - the BEAM stays a straight lane wall down the deck, never aimed;
- *  - the SLAM stays the goo column popping out of the disc.
+ * take it as-is. One deliberate departure, kept because ours reads better
+ * for this game: the BEAM stays a straight lane wall down the deck, never
+ * aimed.
  *
  * Palette discipline (see config.ts): danger speaks hazard amber→red and
  * goo green ONLY — never the disco's magenta/cyan — so a strike can't be
@@ -146,41 +145,6 @@ export class StrikeFx {
     build(group);
     parent.add(group);
     this.live.push({ group, age: 0, life, tick, step });
-  }
-
-  /** OURS, kept: the goo column crashing out of the slam disc — plus a
-   *  white-hot floor flash so the landing frame is unmistakable. */
-  slam(parent: Object3D, x: number, z: number): void {
-    this.spawn(
-      parent,
-      0.5,
-      (k, g) => {
-        const col = g.children[0] as Mesh;
-        col.scale.set(1 + k * 0.4, Math.max(0.05, 1 - k * k), 1 + k * 0.4);
-        (col.material as MeshBasicMaterial).opacity = 0.8 * (1 - k);
-        const ring = g.children[1] as Mesh;
-        ring.scale.setScalar(1 + k * 2.4);
-        (ring.material as MeshBasicMaterial).opacity = 0.8 * (1 - k);
-        const flash = g.children[2] as Mesh;
-        (flash as unknown as { material: { opacity: number } }).material.opacity = 0.95 * (1 - k) * (1 - k);
-        flash.scale.setScalar(1.1 * (1 + k * 1.6));
-      },
-      (g) => {
-        const col = new Mesh(new CylinderGeometry(CHOREO.slamRadius * 0.75, CHOREO.slamRadius, 0.9, 10), basic(GOO, 0.8));
-        col.position.set(x, 0.45, z);
-        g.add(col);
-        const ring = new Mesh(new RingGeometry(CHOREO.slamRadius * 0.85, CHOREO.slamRadius * 1.05, 24), basic(0xbaffc4, 0.8));
-        ring.rotation.x = -Math.PI / 2;
-        ring.position.set(x, DECAL_Y + 0.005, z);
-        g.add(ring);
-        const flash = glowSprite(HOT, 1.1, 0.95);
-        flash.position.set(x, 0.12, z);
-        g.add(flash);
-        const halo = glowSprite(GOO, 1.0, 0.9);
-        halo.position.set(x, 0.3, z);
-        g.add(halo);
-      },
-    );
   }
 
   /** The swing — a hanging goo CURTAIN travels the deck: all its mass is
@@ -480,40 +444,6 @@ export class StrikeFx {
           g.add(post);
         }
       },
-    );
-  }
-
-  /** The chase pounces: the hunter's column crashes on the LOCKED spot —
-   *  amber, not goo green, because this one was aimed at a dancer. */
-  chase(parent: Object3D, x: number, z: number, r: number): void {
-    const sparks = new Sparks(16, WARN);
-    let pounced = false;
-    this.spawn(
-      parent,
-      0.5,
-      (k, g) => {
-        const col = g.children[0] as Mesh;
-        col.scale.set(1 + k * 0.3, Math.max(0.05, 1 - k * k), 1 + k * 0.3);
-        (col.material as MeshBasicMaterial).opacity = 0.85 * (1 - k);
-        const ring = g.children[1] as Mesh;
-        ring.scale.setScalar(1 + k * 2.0);
-        (ring.material as MeshBasicMaterial).opacity = 0.85 * (1 - k);
-        if (!pounced) {
-          pounced = true;
-          sparks.emit(x, 0.15, z, 10, 1.4);
-        }
-      },
-      (g) => {
-        const col = new Mesh(new CylinderGeometry(r * 0.7, r, 1.1, 10), basic(WARN, 0.85));
-        col.position.set(x, 0.55, z);
-        g.add(col);
-        const ring = new Mesh(new RingGeometry(r * 0.85, r * 1.05, 24), basic(HOT, 0.85));
-        ring.rotation.x = -Math.PI / 2;
-        ring.position.set(x, DECAL_Y + 0.005, z);
-        g.add(ring);
-        g.add(sparks.points);
-      },
-      (dt) => sparks.step(dt),
     );
   }
 

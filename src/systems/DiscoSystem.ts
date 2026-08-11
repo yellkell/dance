@@ -54,10 +54,10 @@ export class DiscoSystem extends createSystem({}) {
 
     // The rig is part of the SET — packed away while you're in the menus'
     // places (the foyer and the club are ClubSystem's rooms).
-    const menuRoom = match.screen === 'lobby' || match.screen === 'map' || match.screen === 'tour';
+    const menuRoom = match.screen === 'lobby' || match.screen === 'tour';
     rig.root.visible = !menuRoom;
 
-    const live = match.playing && (match.screen === 'raid' || match.screen === 'tutorial');
+    const live = match.playing && match.screen === 'raid';
     const onBeat = Number.isFinite(match.beat);
     let energy = live ? 1 : match.screen === 'countdown' ? 0.6 : onBeat ? 0.45 : 0.25;
     const beat = onBeat ? match.beat : performance.now() / 1000 / match.beatLen / 4;
@@ -76,7 +76,7 @@ export class DiscoSystem extends createSystem({}) {
 
     // ── THE VOID: the set's world, whenever a set (or its podium) is up ──
     const inSet =
-      match.screen === 'countdown' || match.screen === 'raid' || match.screen === 'tutorial' || match.screen === 'podium';
+      match.screen === 'countdown' || match.screen === 'raid' || match.screen === 'podium';
     this.env.setActive(inSet);
     if (inSet) {
       // The void centres on the stage, like the rig.

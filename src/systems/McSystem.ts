@@ -6,7 +6,6 @@
  * while it charges, so the tell lives at EYE LEVEL in silhouette instead of
  * on the floor:
  *
- *  slam   : both sticks pump OVERHEAD, then crash down on the landing.
  *  beam   : both sticks thrust straight forward, parallel — a lane.
  *  sweep  : one arm out FLAT at neck height on the entry side, cocked back —
  *           then swung across on the landing while HE DUCKS UNDER IT himself.
@@ -15,10 +14,10 @@
  *           palms-out push (near half dies).
  *  gate   : sticks straight up, parallel and narrow — the gap itself —
  *           leaning to stand the "doorway" over the safe column's side.
- *  chase  : one stick tracks you, wagging on the beat — and FREEZES rigid
- *           the moment the disc locks. The freeze is the juke cue.
  *  nova   : arms spread wide and the whole figure winds a slow full spin,
  *           snapping arms down on the burst.
+ *  donut  : arms thrown wide, then hauled in — the gather.
+ *  duckdonut: the gather AND the limbo at once — get close and get small.
  *
  * While a move charges, his sticks and trim burn WARN amber (danger speaks
  * amber, always); between moves he does exactly the groupies' dance — one
@@ -136,7 +135,7 @@ export class McSystem extends createSystem({}) {
 
     // The GREEN ROOM: on menu screens he poses beside the board — the
     // live-service lobby hero, grooving to the room loop.
-    const menuRoom = match.screen === 'lobby' || match.screen === 'map' || match.screen === 'tour';
+    const menuRoom = match.screen === 'lobby' || match.screen === 'tour';
 
     // The MC works raid nights (and their podiums). The goop keeps every
     // rehearsal — and takes the stage mid-count-in on finale nights, over
@@ -286,16 +285,6 @@ export class McSystem extends createSystem({}) {
     p.hy = STAND;
 
     switch (mime.cue.kind) {
-      case 'slam': {
-        // Overhead pump → crash down.
-        const lift = 0.55 + u * 0.35 + pump * 0.12;
-        const y = strike < 1 ? STAND + lift * (1 - strike * 1.6) : STAND - 0.75;
-        p.hy = STAND - strike * 0.35;
-        p.lx = -0.22; p.rx = 0.22;
-        p.ly = p.ry = Math.max(0.45, y);
-        p.lz = p.rz = -0.15 - strike * 0.2;
-        break;
-      }
       case 'beam': {
         // Twin rails, dead ahead (his forward IS toward the crowd).
         const reach = 0.35 + u * 0.3 + strike * 0.25;
@@ -363,19 +352,6 @@ export class McSystem extends createSystem({}) {
         p.ly = p.ry = STAND + 0.75 + u * 0.15 - strike * 0.5;
         p.lz = p.rz = -0.1;
         p.yaw = s * 0.2;
-        break;
-      }
-      case 'chase': {
-        // The hunt: one stick tracking, wagging on the beat — FROZEN rigid
-        // from the lock beat (the disc under your feet freezes at the same
-        // moment; his stillness IS the juke cue).
-        const locked = beat >= mime.dueBeat - 1.25;
-        const wag = locked ? 0 : Math.sin(beat * Math.PI * 2) * 0.12;
-        p.rx = 0.15 + wag;
-        p.ry = 1.25 - strike * 0.45;
-        p.rz = -0.55 - u * 0.15 - strike * 0.2;
-        p.lx = -0.32; p.ly = 0.85; p.lz = -0.05;
-        p.hy = STAND - (locked ? 0.08 : 0);
         break;
       }
       case 'cross': {
@@ -485,6 +461,17 @@ export class McSystem extends createSystem({}) {
         p.lz = p.rz = -0.32 + strike * 0.24;
         // He crouches into the huddle he's demanding.
         p.hy = STAND - strike * 0.18;
+        break;
+      }
+      case 'duckdonut': {
+        // DUCK DONUT: the gather and the limbo in one body — arms thrown
+        // wide and HAULED in as the rim closes, the whole figure sinking
+        // under the blade it drags with it. Get close AND get small.
+        const wide = 0.78 - strike * 0.68;
+        p.lx = -wide; p.rx = wide;
+        p.ly = p.ry = 1.3 - strike * 0.55 + pump * 0.04;
+        p.lz = p.rz = -0.3 + strike * 0.2;
+        p.hy = STAND - u * 0.1 - strike * (STAND - DUCK - 0.1);
         break;
       }
       case 'nova': {

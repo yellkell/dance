@@ -37,7 +37,7 @@ export class ClubBallSystem extends createSystem({}) {
 
   update(delta: number): void {
     const inClub =
-      (match.screen === 'lobby' || match.screen === 'map' || match.screen === 'tour') &&
+      (match.screen === 'lobby' || match.screen === 'tour') &&
       (net.phase === 'hosting' || net.phase === 'joined');
     const ballUp = inClub && net.ball !== null;
     this.holder.visible = ballUp;

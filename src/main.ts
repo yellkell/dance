@@ -134,7 +134,7 @@ World.create(container, {
 // Dev/debug hook: drive the flow from the console (or a headless test)
 // without controllers — e.g. __gdr.startRaid({ seats: 8 }), or walk the
 // club with __gdr.net.host() + __gdr.rig(x, z, yaw).
-import { finishRaid, startRaid, startTutorial, toLobby, toMap, toTour } from './game/flow.js';
+import { finishRaid, startRaid, toLobby, toTour } from './game/flow.js';
 import { match } from './game/state.js';
 import { arena } from './arena/arena.js';
 import { choreoView } from './systems/ChoreoSystem.js';
@@ -146,9 +146,7 @@ declare global {
   interface Window {
     __gdr?: {
       startRaid: typeof startRaid;
-      startTutorial: typeof startTutorial;
       toLobby: typeof toLobby;
-      toMap: typeof toMap;
       toTour: typeof toTour;
       /** Drop the needle early: jump a live set straight to its grade. */
       endSet: typeof finishRaid;
@@ -176,9 +174,7 @@ declare global {
 }
 window.__gdr = {
   startRaid,
-  startTutorial,
   toLobby,
-  toMap,
   toTour,
   endSet: finishRaid,
   info: () => {

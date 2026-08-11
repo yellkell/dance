@@ -193,7 +193,7 @@ export class ClubTeleportSystem extends createSystem({}) {
     // Movement belongs to the SOCIAL place only: the club floor, which is
     // open while a room is (hosting/joined) on a menu screen. The foyer is
     // a front desk, and the raid is your real feet.
-    const menuRoom = match.screen === 'lobby' || match.screen === 'map' || match.screen === 'tour';
+    const menuRoom = match.screen === 'lobby' || match.screen === 'tour';
     const inClub = menuRoom && (net.phase === 'hosting' || net.phase === 'joined');
 
     // Leaving the floor — a set booked it, or you left the room: re-plant

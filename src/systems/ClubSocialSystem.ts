@@ -132,7 +132,7 @@ export class ClubSocialSystem extends createSystem({}) {
   }
 
   update(delta: number): void {
-    const inClub = match.screen === 'lobby' || match.screen === 'map' || match.screen === 'tour';
+    const inClub = match.screen === 'lobby' || match.screen === 'tour';
     const inRoom = net.phase === 'hosting' || net.phase === 'joined';
     const liveSet = net.phase === 'live';
 

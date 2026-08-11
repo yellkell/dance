@@ -330,7 +330,7 @@ export class PlayerSystem extends createSystem({}) {
 
   private groove(): void {
     const d = me();
-    const live = match.playing && (match.screen === 'raid' || match.screen === 'tutorial') && d?.alive;
+    const live = match.playing && match.screen === 'raid' && d?.alive;
     if (!live) {
       this.grooveSide = 0;
       this.streak = 0;

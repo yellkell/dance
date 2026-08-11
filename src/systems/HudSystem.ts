@@ -20,8 +20,8 @@
  * streak, so the row always reads "this run". The sparks off the sticks
  * are still the loud half of the answer; this is the quiet ledger.
  *
- * The count-in and the goopling's lesson still take the centre — they're
- * cards you READ while nothing is trying to kill you — and the flair pops
+ * The count-in and the final grade take the centre — they're cards you
+ * READ while nothing is trying to kill you — and the flair pops
  * (PERFECT! / HIT) ride high off to the right, where they can shout
  * without standing between you and the next landing.
  *
@@ -44,15 +44,15 @@ import { dodgeRate, gradeOf, match, me } from '../game/state.js';
 
 const SET_COLORS = ['#8cff70', '#ff6ee0', '#ffd24a'];
 
-/** The centre card (count-in / lesson). */
+/** The centre card (count-in / grade). */
 const CW = 768;
 const CH = 384;
 /** The wedge strip (live readout). */
 const SW = 512;
 const SH = 288;
 /** The groove's own colour — electric ice, never the seat's, so the two
- *  never blur. */
-const GROOVE_CSS = '#2fe0ff';
+ *  never blur. Turquoise, per the boss. */
+const GROOVE_CSS = '#1cf5c9';
 
 const _head = new Vector3();
 
@@ -109,11 +109,11 @@ function seatNeonCss(hue: number): string {
 }
 
 export class HudSystem extends createSystem({}) {
-  /** The centre card: count-in, "cueing", the goopling's lesson. */
+  /** The centre card: count-in, "cueing", the final grade. */
   private cardCanvas = document.createElement('canvas');
   private cardTex!: CanvasTexture;
   private card!: Mesh;
-  /** The monitor wedge: score / ×mult / lives, low off the front-left rim. */
+  /** The monitor wedge: the live readout, low off the front-left rim. */
   private stripCanvas = document.createElement('canvas');
   private stripTex!: CanvasTexture;
   private strip!: Mesh;
@@ -170,10 +170,10 @@ export class HudSystem extends createSystem({}) {
   }
 
   update(delta: number): void {
-    const inSet = match.screen === 'countdown' || match.screen === 'raid' || match.screen === 'tutorial';
+    const inSet = match.screen === 'countdown' || match.screen === 'raid';
     // The record is over: the grade owns the centre while the board reads
     // out the ranks behind it.
-    const podium = match.screen === 'podium' && !match.goopling;
+    const podium = match.screen === 'podium';
     _head.set(match.headX, match.headY, match.headZ);
 
     // Flair pops.
@@ -191,26 +191,18 @@ export class HudSystem extends createSystem({}) {
     this.flair.scale.set(pop, pop, 1);
     this.flairMat.opacity = fade;
 
-    // The lesson, the count-in and the final grade take the centre; the
-    // live game gets the wedge. (The goopling card owns the whole tutorial.)
-    const cardUp = podium || (inSet && (match.goopling !== null || match.screen === 'countdown'));
+    // The count-in and the final grade take the centre; the live game gets
+    // the wedge.
+    const cardUp = podium || (inSet && match.screen === 'countdown');
     this.card.visible = cardUp;
     this.strip.visible = inSet && !cardUp;
     if (this.strip.visible) this.strip.lookAt(_head);
     if (cardUp) {
-      if (match.goopling && !podium) {
-        // The lesson stays LOW — it hangs around while you dodge, and eye
-        // level would stand between you and the goopling teaching it.
-        this.card.position.set(0, 0.62, -1.06);
-        this.card.scale.setScalar(1);
-        this.card.rotation.set(-0.5, 0, 0);
-      } else {
-        // The count-in and the grade are MOMENTS — hang them at eye line,
-        // big, facing you. Nothing else is happening; nothing is blocked.
-        this.card.position.set(0, 1.42, -1.55);
-        this.card.scale.setScalar(podium ? 1.5 : 1.3);
-        this.card.lookAt(_head);
-      }
+      // The count-in and the grade are MOMENTS — hang them at eye line,
+      // big, facing you. Nothing else is happening; nothing is blocked.
+      this.card.position.set(0, 1.42, -1.55);
+      this.card.scale.setScalar(podium ? 1.5 : 1.3);
+      this.card.lookAt(_head);
     }
 
     if (!inSet && !podium) return;
@@ -233,8 +225,6 @@ export class HudSystem extends createSystem({}) {
       d?.alive,
       match.grooveStreak,
       match.grooveScore,
-      match.tutorialClears,
-      match.goopling?.id,
     ].join(':');
     if (key !== this.lastKey) {
       this.lastKey = key;
@@ -287,18 +277,6 @@ export class HudSystem extends createSystem({}) {
     g.clearRect(0, 0, CW, CH);
     g.textAlign = 'center';
     g.textBaseline = 'middle';
-
-    if (match.goopling) {
-      const gp = match.goopling;
-      ink(g, gp.name, CW / 2, 52, 54, '#b9ffc4');
-      ink(g, gp.epithet, CW / 2, 102, 24, 'rgba(232,236,242,0.85)');
-      gp.lesson.split('\n').forEach((line, i) => {
-        ink(g, line, CW / 2, 168 + i * 46, 30, '#f4f6fb', CW - 60);
-      });
-      ink(g, `${match.tutorialClears} / ${gp.clears}`, CW / 2, CH - 58, 46, '#ffb000');
-      this.cardTex.needsUpdate = true;
-      return;
-    }
 
     if (!Number.isFinite(match.beat)) {
       // The record is still decoding — the clock stays parked until it's
@@ -367,9 +345,9 @@ export class HudSystem extends createSystem({}) {
         g.strokeStyle = 'rgba(0,2,6,0.96)';
         g.stroke();
         if (lit) {
-          g.shadowColor = '#ff2b55';
-          g.shadowBlur = last ? 22 : 12;
-          g.fillStyle = '#ff2b55';
+          g.shadowColor = '#ff0a3c';
+          g.shadowBlur = last ? 30 : 18;
+          g.fillStyle = '#ff0a3c';
         } else {
           g.fillStyle = 'rgba(70,78,92,0.85)';
         }

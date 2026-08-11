@@ -19,16 +19,12 @@ import {
   CHOREO,
   MOVES,
   MUSIC,
-  OCTAGON_HALF_DEPTH,
-  OCTAGON_HALF_WIDTH,
-  type GooplingDef,
   type MoveKind,
 } from '../config.js';
 import { mix, mulberry32 } from '../game/rng.js';
 
 /** A seat-local danger zone, judged at its landing beat. */
 export type Zone =
-  | { kind: 'circle'; x: number; z: number; r: number }
   | { kind: 'lane'; x: number; halfW: number }
   /** The crossfire's side laser: a strip ACROSS the deck at local z, fed
    *  from the rail on `from` — step forward or back off it. */
@@ -48,9 +44,6 @@ export type Zone =
   | { kind: 'half'; side: 1 | -1; axis: 0 | 1 }
   /** Everything burns EXCEPT a clear column at x — stand in the gap. */
   | { kind: 'gate'; x: number; halfW: number }
-  /** A disc that HUNTS its dancer's feet, freezing late (the live lock
-   *  position is per-seat runtime state on the LiveZone, not here). */
-  | { kind: 'chase'; r: number }
   | { kind: 'nova'; bearing: number; halfAngle: number };
 
 /** One landing within a move (a move may land several beats in a row). */
@@ -102,6 +95,7 @@ function pickKind(
   let total = 0;
   for (const k of kinds) {
     if (banned.includes(k)) continue; // this record never calls it
+    if (k === 'duckdonut' && banned.includes('sweep')) continue; // no duck → no combo
     const weights = MOVES[k].weights;
     let w = weights[Math.min(act, weights.length - 1)];
     if (w <= 0) continue;
@@ -114,26 +108,13 @@ function pickKind(
     roll -= w;
     if (roll <= 0) return k;
   }
-  return pool[0]?.[0] ?? 'slam';
+  return pool[0]?.[0] ?? 'beam';
 }
 
 /** Build one move's landings from the seeded rng (seat-local pattern). */
 function buildLandings(kind: MoveKind, landBeat: number, act: number, rng: () => number): Landing[] {
   const landings: Landing[] = [];
-  if (kind === 'slam') {
-    const count = 1 + (act >= 1 ? 1 : 0) + (act >= 3 ? 1 : 0);
-    for (let i = 0; i < count; i++) {
-      landings.push({
-        beat: landBeat + i * CHOREO.slamStepBeats,
-        zone: {
-          kind: 'circle',
-          x: (rng() * 2 - 1) * (OCTAGON_HALF_WIDTH - 0.24),
-          z: (rng() * 2 - 1) * (OCTAGON_HALF_DEPTH - 0.2),
-          r: CHOREO.slamRadius,
-        },
-      });
-    }
-  } else if (kind === 'beam') {
+  if (kind === 'beam') {
     const halfW = CHOREO.beamHalfWidth;
     const lane = (x: number) => landings.push({ beat: landBeat, zone: { kind: 'lane', x, halfW } });
     if (act < 2) {
@@ -174,6 +155,22 @@ function buildLandings(kind: MoveKind, landBeat: number, act: number, rng: () =>
     // centre so one side of it is roomy ground and the read is obvious.
     // From the lattice act on, a stage lane crosses it on the same beat and
     // the safe ground becomes a quarter — the dodge turns diagonal.
+    // THE TRAP (late acts, on a roll): TWO rails on the same beat, one
+    // from each side emitter, symmetric about the centreline — the safe
+    // ground is the corridor pinned between them. Sideways lasers that
+    // close like jaws; the read is the gap.
+    const trapChance = CHOREO.railTrapChance[Math.min(act, CHOREO.railTrapChance.length - 1)];
+    if (rng() < trapChance) {
+      landings.push({
+        beat: landBeat,
+        zone: { kind: 'rail', z: -CHOREO.railTrapZ, halfD: CHOREO.railHalfDepth, from: -1 },
+      });
+      landings.push({
+        beat: landBeat,
+        zone: { kind: 'rail', z: CHOREO.railTrapZ, halfD: CHOREO.railHalfDepth, from: 1 },
+      });
+      return landings;
+    }
     const zSign = rng() < 0.5 ? 1 : -1;
     const z =
       zSign * (CHOREO.railOffsetMin + rng() * (CHOREO.railOffsetMax - CHOREO.railOffsetMin));
@@ -203,6 +200,12 @@ function buildLandings(kind: MoveKind, landBeat: number, act: number, rng: () =>
         zone: { kind: 'quad', corner, step, routine },
       });
     });
+  } else if (kind === 'duckdonut') {
+    // THE COMBINATION: the rim floods AND the blade hangs over the middle
+    // — get to the centre and DUCK there. Both zones detonate together;
+    // both answers are ones the set already taught.
+    landings.push({ beat: landBeat, zone: { kind: 'sweep' } });
+    landings.push({ beat: landBeat, zone: { kind: 'donut', innerR: CHOREO.donutInnerR } });
   } else if (kind === 'wire') {
     // From act 2 the web arrives with cells FILLED IN — columns you must
     // vacate before you freeze. Distinct squares of the 4×4 grid, rolled
@@ -225,8 +228,6 @@ function buildLandings(kind: MoveKind, landBeat: number, act: number, rng: () =>
         halfW: act >= 3 ? CHOREO.gateHalfWLate : CHOREO.gateHalfW,
       },
     });
-  } else if (kind === 'chase') {
-    landings.push({ beat: landBeat, zone: { kind: 'chase', r: CHOREO.chaseRadius } });
   } else if (kind === 'seesaw' || kind === 'surge') {
     const axis: 0 | 1 = kind === 'surge' ? 1 : 0;
     const stages = 2 + Math.min(act, kind === 'surge' ? 2 : 3);
@@ -292,28 +293,3 @@ export function generateSetlist(seed: number, phrases: number, banned: readonly 
   return moves;
 }
 
-/**
- * A goopling's REHEARSAL loop: its one move, over and over, at a kind BPM.
- * Same structure as the raid set so the whole choreo stack runs unchanged.
- */
-export function generateLesson(goopling: GooplingDef, seed: number, count = 60): SetMove[] {
-  const rng = mulberry32(mix(seed, 0x1e550));
-  const moves: SetMove[] = [];
-  const charge = MOVES[goopling.move].chargeBeats;
-  // One move per two bars, landing on the downbeat, forever.
-  let land = barBeats * 2;
-  for (let i = 0; i < count; i++) {
-    const landings = buildLandings(goopling.move, land, 0, rng);
-    moves.push({
-      index: i,
-      kind: goopling.move,
-      telegraphBeat: land - charge,
-      landBeat: land,
-      landings,
-      act: 0,
-    });
-    // Breathe for a bar after the last landing, then the next telegraph.
-    land = landings[landings.length - 1].beat + barBeats + charge;
-  }
-  return moves;
-}

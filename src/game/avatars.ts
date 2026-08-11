@@ -258,12 +258,19 @@ export function buildDancer(hue: number): DancerRig {
     tail.rotation.x = 1.0;
     head.add(tail);
   } else if (variant === 1) {
-    // Floating halo.
-    const halo = M(torusGeo(0.075, 0.006), neonStd);
-    halo.position.set(0, 0.155, 0);
-    halo.rotation.x = Math.PI / 2;
-    halo.rotation.z = 0.1;
-    head.add(halo);
+    // Side-swept twin blades — an undercut read, raked hard to one side.
+    // (This slot used to float a halo; halos are out.)
+    for (const [ox, oy, len, rake] of [
+      [0.018, 0.055, 0.115, 0.55],
+      [0.04, 0.035, 0.085, 0.75],
+    ] as const) {
+      const blade = M(boxGeo(), limb);
+      blade.scale.set(0.01, len, 0.1);
+      blade.position.set(ox, oy, 0.01);
+      blade.rotation.z = -rake * 0.5;
+      blade.rotation.x = rake;
+      head.add(blade);
+    }
   } else if (variant === 2) {
     // Swept horn crest: a flattened cone rooted in the crown — thin across,
     // deep front-to-back, so it reads as sculpted hair, not an antenna —

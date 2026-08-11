@@ -119,7 +119,7 @@ export class AvatarSystem extends createSystem({}) {
         this.driveBot(p, d, beat, delta);
       }
 
-      // Where this dancer stands on their own deck — the chase discs hunt it.
+      // Where this dancer stands on their own deck — zone judges read it.
       liveSpots.set(p.seat, { x: p.pose.hx, z: p.pose.hz });
 
       p.rig.pose(p.pose);
@@ -152,8 +152,18 @@ export class AvatarSystem extends createSystem({}) {
     let want: { x: number; z: number } | null = null;
     if (d.alive && match.playing) {
       let soonest: (typeof choreoView.zones)[number] | null = null;
+      let planted = false;
       for (const z of choreoView.zones) {
         if (z.seat !== p.seat || z.resolved) continue;
+        if (z.zone.kind === 'sweep') {
+          // The sweep is BODY HEIGHT, not floor position — it stacks with
+          // any floor zone (DUCK DONUT throws both on one beat), so its
+          // roll is judged apart and the duck rides along with the walk.
+          const chance = Math.max(0.25, d.skill - z.act * BOTS.actPenalty);
+          if (roll(match.seed, 0xb0b, z.seat, z.moveIdx, z.landingIdx) < chance) p.duck = true;
+          planted = true;
+          continue;
+        }
         if (!soonest || z.dueBeat < soonest.dueBeat) soonest = z;
       }
       if (soonest) {
@@ -161,6 +171,9 @@ export class AvatarSystem extends createSystem({}) {
         const chance = Math.max(0.25, d.skill - soonest.act * BOTS.actPenalty);
         const willDodge = roll(match.seed, 0xb0b, soonest.seat, soonest.moveIdx, soonest.landingIdx) < chance;
         want = this.spotFor(soonest, p, willDodge);
+      } else if (planted) {
+        // A lone blade: hold your ground and take it (or duck under it).
+        want = { x: p.tx, z: p.tz };
       }
     }
     if (!want) {
@@ -208,13 +221,10 @@ export class AvatarSystem extends createSystem({}) {
   /** Where a groupie stands for a zone, given whether it intends to live. */
   private spotFor(live: (typeof choreoView.zones)[number], p: Puppet, dodge: boolean): { x: number; z: number } {
     const zone: Zone = live.zone;
+    // Sweeps never land here — driveBot judges them apart (body height,
+    // not floor position) — so this switch only walks the floor zones.
+    if (zone.kind === 'sweep') return { x: p.tx, z: p.tz };
     switch (zone.kind) {
-      case 'circle': {
-        if (!dodge) return { x: zone.x, z: zone.z };
-        // Step to the far side of the deck from the disc.
-        const away = Math.hypot(zone.x, zone.z) > 0.01 ? -1 : 1;
-        return { x: Math.sign(zone.x || 0.3) * away * 0.45, z: Math.sign(zone.z || 0.3) * away * 0.35 };
-      }
       case 'lane': {
         if (!dodge) return { x: zone.x, z: p.tz };
         const clear = zone.x > 0 ? zone.x - zone.halfW - 0.38 : zone.x + zone.halfW + 0.38;
@@ -259,10 +269,6 @@ export class AvatarSystem extends createSystem({}) {
         }
         return { x: p.tx + Math.sin(p.phase * 5) * 0.3, z: p.tz + Math.cos(p.phase * 4) * 0.24 };
       }
-      case 'sweep': {
-        p.duck = dodge;
-        return { x: p.tx, z: p.tz };
-      }
       case 'half': {
         const target = dodge ? -zone.side * 0.42 : zone.side * 0.42;
         return zone.axis === 1 ? { x: p.tx, z: target } : { x: target, z: p.tz };
@@ -271,18 +277,6 @@ export class AvatarSystem extends createSystem({}) {
         // Live: into the safe column. Doomed: square in a danger field.
         if (dodge) return { x: zone.x, z: p.tz };
         return { x: zone.x > 0 ? zone.x - zone.halfW - 0.4 : zone.x + zone.halfW + 0.4, z: p.tz };
-      }
-      case 'chase': {
-        const c = live.chase;
-        if (!c) return { x: p.tx, z: p.tz };
-        if (!c.locked) {
-          // Being hunted: keep drifting (the disc follows anyway).
-          return { x: Math.sin(p.phase * 3) * 0.35, z: Math.cos(p.phase * 2) * 0.28 };
-        }
-        // Locked: the juke — away from the frozen disc, or freeze in it.
-        if (!dodge) return { x: c.x, z: c.z };
-        const away = Math.atan2(-c.x, -c.z);
-        return { x: c.x + Math.sin(away) * 0.55, z: c.z + Math.cos(away) * 0.45 };
       }
       case 'nova': {
         const local = zone.bearing - seatBearing(p.seat, match.seats);

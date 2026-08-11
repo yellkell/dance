@@ -883,14 +883,6 @@ export function floodCrash(): void {
   bubble(320, 0.05, 0.3, 0.06);
 }
 
-/** The chase disc pouncing shut on its mark — a SNAP, not a slam. */
-export function pounceSnap(): void {
-  tone({ freq: 900, to: 70, type: 'square', dur: 0.12, gain: 0.11 }); // jaws down
-  noiseHit(0.1, 0.28, 2600, 400, 1.2);
-  tone({ freq: 95, to: 34, type: 'sine', dur: 0.3, gain: 0.3, delay: 0.03 }); // planted
-  clank(420, 0.1, 0.05, 0.05);
-}
-
 /** THE CROSSFIRE: a laser thrown from a side rail, raking across the deck.
  *  Reads sideways on purpose — the beam's blast is a flat wall of noise,
  *  this one is a pitch that TRAVELS, so the ear places it off to one side

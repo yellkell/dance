@@ -41,23 +41,21 @@ export class MusicSystem extends createSystem({}) {
       this.stoppedFor = '';
       stopAmbient(0.35);
       const track = trackById(match.trackId) ?? pickRaidTrack(match.seed);
-      const tutorial = match.after === 'tutorial';
       const total = match.phrases;
       startSet({
         track,
         countInBeats: countInBeatsFor(track.bpm),
-        endBeat: tutorial ? 1e9 : total * phraseBeats(),
+        endBeat: total * phraseBeats(),
         seed: match.seed,
-        actAt: tutorial ? () => 0 : (beat) => actOfBeat(beat, total),
+        actAt: (beat) => actOfBeat(beat, total),
         beatZeroAt: Number.isFinite(match.beatZeroAt) ? match.beatZeroAt : undefined,
-        // A lesson runs until you clear it — it must outlast its record.
-        loop: tutorial,
+        loop: false,
       });
       match.beatLen = 60 / track.bpm;
       match.playing = true;
     }
 
-    const inSet = screen === 'countdown' || screen === 'raid' || screen === 'tutorial';
+    const inSet = screen === 'countdown' || screen === 'raid';
 
     if (match.playing && inSet) {
       // Still decoding? Hold the countdown — the clock stays parked at −∞
@@ -68,7 +66,7 @@ export class MusicSystem extends createSystem({}) {
       }
     }
 
-    // Lobby / map / podium: fade the set out once, bring the room loop up.
+    // Lobby / podium: fade the set out once, bring the room loop up.
     if (!inSet) {
       if (this.stoppedFor !== screen) {
         this.stoppedFor = screen;
@@ -76,7 +74,7 @@ export class MusicSystem extends createSystem({}) {
         match.playing = false;
         this.generation = -1; // the next countdown always re-drops
       }
-      if (screen === 'lobby' || screen === 'map' || screen === 'tour') {
+      if (screen === 'lobby' || screen === 'tour') {
         // The house sound: SWAG holds the club solo; the moment a room has
         // the floor (hosting or joined — the SOCIAL night), ECLIPSE takes
         // the decks. startAmbient switches cleanly when the id changes.

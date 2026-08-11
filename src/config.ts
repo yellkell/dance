@@ -144,7 +144,6 @@ export const GOOP = {
  * with bright DOORPOST rails and chevrons marching INTO it: whatever the
  * chevrons run toward, be there. An experienced dancer never needs a word:
  *
- *  slam   : discs fill on the deck — STEP off them.
  *  beam   : a strip fills down the deck — SIDESTEP off the lane. A single
  *           laser snaps to one of three slots (middle, or a third out); a
  *           DOUBLE is never two random strips — it is either a TWIN pair
@@ -160,10 +159,12 @@ export const GOOP = {
  *  surge  : the seesaw's cousin, front/back.
  *  gate   : the WHOLE deck fills except one clear column, doorposts + both
  *           chevron streams pointing into it — STAND IN THE GAP.
- *  chase  : a disc GLUED to your feet — it follows you while it fills,
- *           freezes late, then lands. Moving after the freeze IS the dodge.
  *  nova   : everything burns EXCEPT one wedge at a shared compass bearing —
  *           the whole ring rotates to the same safe ground together.
+ *  duckdonut: the rare late-set COMBINATION — the donut's rim floods AND
+ *           the sweep's blade hangs over the safe middle: get to the
+ *           centre and DUCK there. Two honest reads at once; both answers
+ *           are ones you already know.
  *  routine: THE MEMORY TEST. The deck splits into four quarters and the
  *           boss teaches a ROUTINE — two to four corners, never the same
  *           one twice, each marked with its step number and pointed out in
@@ -192,18 +193,17 @@ export const GOOP = {
  *           hitbox you were always inside, made honest.
  */
 export type MoveKind =
-  | 'slam'
   | 'beam'
   | 'sweep'
   | 'seesaw'
   | 'surge'
   | 'gate'
-  | 'chase'
   | 'nova'
   | 'cross'
   | 'wire'
   | 'donut'
-  | 'routine';
+  | 'routine'
+  | 'duckdonut';
 
 export const MOVES: Record<
   MoveKind,
@@ -214,9 +214,6 @@ export const MOVES: Record<
     weights: number[];
   }
 > = {
-  // The slam is deliberately RARE and LATE: it fits, but it was opening
-  // nearly every set and never letting up.
-  slam: { chargeBeats: 4, weights: [1, 3, 2, 2] },
   beam: { chargeBeats: 4, weights: [2, 3, 3, 3] },
   // Ducking is the most physically demanding dodge in the game — a spice,
   // not a staple. At weight 3 it was landing several times every song.
@@ -227,9 +224,7 @@ export const MOVES: Record<
   // The GATE is the early-variety hero: instantly readable, teaches lateral
   // precision, and looks great rippling around the whole ring.
   gate: { chargeBeats: 4, weights: [3, 3, 2, 2] },
-  // The CHASE arrives once feet are warm — pursuit, then the late juke.
-  chase: { chargeBeats: 5, weights: [0, 2, 3, 3] },
-  // The PIE hits on a chase-length fuse: finding the wedge takes one look,
+  // The PIE: finding the wedge takes one look,
   // and the old 8-beat wind-up was a 6-second stand-and-wait on slow
   // records. 5 beats keeps the whole-ring rotate honest and lands sooner.
   nova: { chargeBeats: 5, weights: [0, 0, 2, 3] },
@@ -250,13 +245,11 @@ export const MOVES: Record<
   // the floor talks about afterwards, and a memory test you meet every
   // phrase stops being one.
   routine: { chargeBeats: 8, weights: [0, 1, 2, 2] },
+  // THE COMBINATION is a finale spice: act 3 only, and rare even there.
+  duckdonut: { chargeBeats: 6, weights: [0, 0, 0, 1] },
 };
 
 export const CHOREO = {
-  /** Slam disc radius on the deck. */
-  slamRadius: 0.34,
-  /** Extra beats between multi-disc slam landings (the drumline). */
-  slamStepBeats: 1,
   /** Beam lane half-width. */
   beamHalfWidth: 0.24,
   /** A SINGLE laser only ever lands on one of these local-x slots — the
@@ -337,6 +330,11 @@ export const CHOREO = {
    *  leaves a mean margin both ways, so they always favour one side. */
   railOffsetMin: 0.12,
   railOffsetMax: 0.42,
+  /** THE TRAP (late crossfire): TWO rails land on the same beat, one from
+   *  each side emitter, symmetric about the centreline — the safe ground
+   *  is the corridor pinned between them. */
+  railTrapChance: [0, 0, 0.35, 0.5],
+  railTrapZ: 0.44,
   /** From this act on, the crossfire lays a stage lane ACROSS the rail: the
    *  safe ground becomes a quarter of the deck and the dodge is diagonal. */
   latticeFromAct: 2,
@@ -354,10 +352,6 @@ export const CHOREO = {
   /** Gate: half-width of the safe column; tightens in the last act. */
   gateHalfW: 0.3,
   gateHalfWLate: 0.22,
-  /** Chase: disc radius, and how many beats before landing it FREEZES —
-   *  the freeze is the cue, the juke after it is the dodge. */
-  chaseRadius: 0.42,
-  chaseLockBeats: 1.25,
   /** Moves per phrase by act — the escalation curve. */
   movesPerPhrase: [2, 3, 4, 5],
   /** Minimum clear beats between one landing and the next telegraph —
@@ -487,6 +481,14 @@ export const RANK = {
    *  like a swell arriving, and losing it like the tide going out, never
    *  an elevator. */
   riseLerp: 0.45,
+  /** THE CLIMB: holding rank 1 keeps you going up — the world sinks a
+   *  little further every second you stay champion, so a dominant night
+   *  ends with the giant's crown below your eyeline. `climbPerSec` is the
+   *  accrual; `climbMax` is how much can accrue on top of the champion
+   *  lift (0.7 + 4.4 = 5.1 m of rise — the goop stands ~4.4 m). Losing
+   *  the lead lets it go at the same gentle riseLerp ease. */
+  climbPerSec: 0.09,
+  climbMax: 4.4,
   /** Rank recompute cadence (seconds). */
   refresh: 0.25,
 };
@@ -499,100 +501,6 @@ export const PODIUM = {
   holdSeconds: 18,
 };
 
-/* ────────────────────────────── THE CAMPAIGN ─────────────────────────────
- * REHEARSAL: a small map of goop creatures, each teaching ONE move at a
- * gentle BPM. Clear a creature by surviving `clears` of its move; the last
- * node opens the full raid. Progress lives in localStorage.
- */
-export interface GooplingDef {
-  id: string;
-  name: string;
-  epithet: string;
-  move: MoveKind;
-  /** Creature scale (the raid boss is 2.4). */
-  scale: number;
-  /** Which record this lesson runs on (audio/tracks.ts) — its measured
-   *  tempo sets the pace, so the row steps up 91 → 117 → 135 BPM. */
-  trackId: string;
-  clears: number;
-  /** What the card tells you. */
-  lesson: string;
-}
-
-export const GOOPLINGS: GooplingDef[] = [
-  {
-    id: 'step',
-    name: 'GOOPLET',
-    epithet: 'the puddle prodigy',
-    move: 'slam',
-    scale: 1.0,
-    trackId: 'target',
-    clears: 6,
-    lesson: 'Discs mark where the goo lands.\nSTEP OFF the glow before the drop.',
-  },
-  {
-    id: 'lane',
-    name: 'DRIZZLE',
-    epithet: 'the laser sommelier',
-    move: 'beam',
-    scale: 1.15,
-    trackId: 'target',
-    clears: 6,
-    lesson: 'A lane of light rakes the deck.\nSIDESTEP out of the strip.',
-  },
-  {
-    id: 'duck',
-    name: 'SLOSHA',
-    epithet: 'the limbo queen',
-    move: 'sweep',
-    scale: 1.3,
-    trackId: 'capture',
-    clears: 6,
-    lesson: 'A blade of goo sweeps head-high.\nDUCK — get LOW and hold it.',
-  },
-  {
-    id: 'cross',
-    name: 'BIG SPILL',
-    epithet: 'the tide turner',
-    move: 'seesaw',
-    scale: 1.6,
-    trackId: 'capture',
-    clears: 8,
-    lesson: 'Half the deck floods, then the other.\nCROSS the centreline on the beat.',
-  },
-  {
-    id: 'door',
-    name: 'BOUNCER',
-    epithet: 'the velvet rope',
-    move: 'gate',
-    scale: 1.45,
-    trackId: 'capture',
-    clears: 6,
-    lesson: 'The whole deck floods — one gap stays.\nSTAND IN THE DOORWAY.',
-  },
-  {
-    id: 'cling',
-    name: 'SMITTEN',
-    epithet: 'the lovestruck puddle',
-    move: 'chase',
-    scale: 1.5,
-    trackId: 'combat',
-    clears: 6,
-    lesson: 'A disc GLUES to your feet and follows.\nKEEP MOVING — JUKE when it freezes.',
-  },
-  {
-    id: 'compass',
-    name: 'GLOBULON',
-    epithet: 'the wedge preacher',
-    move: 'nova',
-    scale: 1.9,
-    trackId: 'combat',
-    clears: 4,
-    lesson: 'Everything burns except one wedge.\nSTAND in the marked safe ground.',
-  },
-];
-
-export const CAMPAIGN_KEY = 'gdr-campaign';
 
 /* ──────────────────────────────── THE MC ─────────────────────────────────
  * The headliner most nights: a GIANT of the dancers' own kind — same sleek

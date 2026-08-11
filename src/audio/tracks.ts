@@ -42,7 +42,7 @@ import discoballUrl from '../assets/music/discoball.mp3';
 import eclipseUrl from '../assets/music/eclipse.mp3';
 import type { MoveKind } from '../config.js';
 
-export type TrackRole = 'raid' | 'lobby' | 'rehearsal' | 'club';
+export type TrackRole = 'raid' | 'lobby' | 'club';
 
 export interface Track {
   id: string;
@@ -93,11 +93,9 @@ export const TRACKS: Track[] = [
     downbeat: 0.4909,
     seconds: 186.67,
     lufs: -13.2,
-    // Also the last rehearsal's record: the lesson row steps 91 → 117 → 135
-    // so the final goopling already moves at raid tempo. Gave its PEAK
-    // HOURS slot to DISCO BALL and joined the quick-raid pool — the MONEY
-    // precedent.
-    roles: ['raid', 'rehearsal'],
+    // Gave its PEAK HOURS slot to DISCO BALL and joined the quick-raid
+    // pool — the MONEY precedent.
+    roles: ['raid'],
   },
   {
     id: 'discoball',
@@ -131,7 +129,7 @@ export const TRACKS: Track[] = [
     downbeat: 1.0663,
     seconds: 225.64,
     lufs: -15.0,
-    roles: ['raid', 'rehearsal'],
+    roles: ['raid'],
   },
   {
     id: 'morning',
@@ -167,8 +165,7 @@ export const TRACKS: Track[] = [
     downbeat: 0.0406,
     seconds: 253.19,
     lufs: -9.5,
-    // Slow, steady and long — the natural metronome to learn a move to.
-    roles: ['raid', 'rehearsal'],
+    roles: ['raid'],
   },
   {
     id: 'breakcore',

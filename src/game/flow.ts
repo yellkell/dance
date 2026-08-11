@@ -10,10 +10,10 @@
  * boundaries are fractions of the set) stretches to fit whatever is on.
  */
 
-import { GOOPLINGS, MUSIC, RING, TOUR, countInBeatsFor } from '../config.js';
-import { pickRaidTrack, trackById, trackPhrases, tracksFor, type Track } from '../audio/tracks.js';
+import { MUSIC, RING, TOUR, countInBeatsFor } from '../config.js';
+import { pickRaidTrack, trackById, trackPhrases, type Track } from '../audio/tracks.js';
 import { freshSeed } from './rng.js';
-import { buildRoster, gradeOf, markGooplingCleared, markTourNightCleared, match, pushFlair } from './state.js';
+import { buildRoster, gradeOf, markTourNightCleared, match, pushFlair } from './state.js';
 
 const phraseBeats = MUSIC.beatsPerBar * MUSIC.barsPerPhrase;
 
@@ -71,36 +71,10 @@ export function startRaid(opts: RaidOptions = {}): void {
   // Campaign nights stay night-sized even on marathon records.
   if (opts.tour) match.phrases = Math.min(match.phrases, TOUR.maxPhrases);
 
-  match.goopling = null;
   match.beatZeroAt = opts.beatZeroAt ?? NaN;
   match.online = opts.online ?? false;
   buildRoster(seats, match.seed, match.mySeat, opts.humans);
   match.after = 'raid';
-  match.screen = 'countdown';
-  match.playing = false;
-  match.beat = -Infinity;
-  match.generation++;
-}
-
-/** One goopling's rehearsal: a private stage, its move on a kind clock. */
-export function startTutorial(gooplingIndex: number): void {
-  const goopling = GOOPLINGS[gooplingIndex];
-  if (!goopling) return;
-  match.goopling = goopling;
-  match.tutorialClears = 0;
-  match.seats = 1;
-  match.mySeat = 0;
-  match.seed = 0x600d + gooplingIndex; // fixed seed: a lesson, not a gamble
-
-  // Rehearsals run on the steadiest record we have (see tracks.ts roles).
-  const track = trackById(goopling.trackId) ?? tracksFor('rehearsal')[0] ?? pickRaidTrack(0);
-  mountTrack(track);
-  match.phrases = 999; // the lesson loops until you clear it
-
-  match.beatZeroAt = NaN;
-  match.online = false;
-  buildRoster(1, match.seed, 0);
-  match.after = 'tutorial';
   match.screen = 'countdown';
   match.playing = false;
   match.beat = -Infinity;
@@ -121,24 +95,6 @@ export function finishRaid(): void {
   match.screen = 'podium';
 }
 
-/** Rehearsal cleared (or abandoned). */
-export function finishTutorial(cleared: boolean): void {
-  if (match.goopling && cleared) {
-    markGooplingCleared(match.goopling.id);
-    pushFlair(`${match.goopling.name} CLEARED`, 'milestone');
-  }
-  match.goopling = null;
-  toMap();
-}
-
-/** The rehearsal map (move lessons). */
-export function toMap(): void {
-  match.screen = 'map';
-  match.playing = false;
-  match.beat = -Infinity;
-  match.generation++;
-}
-
 /** The tour screen (the campaign of song sets). */
 export function toTour(): void {
   match.screen = 'tour';
@@ -152,7 +108,6 @@ export function toLobby(): void {
   match.screen = 'lobby';
   match.playing = false;
   match.beat = -Infinity;
-  match.goopling = null;
   match.tour = null;
   match.generation++;
 }

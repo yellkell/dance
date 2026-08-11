@@ -64,7 +64,7 @@ export class ClubSystem extends createSystem({}) {
     const foyer = this.foyer;
     if (!club || !foyer) return;
 
-    const menuRoom = match.screen === 'lobby' || match.screen === 'map' || match.screen === 'tour';
+    const menuRoom = match.screen === 'lobby' || match.screen === 'tour';
     const social = net.phase === 'hosting' || net.phase === 'joined';
     const wantClub = menuRoom && social;
     const wantFoyer = menuRoom && !social;

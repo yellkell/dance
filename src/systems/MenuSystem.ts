@@ -10,18 +10,19 @@
  *   ┌────────┬───────────────────────────────┐
  *   │ RAVE   │  HEADER: wordmark · status    │
  *   │  RAID  ├───────────────────────────────┤
- *   │ PLAY   │                               │
- *   │ TOUR   │   content cards per tab       │
- *   │ REHRSL │                               │
+ *   │ TOUR   │                               │
+ *   │ PLAY   │   content cards per tab       │
+ *   │ MULTI  │                               │
  *   │ SYSTEM │                               │
  *   ├────────┴───────────────────────────────┤
  *   │ footer hints                           │
  *   └────────────────────────────────────────┘
  *
- * One rail, one content region, no floating sub-panels. The rail tabs map
- * onto the flow screens (PLAY = lobby, TOUR = tour, REHEARSAL = map) plus
- * an in-panel SYSTEM mode; mid-set the board vanishes and the right
- * controller's A button is the only way out.
+ * One rail, one content region, no floating sub-panels. TOUR is its own
+ * flow screen; PLAY, MULTIPLAYER and SYSTEM are in-panel modes of the
+ * lobby. MULTIPLAYER stays locked (greyed) until the first boss falls —
+ * tour set 1's finale — then the club opens for good. Mid-set the board
+ * vanishes and the right controller's A button is the only way out.
  */
 
 import { createSystem, InputComponent } from '@iwsdk/core';
@@ -37,19 +38,12 @@ import {
   type Intersection,
   type Object3D,
 } from 'three';
-import { GOOPLINGS, RING, TOUR } from '../config.js';
+import { RING, TOUR } from '../config.js';
 import * as sfx from '../audio/sfx.js';
 import { musicVolume, preload, setMusicVolume } from '../audio/music.js';
 import { pickRaidTrack, trackById, tracksFor } from '../audio/tracks.js';
-import { finishTutorial, startRaid, startTutorial, toLobby, toMap, toTour } from '../game/flow.js';
-import {
-  allGooplingsCleared,
-  clearedGooplings,
-  clearedTourNights,
-  gooplingUnlocked,
-  match,
-  tourNightUnlocked,
-} from '../game/state.js';
+import { startRaid, toLobby, toTour } from '../game/flow.js';
+import { clearedTourNights, match, tourNightUnlocked } from '../game/state.js';
 import { ballSpawnPos } from '../club/ball.js';
 import {
   CODE_ALPHABET,
@@ -96,7 +90,7 @@ const MAP_NODES: { x: number; y: number; r: number }[][] = [
   ],
 ];
 
-type Tab = 'play' | 'tour' | 'map' | 'sys';
+type Tab = 'play' | 'tour' | 'multi' | 'sys';
 
 interface Pointer {
   line: Line;
@@ -112,7 +106,8 @@ export class MenuSystem extends createSystem({}) {
   private hover: string | null = null;
   private lastKey = '';
   private joinMode = false;
-  private sysMode = false;
+  /** Which in-panel mode the lobby board shows (TOUR is its own screen). */
+  private mode: 'play' | 'multi' | 'sys' = 'play';
   private joinCode = [0, 0, 0, 0];
   private lastNetDirty = -1;
 
@@ -154,26 +149,29 @@ export class MenuSystem extends createSystem({}) {
     return { line, dot };
   }
 
+  /** The club (multiplayer) opens when the first boss falls — set 1's finale. */
+  private multiplayerUnlocked(): boolean {
+    return clearedTourNights().has('0:2');
+  }
+
   private activeTab(): Tab {
     if (match.screen === 'tour') return 'tour';
-    if (match.screen === 'map') return 'map';
-    return this.sysMode ? 'sys' : 'play';
+    return this.mode;
   }
 
   update(): void {
     const screen = match.screen;
 
     // Mid-set escape hatch: right A bails.
-    if (screen === 'raid' || screen === 'tutorial' || screen === 'countdown') {
+    if (screen === 'raid' || screen === 'countdown') {
       if (this.input.xr.gamepads.right?.getButtonDown(InputComponent.A_Button)) {
         sfx.uiClick();
-        if (match.after === 'tutorial') finishTutorial(false);
-        else toLobby();
+        toLobby();
       }
     }
 
-    const menuRoom = screen === 'lobby' || screen === 'map' || screen === 'tour';
-    const exitUp = screen === 'tutorial' || screen === 'podium';
+    const menuRoom = screen === 'lobby' || screen === 'tour';
+    const exitUp = screen === 'podium';
     this.board.group.visible = menuRoom;
     this.exit.group.visible = exitUp;
 
@@ -255,20 +253,19 @@ export class MenuSystem extends createSystem({}) {
 
   private action(id: string): void {
     if (id === 'tab-play') {
-      this.sysMode = false;
+      this.mode = 'play';
       this.joinMode = false;
       if (match.screen !== 'lobby') toLobby();
     } else if (id === 'tab-tour') {
-      this.sysMode = false;
       this.joinMode = false;
       if (match.screen !== 'tour') toTour();
-    } else if (id === 'tab-map') {
-      this.sysMode = false;
+    } else if (id === 'tab-multi') {
+      this.mode = 'multi';
       this.joinMode = false;
-      if (match.screen !== 'map') toMap();
+      if (match.screen !== 'lobby') toLobby();
     } else if (id === 'tab-sys') {
+      this.mode = 'sys';
       this.joinMode = false;
-      this.sysMode = true;
       if (match.screen !== 'lobby') toLobby();
     } else if (id === 'raid') {
       if (net.phase === 'hosting' || net.phase === 'joined') {
@@ -328,11 +325,8 @@ export class MenuSystem extends createSystem({}) {
       this.joinMode = false;
     } else if (id === 'back') {
       this.joinMode = false;
-    } else if (id.startsWith('node')) {
-      startTutorial(Number(id.slice(4)));
     } else if (id === 'exit') {
-      if (match.screen === 'tutorial') finishTutorial(false);
-      else if (match.tour) toTour(); // tour podium → back to the map
+      if (match.tour) toTour(); // tour podium → back to the map
       else toLobby();
     }
     this.lastKey = ''; // force repaint
@@ -349,35 +343,29 @@ export class MenuSystem extends createSystem({}) {
       match.screen,
       this.hover,
       this.joinMode,
-      this.sysMode,
+      this.mode,
       this.joinCode.join(''),
       match.seats,
       Math.round(musicVolume() * 10),
       net.phase,
       net.code,
       net.members.length,
-      match.tutorialClears,
       clearedTourNights().size,
     ].join('|');
     if (key === this.lastKey) return;
     this.lastKey = key;
 
-    if (match.screen === 'lobby' || match.screen === 'map' || match.screen === 'tour') {
+    if (match.screen === 'lobby' || match.screen === 'tour') {
       this.paintBoard();
     }
-    if (match.screen === 'tutorial' || match.screen === 'podium') {
+    if (match.screen === 'podium') {
       this.exit.paint(
         '',
         () => {},
         [
           {
             id: 'exit',
-            label:
-              match.screen === 'tutorial'
-                ? 'END REHEARSAL'
-                : match.tour
-                  ? 'BACK TO THE MAP'
-                  : 'BACK TO THE GREEN ROOM',
+            label: match.tour ? 'BACK TO THE MAP' : 'BACK TO THE GREEN ROOM',
             accent: UI.danger,
             x: 24,
             y: 24,
@@ -396,11 +384,19 @@ export class MenuSystem extends createSystem({}) {
     const tab = this.activeTab();
     const buttons: PanelButton[] = [];
 
-    // The rail — the TOUR leads: the map is the main attraction.
-    const tabs: { id: string; tab: Tab; label: string; sub?: string }[] = [
+    // The rail — the TOUR leads: the map is the main attraction. The club
+    // seat stays greyed until the first boss is down.
+    const clubOpen = this.multiplayerUnlocked();
+    const tabs: { id: string; tab: Tab; label: string; sub?: string; disabled?: boolean }[] = [
       { id: 'tab-tour', tab: 'tour', label: '🗺 THE TOUR', sub: this.tourProgressSub() },
       { id: 'tab-play', tab: 'play', label: '▶ QUICK RAID' },
-      { id: 'tab-map', tab: 'map', label: '🎓 REHEARSAL', sub: this.rehearsalSub() },
+      {
+        id: 'tab-multi',
+        tab: 'multi',
+        label: '👥 MULTIPLAYER',
+        sub: clubOpen ? undefined : 'beat the first boss',
+        disabled: !clubOpen,
+      },
       { id: 'tab-sys', tab: 'sys', label: '⚙ SYSTEM' },
     ];
     tabs.forEach((t, i) => {
@@ -409,6 +405,7 @@ export class MenuSystem extends createSystem({}) {
         label: t.label,
         sub: t.sub,
         accent: tab === t.tab ? UI.goop : undefined,
+        disabled: t.disabled,
         x: RAIL_X + 12,
         y: 152 + i * 118,
         w: RAIL_W - 24,
@@ -419,9 +416,10 @@ export class MenuSystem extends createSystem({}) {
 
     // Tab content.
     if (tab === 'tour') this.tourContent(buttons);
-    else if (tab === 'map') this.rehearsalContent(buttons);
-    else if (tab === 'sys') this.systemContent(buttons);
-    else if (this.joinMode) this.joinContent(buttons);
+    else if (tab === 'multi') {
+      if (this.joinMode) this.joinContent(buttons);
+      else this.multiContent(buttons);
+    } else if (tab === 'sys') this.systemContent(buttons);
     else this.playContent(buttons);
 
     this.board.paint('', (g) => this.drawShell(g, tab), buttons, this.hover);
@@ -431,10 +429,6 @@ export class MenuSystem extends createSystem({}) {
     const done = clearedTourNights().size;
     const all = TOUR.sets.length * 3;
     return done >= all ? 'complete ✓' : `${done}/${all} nights`;
-  }
-
-  private rehearsalSub(): string {
-    return allGooplingsCleared() ? 'rave ready ✓' : `${clearedGooplings().size}/${GOOPLINGS.length} moves`;
   }
 
   private drawShell(g: CanvasRenderingContext2D, tab: Tab): void {
@@ -470,7 +464,7 @@ export class MenuSystem extends createSystem({}) {
     g.beginPath();
     g.roundRect(RAIL_X, 136, RAIL_W, 500, 22);
     g.fill();
-    const tabIndex = { tour: 0, play: 1, map: 2, sys: 3 }[tab];
+    const tabIndex = { tour: 0, play: 1, multi: 2, sys: 3 }[tab];
     g.fillStyle = UI.goop;
     g.beginPath();
     g.roundRect(RAIL_X + 2, 158 + tabIndex * 118, 6, 90, 3);
@@ -483,7 +477,7 @@ export class MenuSystem extends createSystem({}) {
     // Tab-specific body decoration. No slogans, no manuals — the boards
     // carry buttons and progress, and the game teaches itself.
     if (tab === 'tour') this.drawTreasureMap(g);
-    if (tab === 'play' && !this.joinMode) {
+    if (tab === 'play') {
       const done = clearedTourNights().size;
       if (done > 0) {
         g.textAlign = 'left';
@@ -491,12 +485,6 @@ export class MenuSystem extends createSystem({}) {
         g.fillStyle = UI.goop;
         g.fillText(`tour ${done}/${TOUR.sets.length * 3}`, CONTENT_X, 740);
       }
-    }
-    if (tab === 'map' && allGooplingsCleared()) {
-      g.textAlign = 'center';
-      g.font = "700 21px 'Arial Black', system-ui, sans-serif";
-      g.fillStyle = UI.goop;
-      g.fillText('RAVE READY', W / 2, 992);
     }
   }
 
@@ -560,19 +548,39 @@ export class MenuSystem extends createSystem({}) {
     buttons.push({ id: 'seats+', label: '+', x: 1324, y: 392, w: 104, h: 112, disabled: match.seats >= RING.maxSeats });
 
     if (online === 'hosting' || online === 'joined') {
+      // A live room is worth knowing about from any tab that starts a set.
       buttons.push({
         id: 'code',
         label: `ROOM ${net.code}`,
-        sub: `share the code or ?room=${net.code}`,
+        sub: `${net.members.length} on the floor`,
         accent: UI.amber,
         disabled: true,
         x: CONTENT_X,
         y: 528,
-        w: 856,
+        w: 640,
         h: 108,
         small: true,
       });
-      buttons.push({ id: 'leave', label: 'LEAVE', accent: UI.danger, x: 1192, y: 528, w: 236, h: 108, small: true });
+    }
+  }
+
+  /* ── MULTIPLAYER: the club's front door ── */
+
+  private multiContent(buttons: PanelButton[]): void {
+    const online = net.phase;
+    if (online === 'hosting' || online === 'joined') {
+      buttons.push({
+        id: 'code',
+        label: `ROOM ${net.code}`,
+        sub: `${net.members.length} in · share the code or ?room=${net.code}`,
+        accent: UI.amber,
+        disabled: true,
+        x: CONTENT_X,
+        y: 172,
+        w: CONTENT_W,
+        h: 210,
+      });
+      buttons.push({ id: 'leave', label: 'LEAVE', accent: UI.danger, x: CONTENT_X, y: 428, w: 452, h: 116, small: true });
     } else {
       buttons.push({
         id: 'host',
@@ -581,10 +589,9 @@ export class MenuSystem extends createSystem({}) {
         accent: UI.amber,
         disabled: online === 'connecting',
         x: CONTENT_X,
-        y: 528,
-        w: 640,
-        h: 108,
-        small: true,
+        y: 172,
+        w: CONTENT_W,
+        h: 210,
       });
       buttons.push({
         id: 'join',
@@ -592,11 +599,10 @@ export class MenuSystem extends createSystem({}) {
         sub: 'enter a 4-letter code',
         accent: UI.amber,
         disabled: online === 'connecting',
-        x: 976,
-        y: 528,
-        w: 452,
-        h: 108,
-        small: true,
+        x: CONTENT_X,
+        y: 428,
+        w: CONTENT_W,
+        h: 210,
       });
     }
   }
@@ -854,29 +860,6 @@ export class MenuSystem extends createSystem({}) {
           w: (n.r + pad) * 2,
           h: (n.r + pad) * 2,
         });
-      });
-    });
-  }
-
-  /* ── REHEARSAL ── */
-
-  private rehearsalContent(buttons: PanelButton[]): void {
-    const cleared = clearedGooplings();
-    // Seven tutors fit the column at a tighter pitch.
-    GOOPLINGS.forEach((gp, i) => {
-      const unlocked = gooplingUnlocked(i);
-      const done = cleared.has(gp.id);
-      buttons.push({
-        id: `node${i}`,
-        label: `${done ? '✓ ' : unlocked ? '' : '🔒 '}${gp.name}`,
-        sub: `${gp.epithet} · teaches ${gp.move.toUpperCase()}`,
-        accent: done ? UI.goop : unlocked ? UI.magenta : undefined,
-        disabled: !unlocked,
-        x: CONTENT_X,
-        y: 148 + i * 114,
-        w: CONTENT_W,
-        h: 102,
-        small: true,
       });
     });
   }

@@ -31,7 +31,7 @@ export class NetworkSystem extends createSystem({}) {
 
   update(delta: number): void {
     const screen = match.screen;
-    const menuRoom = screen === 'lobby' || screen === 'map' || screen === 'tour';
+    const menuRoom = screen === 'lobby' || screen === 'tour';
 
     // An online podium DEPOSITS you back on the club floor by itself once
     // the reading's done — nobody should have to find a button to go home.

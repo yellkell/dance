@@ -35,9 +35,12 @@ everyone else.
   however clean the set was up to then.
 - A **live holo leaderboard** over the stage shows everyone's rank, score and
   chain. The **top ten** dance on raised platforms, and the current **champion
-  above them all** — but nobody ever renders below your real floor: leaders
-  float overhead on lit pedestals, your own lift is something only the
-  others see, and the fallen dim instead of sinking.
+  above them all** — and nobody ever renders below your real floor: leaders
+  float overhead on lit pedestals and the fallen dim instead of sinking.
+  Your own lift is real too, but inverted — your deck IS your real floor
+  and can't move, so when you lead, **the rest of the show gently sinks**
+  (THE RISE), and the longer you hold #1 the further it goes (THE CLIMB),
+  until you're looking **down** on the boss.
 - Every other dancer is a **slender humanoid figure** — gloss-black mannequin,
   neon collar/waist/wrist trim and visor in their seat colour, glowsticks in
   hand — solved live from just a head and two hands (which is all VR knows).
@@ -97,23 +100,22 @@ npm run dev          # → http://localhost:5173
 - **Mid-set escape hatch**: right controller **Ⓐ** bails back to the lobby.
 
 There's also a debug hook in the console:
-`__gdr.startRaid({ seats: 24 })`, `__gdr.startTutorial(0)`, `__gdr.match`.
+`__gdr.startRaid({ seats: 24 })`, `__gdr.match`.
 
 ## The moves (and their answers)
 
 | Move | The tell | Your answer |
 | --- | --- | --- |
-| **SLAM** | amber discs charge on your deck (a drumline in later acts) | **step** off the glow |
 | **BEAM** | a strip rakes down the deck from the stage — one laser on a slot, or a deliberate **double**: a TWIN pair taking one side and the middle, or a SPLIT evenly either side of centre | **sidestep** the lane; **get across** a twin; **stand between** a split |
 | **SWEEP** | a blade hangs at chest height, chevrons cascading **downward** off it | **duck** — and hold it |
 | **SEESAW** | one half of the deck floods, then the other, on the beat | **cross** the centreline |
 | **SURGE** | the seesaw's front/back cousin | **cross**, the other way |
 | **GATE** | the whole deck floods except one clear column — doorposts + chevrons pointing in | **stand in the gap** |
-| **CHASE** | a disc glued to your feet, following you — then it **freezes** | **juke** after the freeze |
 | **NOVA** | everything burns except one wedge — same compass bearing for the whole ring | **stand** in the safe ground, together |
-| **CROSSFIRE** | a laser is loaded on one side rail and a strip fills **across** the deck (late on, a stage lane crosses it) | **step forward or back** off the strip — diagonally, once it's a lattice |
+| **CROSSFIRE** | a laser is loaded on one side rail and a strip fills **across** the deck (late on, a stage lane crosses it) — and from mid-set it can come as **THE TRAP**: both side rails at once, one ahead of you and one behind, landing on the same beat | **step forward or back** off the strip — diagonally, once it's a lattice; against the trap, **squeeze into the band between the rails** |
 | **TRIP WEB** | a shin-high lattice cuts the deck into a 4×4 grid — and from act 2, chosen cells arrive **filled**: columns of danger rising floor to eye level | **leave the filled squares early**, then **hold still**; on the discharge the whole lattice sweeps up to eye level — the hitbox it always was |
 | **DONUT** | usually a laser straight down the middle, and a bar later the rim closes with chevrons marching **inward** | **step off** the middle, then **run back into it** |
+| **DUCK DONUT** | the finale combination, rare even in act 3: the rim closes **and** the blade hangs at chest height, both on one beat | **get to the middle AND duck** — small and close |
 | **ROUTINE** | the deck splits into quarters and the boss **teaches** a corner sequence — each marked with its step number, each pointed out in turn — then the marks go out and, on every step, three spinning neon blocks **fall from above** onto the quarters you weren't taught | **remember it**, and stand in the taught corner on each tick |
 
 The telegraph is the whole instruction: whatever fills amber→red, don't be
@@ -147,17 +149,12 @@ everyone off centre, the ring hauls them back a bar later — and its ring
 stays dark until that laser has fired, so there is only ever one shape on
 the deck to read (the same staging the pie chain uses).
 
-## Rehearsal (the campaign)
-
-The lobby's **REHEARSAL** map is a row of goop creatures, each drilling one
-move at a gentle BPM: **GOOPLET** (step), **DRIZZLE** (sidestep), **SLOSHA**
-(duck), **BIG SPILL** (cross the line), **BOUNCER** (the gate), **SMITTEN**
-(the chase juke), **GLOBULON** (the nova wedge). Clear the row and you're
-**RAVE READY**. Progress saves locally. Surge, crossfire and the trip web
-have no tutor yet — they arrive in a set and teach themselves off the
-telegraph.
-
 ## Multiplayer — and the club
+
+The board's **MULTIPLAYER** seat starts greyed out and unlocks when the
+first boss falls — clear the opening set's finale night on THE TOUR and
+the club is open for good. (A friend's `?room=` link still works either
+way — being pulled through the door is its own invitation.)
 
 The whole choreography — every zone, every bot's every roll, even the
 placeholder track's bassline — is **deterministic from one seed**. So the
@@ -219,10 +216,10 @@ files**, not guessed — the whole game is quantized to them, so they had to be:
 | Track | BPM | Set length | Loudness | Where it plays |
 | --- | --- | --- | --- | --- |
 | MORNING | 96.665 | 5 phrases | −11.1 LUFS | tour: opening night · no ducking |
-| TARGET | 91 | 11 phrases | −9.5 LUFS | tour · rehearsal |
-| CAPTURE | 117 | 13 phrases | −15.0 LUFS | tour: first goop finale · rehearsal |
+| TARGET | 91 | 11 phrases | −9.5 LUFS | tour |
+| CAPTURE | 117 | 13 phrases | −15.0 LUFS | tour: first goop finale |
 | DISCO BALL | 73.33 | 4 phrases | −12.6 LUFS | tour: peak-hours opener — the night after the first goop falls · no ducking |
-| COMBAT | 135 | 12 phrases | −13.2 LUFS | quick raid · rehearsal |
+| COMBAT | 135 | 12 phrases | −13.2 LUFS | quick raid |
 | LOOP | 150 | 17 phrases | −11.2 LUFS | tour: peak hours |
 | DYNASTY | 155 | 10 phrases | −9.6 LUFS | tour: peak-hours finale |
 | INFECTION | 138 | 15 phrases | −10.9 LUFS | tour: after hours |
@@ -261,7 +258,7 @@ set — so MONEY (2.8 min) and LOOP (5.6 min) both get a full opening, build,
 peak and finale.
 
 **The lobby is never silent.** SWAG — the soft one — loops under the foyer
-and the rehearsal map at reduced level, and publishes its own beat, so the
+at reduced level, and publishes its own beat, so the
 room is already grooving before anyone starts a set. The moment a room has
 the floor (hosting or joined), **ECLIPSE** — the club's own slow-burn
 70 BPM record — takes the decks, and the chandelier phases to it. Step

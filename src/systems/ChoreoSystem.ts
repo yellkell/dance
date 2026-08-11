@@ -11,8 +11,8 @@
  *   real tracked body, the groupies by seeded rolls every client computes
  *   identically, the remote humans by their own report (never guessed here).
  *
- * Also owns the score/combo/miss-chain bookkeeping, tutorial clear counting, and
- * the end of the set (song out, or one dancer left standing).
+ * Also owns the score/combo/miss-chain bookkeeping and the end of the set
+ * (song out, or one dancer left standing).
  */
 
 import { createSystem } from '@iwsdk/core';
@@ -24,7 +24,6 @@ import { RoutineBlockfall } from '../choreo/blockfall.js';
 import { StrikeFx } from '../choreo/strikes.js';
 import {
   beamTelegraph,
-  circleTelegraph,
   donutTelegraph,
   gateTelegraph,
   halfTelegraph,
@@ -37,15 +36,14 @@ import {
   wireTelegraph,
   type Telegraph,
 } from '../choreo/telegraphs.js';
-import { generateLesson, generateSetlist, type SetMove, type Zone } from '../choreo/setlist.js';
-import { finishRaid, finishTutorial } from '../game/flow.js';
+import { generateSetlist, type SetMove, type Zone } from '../choreo/setlist.js';
+import { finishRaid } from '../game/flow.js';
 import { roll } from '../game/rng.js';
 import { seatBearing } from '../game/ring.js';
 import {
   aliveCount,
   barBeats,
   dancerAtSeat,
-  liveSpots,
   match,
   pushFlair,
   setEndBeat,
@@ -70,9 +68,6 @@ export interface LiveZone {
   probed: boolean;
   wasInside: boolean;
   resolved: boolean;
-  /** Chase runtime: where the hunting disc currently sits (per-seat — the
-   *  shared Zone object stays immutable), frozen once `locked`. */
-  chase?: { x: number; z: number; locked: boolean };
   /** Trip-web runtime (local seat only): where the head was when the sensor
    *  armed, and the furthest it has strayed since. Judgement is that drift,
    *  not a position — the web has no safe ground to stand on. */
@@ -90,6 +85,10 @@ export const choreoView: {
   dropRoutine?: () => void;
   /** Dev: string a trip web NOW (act 3 by default, so the filled cells show). */
   dropWire?: (act?: number) => void;
+  /** Dev: throw THE TRAP now — both side rails on one beat. */
+  dropTrap?: () => void;
+  /** Dev: throw DUCK DONUT now — the blade and the closing rim together. */
+  dropDuckDonut?: () => void;
 } = { zones: [] };
 
 const HEAD_R = 0.1; // projected head radius for floor-zone tests
@@ -143,7 +142,6 @@ export class ChoreoSystem extends createSystem({}) {
   private landedSfx = new Set<string>();
   private cuedSteps = new Set<string>();
   private cuedTicks = new Set<string>();
-  private tutorialMoveHit = new Map<number, boolean>();
   private ended = false;
 
   init(): void {
@@ -182,6 +180,38 @@ export class ChoreoSystem extends createSystem({}) {
         landings: [{ beat: land, zone: { kind: 'wire', hold: CHOREO.wireHoldBeats, filled } }],
       });
     };
+    choreoView.dropTrap = () => {
+      if (!match.playing || !Number.isFinite(match.beat)) return;
+      const tele = match.beat + 0.25;
+      const land = tele + MOVES.cross.chargeBeats;
+      this.begin({
+        index: 9600 + this.nextMove,
+        kind: 'cross',
+        telegraphBeat: tele,
+        landBeat: land,
+        act: 3,
+        landings: [
+          { beat: land, zone: { kind: 'rail', z: -CHOREO.railTrapZ, halfD: CHOREO.railHalfDepth, from: -1 } },
+          { beat: land, zone: { kind: 'rail', z: CHOREO.railTrapZ, halfD: CHOREO.railHalfDepth, from: 1 } },
+        ],
+      });
+    };
+    choreoView.dropDuckDonut = () => {
+      if (!match.playing || !Number.isFinite(match.beat)) return;
+      const tele = match.beat + 0.25;
+      const land = tele + MOVES.duckdonut.chargeBeats;
+      this.begin({
+        index: 9700 + this.nextMove,
+        kind: 'duckdonut',
+        telegraphBeat: tele,
+        landBeat: land,
+        act: 3,
+        landings: [
+          { beat: land, zone: { kind: 'sweep' } },
+          { beat: land, zone: { kind: 'donut', innerR: CHOREO.donutInnerR } },
+        ],
+      });
+    };
   }
 
   private strikesRoot(): void {
@@ -202,18 +232,14 @@ export class ChoreoSystem extends createSystem({}) {
     this.landedSfx.clear();
     this.cuedSteps.clear();
     this.cuedTicks.clear();
-    this.tutorialMoveHit.clear();
     this.ended = false;
-    this.setlist =
-      match.after === 'tutorial' && match.goopling
-        ? generateLesson(match.goopling, match.seed)
-        : generateSetlist(match.seed, match.phrases, trackById(match.trackId)?.banned ?? []);
+    this.setlist = generateSetlist(match.seed, match.phrases, trackById(match.trackId)?.banned ?? []);
   }
 
   update(delta: number): void {
     this.strikes.update(delta);
 
-    const inSet = match.screen === 'countdown' || match.screen === 'raid' || match.screen === 'tutorial';
+    const inSet = match.screen === 'countdown' || match.screen === 'raid';
     if (!inSet) {
       if (this.zones.length) {
         for (const z of this.zones) {
@@ -291,25 +317,6 @@ export class ChoreoSystem extends createSystem({}) {
         // at once reads as noise, two reads as "THIS side now, THAT next".
         if (z.zone.kind === 'half') z.tg.group.visible = z.dueBeat - beat < 4.2;
       }
-      // THE CHASE: the disc hunts its dancer's feet, then FREEZES with
-      // chaseLockBeats still on the clock — the freeze is the tell, the
-      // juke after it is the dodge.
-      if (z.zone.kind === 'chase' && z.chase) {
-        if (!z.chase.locked) {
-          if (beat >= z.dueBeat - CHOREO.chaseLockBeats) {
-            z.chase.locked = true;
-            z.chase.x = Math.max(-OCTAGON_HALF_WIDTH + 0.15, Math.min(OCTAGON_HALF_WIDTH - 0.15, z.chase.x));
-            z.chase.z = Math.max(-OCTAGON_HALF_DEPTH + 0.12, Math.min(OCTAGON_HALF_DEPTH - 0.12, z.chase.z));
-          } else {
-            const spot =
-              z.seat === match.mySeat ? { x: match.headX, z: match.headZ } : (liveSpots.get(z.seat) ?? { x: 0, z: 0 });
-            const k = Math.min(1, delta * 7); // glued, with a hint of lag
-            z.chase.x += (spot.x - z.chase.x) * k;
-            z.chase.z += (spot.z - z.chase.z) * k;
-          }
-        }
-        if (z.tg) z.tg.group.position.set(z.chase.x, 0.05, z.chase.z);
-      }
       // THE TRIP WEB: the wires go live `hold` beats out. From that instant
       // the only thing judged is how far you STRAY from where you were
       // standing — so the sensor remembers that spot and keeps the worst
@@ -384,14 +391,6 @@ export class ChoreoSystem extends createSystem({}) {
       move.landings.forEach((landing, landingIdx) => {
         const tg = this.buildTelegraph(landing.zone, dancer.seat, move.index, landingIdx);
         if (tg) parent.add(tg.group);
-        // A chase disc opens on its dancer's current spot (per-seat state —
-        // the Zone object itself is shared across all seats).
-        const chase =
-          landing.zone.kind === 'chase'
-            ? dancer.seat === match.mySeat
-              ? { x: match.headX, z: match.headZ, locked: false }
-              : { ...(liveSpots.get(dancer.seat) ?? { x: 0, z: 0 }), locked: false }
-            : undefined;
         // Staged shapes open their own telegraph window instead of riding
         // the move's: a chained pie appears exactly as the last one goes
         // off, and the donut's ring waits for its opening laser to fire —
@@ -421,7 +420,6 @@ export class ChoreoSystem extends createSystem({}) {
           probed: false,
           wasInside: false,
           resolved: false,
-          chase,
           wire:
             landing.zone.kind === 'wire' ? { x0: 0, z0: 0, armed: false, moved: 0 } : undefined,
           blocks,
@@ -432,11 +430,6 @@ export class ChoreoSystem extends createSystem({}) {
 
   private buildTelegraph(zone: Zone, seat: number, moveIdx: number, landingIdx: number): Telegraph | null {
     switch (zone.kind) {
-      case 'circle': {
-        const tg = circleTelegraph(zone.r);
-        tg.group.position.set(zone.x, 0.05, zone.z);
-        return tg;
-      }
       case 'lane': {
         const tg = beamTelegraph(zone.halfW, OCTAGON_HALF_DEPTH * 2 + 0.8);
         // Strip runs down local −Z (toward the stage); origin at the near edge.
@@ -466,12 +459,6 @@ export class ChoreoSystem extends createSystem({}) {
       case 'gate': {
         const tg = gateTelegraph(OCTAGON_HALF_WIDTH, OCTAGON_HALF_DEPTH, zone.x, zone.halfW);
         tg.group.position.y = 0.05;
-        return tg;
-      }
-      case 'chase': {
-        // Opens wherever the dancer stands; tracked live in update().
-        const tg = circleTelegraph(zone.r);
-        tg.group.position.set(0, 0.05, 0);
         return tg;
       }
       case 'rail': {
@@ -526,8 +513,6 @@ export class ChoreoSystem extends createSystem({}) {
     const x = match.headX;
     const z = match.headZ;
     switch (zone.kind) {
-      case 'circle':
-        return Math.hypot(x - zone.x, z - zone.z) <= zone.r + HEAD_R * 0.7;
       case 'lane':
         return Math.abs(x - zone.x) <= zone.halfW + HEAD_R * 0.7;
       case 'rail':
@@ -558,11 +543,6 @@ export class ChoreoSystem extends createSystem({}) {
       case 'gate':
         // Danger is everywhere EXCEPT the column — be in the gap.
         return Math.abs(x - zone.x) > zone.halfW;
-      case 'chase': {
-        const c = live.chase;
-        if (!c) return false;
-        return Math.hypot(x - c.x, z - c.z) <= zone.r + HEAD_R * 0.7;
-      }
       case 'donut':
         // Same forgiveness as the wedge: the head reaching the middle is
         // the dodge, heels or no heels.
@@ -605,9 +585,6 @@ export class ChoreoSystem extends createSystem({}) {
     if (!this.landedSfx.has(key)) {
       this.landedSfx.add(key);
       switch (z.zone.kind) {
-        case 'circle':
-          sfx.gooSlam();
-          break;
         case 'lane':
           sfx.beamBlast();
           break;
@@ -619,9 +596,6 @@ export class ChoreoSystem extends createSystem({}) {
           break;
         case 'gate':
           sfx.slamImpact();
-          break;
-        case 'chase':
-          sfx.pounceSnap();
           break;
         case 'nova':
           sfx.novaBoom();
@@ -645,8 +619,6 @@ export class ChoreoSystem extends createSystem({}) {
 
     if (dancer.kind === 'local') {
       this.judgeLocal(z, dancer);
-      // Rehearsal bookkeeping runs on every local landing, dodged or not.
-      if (match.screen === 'tutorial') this.checkTutorialProgress(z);
     } else if (dancer.kind === 'bot') {
       this.judgeBot(z, dancer);
     }
@@ -655,9 +627,6 @@ export class ChoreoSystem extends createSystem({}) {
 
   private strikeFx(z: LiveZone, parent: NonNullable<ReturnType<typeof platformRoot>>): void {
     switch (z.zone.kind) {
-      case 'circle':
-        this.strikes.slam(parent, z.zone.x, z.zone.z);
-        break;
       case 'lane':
         this.strikes.beam(parent, z.zone.x);
         break;
@@ -669,9 +638,6 @@ export class ChoreoSystem extends createSystem({}) {
         break;
       case 'gate':
         this.strikes.gate(parent, z.zone.x, z.zone.halfW);
-        break;
-      case 'chase':
-        if (z.chase) this.strikes.chase(parent, z.chase.x, z.chase.z, z.zone.r);
         break;
       case 'rail':
         this.strikes.rail(parent, z.zone.z, z.zone.halfD, z.zone.from);
@@ -743,15 +709,6 @@ export class ChoreoSystem extends createSystem({}) {
     d.combo = 0;
     d.invulnUntilBeat = z.dueBeat + SCORE.invulnBeats;
 
-    if (match.screen === 'tutorial') {
-      if (d.kind === 'local') {
-        this.tutorialMoveHit.set(z.moveIdx, true);
-        pushFlair('CLIPPED — AGAIN!', 'hit');
-        sfx.hitTaken();
-      }
-      return;
-    }
-
     d.hits += 1;
     d.missChain += 1;
     const out = d.missChain >= GRADE.chainOut;
@@ -778,19 +735,4 @@ export class ChoreoSystem extends createSystem({}) {
     }
   }
 
-  /** Tutorial: a move survived end-to-end is a clear; enough clears wins. */
-  private checkTutorialProgress(z: LiveZone): void {
-    const pending = this.zones.some((o) => !o.resolved && o.moveIdx === z.moveIdx);
-    // Called from resolve — the current zone is already marked resolved.
-    if (pending) return;
-    const wasHit = this.tutorialMoveHit.get(z.moveIdx) ?? false;
-    if (!wasHit) {
-      match.tutorialClears += 1;
-      const target = match.goopling?.clears ?? 6;
-      pushFlair(`${match.tutorialClears} / ${target}`, 'dodge');
-      sfx.uiClick();
-      if (match.tutorialClears >= target) finishTutorial(true);
-    }
-    this.tutorialMoveHit.delete(z.moveIdx);
-  }
 }

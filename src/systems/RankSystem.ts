@@ -52,6 +52,8 @@ export class RankSystem extends createSystem({}) {
   private lastHash = '';
   private podiumT = 0;
   private podiumDone = false;
+  /** Accrued champion climb (m) — see RANK.climbPerSec. */
+  private climb = 0;
 
   init(): void {
     this.scene.add(this.board.group);
@@ -78,8 +80,16 @@ export class RankSystem extends createSystem({}) {
 
     // THE RISE: when I carry a tier the whole world eases down by it — the
     // stage sinks and the giant, rig, void and board all ride it. Slow on
-    // purpose; a lift you feel, not a lurch.
-    const meSink = inShow ? tierOf(match.players.find((p) => p.kind === 'local')) : 0;
+    // purpose; a lift you feel, not a lurch. And THE CLIMB: every second
+    // spent holding rank 1 accrues more rise, so a dominant night ends
+    // with you looking DOWN on the giant. The accrual drains (through the
+    // same gentle ease) the moment the lead is lost.
+    const meDancer = match.players.find((p) => p.kind === 'local');
+    const champion = inShow && match.screen === 'raid' && meDancer?.alive && meDancer.rank === 1;
+    this.climb = champion
+      ? Math.min(RANK.climbMax, this.climb + delta * RANK.climbPerSec)
+      : Math.max(0, this.climb - delta * RANK.climbPerSec * 2);
+    const meSink = inShow ? tierOf(meDancer) + (inShow && meDancer?.alive ? this.climb : 0) : 0;
     a.stage.position.y += (-meSink - a.stage.position.y) * Math.min(1, delta * RANK.riseLerp);
     const sunk = -a.stage.position.y; // the eased world drop, shared by all
 
