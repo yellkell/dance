@@ -1,11 +1,11 @@
 /**
- * MenuSystem — the GREEN ROOM: menus as their own place, apart from the club.
+ * MenuSystem — the front desk of THE GILDED ECLIPSE.
  *
  * While you're on any menu screen the ring, stage and light rig are packed
- * away (ArenaSystem/DiscoSystem hide them); what's left is a quiet dark
- * room — soft key light, a neon floor ring, the GOOPLIATH lounging on one
- * side and the MC posing on the other — with one wide BOARD in front of
- * you, laid out like a modern live-service lobby:
+ * away (ArenaSystem/DiscoSystem hide them) and you're standing in the CLUB
+ * (ClubSystem owns the venue; the MC poses on its dance floor) — with one
+ * wide BOARD floating in front of the spawn, laid out like a modern
+ * live-service lobby:
  *
  *   ┌────────┬───────────────────────────────┐
  *   │ RAVE   │  HEADER: wordmark · status    │
@@ -26,18 +26,12 @@
 
 import { createSystem, InputComponent } from '@iwsdk/core';
 import {
-  AdditiveBlending,
-  BoxGeometry,
   BufferGeometry,
-  Group,
-  HemisphereLight,
   Line,
   LineBasicMaterial,
   Mesh,
   MeshBasicMaterial,
-  PointLight,
   Raycaster,
-  RingGeometry,
   SphereGeometry,
   Vector3,
   type Intersection,
@@ -111,7 +105,6 @@ interface Pointer {
 export class MenuSystem extends createSystem({}) {
   private board!: Panel;
   private exit!: Panel;
-  private greenRoom!: Group;
   private pointers!: Record<'left' | 'right', Pointer>;
   private ray = new Raycaster();
   private hits: Intersection[] = [];
@@ -143,41 +136,9 @@ export class MenuSystem extends createSystem({}) {
     this.exit.group.rotation.y = -0.5;
     this.scene.add(this.exit.group);
 
-    this.buildGreenRoom();
     this.pointers = { left: this.makePointer(), right: this.makePointer() };
 
     autoJoinFromUrl();
-  }
-
-  /** The menu space itself: a key light, a neon floor ring and three slim
-   *  pillars — enough room to read the characters, nothing of the club. */
-  private buildGreenRoom(): void {
-    this.greenRoom = new Group();
-    this.greenRoom.name = 'green-room';
-
-    this.greenRoom.add(new HemisphereLight(0xcfe0ff, 0x0a0812, 0.85));
-    const key = new PointLight(0xffffff, 1.3, 14, 1.7);
-    key.position.set(0, 2.8, -1.8);
-    this.greenRoom.add(key);
-
-    const ringMat = (color: number, opacity: number) =>
-      new MeshBasicMaterial({ color, transparent: true, opacity, blending: AdditiveBlending, depthWrite: false });
-    const innerRing = new Mesh(new RingGeometry(1.35, 1.48, 48), ringMat(0xff2ad5, 0.5));
-    innerRing.rotation.x = -Math.PI / 2;
-    innerRing.position.y = 0.012;
-    this.greenRoom.add(innerRing);
-    const outerRing = new Mesh(new RingGeometry(2.5, 2.56, 56), ringMat(0x4fb7ff, 0.22));
-    outerRing.rotation.x = -Math.PI / 2;
-    outerRing.position.y = 0.01;
-    this.greenRoom.add(outerRing);
-
-    const pillarColors = [0xb06bff, 0xff2ad5, 0x4fb7ff];
-    for (let i = 0; i < 3; i++) {
-      const pillar = new Mesh(new BoxGeometry(0.05, 2.7, 0.05), ringMat(pillarColors[i], 0.5));
-      pillar.position.set((i - 1) * 2.3, 1.35, -3.6);
-      this.greenRoom.add(pillar);
-    }
-    this.scene.add(this.greenRoom);
   }
 
   private makePointer(): Pointer {
@@ -213,7 +174,6 @@ export class MenuSystem extends createSystem({}) {
     const menuRoom = screen === 'lobby' || screen === 'map' || screen === 'tour';
     const exitUp = screen === 'tutorial' || screen === 'podium';
     this.board.group.visible = menuRoom;
-    this.greenRoom.visible = menuRoom;
     this.exit.group.visible = exitUp;
 
     if (!menuRoom && !exitUp) {
@@ -275,7 +235,9 @@ export class MenuSystem extends createSystem({}) {
     pos.setXYZ(0, _origin.x, _origin.y, _origin.z);
     pos.setXYZ(1, _end.x, _end.y, _end.z);
     pos.needsUpdate = true;
-    p.line.visible = true;
+    // The laser only draws when it's actually ON a panel — searchlights
+    // sweeping the club every time a hand moved were pure noise.
+    p.line.visible = Boolean(hit);
     p.dot.visible = Boolean(hit);
     if (hit) p.dot.position.copy(hit.point);
     return hit;
@@ -546,7 +508,7 @@ export class MenuSystem extends createSystem({}) {
           ? allGooplingsCleared()
             ? 'RAVE READY — every move in your feet'
             : `${GOOPLINGS.length} gooplings · one move each · clear the row`
-          : 'point · pull the trigger — mid-set the board packs away, right Ⓐ bails',
+          : 'trigger clicks · thumbstick teleports the club · right Ⓐ social panel · mid-set, right Ⓐ bails',
         W / 2,
         992,
       );

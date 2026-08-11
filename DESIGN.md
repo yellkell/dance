@@ -98,6 +98,51 @@ GLOBULON (nova). Clear N reps of the move to pass; progress in localStorage;
 clearing the row flags you RAVE READY. Same ChoreoSystem, same judge — a
 lesson is just a set-list with one song and one move.
 
+## THE GILDED ECLIPSE (the club, and the three places)
+
+FIRE FIGHT's pub proved a third thing worth stealing whole: **a social room
+on the same socket** — teleport-only movement, spatial PCM voice fanned out
+by the relay, and local-only mute/block. Carried forward, and dressed up.
+
+The law of the land is **three places — where you are is what you're doing**:
+
+1. **THE FOYER** (menu place): a compact antechamber — board, coat check,
+   the MC posing, closed doors to THE FLOOR. Solo players never leave it.
+2. **THE CLUB** (social place): host/join a room and the doors open on the
+   full hall. Everything the pub had, remade elegant; everything the raid
+   needs, foreshadowed (the dance floor's brass inlay is the raid ring's
+   ghost — 24 seat ticks and all).
+3. **THE SET** (game place): passthrough, your real room, exactly as ever.
+   Both interiors pack away; the rig re-plants at the spawn so "my platform
+   IS the world origin" stays true no matter where you teleported.
+
+Art direction — the opposite pole from the boozer: restrained Art Deco.
+Charcoal lime plaster, smoked oak, champagne brass, oxblood velvet, dark
+veined stone, ribbed glass. Saturated colour is reserved for LIGHT (coves,
+candles, signage, drinks, the eclipse) — the rave's neon vocabulary stays
+whole for the raid. The hero is the **eclipse chandelier**: five
+counter-rotating brass rings over the dance floor whose glow phases around
+the stack with the bars, a moon-disc heart half-swallowed by its own
+shadow. Detail discipline: every edge carries thickness (skirting, dado,
+picture rail, nosings, fluting, joints); wear where hands and feet go
+(terrazzo scuff, marble condensation rings); no five adjacent modules
+identical.
+
+Perf discipline: the whole shell bakes to a handful of draw calls
+(collapseStatic, the IBB merge helper vendored to `club/merge.ts`); four
+real point lights + a hemisphere per interior; everything else is emissive
+or a glow sprite; fog only while indoors. The club renders only on menu
+screens, where no choreography runs — the raid's budget is untouched.
+
+The social wire is three small relay additions, all still just relaying:
+`cp` club poses (world-space head+hands keyed by member idx, 12 Hz), binary
+voice frames tagged with the sender idx (16 kHz Int16 PCM, HRTF-panned at
+the receiver — the pub's exact recipe, because WebCodecs died on Quest and
+this didn't), and `end` — the host reopening the floor so **rooms outlive
+their sets**. A leaving host hands the room to the longest-standing member.
+Blocking stays strictly local and keys on names, so it survives reconnects;
+BLOCK hides figure + tag and drops their frames at the door.
+
 ## Roadmap
 
 - **Real tracks.** Drop the produced music in, declare BPM + offset per

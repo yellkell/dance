@@ -29,12 +29,22 @@ everyone else.
   controllers; the figure is for everyone else's view of you.
 - Last dancer standing (or the highest score when the set ends) **owns the
   night**: podium, crown, confetti cannons.
+- Between sets, online rooms live in **THE GILDED ECLIPSE** — the club. An
+  Art Deco hall with a dance floor, a backlit bar, velvet booths, a raised
+  terrace and a hushed STILL ROOM, under an eclipse of counter-rotating
+  brass rings. Teleport around it, **talk** to your room (spatial voice),
+  and mute/block anyone from the SOCIAL panel. The room **outlives its
+  sets**: the drop takes everyone to the raid, the last beat brings everyone
+  back to the floor.
 
 Built on Meta's [Immersive Web SDK](https://developers.meta.com/horizon/documentation/web/immersive-web-sdk/)
 (`@iwsdk/core`) + Three.js. The gel creature, the telegraph language and the
 platform arena are lifted from
 [Iron Balls Boxing](https://github.com/yellkell/Iron-Balls-Boxing)'s FIRE FIGHT
 campaign (the `goopliath-raid-campaign-boss` branch) — same goo, new religion.
+The club carries FIRE FIGHT's pub systems forward whole — the teleport
+arc-and-octagon, the PCM voice relay, the mute/block store — re-dressed from
+diamond-plate boozer to champagne-brass supper club.
 
 ---
 
@@ -106,7 +116,7 @@ move at a gentle BPM: **GOOPLET** (step), **DRIZZLE** (sidestep), **SLOSHA**
 have no tutor yet — they arrive in a set and teach themselves off the
 telegraph.
 
-## Multiplayer
+## Multiplayer — and the club
 
 The whole choreography — every zone, every bot's every roll, even the
 placeholder track's bassline — is **deterministic from one seed**. So the
@@ -118,10 +128,38 @@ Empty seats are filled with identical seeded **goo-groupies** on every client.
 npm run server       # room relay on :8788
 ```
 
-In the lobby: **HOST ROOM** → share the 4-letter code (or the
-`?room=CODE&name=YOU` link) → friends **JOIN ROOM** → host presses
-**DROP THE SET**. Humans are spread evenly around the ring; groupies fill the
-gaps. Point clients at a hosted relay with `?server=wss://your-host:8788`.
+There are **three places**, and where you are is what you're doing:
+
+1. **THE FOYER** — the menu place. Every menu screen stands at the front
+   desk of THE GILDED ECLIPSE: the board, the coat check, the MC posing,
+   and the closed doors to THE FLOOR with warm light in the crack.
+2. **THE CLUB** — the social place. **HOST ROOM** → share the 4-letter code
+   (or the `?room=CODE&name=YOU` link) → friends **JOIN ROOM** — and the
+   doors do the rest: your whole room stands in the club together. Every
+   member is a raver figure in their join colour with a name tag that
+   swells while they talk. Voice is **spatial** (each voice comes from its
+   figure, HRTF + distance falloff) and rides the same room socket as
+   Int16 PCM — no SFU, no peer soup, the exact system proven in FIRE
+   FIGHT's pub. Movement is **teleport-only**: deflect a thumbstick, aim
+   the arc, roll the stick to set your landing facing, release to go; an
+   isolated sideways flick snap-turns. Left **Ⓨ** mutes your mic. Right
+   **Ⓐ** raises the **SOCIAL panel**: MUTE (silence) or BLOCK (silence +
+   vanish) anyone, persisted by name, strictly local — plus the voice-chat
+   master switch. Step into **THE STILL ROOM** (north-west corner) and the
+   music falls to a murmur; voices stay.
+3. **THE SET** — the game place. The host presses **DROP THE SET**: both
+   rooms pack away and the passthrough raid takes your real room. Humans
+   spread evenly around the ring; groupies fill the gaps. Voice keeps
+   running through the set, pinned to each dancer's platform. When the set
+   resolves (or you bail with right Ⓐ), everyone lands **back on the club
+   floor, room intact** — the code survives, the floor reopens, the next
+   set is one button away. A departing host hands the room to the
+   longest-standing member instead of folding the party.
+
+Point clients at a hosted relay with `?server=wss://your-host:8788` (the
+production default is `wss://rave-raid-relay.onrender.com` — deploy
+`server/index.mjs` there, or anywhere, and change `DEFAULT_RELAY` in
+`src/config.ts`).
 
 ## The music
 
@@ -144,7 +182,8 @@ files**, not guessed — the whole game is quantized to them, so they had to be:
 | SAKUPENED | 133.964 | 10 phrases | −8.1 LUFS | quick raid |
 | UNITY | 117 | 17 phrases | −13.8 LUFS | quick raid · skips its ambient open |
 | MONEY | 78.395 | 6 phrases | −14.5 LUFS | quick raid · no ducking |
-| SWAG | 91.974 | — | −15.7 LUFS | lobby loop |
+| SWAG | 91.974 | — | −15.7 LUFS | foyer loop |
+| ECLIPSE | 70 | — | −10.4 LUFS | the club's house record |
 
 - **Tempo** came from an onset-flux autocorrelation phase-locked across each
   whole track. Four land on exact integers (a DAW grid). Three genuinely sit a
@@ -171,10 +210,12 @@ of 8-bar phrases in the match, and the act boundaries are *fractions* of the
 set — so MONEY (2.8 min) and LOOP (5.6 min) both get a full opening, build,
 peak and finale.
 
-**The lobby is never silent.** SWAG — the soft one — loops under the lobby and
-the rehearsal map at reduced level, and publishes its own beat, so the mirror
-ball, the lasers and the GOOPLIATH's idle bounce are already grooving before
-anyone starts a set.
+**The lobby is never silent.** SWAG — the soft one — loops under the foyer
+and the rehearsal map at reduced level, and publishes its own beat, so the
+room is already grooving before anyone starts a set. The moment a room has
+the floor (hosting or joined), **ECLIPSE** — the club's own slow-burn 70 BPM
+record — takes the decks, and the chandelier phases to it. Step into THE
+STILL ROOM and the mix ducks to a murmur without stopping.
 
 **Picking a record**: the lobby's `♪` row cycles SHUFFLE → each raid track.
 SHUFFLE derives the record from the match seed, so an online room agrees on the
@@ -202,11 +243,48 @@ src/
   choreo/telegraphs.ts the hazard-shape shader kit (vendored)
   choreo/strikes.ts    landing FX per platform
   arena/               platform ring, stage, disco rig
+  club/                THE GILDED ECLIPSE: venue + foyer build, layout,
+                       materials, voice (capture + spatial playback),
+                       mute/block store, static-merge helper
   game/                state, flow, ring math, rng, avatars
   systems/             Music, Choreo, Player, Avatar, Rank, Goopliath,
-                       Disco, Hud, Menu, Network, Arena
-  net/                 room session + pose store
-server/index.mjs       the room relay
+                       Disco, Hud, Menu, Network, Arena,
+                       Club, ClubTeleport, ClubSocial
+  net/                 room session + pose stores (ring + club floor)
+server/index.mjs       the room relay (seats/seed/poses + club poses,
+                       voice fan-out, rooms that outlive their sets)
+tools/                 track analyzer · preview-shot · club-capture ·
+                       social-check (two-headset end-to-end)
+avatar-preview.html    dev-only dancer catwalk (never shipped)
 ```
 
 `DESIGN.md` has the full design notes and the roadmap.
+
+## Deploying
+
+Two pipelines ship `dist/` (both in `.github/workflows/`):
+
+- **GitHub Pages** — `deploy.yml`, on every push to main.
+- **Firebase Hosting** — `firebase-deploy.yml` → project `raveraid-bc866`,
+  site `raveraid` → **https://raveraid.web.app**. Needs a one-time repo
+  secret `FIREBASE_SERVICE_ACCOUNT` (a service-account JSON key with the
+  Firebase Hosting Admin role). PRs get ephemeral preview channels.
+  `index.html` carries the project's Analytics tag (`G-3MV2K6R84H`); the
+  full web-app config for future Firebase products:
+
+  ```js
+  const firebaseConfig = {
+    apiKey: 'AIzaSyBqsUcpCKzs2bANP0db6J4Nz_SkKe4wXzI',
+    authDomain: 'raveraid-bc866.firebaseapp.com',
+    projectId: 'raveraid-bc866',
+    storageBucket: 'raveraid-bc866.firebasestorage.app',
+    messagingSenderId: '1090372809167',
+    appId: '1:1090372809167:web:40f228c18bf6d1a0b022ba',
+    measurementId: 'G-3MV2K6R84H',
+  };
+  ```
+
+The static site is fully playable solo. Online rooms need the relay
+(`server/index.mjs`) hosted somewhere reachable — the client defaults to
+`wss://rave-raid-relay.onrender.com` on https deploys (`DEFAULT_RELAY` in
+`src/config.ts`; any `?server=` wins).

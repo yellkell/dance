@@ -82,6 +82,8 @@ let ambGain: GainNode | null = null;
 let ambTrack: Track | null = null;
 let ambZero = 0;
 let ambToken = 0;
+let ambBase = 0;
+let ambDuck = 1;
 
 export function musicVolume(): number {
   return musicVol;
@@ -312,7 +314,8 @@ export function startAmbient(track: Track, level = 0.55): void {
   void loadTrack(track).then((buf) => {
     if (token !== ambToken || !buf) return;
     const gain = c.createGain();
-    gain.gain.value = trackGain(track) * level;
+    ambBase = trackGain(track) * level;
+    gain.gain.value = ambBase * ambDuck;
     gain.connect(chain(c));
     const src = c.createBufferSource();
     src.buffer = buf;
@@ -354,6 +357,19 @@ export function stopAmbient(fade = 0.4): void {
 
 export function ambientRunning(): boolean {
   return ambSrc !== null;
+}
+
+/**
+ * Duck the room loop without stopping it — THE STILL ROOM's whole trick:
+ * step through its door and the club's music falls away to a murmur (the
+ * ClubSystem drives this from your head position). 1 = full level.
+ */
+export function setAmbientDuck(mult: number): void {
+  ambDuck = Math.min(1, Math.max(0, mult));
+  const c = audioContext();
+  if (!c || !ambGain) return;
+  ambGain.gain.cancelScheduledValues(c.currentTime);
+  ambGain.gain.setTargetAtTime(ambBase * ambDuck, c.currentTime, 0.35);
 }
 
 /** The lobby loop's beat position — the club's idle pulse. */

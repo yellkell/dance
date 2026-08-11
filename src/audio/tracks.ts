@@ -38,9 +38,10 @@ import dynastyUrl from '../assets/music/dynasty.mp3';
 import spreadUrl from '../assets/music/spread.m4a';
 import morningUrl from '../assets/music/morning.mp3';
 import assembleUrl from '../assets/music/assemble.m4a';
+import eclipseUrl from '../assets/music/eclipse.mp3';
 import type { MoveKind } from '../config.js';
 
-export type TrackRole = 'raid' | 'lobby' | 'rehearsal';
+export type TrackRole = 'raid' | 'lobby' | 'rehearsal' | 'club';
 
 export interface Track {
   id: string;
@@ -230,6 +231,21 @@ export const TRACKS: Track[] = [
     seconds: 222.61,
     lufs: -10.9,
     roles: ['raid'],
+  },
+  {
+    id: 'eclipse',
+    title: 'ECLIPSE',
+    url: eclipseUrl,
+    bpm: 70.0,
+    downbeat: 3.4248,
+    seconds: 154.03,
+    lufs: -10.4,
+    // THE GILDED ECLIPSE's own record — a slow-burn 70 BPM groove that holds
+    // the club whenever an online room has the floor between sets. The
+    // chandelier phases to it. Never a raid record: at this tempo the ring
+    // would be a waiting room, and the club deserves a house sound no set
+    // ever borrows.
+    roles: ['club'],
   },
   {
     id: 'swag',

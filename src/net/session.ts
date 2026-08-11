@@ -3,9 +3,22 @@
  *
  * The deterministic-choreography model keeps this tiny: the server's only
  * real jobs are seats, the seed, and a shared "beat 0 lands in N ms". After
- * that the wire carries nothing but poses (10 Hz) and score reports (3 Hz);
- * every client runs the identical show from the seed. Empty seats become
- * groupies, identical on every client.
+ * that the wire carries poses (10 Hz) and score reports (3 Hz); every client
+ * runs the identical show from the seed. Empty seats become groupies,
+ * identical on every client.
+ *
+ * THE CLUB made the room a PLACE, so the session now carries a social layer
+ * too — and a room OUTLIVES its sets:
+ *
+ *  - While the room is on the club floor (hosting/joined), everyone streams
+ *    a club pose ('cp', world space, keyed by member idx) and binary VOICE
+ *    frames ride the same socket (see src/club/voice.ts for the format).
+ *  - 'start' flips the room to a live set; when the set resolves the host
+ *    sends 'end' and everyone lands back in the club together, same code,
+ *    same members, ready to go again. Leaving is a button, not a side
+ *    effect of the music stopping.
+ *  - The host can leave without folding the party: the relay promotes the
+ *    longest-standing member and tells them with a fresh 'room' message.
  *
  * Join by code (the 4-letter room code uses the alphabet A–H so the XR code
  * picker only needs 8 letters per slot) or by URL: ?room=CADA&name=YELL.
@@ -13,9 +26,10 @@
 
 import { NET, serverUrl } from '../config.js';
 import { audioContext, ensureAudio } from '../audio/sfx.js';
+import { clearVoiceSpeakers, removeVoiceSpeaker, stopVoiceCapture } from '../club/voice.js';
 import { startRaid } from '../game/flow.js';
 import { dancerAtSeat, match } from '../game/state.js';
-import { remotePoses } from './poses.js';
+import { clearClubPoses, clubPoses, remotePoses } from './poses.js';
 
 export type NetPhase = 'off' | 'connecting' | 'hosting' | 'joined' | 'live' | 'error';
 
@@ -23,7 +37,7 @@ export const CODE_ALPHABET = 'ABCDEFGH';
 
 export interface LobbyMember {
   name: string;
-  /** Provisional join order (final ring seats arrive with the start). */
+  /** Stable relay member index — club poses and voice are keyed by it. */
   idx: number;
 }
 
@@ -32,11 +46,17 @@ export const net = {
   code: '',
   members: [] as LobbyMember[],
   isHost: false,
+  /** My own relay member index (−1 until the room hands it over). */
+  myIdx: -1,
   error: '',
   rttMs: 0,
   /** Bumped on any lobby change so menus know to repaint. */
   dirty: 0,
 };
+
+/** Member idx → ring seat for the CURRENT set (filled by 'start') — how
+ *  voice finds a dancer's platform while the raid is live. */
+export const seatByIdx = new Map<number, number>();
 
 let ws: WebSocket | null = null;
 let pingTimer: number | null = null;
@@ -58,6 +78,7 @@ function connect(onOpen: () => void): void {
     net.dirty++;
     return;
   }
+  ws.binaryType = 'arraybuffer'; // voice frames ride as binary beside the JSON
   ws.onopen = () => {
     onOpen();
     // A light ping keeps RTT fresh for the start-time compensation.
@@ -77,11 +98,19 @@ function connect(onOpen: () => void): void {
       net.dirty++;
     }
     stopPing();
+    stopVoiceCapture();
+    clearVoiceSpeakers();
+    clearClubPoses();
   };
   ws.onmessage = (ev) => {
+    // Binary payloads are voice frames; everything else is JSON room traffic.
+    if (typeof ev.data !== 'string') {
+      handleVoiceFrame(ev.data as ArrayBuffer);
+      return;
+    }
     let msg: Record<string, unknown>;
     try {
-      msg = JSON.parse(String(ev.data)) as Record<string, unknown>;
+      msg = JSON.parse(ev.data) as Record<string, unknown>;
     } catch {
       return;
     }
@@ -109,30 +138,69 @@ function teardown(reason: string): void {
   net.code = '';
   net.members = [];
   net.isHost = false;
+  net.myIdx = -1;
   net.dirty++;
+  seatByIdx.clear();
+  stopVoiceCapture();
+  clearVoiceSpeakers();
+  clearClubPoses();
+}
+
+/** A voice frame off the wire: [1-byte id length][ascii sender id][pcm]. */
+function handleVoiceFrame(buf: ArrayBuffer): void {
+  if (!voiceHook || buf.byteLength < 2) return;
+  const bytes = new Uint8Array(buf);
+  const idLen = bytes[0];
+  if (buf.byteLength < 1 + idLen + 8) return;
+  let id = '';
+  for (let i = 0; i < idLen; i++) id += String.fromCharCode(bytes[1 + i]);
+  voiceHook(id, buf.slice(1 + idLen));
+}
+
+/** ClubSocialSystem routes inbound frames to the spatial speakers. */
+let voiceHook: ((id: string, frame: ArrayBuffer) => void) | null = null;
+export function onVoice(fn: (id: string, frame: ArrayBuffer) => void): void {
+  voiceHook = fn;
 }
 
 function handle(msg: Record<string, unknown>): void {
   switch (msg.t) {
-    case 'room':
-      net.phase = msg.host ? 'hosting' : 'joined';
-      net.code = String(msg.code ?? '');
+    case 'room': {
+      // Join-time, OR a mid-session battlefield promotion: the host left and
+      // the relay handed this club to us.
+      const wasLive = net.phase === 'live';
+      net.phase = wasLive ? 'live' : msg.host ? 'hosting' : 'joined';
       net.isHost = Boolean(msg.host);
+      net.code = String(msg.code ?? net.code);
+      if (Number.isFinite(Number(msg.idx))) net.myIdx = Number(msg.idx);
       net.dirty++;
       break;
-    case 'roster':
-      net.members = (msg.players as LobbyMember[]) ?? [];
+    }
+    case 'roster': {
+      const members = (msg.players as LobbyMember[]) ?? [];
+      // Anyone who vanished takes their voice and club figure with them.
+      const still = new Set(members.map((m) => m.idx));
+      for (const old of net.members) {
+        if (!still.has(old.idx)) {
+          removeVoiceSpeaker(String(old.idx));
+          clubPoses.delete(old.idx);
+        }
+      }
+      net.members = members;
       net.dirty++;
       break;
+    }
     case 'start': {
-      // Everyone leaves the lobby together: seed + seats + my ring seat +
-      // the human seat map + a shared "beat 0 in N ms" (RTT-compensated).
-      const players = (msg.players as { seat: number; name: string; you?: boolean }[]) ?? [];
-      const humans = new Map<number, { name: string }>();
+      // Everyone leaves the club floor together: seed + seats + my ring seat
+      // + the human seat map + a shared "beat 0 in N ms" (RTT-compensated).
+      const players = (msg.players as { seat: number; name: string; idx?: number; you?: boolean }[]) ?? [];
+      const humans = new Map<number, { name: string; netId?: number }>();
+      seatByIdx.clear();
       let mySeat = 0;
       for (const p of players) {
+        if (Number.isFinite(Number(p.idx))) seatByIdx.set(Number(p.idx), p.seat);
         if (p.you) mySeat = p.seat;
-        else humans.set(p.seat, { name: p.name });
+        else humans.set(p.seat, { name: p.name, netId: p.idx });
       }
       const startInMs = Number(msg.startInMs ?? 5000) - net.rttMs / 2;
       ensureAudio();
@@ -166,6 +234,19 @@ function handle(msg: Record<string, unknown>): void {
       });
       break;
     }
+    case 'cp': {
+      // A room-mate moving through the club (world space, keyed by idx).
+      const idx = Number(msg.idx);
+      const d = msg.d as number[];
+      if (!Number.isFinite(idx) || !Array.isArray(d) || d.length < 10) break;
+      clubPoses.set(idx, {
+        hx: d[0], hy: d[1], hz: d[2], hyaw: d[3],
+        lx: d[4], ly: d[5], lz: d[6],
+        rx: d[7], ry: d[8], rz: d[9],
+        t: performance.now(),
+      });
+      break;
+    }
     case 's': {
       const seat = Number(msg.seat);
       const d = msg.d as { score: number; combo: number; lives: number; alive: boolean; elim: number };
@@ -191,6 +272,12 @@ function handle(msg: Record<string, unknown>): void {
         dancer.elimAtBeat = Number.isFinite(match.beat) ? match.beat : 0;
       }
       remotePoses.delete(seat);
+      const idx = Number(msg.idx);
+      if (Number.isFinite(idx)) {
+        removeVoiceSpeaker(String(idx));
+        clubPoses.delete(idx);
+        seatByIdx.delete(idx);
+      }
       net.dirty++;
       break;
     }
@@ -232,8 +319,32 @@ export function leaveRoom(): void {
   teardown('');
 }
 
+/**
+ * A finished (or bailed) set folds back into the club, NOT out of the room:
+ * phase returns to hosting/joined, the host tells the relay the floor is
+ * open again, and the same members carry on where the music left them.
+ */
+export function backToClub(): void {
+  if (net.phase !== 'live') return;
+  net.phase = net.isHost ? 'hosting' : 'joined';
+  net.dirty++;
+  if (net.isHost) send({ t: 'end' });
+  remotePoses.clear();
+  seatByIdx.clear();
+}
+
 export function sendPose(d: number[]): void {
   if (net.phase === 'live') send({ t: 'p', d });
+}
+
+/** My spot on the club floor (world space) — for the room-mates' view. */
+export function sendClubPose(d: number[]): void {
+  if (net.phase === 'hosting' || net.phase === 'joined') send({ t: 'cp', d });
+}
+
+/** Ship one local voice frame to the room (binary; any connected phase). */
+export function sendVoice(frame: ArrayBuffer): void {
+  if (ws?.readyState === WebSocket.OPEN && net.phase !== 'off' && net.phase !== 'error') ws.send(frame);
 }
 
 export function sendScore(d: { score: number; combo: number; lives: number; alive: boolean; elim: number }): void {

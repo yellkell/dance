@@ -38,8 +38,10 @@ import { createSystem } from '@iwsdk/core';
 import type { MeshBasicMaterial, MeshStandardMaterial } from 'three';
 import { MC, RING, hueToColor, ringRadius } from '../config.js';
 import { arena } from '../arena/arena.js';
+import { CLUB as CLUB_LAYOUT } from '../club/config.js';
 import { buildDancer, type DancerPose, type DancerRig } from '../game/avatars.js';
 import { match, type GestureCue } from '../game/state.js';
+import { net } from '../net/session.js';
 
 /** The eat window (song beats, negative = count-in) — mirrors GoopliathSystem. */
 const EAT_START = -2.8;
@@ -66,8 +68,11 @@ const freshPose = (): DancerPose => ({
   slump: 0,
 });
 
-/** Where the headliner poses in the green room (menu screens). */
-const MENU_SPOT = { x: 1.55, z: -2.55, scale: 1.35 };
+/** Where the headliner poses in the FOYER (menu screens, solo). */
+const MENU_SPOT = { x: 1.55, y: 0, z: -2.55, scale: 1.35 };
+/** …and where he works when the CLUB floor is open (a room is live): up on
+ *  the stage behind his console, playing the record the room hears. */
+const DECK_SPOT = { x: 0, y: CLUB_LAYOUT.stage.h, z: CLUB_LAYOUT.stage.z + 0.5, scale: 1.35 };
 
 export class McSystem extends createSystem({}) {
   private rig: DancerRig | null = null;
@@ -154,8 +159,12 @@ export class McSystem extends createSystem({}) {
       this.menuClock += delta;
       this.eaten = false;
       this.mime = null;
-      rig.root.position.set(MENU_SPOT.x, 0, MENU_SPOT.z);
-      this.faceCrowd(MENU_SPOT.x, MENU_SPOT.z);
+      // Foyer: beside the board, the live-service hero. Club floor open
+      // (a room is hosting/joined): he's up at his decks, working.
+      const social = net.phase === 'hosting' || net.phase === 'joined';
+      const spot = social ? DECK_SPOT : MENU_SPOT;
+      rig.root.position.set(spot.x, spot.y, spot.z);
+      this.faceCrowd(spot.x, spot.z);
       this.idleGroove(this.menuClock * 1.9); // ~114 BPM sway, clock of his own
       this.warn += (0 - this.warn) * Math.min(1, delta * 6);
       this.applyAccents(this.warn);

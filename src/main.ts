@@ -16,6 +16,9 @@ import { ensureAudio } from './audio/sfx.js';
 import { ArenaSystem } from './systems/ArenaSystem.js';
 import { AvatarSystem } from './systems/AvatarSystem.js';
 import { ChoreoSystem } from './systems/ChoreoSystem.js';
+import { ClubSocialSystem } from './systems/ClubSocialSystem.js';
+import { ClubSystem } from './systems/ClubSystem.js';
+import { ClubTeleportSystem } from './systems/ClubTeleportSystem.js';
 import { DiscoSystem } from './systems/DiscoSystem.js';
 import { GoopliathSystem } from './systems/GoopliathSystem.js';
 import { HudSystem } from './systems/HudSystem.js';
@@ -28,6 +31,9 @@ import { RankSystem } from './systems/RankSystem.js';
 
 const container = document.getElementById('scene-container') as HTMLDivElement;
 const enterButton = document.getElementById('enter-vr') as HTMLButtonElement | null;
+
+/** The created world, for the debug hook below (set once boot resolves). */
+let worldRef: World | null = null;
 
 enterButton?.setAttribute('disabled', '');
 
@@ -61,10 +67,18 @@ World.create(container, {
     camera: { position: [0, 1.65, 0] },
   },
 }).then(async (world) => {
+  worldRef = world;
   // Order matters lightly: player pose first, then the floor, then everything
   // that reads both. Music owns the clock; choreo owns the judgement.
   world.registerSystem(PlayerSystem);
   world.registerSystem(ArenaSystem);
+  // THE GILDED ECLIPSE: the venue the menus live in, its teleport-only
+  // movement, and the social floor (room-mates, voice, mute/block). The
+  // teleport system runs before the network pumps so the rig is already
+  // re-planted at the spawn on the frame a set books the floor.
+  world.registerSystem(ClubSystem);
+  world.registerSystem(ClubTeleportSystem);
+  world.registerSystem(ClubSocialSystem);
   world.registerSystem(MusicSystem);
   world.registerSystem(ChoreoSystem);
   world.registerSystem(GoopliathSystem);
@@ -110,11 +124,14 @@ World.create(container, {
 });
 
 // Dev/debug hook: drive the flow from the console (or a headless test)
-// without controllers — e.g. __gdr.startRaid({ seats: 8 }).
+// without controllers — e.g. __gdr.startRaid({ seats: 8 }), or walk the
+// club with __gdr.net.host() + __gdr.rig(x, z, yaw).
 import { startRaid, startTutorial, toLobby, toMap, toTour } from './game/flow.js';
 import { match } from './game/state.js';
 import { arena } from './arena/arena.js';
 import { choreoView } from './systems/ChoreoSystem.js';
+import { hostRoom, joinRoom, leaveRoom, net, requestStart, setDancerName } from './net/session.js';
+import { clubPoses } from './net/poses.js';
 
 declare global {
   interface Window {
@@ -127,7 +144,42 @@ declare global {
       match: typeof match;
       arena: typeof arena;
       choreo: typeof choreoView;
+      net: {
+        host: typeof hostRoom;
+        join: typeof joinRoom;
+        leave: typeof leaveRoom;
+        start: typeof requestStart;
+        setName: typeof setDancerName;
+        state: typeof net;
+        poses: typeof clubPoses;
+      };
+      /** Park the player rig at (x, z) facing `yaw` — headless club walks. */
+      rig: (x: number, z: number, yaw?: number, y?: number) => void;
     };
   }
 }
-window.__gdr = { startRaid, startTutorial, toLobby, toMap, toTour, match, arena, choreo: choreoView };
+window.__gdr = {
+  startRaid,
+  startTutorial,
+  toLobby,
+  toMap,
+  toTour,
+  match,
+  arena,
+  choreo: choreoView,
+  net: {
+    host: hostRoom,
+    join: joinRoom,
+    leave: leaveRoom,
+    start: requestStart,
+    setName: setDancerName,
+    state: net,
+    poses: clubPoses,
+  },
+  rig: (x, z, yaw = 0, y = 0) => {
+    const w = worldRef;
+    if (!w) return;
+    w.player.position.set(x, y, z);
+    w.player.rotation.set(0, yaw, 0);
+  },
+};

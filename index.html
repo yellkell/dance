@@ -8,6 +8,19 @@
       rel="icon"
       href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🪩%3C/text%3E%3C/svg%3E"
     />
+    <!-- Firebase Analytics for the raveraid.web.app deploy (project
+         raveraid-bc866; the full web-app config lives in the README's
+         deploy section). Plain gtag — no SDK weight in the bundle, and it
+         fails silently offline or in dev. -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-3MV2K6R84H"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag() {
+        dataLayer.push(arguments);
+      }
+      gtag('js', new Date());
+      gtag('config', 'G-3MV2K6R84H');
+    </script>
     <style>
       :root {
         color-scheme: dark;
@@ -135,6 +148,18 @@
           transform: scale(0.99);
         }
       }
+      .landing__doors {
+        position: relative;
+        z-index: 1;
+        margin-top: -8px;
+        font-family: Georgia, 'Times New Roman', serif;
+        font-size: clamp(13px, 1.8vw, 18px);
+        letter-spacing: 0.22em;
+        text-indent: 0.22em;
+        color: rgba(232, 217, 176, 0.82);
+        text-shadow: 0 0 16px rgba(255, 196, 110, 0.5);
+        user-select: none;
+      }
       #enter-vr {
         position: relative;
         z-index: 1;
@@ -176,6 +201,7 @@
         <span class="landing__rave">RAVE</span>
         <span class="landing__raidword">RAID</span>
       </div>
+      <div class="landing__doors">doors at THE GILDED ECLIPSE · bring your room</div>
       <button id="enter-vr">ENTER THE RAVE</button>
     </div>
     <script type="module" src="/src/main.ts"></script>

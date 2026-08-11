@@ -2,13 +2,20 @@
  * NetworkSystem — the online pumps. While a networked set is live it streams
  * my pose (10 Hz, platform-local: head + hands + head yaw) and my score line
  * (3 Hz, or instantly on a life change) to the room; the session module
- * applies everything inbound. Ends the session when I'm back in the lobby.
+ * applies everything inbound.
+ *
+ * A room OUTLIVES its sets now — the club is where it lives between them —
+ * so the end of a set doesn't end the session: it folds back to the club
+ * floor (backToClub), same members, same code. Bailing out mid-set (right
+ * Ⓐ) tells the room you're done dancing first, so your figure folds on
+ * everyone else's ring instead of freezing mid-move. LEAVE is a button on
+ * the board, and the only thing that actually hangs up.
  */
 
 import { createSystem, Quaternion, Vector3 } from '@iwsdk/core';
 import { NET } from '../config.js';
-import { match, me } from '../game/state.js';
-import { leaveRoom, net, sendPose, sendScore } from '../net/session.js';
+import { match, me, type Screen } from '../game/state.js';
+import { backToClub, net, sendPose, sendScore } from '../net/session.js';
 
 const _v = new Vector3();
 const _q = new Quaternion();
@@ -18,10 +25,31 @@ export class NetworkSystem extends createSystem({}) {
   private poseT = 0;
   private scoreT = 0;
   private lastLives = -1;
+  private prevScreen: Screen | '' = '';
 
   update(delta: number): void {
-    // A finished (or abandoned) online set folds the session.
-    if (net.phase === 'live' && match.screen === 'lobby') leaveRoom();
+    const screen = match.screen;
+    const menuRoom = screen === 'lobby' || screen === 'map' || screen === 'tour';
+
+    // Back on the club floor with a live session? The set is over for me —
+    // fold the session back to the room, not out of it. A direct raid →
+    // menu jump is a mid-set BAIL: report myself down first so my dancer
+    // folds on every other ring (a podium exit is a clean set end).
+    if (net.phase === 'live' && menuRoom) {
+      const d = me();
+      if ((this.prevScreen === 'raid' || this.prevScreen === 'countdown') && d?.alive) {
+        sendScore({
+          score: d.score,
+          combo: d.combo,
+          lives: 0,
+          alive: false,
+          elim: Number.isFinite(match.beat) ? match.beat : 0,
+        });
+      }
+      backToClub();
+    }
+    this.prevScreen = screen;
+
     if (net.phase !== 'live' || !match.playing) return;
 
     this.poseT -= delta;

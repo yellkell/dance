@@ -716,6 +716,14 @@ export const NET = {
   defaultPort: 8788,
 };
 
+/** The hosted room relay (deploy server/index.mjs here — same Render-style
+ *  arrangement as Iron Balls Boxing's pub relay). Override per-session with
+ *  ?server=wss://… or by setting localStorage 'gdr-server'. */
+export const DEFAULT_RELAY = 'wss://rave-raid-relay.onrender.com';
+
+/** Resolve the relay URL: ?server= param > localStorage > a local dev
+ *  relay when the page itself is local > the hosted relay (raveraid.web.app
+ *  and friends can't reach ws://localhost). */
 export function serverUrl(): string {
   const param = new URLSearchParams(location.search).get('server');
   if (param) return param;
@@ -725,6 +733,11 @@ export function serverUrl(): string {
   } catch {
     /* storage may be unavailable */
   }
-  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-  return `${proto}://${location.hostname}:${NET.defaultPort}`;
+  // A plain-http page is a dev serve (vite on this machine or its LAN IP,
+  // reached from a headset) — talk to the relay running beside it. Https
+  // means a real deploy (raveraid.web.app), which needs the hosted relay.
+  if (location.protocol !== 'https:') {
+    return `ws://${location.hostname}:${NET.defaultPort}`;
+  }
+  return DEFAULT_RELAY;
 }

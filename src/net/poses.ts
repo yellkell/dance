@@ -25,3 +25,15 @@ export const remotePoses = new Map<number, RemotePose>();
 export function clearRemotePoses(): void {
   remotePoses.clear();
 }
+
+/**
+ * CLUB poses — the same wire shape, different space and key: while a room
+ * hangs out in THE GILDED ECLIPSE (before/after a set) every member streams
+ * head + hands in club WORLD space, keyed by their relay member idx (seats
+ * don't exist yet). ClubSocialSystem embodies these.
+ */
+export const clubPoses = new Map<number, RemotePose>();
+
+export function clearClubPoses(): void {
+  clubPoses.clear();
+}

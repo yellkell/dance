@@ -25,6 +25,7 @@ import {
 import { pickRaidTrack, trackById, tracksFor } from '../audio/tracks.js';
 import { actOfBeat } from '../choreo/setlist.js';
 import { match, phraseBeats } from '../game/state.js';
+import { net } from '../net/session.js';
 
 export class MusicSystem extends createSystem({}) {
   private generation = -1;
@@ -76,8 +77,12 @@ export class MusicSystem extends createSystem({}) {
         this.generation = -1; // the next countdown always re-drops
       }
       if (screen === 'lobby' || screen === 'map' || screen === 'tour') {
-        const room = tracksFor('lobby')[0];
-        if (room) startAmbient(room);
+        // The house sound: SWAG holds the club solo; the moment a room has
+        // the floor (hosting or joined — the SOCIAL night), ECLIPSE takes
+        // the decks. startAmbient switches cleanly when the id changes.
+        const social = net.phase === 'hosting' || net.phase === 'joined';
+        const room = (social ? tracksFor('club')[0] : undefined) ?? tracksFor('lobby')[0];
+        if (room) startAmbient(room, social ? 0.7 : 0.55);
         // Warm the raid record while the room track holds the floor, so the
         // drop is instant when someone hits START.
         if (!this.warmed) {
