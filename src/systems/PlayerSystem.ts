@@ -17,8 +17,10 @@
  * wrong idea. (The dodge chain is a separate thing — that one multiplies.)
  *
  * THE STICKS: every dancer on the ring carries glowsticks — now so do you,
- * riding your controllers in your seat's colour. They burn brighter as the
- * combo climbs, and every REWARDED swap answers from the hand that went up:
+ * riding your controllers in your seat's colour, each one cased in a thick
+ * near-black outline so it never dissolves into the deck wearing that same
+ * colour. They burn brighter as the combo climbs, and every REWARDED swap
+ * answers from the hand that went up:
  * the stick pulses, the palm ticks, and a burst of SPARKS jumps off the tip
  * — a few faint motes when the groove is young, a hotter, denser fountain
  * as it deepens. No numbers, no panels: the sticks themselves are the
@@ -28,6 +30,7 @@
 import { createSystem, Vector3 } from '@iwsdk/core';
 import {
   AdditiveBlending,
+  BackSide,
   BufferAttribute,
   BufferGeometry,
   CanvasTexture,
@@ -58,6 +61,18 @@ interface Stick {
   halo: Sprite;
   pulse: number;
   attachedTo: Object3D | null;
+}
+
+/** Stick dimensions, and how thick its black casing runs. */
+const STICK_R = 0.013;
+const STICK_LEN = 0.3;
+const STICK_CASE = 0.007;
+
+/** One near-black casing material for both hands — never lit, never tinted. */
+let _casingMat: MeshBasicMaterial | null = null;
+function casingMat(): MeshBasicMaterial {
+  if (!_casingMat) _casingMat = new MeshBasicMaterial({ color: 0x02010a, side: BackSide });
+  return _casingMat;
 }
 
 /** A soft round dot for the spark points — drawn once, shared forever. */
@@ -192,10 +207,36 @@ export class PlayerSystem extends createSystem({}) {
 
   private buildStick(): Stick {
     const group = new Group();
+
+    // THE CASING. Your sticks and your deck wear the same seat colour —
+    // hueToColor(seatHue, 0.6), the identical value — so a bare neon rod
+    // held over your own rim vanishes into it. The fix is the fix the HUD
+    // already uses for text: a thick near-black outline, so the colour
+    // reads as a lit object ON the deck instead of a patch OF it.
+    //
+    // It's an inverted hull: a slightly fatter cylinder drawn BACK faces
+    // only, so its far wall sits behind the core and rings it in black
+    // from every angle, with no second render pass.
+    const casing = new Mesh(
+      new CylinderGeometry(STICK_R + STICK_CASE, STICK_R + STICK_CASE, STICK_LEN + STICK_CASE * 2, 8),
+      casingMat(),
+    );
+    casing.position.y = 0.02;
+    group.add(casing);
+
     const mat = new MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85 });
-    const stick = new Mesh(new CylinderGeometry(0.013, 0.013, 0.3, 8), mat);
+    const stick = new Mesh(new CylinderGeometry(STICK_R, STICK_R, STICK_LEN, 8), mat);
     stick.position.y = 0.02;
     group.add(stick);
+    // A hot white filament down the middle of the neon — the same reason
+    // the casing is there. Colour says WHOSE; brightness says it's a light.
+    const core = new Mesh(
+      new CylinderGeometry(STICK_R * 0.5, STICK_R * 0.5, STICK_LEN * 0.97, 6),
+      new MeshBasicMaterial({ color: 0xfffaff }),
+    );
+    core.position.y = 0.02;
+    group.add(core);
+
     const halo = glowSprite(0xffffff, 0.34, 0.55);
     halo.position.y = 0.08;
     group.add(halo);
