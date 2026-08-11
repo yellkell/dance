@@ -132,6 +132,17 @@ await page.evaluate(() => {
   window.__gdr.match.grooveScore = 0;
 });
 
+// The sparkles: three hot bursts off the right stick, shot mid-flight so
+// the glints and their twins in the deck's polish are both in frame.
+await rig(0, 0.35, 0.35, 0);
+await page.evaluate(() => {
+  window.__gdr.sparkle(1);
+  setTimeout(() => window.__gdr.sparkle(0.8), 120);
+  setTimeout(() => window.__gdr.sparkle(1), 240);
+});
+await page.waitForTimeout(280);
+await shot('vr-sparkles');
+
 // The chain warning: two clipped landings back to back, one to go.
 // Freeze the judge first: left running, the very next clean landing wipes
 // the chain before the shutter — which is exactly the rule (a dodge is an
@@ -145,19 +156,30 @@ await page.evaluate(() => {
 });
 await page.waitForTimeout(300);
 await shot('vr-chain-warning');
-await page.evaluate(() => {
-  window.__gdr.match.playing = true;
-  window.__keepAlive = true;
-});
+// Restore in ONE evaluate: zeroing the injected chain in a separate call
+// left a frame where playing was live with missChain at 2 — one judged
+// landing in that gap and the whole shot list game-overs.
 await page.evaluate(() => {
   const d = window.__gdr.match.players.find((p) => p.kind === 'local');
   d.hits = 0;
   d.missChain = 0;
+  d.alive = true;
+  d.elimAtBeat = -1;
+  window.__gdr.match.playing = true;
+  window.__keepAlive = true;
 });
 await rig(0, 0.4, 0, 0);
 
 // ── THE ROUTINE's blocks, on demand ──────────────────────────────────────
 console.log('routine:');
+// If an earlier race ended the set (podium → lobby), start a fresh one.
+await page.evaluate(() => {
+  if (window.__gdr.match.screen !== 'raid') window.__gdr.startRaid({ seats: 24 });
+});
+await page.waitForFunction(
+  () => window.__gdr.match.screen === 'raid' && Number.isFinite(window.__gdr.match.beat) && window.__gdr.match.beat > 1,
+  { timeout: 90000, polling: 200 },
+);
 await page.evaluate(() => window.__gdr.choreo.dropRoutine());
 // Wait for the first block set to go visible (the beat-locked drop began).
 try {

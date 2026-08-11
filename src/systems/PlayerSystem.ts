@@ -33,7 +33,6 @@ import {
   BackSide,
   BufferAttribute,
   BufferGeometry,
-  CanvasTexture,
   Color,
   CylinderGeometry,
   DynamicDrawUsage,
@@ -47,13 +46,17 @@ import {
   type Object3D,
 } from 'three';
 import { CHOREO, GROOVE, hueToColor, seatHue } from '../config.js';
-import { glowSprite } from '../materials/glow.js';
+import { glintTexture, glowSprite } from '../materials/glow.js';
 import { match, me } from '../game/state.js';
 
 const _head = new Vector3();
 const _hand = new Vector3();
 const _c = new Color();
 const _white = new Color(0xffffff);
+
+/** Dev window into the groove: `__gdr.sparkle(heat)` fires a burst off the
+ *  right stick so the sparkles can be tuned without dancing for them. */
+export const grooveView: { burst?: (heat?: number) => void } = {};
 
 interface Stick {
   group: Group;
@@ -75,35 +78,29 @@ function casingMat(): MeshBasicMaterial {
   return _casingMat;
 }
 
-/** A soft round dot for the spark points — drawn once, shared forever. */
-function sparkDot(): CanvasTexture {
-  const c = document.createElement('canvas');
-  c.width = c.height = 64;
-  const g = c.getContext('2d')!;
-  const grad = g.createRadialGradient(32, 32, 2, 32, 32, 30);
-  grad.addColorStop(0, 'rgba(255,255,255,1)');
-  grad.addColorStop(0.4, 'rgba(255,255,255,0.55)');
-  grad.addColorStop(1, 'rgba(255,255,255,0)');
-  g.fillStyle = grad;
-  g.fillRect(0, 0, 64, 64);
-  return new CanvasTexture(c);
-}
-
 /**
- * The groove's voice: one additive Points cloud, world-space, recycled.
- * Sparks fly up and out of a stick tip, ride a little gravity, and fade by
- * darkening (additive black = gone) — so no per-particle opacity needed.
+ * The groove's voice: NEON SPARKLES — lens glints, not dots and never
+ * squares. One additive Points cloud, world-space, recycled, wearing the
+ * shared glint texture (hot core, crossing streaks), with a TWIN cloud
+ * mirrored under the deck plane: the polished slab you dance on gets the
+ * reflection the void's floor already has, so every burst lands twice.
+ * Sparks fade by darkening (additive black = gone) and DIE IN THE AIR —
+ * a glint that settles on the floor is litter, and litter is retro.
  */
 const MAX_SPARKS = 192;
+/** Below this height a spark twinkles out rather than landing. */
+const SPARK_FLOOR = 0.12;
 
 class SparkPool {
   readonly points: Points;
-  private pos = new Float32Array(MAX_SPARKS * 3);
-  private col = new Float32Array(MAX_SPARKS * 3);
+  // Primary sparks in [0, MAX); their mirror twins in [MAX, 2·MAX).
+  private pos = new Float32Array(MAX_SPARKS * 6);
+  private col = new Float32Array(MAX_SPARKS * 6);
   private vel = new Float32Array(MAX_SPARKS * 3);
   private base = new Float32Array(MAX_SPARKS * 3);
   private age = new Float32Array(MAX_SPARKS);
   private life = new Float32Array(MAX_SPARKS);
+  private twinkle = new Float32Array(MAX_SPARKS);
   private cursor = 0;
   private posAttr: BufferAttribute;
   private colAttr: BufferAttribute;
@@ -111,7 +108,7 @@ class SparkPool {
   constructor() {
     const geo = new BufferGeometry();
     this.pos.fill(0);
-    for (let i = 0; i < MAX_SPARKS; i++) this.pos[i * 3 + 1] = -999; // parked
+    for (let i = 0; i < MAX_SPARKS * 2; i++) this.pos[i * 3 + 1] = -999; // parked
     this.posAttr = new BufferAttribute(this.pos, 3).setUsage(DynamicDrawUsage);
     this.colAttr = new BufferAttribute(this.col, 3).setUsage(DynamicDrawUsage);
     geo.setAttribute('position', this.posAttr);
@@ -119,8 +116,8 @@ class SparkPool {
     this.points = new Points(
       geo,
       new PointsMaterial({
-        size: 0.05,
-        map: sparkDot(),
+        size: 0.085,
+        map: glintTexture(),
         vertexColors: true,
         transparent: true,
         blending: AdditiveBlending,
@@ -131,7 +128,7 @@ class SparkPool {
     this.points.renderOrder = 29;
   }
 
-  /** `heat` 0..1 — deeper groove throws more, faster, whiter sparks. */
+  /** `heat` 0..1 — deeper groove throws more, faster, whiter sparkles. */
   burst(at: Vector3, heat: number, colorHex: number): void {
     const count = Math.round(6 + heat * 22);
     for (let n = 0; n < count; n++) {
@@ -148,26 +145,33 @@ class SparkPool {
       this.vel[i3 + 1] = (0.7 + Math.random() * 0.9) * (0.8 + heat * 0.9);
       this.vel[i3 + 2] = Math.sin(a) * r;
       // Seat colour, run hotter (toward white) as the streak deepens —
-      // each spark jittered so the burst shimmers instead of banding.
+      // each sparkle jittered so the burst shimmers instead of banding.
       _c.setHex(colorHex).lerp(_white, Math.min(1, heat * 0.55 + Math.random() * 0.3));
       this.base[i3] = _c.r;
       this.base[i3 + 1] = _c.g;
       this.base[i3 + 2] = _c.b;
       this.age[i] = 0;
-      this.life[i] = 0.3 + Math.random() * 0.3 + heat * 0.2;
+      this.life[i] = 0.35 + Math.random() * 0.35 + heat * 0.2;
+      // Each glint scintillates at its own rate — the difference between
+      // "particles" and "sparkles" is that sparkles TWINKLE.
+      this.twinkle[i] = 7 + Math.random() * 9;
     }
   }
 
   update(delta: number): void {
+    const M3 = MAX_SPARKS * 3;
     for (let i = 0; i < MAX_SPARKS; i++) {
       if (this.life[i] <= 0) continue;
       const i3 = i * 3;
       this.age[i] += delta;
       const k = this.age[i] / this.life[i];
-      if (k >= 1) {
+      const grounded = this.pos[i3 + 1] <= SPARK_FLOOR;
+      if (k >= 1 || grounded) {
         this.life[i] = 0;
         this.pos[i3 + 1] = -999;
+        this.pos[i3 + 1 + M3] = -999;
         this.col[i3] = this.col[i3 + 1] = this.col[i3 + 2] = 0;
+        this.col[i3 + M3] = this.col[i3 + 1 + M3] = this.col[i3 + 2 + M3] = 0;
         continue;
       }
       this.vel[i3 + 1] -= 2.4 * delta; // light gravity — a fountain, not confetti
@@ -177,10 +181,19 @@ class SparkPool {
       this.pos[i3] += this.vel[i3] * delta;
       this.pos[i3 + 1] += this.vel[i3 + 1] * delta;
       this.pos[i3 + 2] += this.vel[i3 + 2] * delta;
-      const fade = (1 - k) * (1 - k);
+      const flicker = 0.72 + 0.28 * Math.sin(this.age[i] * this.twinkle[i] + i * 1.7);
+      const fade = (1 - k) * (1 - k) * flicker;
       this.col[i3] = this.base[i3] * fade;
       this.col[i3 + 1] = this.base[i3 + 1] * fade;
       this.col[i3 + 2] = this.base[i3 + 2] * fade;
+      // The twin in the polish: same glint, upside down, dimmed the way
+      // the void mirrors its own towers.
+      this.pos[i3 + M3] = this.pos[i3];
+      this.pos[i3 + 1 + M3] = -this.pos[i3 + 1];
+      this.pos[i3 + 2 + M3] = this.pos[i3 + 2];
+      this.col[i3 + M3] = this.col[i3] * 0.38;
+      this.col[i3 + 1 + M3] = this.col[i3 + 1] * 0.38;
+      this.col[i3 + 2 + M3] = this.col[i3 + 2] * 0.38;
     }
     this.posAttr.needsUpdate = true;
     this.colAttr.needsUpdate = true;
@@ -203,6 +216,12 @@ export class PlayerSystem extends createSystem({}) {
   init(): void {
     this.sticks = { left: this.buildStick(), right: this.buildStick() };
     this.scene.add(this.sparks.points);
+    grooveView.burst = (heat = 1) => {
+      const s = this.sticks.right;
+      if (s.attachedTo) s.halo.getWorldPosition(_hand);
+      else _hand.set(0.25, 1.35, -0.4);
+      this.sparks.burst(_hand, Math.min(1, Math.max(0, heat)), hueToColor(seatHue(match.mySeat), 0.6));
+    };
   }
 
   private buildStick(): Stick {

@@ -26,7 +26,7 @@ import {
   SphereGeometry,
 } from 'three';
 import { LASER_HUES, PALETTE, RING, hueToColor } from '../config.js';
-import { glowSprite } from '../materials/glow.js';
+import { glintTexture, glowSprite } from '../materials/glow.js';
 
 // The GOOPLIATH stands ~4.3 m at raid scale — the ball hangs clear above
 // him, and the holo board slots between the two.
@@ -163,13 +163,19 @@ export class DiscoRig {
     const geo = new BufferGeometry();
     geo.setAttribute('position', new BufferAttribute(this.confettiPos, 3));
     geo.setAttribute('color', new BufferAttribute(colors, 3));
+    // Neon glints, not paper: an unmapped Points material renders literal
+    // SQUARES, and squares raining onto the floor read as sprite litter.
+    // The lens-glint texture + additive blending turns the same cloud into
+    // a sparkler burst that belongs to the light show.
     this.confetti = new Points(
       geo,
       new PointsMaterial({
-        size: 0.045,
+        size: 0.09,
+        map: glintTexture(),
         vertexColors: true,
         transparent: true,
         opacity: 0.95,
+        blending: AdditiveBlending,
         depthWrite: false,
       }),
     );
@@ -231,11 +237,15 @@ export class DiscoRig {
       const pos = this.confettiPos;
       const vel = this.confettiVel;
       for (let i = 0; i < CONFETTI; i++) {
+        if (pos[i * 3 + 1] <= -40) continue; // already burnt out
         vel[i * 3 + 1] -= dt * 1.6; // light gravity — it flutters, not falls
         vel[i * 3] *= 1 - dt * 0.4;
         vel[i * 3 + 2] *= 1 - dt * 0.4;
         pos[i * 3] += vel[i * 3] * dt;
-        pos[i * 3 + 1] = Math.max(0.02, pos[i * 3 + 1] + vel[i * 3 + 1] * dt);
+        const ny = pos[i * 3 + 1] + vel[i * 3 + 1] * dt;
+        // A glint that reaches the floor winks out — the shower never
+        // becomes litter lying on the glass.
+        pos[i * 3 + 1] = ny <= 0.05 ? -50 : ny;
         pos[i * 3 + 2] += vel[i * 3 + 2] * dt;
       }
       (this.confetti.geometry.getAttribute('position') as BufferAttribute).needsUpdate = true;

@@ -138,6 +138,7 @@ import { finishRaid, startRaid, startTutorial, toLobby, toMap, toTour } from './
 import { match } from './game/state.js';
 import { arena } from './arena/arena.js';
 import { choreoView } from './systems/ChoreoSystem.js';
+import { grooveView } from './systems/PlayerSystem.js';
 import { callBall, cancelBall, hostRoom, joinBall, joinRoom, leaveRoom, net, setDancerName } from './net/session.js';
 import { clubPoses } from './net/poses.js';
 
@@ -156,6 +157,8 @@ declare global {
       match: typeof match;
       arena: typeof arena;
       choreo: typeof choreoView;
+      /** Fire a glowstick sparkle burst (heat 0..1) for tuning. */
+      sparkle: (heat?: number) => void;
       net: {
         host: typeof hostRoom;
         join: typeof joinRoom;
@@ -186,6 +189,7 @@ window.__gdr = {
   match,
   arena,
   choreo: choreoView,
+  sparkle: (heat = 1) => grooveView.burst?.(heat),
   net: {
     host: hostRoom,
     join: joinRoom,

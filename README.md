@@ -15,9 +15,11 @@ everyone else.
 - Nail a **last-instant dodge** (still in the fire one beat out, clear on the
   drop) → **PERFECT!**, ×1.5.
 - **COMBO**: dance like the groupies — one hand up, one hand down, swapping
-  on the beat. Every rhythmic swap pays a little and throws **sparks off the
-  glowstick** that went up — a few faint motes at first, a hotter, denser
-  fountain the deeper the groove. The HUD's **groove row** keeps the ledger:
+  on the beat. Every rhythmic swap throws **neon sparkles off the
+  glowstick** that went up — four-point lens glints that twinkle, run
+  hotter and denser the deeper the groove, mirror themselves in the
+  floor's polish, and die in the air (nothing ever lies on the floor as
+  litter). The HUD's **groove row** keeps the ledger:
   four pips light one per swap as it catches, then give way to a fill bar
   and the points that streak has paid. Stop, or swap off-rhythm, and it
   lets go — row and all.

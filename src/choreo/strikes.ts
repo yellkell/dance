@@ -35,7 +35,7 @@ import {
   type Object3D,
 } from 'three';
 import { CHOREO, DECAL_Y, OCTAGON_HALF_DEPTH, OCTAGON_HALF_WIDTH, PALETTE } from '../config.js';
-import { glowSprite } from '../materials/glow.js';
+import { glintTexture, glowSprite } from '../materials/glow.js';
 
 interface Strike {
   group: Group;
@@ -81,7 +81,8 @@ class Sparks {
       geo,
       new PointsMaterial({
         color,
-        size: 0.035,
+        size: 0.055,
+        map: glintTexture(),
         transparent: true,
         opacity: 0.95,
         blending: AdditiveBlending,
@@ -117,7 +118,15 @@ class Sparks {
       }
       this.vel[i * 3 + 1] -= dt * 5.2;
       this.pos[i * 3] += this.vel[i * 3] * dt;
-      this.pos[i * 3 + 1] = Math.max(0.02, this.pos[i * 3 + 1] + this.vel[i * 3 + 1] * dt);
+      const ny = this.pos[i * 3 + 1] + this.vel[i * 3 + 1] * dt;
+      // An ember that reaches the deck winks out — nothing ever lies on
+      // the floor as litter.
+      if (ny <= 0.04) {
+        this.life[i] = 0;
+        this.pos[i * 3 + 1] = -99;
+        continue;
+      }
+      this.pos[i * 3 + 1] = ny;
       this.pos[i * 3 + 2] += this.vel[i * 3 + 2] * dt;
     }
     (this.points.geometry.getAttribute('position') as BufferAttribute).needsUpdate = true;

@@ -38,7 +38,7 @@ import {
   MeshBasicMaterial,
   PlaneGeometry,
 } from 'three';
-import { GRADE, GROOVE, SCORE, TOUR, hueToColor, seatHue } from '../config.js';
+import { GRADE, GROOVE, SCORE, TOUR, seatHue } from '../config.js';
 import { trackById } from '../audio/tracks.js';
 import { dodgeRate, gradeOf, match, me } from '../game/state.js';
 
@@ -50,8 +50,9 @@ const CH = 384;
 /** The wedge strip (live readout). */
 const SW = 512;
 const SH = 288;
-/** The groove's own colour — never the seat's, so the two never blur. */
-const GROOVE_CSS = '#4fb7ff';
+/** The groove's own colour — electric ice, never the seat's, so the two
+ *  never blur. */
+const GROOVE_CSS = '#2fe0ff';
 
 const _head = new Vector3();
 
@@ -75,6 +76,36 @@ function ink(
   g.fillStyle = fill;
   if (maxWidth) g.fillText(text, x, y, maxWidth);
   else g.fillText(text, x, y);
+}
+
+/** Ink with a neon halo — the same casing, then the colour BLOOMS. The
+ *  whites stay white; everything coloured earns a glow of its own hue,
+ *  which is where the vibrance lives (a saturated fill with no bloom
+ *  reads as flat print, not light). */
+function neon(
+  g: CanvasRenderingContext2D,
+  text: string,
+  x: number,
+  y: number,
+  px: number,
+  fill: string,
+  glow = fill,
+  maxWidth?: number,
+): void {
+  ink(g, text, x, y, px, fill, maxWidth);
+  g.shadowColor = glow;
+  g.shadowBlur = Math.max(14, px * 0.4);
+  g.fillStyle = fill;
+  g.font = `900 ${px}px 'Arial Black', system-ui, sans-serif`;
+  if (maxWidth) g.fillText(text, x, y, maxWidth);
+  else g.fillText(text, x, y);
+  g.shadowBlur = 0;
+}
+
+/** A seat's colour at FULL neon: hue straight to hsl, no muddying through
+ *  the palette's dimmer value curve. */
+function seatNeonCss(hue: number): string {
+  return `hsl(${Math.round(hue * 360)}, 100%, 62%)`;
 }
 
 export class HudSystem extends createSystem({}) {
@@ -290,8 +321,8 @@ export class HudSystem extends createSystem({}) {
         SET_COLORS[match.tour.set % SET_COLORS.length],
       );
     }
-    ink(g, `${Math.max(1, count)}`, CW / 2, CH / 2 - 4, 150, '#ff2ad5');
-    if (cued) ink(g, `♪ ${cued.title}`, CW / 2, CH - 52, 36, '#b9ffc4');
+    neon(g, `${Math.max(1, count)}`, CW / 2, CH / 2 - 4, 150, '#ff2ad5');
+    if (cued) neon(g, `♪ ${cued.title}`, CW / 2, CH - 52, 36, '#7dffb2');
     this.cardTex.needsUpdate = true;
   }
 
@@ -303,16 +334,17 @@ export class HudSystem extends createSystem({}) {
     g.textBaseline = 'middle';
 
     const d = me();
-    const seatCss = `#${hueToColor(seatHue(match.mySeat), 0.62).toString(16).padStart(6, '0')}`;
+    const seatCss = seatNeonCss(seatHue(match.mySeat));
     const cx = SW / 2;
 
-    // Score — big and white, with the chain riding beside it so one glance
-    // catches both.
+    // Score — big and white with the faintest white bloom (the whites are
+    // right; they just get to be LIGHT). The multiplier below it wears the
+    // seat's hue at full neon.
     g.textAlign = 'center';
-    ink(g, `${d?.score ?? 0}`, cx, 74, 92, '#ffffff');
+    neon(g, `${d?.score ?? 0}`, cx, 74, 92, '#ffffff', 'rgba(255,255,255,0.55)');
     if (d && d.alive && d.combo > 0) {
       const mult = 1 + SCORE.comboStep * Math.min(d.combo, SCORE.comboCap);
-      ink(g, `×${mult.toFixed(1)}`, cx, 150, 54, seatCss);
+      neon(g, `×${mult.toFixed(1)}`, cx, 150, 54, seatCss);
     }
 
     if (d?.alive !== false) this.drawGroove(g, cx);
@@ -335,9 +367,9 @@ export class HudSystem extends createSystem({}) {
         g.strokeStyle = 'rgba(0,2,6,0.96)';
         g.stroke();
         if (lit) {
-          g.shadowColor = '#ff5040';
+          g.shadowColor = '#ff2b55';
           g.shadowBlur = last ? 22 : 12;
-          g.fillStyle = '#ff5040';
+          g.fillStyle = '#ff2b55';
         } else {
           g.fillStyle = 'rgba(70,78,92,0.85)';
         }
@@ -406,7 +438,7 @@ export class HudSystem extends createSystem({}) {
     // What the streak has paid — the combo's own ledger, dying with it.
     if (tally) {
       g.textAlign = 'left';
-      ink(g, tally, left + meterW + 14, y, 40, GROOVE_CSS);
+      neon(g, tally, left + meterW + 14, y, 40, GROOVE_CSS);
     }
   }
 
