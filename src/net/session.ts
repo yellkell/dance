@@ -47,6 +47,8 @@ export interface BallState {
   callerIdx: number;
   callerName: string;
   track: string;
+  /** The caller's difficulty — the whole ring dances one chart. */
+  diff: number;
   pos: [number, number, number];
   firesAt: number;
   joins: Set<number>;
@@ -214,6 +216,7 @@ function handle(msg: Record<string, unknown>): void {
         callerIdx: Number(msg.idx),
         callerName: String(msg.name ?? ''),
         track: typeof msg.track === 'string' ? msg.track : '',
+        diff: Number.isFinite(Number(msg.diff)) ? Number(msg.diff) : 1,
         pos:
           Array.isArray(msg.pos) && msg.pos.length === 3
             ? [Number(msg.pos[0]), Number(msg.pos[1]), Number(msg.pos[2])]
@@ -270,8 +273,10 @@ function handle(msg: Record<string, unknown>): void {
         beatZeroAt,
         online: true,
         // The host's record (empty = everyone derives the same one from the
-        // seed). Either way the whole room lands on one song.
+        // seed). Either way the whole room lands on one song — and on the
+        // caller's difficulty, so every deck runs the identical chart.
         trackId: typeof msg.track === 'string' ? msg.track : undefined,
+        difficulty: Number.isFinite(Number(msg.diff)) ? Number(msg.diff) : undefined,
       });
       match.roomCode = net.code;
       break;
@@ -378,7 +383,7 @@ export function leaveRoom(): void {
  *  along. The relay owns the 60-second clock from here. */
 export function callBall(pos: [number, number, number]): void {
   if (net.phase !== 'hosting' && net.phase !== 'joined') return;
-  send({ t: 'ball-up', track: match.preferredTrack, seats: match.seats, pos });
+  send({ t: 'ball-up', track: match.preferredTrack, diff: match.difficulty, seats: match.seats, pos });
 }
 
 /** Touch in (or step back out) of the hanging ball. */

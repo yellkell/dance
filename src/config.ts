@@ -272,8 +272,11 @@ export const CHOREO = {
   beamSplitChance: [0.4, 0.4, 0.55, 0.55],
   /** THE X: two beams thrown diagonally through the deck centre at once,
    *  crossing in an X — the safe ground is the four pockets between the
-   *  arms, so the dodge reads radial (out of the cross, not off a line). */
+   *  arms, so the dodge reads radial (out of the cross, not off a line).
+   *  The arms run THINNER than a straight beam: two full-width strips on
+   *  the diagonals left pockets too tight to trust. */
   beamXChance: [0, 0, 0.3, 0.35],
+  beamXHalfW: 0.17,
   /** THE WAVE: four beams marching across the whole deck in order, one
    *  landing per step — cross with it or be caught. The four stops tile
    *  the deck edge to edge (adjacent kill widths overlap on purpose: no
@@ -368,12 +371,26 @@ export const CHOREO = {
   /** Minimum clear beats between one landing and the next telegraph —
    *  bar/half-bar multiples so successive moves stay on the grid. */
   restBeats: [4, 4, 2, 2],
-  /**
-   * Act boundaries as a FRACTION of the set, not fixed phrase numbers —
-   * the tracks run 2 to 4 minutes, so the escalation curve has to stretch
-   * to whatever record is on. Act 0 opens, act 3 is the last fifth.
-   */
-  actAtProgress: [0, 0.25, 0.55, 0.8],
+};
+
+/**
+ * DIFFICULTY — chosen on the board, applied to the whole song. The old
+ * universal ramp gave every record a trivially easy opening third; now the
+ * player picks the floor and the song adds ONE act of lift in its back
+ * stretch (a set still deserves a finale), capped at act 3.
+ *
+ *   EASY   : acts 0 → 1
+ *   NORMAL : acts 1 → 2
+ *   HARD   : acts 2 → 3
+ *
+ * Shared like the song pick: solo it's yours; on the club floor the ball
+ * carries the caller's choice so the whole ring dances one chart.
+ */
+export const DIFFICULTY = {
+  labels: ['EASY', 'NORMAL', 'HARD'],
+  baseAct: [0, 1, 2],
+  /** The lift: one more act from this fraction of the set on. */
+  liftAt: 0.6,
 };
 
 /* ────────────────────────────── THE GROOVE ───────────────────────────────

@@ -194,7 +194,7 @@ export class StrikeFx {
    *  exactly where the strip said. Recoloured out of the disco's magenta
    *  into the hazard palette, with a white-hot core so it reads as danger
    *  and not as one more laser. */
-  beam(parent: Object3D, x: number, yaw = 0): void {
+  beam(parent: Object3D, x: number, yaw = 0, halfW = CHOREO.beamHalfWidth): void {
     // A yawed beam (THE X's arm) runs the deck diagonal; its offset `x` is
     // perpendicular to its own run.
     const len = yaw
@@ -214,11 +214,11 @@ export class StrikeFx {
         core.scale.x = 1 - k * 0.4;
       },
       (g) => {
-        const wall = new Mesh(new BoxGeometry(CHOREO.beamHalfWidth * 2, 2.4, len), basic(WARN, 0.7));
+        const wall = new Mesh(new BoxGeometry(halfW * 2, 2.4, len), basic(WARN, 0.7));
         wall.position.set(px, 1.2, pz);
         wall.rotation.y = yaw;
         g.add(wall);
-        const core = new Mesh(new BoxGeometry(CHOREO.beamHalfWidth * 0.7, 2.4, len), basic(HOT, 0.95));
+        const core = new Mesh(new BoxGeometry(halfW * 0.7, 2.4, len), basic(HOT, 0.95));
         core.position.set(px, 1.2, pz);
         core.rotation.y = yaw;
         g.add(core);

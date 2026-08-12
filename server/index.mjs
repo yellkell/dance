@@ -45,7 +45,7 @@ const START_IN_MS = 5500; // count-in cushion: 8 beats at 128 BPM is 3750 ms
  * code → {
  *   members: Map<ws, {name, idx, seat}>,
  *   host: ws,
- *   ball: { caller: idx, track, seats, pos, joins: Set<idx>, timer, deadline } | null,
+ *   ball: { caller: idx, track, diff, seats, pos, joins: Set<idx>, timer, deadline } | null,
  *   playing: Set<idx>,   // members currently away on the ring
  * }
  */
@@ -124,6 +124,7 @@ function fireBall(code) {
       seed,
       seats,
       track: ball.track,
+      diff: ball.diff,
       startInMs: START_IN_MS,
       players: players.map(([m, h]) => ({ seat: h.seat, name: h.name, idx: h.idx, you: m === ws })),
     });
@@ -256,6 +257,7 @@ wss.on('connection', (ws) => {
             idx: room.ball.caller,
             name: memberByIdx(room, room.ball.caller)?.[1].name ?? '',
             track: room.ball.track,
+            diff: room.ball.diff,
             pos: room.ball.pos,
             ms: Math.max(500, room.ball.deadline - Date.now()),
             joins: [...room.ball.joins],
@@ -278,12 +280,15 @@ wss.on('connection', (ws) => {
         }
         const pos = Array.isArray(msg.pos) && msg.pos.length === 3 ? msg.pos.map(Number) : [0, 1.5, -1.5];
         const track = typeof msg.track === 'string' ? msg.track.slice(0, 32) : '';
+        // The caller's difficulty rides the ball like their song pick does.
+        const diff = Number.isFinite(Number(msg.diff)) ? Math.max(0, Math.min(2, Number(msg.diff))) : 1;
         // Capture the code now — ws.room clears if the caller walks, and
         // the timeout must still find the room (fireBall re-checks state).
         const code = ws.room;
         room.ball = {
           caller: info.idx,
           track,
+          diff,
           seats: Number(msg.seats) || 0,
           pos,
           joins: new Set(),
@@ -295,6 +300,7 @@ wss.on('connection', (ws) => {
           idx: info.idx,
           name: info.name,
           track,
+          diff,
           pos,
           ms: BALL_MS,
           joins: [],

@@ -110,7 +110,7 @@ There's also a debug hook in the console:
 
 | Move | The tell | Your answer |
 | --- | --- | --- |
-| **BEAM** | a strip rakes down the deck from the stage on a short fuse — one laser on a slot, or a deliberate **double**: a TWIN pair taking one side and the middle, a SPLIT evenly either side of centre, or (late) **THE X**: two thrown diagonally at once, crossing dead centre | **sidestep** the lane; **get across** a twin; **stand between** a split; against the X, **get into a pocket** between the arms |
+| **BEAM** | a strip rakes down the deck from the stage on a short fuse — one laser on a slot, or a deliberate **double**: a TWIN pair taking one side and the middle, a SPLIT evenly either side of centre, or (late) **THE X**: two THIN beams thrown diagonally at once, crossing dead centre | **sidestep** the lane; **get across** a twin; **stand between** a split; against the X, **get into a pocket** between the arms — they're real rooms |
 | **SWEEP** | a blade hangs at chest height, chevrons cascading **downward** off it | **duck** — and hold it |
 | **SEESAW** | one half of the deck floods, then the other, on the beat | **cross** the centreline |
 | **SURGE** | the seesaw's front/back cousin | **cross**, the other way |
@@ -119,7 +119,7 @@ There's also a debug hook in the console:
 | **CROSSFIRE** | a laser is loaded on one side rail and a strip fills **across** the deck (late on, a stage lane crosses it) — and from mid-set it can come as **THE TRAP**: both side rails at once, one ahead of you and one behind, landing on the same beat | **step forward or back** off the strip — diagonally, once it's a lattice; against the trap, **squeeze into the band between the rails** |
 | **DONUT** | usually a laser straight down the middle, and a bar later the rim closes fast with chevrons marching **inward** on a tight safe disc | **step off** the middle, then **run back into it** |
 | **DUCK DONUT** | the finale combination, rare even in act 3: the rim closes **and** the blade hangs at chest height, both on one beat | **get to the middle AND duck** — small and close |
-| **THE WAVE** | four beams marching **1-2-3-4** across the whole deck (their staggered fills ARE the count) — sideways, or front-to-back; late acts can send it straight back the way it came | **travel** — cross with the march, or ride just behind the newest strike; on a return wave, across **and back** |
+| **THE WAVE** | beams marching **1-2-3** across the deck (their staggered fills ARE the count) — sideways, or front-to-back — with the far quarter left dark: the **EXIT**; late acts send the march straight back the way it came | **travel with the march into the exit**; on a return wave, back out the way you came |
 | **ROUTINE** | the deck splits into quarters and the boss **teaches** a corner sequence — each marked with its step number, each pointed out in turn — then the marks go out and, on every step, three spinning neon blocks **fall from above** onto the quarters you weren't taught | **remember it**, and stand in the taught corner on each tick |
 
 The telegraph is the whole instruction: whatever fills amber→red, don't be
@@ -294,6 +294,11 @@ into THE STILL ROOM and the mix ducks to a murmur without stopping.
 SHUFFLE derives the record from the match seed, so an online room agrees on the
 song without anyone sending it; a host's explicit pick rides along in the start
 message.
+
+**Picking a difficulty**: the EASY / NORMAL / HARD row under it is the act
+floor for the whole song — every record used to open trivially easy and ramp;
+now you choose the floor and the song lifts one act in its back stretch.
+Online, the ball carries the caller's difficulty with their song pick.
 
 **Adding a track**: drop the file in `src/assets/music/`, add a row to
 `TRACKS`, done. Roles decide where it plays. `npm run analyze -- <file…>` prints

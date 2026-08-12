@@ -17,6 +17,7 @@
 
 import {
   CHOREO,
+  DIFFICULTY,
   MOVES,
   MUSIC,
   type MoveKind,
@@ -69,20 +70,18 @@ export interface SetMove {
 const barBeats = MUSIC.beatsPerBar;
 const phraseBeats = MUSIC.beatsPerBar * MUSIC.barsPerPhrase;
 
-/** Act for a phrase within a set of `total` phrases (boundaries are
- *  fractions of the set, so a 2-minute track and a 4-minute track both get
- *  a full opening, build, peak and finale). */
-export function actOfPhrase(phrase: number, total: number): number {
+/** Act for a phrase within a set of `total` phrases: the chosen DIFFICULTY
+ *  sets the floor for the whole song, and the back stretch lifts one act —
+ *  a set still deserves a finale, but nobody sits through a trivial
+ *  opening third ever again. */
+export function actOfPhrase(phrase: number, total: number, difficulty = 1): number {
   const progress = total > 0 ? phrase / total : 0;
-  let act = 0;
-  for (let i = 0; i < CHOREO.actAtProgress.length; i++) {
-    if (progress >= CHOREO.actAtProgress[i]) act = i;
-  }
-  return act;
+  const base = DIFFICULTY.baseAct[Math.max(0, Math.min(DIFFICULTY.baseAct.length - 1, difficulty))];
+  return Math.min(3, base + (progress >= DIFFICULTY.liftAt ? 1 : 0));
 }
 
-export function actOfBeat(beat: number, totalPhrases: number): number {
-  return actOfPhrase(Math.floor(Math.max(0, beat) / phraseBeats), totalPhrases);
+export function actOfBeat(beat: number, totalPhrases: number, difficulty = 1): number {
+  return actOfPhrase(Math.floor(Math.max(0, beat) / phraseBeats), totalPhrases, difficulty);
 }
 
 /**
@@ -117,11 +116,11 @@ function pickKind(
   for (const k of kinds) {
     if (banned.includes(k)) continue; // this record never calls it
     if (k === 'duckdonut' && banned.includes('sweep')) continue; // no duck → no combo
+    if (k === last) continue; // NEVER the same move twice running
     const weights = MOVES[k].weights;
     let w = weights[Math.min(act, weights.length - 1)];
     if (w <= 0) continue;
-    if (k === last) w *= 0.3;
-    else if (last && VERB[k] === VERB[last]) w *= 0.45; // same verb, new face — still a rut
+    if (last && VERB[k] === VERB[last]) w *= 0.35; // same verb, new face — still a rut
     pool.push([k, w]);
     total += w;
   }
@@ -145,9 +144,11 @@ function buildLandings(kind: MoveKind, landBeat: number, act: number, rng: () =>
     } else if (rng() < CHOREO.beamXChance[Math.min(act, CHOREO.beamXChance.length - 1)]) {
       // THE X: two beams thrown diagonally at once, crossing dead centre.
       // The safe ground is the four pockets between the arms — the dodge
-      // is radial, out of the cross, not a sidestep off a line.
-      landings.push({ beat: landBeat, zone: { kind: 'lane', x: 0, halfW, yaw: Math.PI / 4 } });
-      landings.push({ beat: landBeat, zone: { kind: 'lane', x: 0, halfW, yaw: -Math.PI / 4 } });
+      // is radial, out of the cross, not a sidestep off a line. The arms
+      // run thin so the pockets are real rooms, not slivers.
+      const xw = CHOREO.beamXHalfW;
+      landings.push({ beat: landBeat, zone: { kind: 'lane', x: 0, halfW: xw, yaw: Math.PI / 4 } });
+      landings.push({ beat: landBeat, zone: { kind: 'lane', x: 0, halfW: xw, yaw: -Math.PI / 4 } });
     } else if (rng() < CHOREO.beamSplitChance[Math.min(act, CHOREO.beamSplitChance.length - 1)]) {
       // SPLIT: evenly spaced either side of centre. What's left is a
       // corridor down the middle — the dodge is to stand BETWEEN them.
@@ -231,16 +232,18 @@ function buildLandings(kind: MoveKind, landBeat: number, act: number, rng: () =>
       });
     });
   } else if (kind === 'wave') {
-    // THE WAVE: four beams marching 1-2-3-4 across the whole deck — cross
-    // with the march or be caught by it. Sideways (lanes walking x) or
-    // front/back (rails walking z); each stop's telegraph runs the beam's
-    // own short fuse, staggered, so the deck reads as a wave building.
-    // Late acts can send it straight back the way it came: across AND back.
+    // THE WAVE: beams marching 1-2-3 across the deck — travel with the
+    // march into the EXIT: the last quarter never fires, so the crossing
+    // has a destination instead of a countdown. Sideways (lanes walking x)
+    // or front/back (rails walking z); each stop's telegraph runs the
+    // beam's own short fuse, staggered, so the deck reads as a wave
+    // building. Late acts can send it straight back the way it came —
+    // across and back — and the exit still holds.
     const axis: 0 | 1 = rng() < 0.5 ? 1 : 0;
     const step = CHOREO.waveStepBeats[Math.min(act, CHOREO.waveStepBeats.length - 1)];
     const back = rng() < CHOREO.waveReturnChance[Math.min(act, CHOREO.waveReturnChance.length - 1)];
     const stops = axis ? CHOREO.waveRailZ : CHOREO.waveLaneX;
-    const order = rng() < 0.5 ? [...stops] : [...stops].reverse();
+    const order = (rng() < 0.5 ? [...stops] : [...stops].reverse()).slice(0, -1);
     if (back) order.push(...order.slice(0, -1).reverse());
     const from: 1 | -1 = rng() < 0.5 ? 1 : -1;
     order.forEach((at, i) => {
@@ -310,7 +313,12 @@ function buildLandings(kind: MoveKind, landBeat: number, act: number, rng: () =>
  * `banned` comes from the record on the decks (tracks.ts): some songs
  * simply never call certain moves.
  */
-export function generateSetlist(seed: number, phrases: number, banned: readonly MoveKind[] = []): SetMove[] {
+export function generateSetlist(
+  seed: number,
+  phrases: number,
+  banned: readonly MoveKind[] = [],
+  difficulty = 1,
+): SetMove[] {
   const rng = mulberry32(mix(seed, 0xc03e0));
   const moves: SetMove[] = [];
   // Two bars of dancing, then the show starts: the first telegraph blooms at
@@ -321,7 +329,7 @@ export function generateSetlist(seed: number, phrases: number, banned: readonly 
   let index = 0;
 
   for (let phrase = 0; phrase < phrases; phrase++) {
-    const act = actOfPhrase(phrase, phrases);
+    const act = actOfPhrase(phrase, phrases, difficulty);
     const want = CHOREO.movesPerPhrase[Math.min(act, CHOREO.movesPerPhrase.length - 1)];
     const phraseEnd = (phrase + 1) * phraseBeats;
     const rest = CHOREO.restBeats[Math.min(act, CHOREO.restBeats.length - 1)];

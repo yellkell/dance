@@ -91,6 +91,9 @@ export interface MatchState {
   trackId: string;
   /** Lobby override: a track id to always play, or '' for seed shuffle. */
   preferredTrack: string;
+  /** DIFFICULTY (0 easy · 1 normal · 2 hard) — the act floor for the whole
+   *  song. Chosen on the board; the ball carries the caller's choice. */
+  difficulty: number;
   bpm: number;
   /** Total phrases in the current set — derived from the track's length. */
   phrases: number;
@@ -157,6 +160,7 @@ export const match: MatchState = {
   seed: 1,
   trackId: '',
   preferredTrack: '',
+  difficulty: 1,
   bpm: MUSIC.fallbackBpm,
   phrases: 8,
   beatZeroAt: NaN,

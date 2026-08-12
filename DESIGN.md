@@ -37,20 +37,29 @@ win condition from "kill the titan" to "outlast the floor".
 
 ## The set (match structure)
 
-14 phrases of 8 bars at 128 BPM ≈ a four-minute set.
+Acts set the tempo of danger; **DIFFICULTY sets the acts**. The old
+universal ramp gave every record a trivially easy opening third — by the
+last tour night that read as "barely move for half the song". Now the
+board's EASY / NORMAL / HARD pick is the act floor for the whole record,
+and the back stretch (from 60%) lifts exactly one act, because a set
+still deserves a finale:
 
-| Phrases | Act | Moves/phrase | Rest | New |
-| --- | --- | --- | --- | --- |
-| 0 | intro | 0 | — | count-in, dance, calibrate |
-| 1–3 | 0 | 2 | 4 beats | beam, sweep, seesaw, gate (both axes), crossfire |
-| 4–7 | 1 | 3 | 3 beats | donut one-twos, the routine, THE WAVE |
-| 8–10 | 2 | 4 | 2 beats | surge, nova, rail traps, double beams, THE X |
-| 11–13 | 3 | 5 | 1 beat | duck donut, return waves, 5-stage seesaws, tight novas |
+| Difficulty | Acts | Moves/phrase | Rest |
+| --- | --- | --- | --- |
+| EASY | 0 → 1 | 2 → 3 | 4 beats |
+| NORMAL | 1 → 2 | 3 → 4 | 3 → 2 beats |
+| HARD | 2 → 3 | 4 → 5 | 2 → 1 beats |
 
-One law above the table: the choreographer tracks each move's dodge VERB
-(lateral, depth, radial, duck, still…) and damps any candidate that would
-repeat the previous one — the floor is kept travelling in every axis, not
-sidestepping in place.
+What each act brings: act 0 — beam, sweep, seesaw, gate (both axes),
+crossfire; act 1 — donut one-twos, the routine, THE WAVE; act 2 — surge,
+nova, rail traps, double beams, THE X; act 3 — duck donut, return waves,
+5-stage seesaws, tight novas. Online, the ball carries the caller's
+difficulty with the song pick, so the whole ring dances one chart.
+
+Two laws above the table: the choreographer NEVER calls the same move
+twice running, and it tracks each move's dodge VERB (lateral, depth,
+radial, duck…), damping any candidate that would repeat the previous one
+— the floor is kept travelling in every axis, not sidestepping in place.
 
 Ends at the final downbeat — or the moment one dancer remains.
 

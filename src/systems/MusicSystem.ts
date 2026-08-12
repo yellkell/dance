@@ -47,7 +47,7 @@ export class MusicSystem extends createSystem({}) {
         countInBeats: countInBeatsFor(track.bpm),
         endBeat: total * phraseBeats(),
         seed: match.seed,
-        actAt: (beat) => actOfBeat(beat, total),
+        actAt: (beat) => actOfBeat(beat, total, match.difficulty),
         beatZeroAt: Number.isFinite(match.beatZeroAt) ? match.beatZeroAt : undefined,
         loop: false,
       });

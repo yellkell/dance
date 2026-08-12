@@ -37,6 +37,8 @@ export interface RaidOptions {
   online?: boolean;
   /** Force a track; otherwise the lobby preference, else a seeded pick. */
   trackId?: string;
+  /** Force a difficulty (online: the caller's) — else this headset's. */
+  difficulty?: number;
   /** A tour night: fixes the record, and the set's third night books the
    *  GOOP (recoloured, with the eat-the-MC opener). */
   tour?: { set: number; song: number };
@@ -48,6 +50,7 @@ export function startRaid(opts: RaidOptions = {}): void {
   match.seats = seats;
   match.mySeat = opts.mySeat ?? 0;
   match.seed = opts.seed ?? freshSeed();
+  if (opts.difficulty !== undefined) match.difficulty = Math.max(0, Math.min(2, opts.difficulty));
 
   // The headliner: the MC runs most nights; the GOOP takes tour finales.
   const tourSet = opts.tour ? TOUR.sets[opts.tour.set] : undefined;

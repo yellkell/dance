@@ -185,8 +185,8 @@ export class ChoreoSystem extends createSystem({}) {
         landBeat: land,
         act: 3,
         landings: [
-          { beat: land, zone: { kind: 'lane', x: 0, halfW: CHOREO.beamHalfWidth, yaw: Math.PI / 4 } },
-          { beat: land, zone: { kind: 'lane', x: 0, halfW: CHOREO.beamHalfWidth, yaw: -Math.PI / 4 } },
+          { beat: land, zone: { kind: 'lane', x: 0, halfW: CHOREO.beamXHalfW, yaw: Math.PI / 4 } },
+          { beat: land, zone: { kind: 'lane', x: 0, halfW: CHOREO.beamXHalfW, yaw: -Math.PI / 4 } },
         ],
       });
     };
@@ -195,7 +195,7 @@ export class ChoreoSystem extends createSystem({}) {
       const tele = match.beat + 0.25;
       const land = tele + MOVES.wave.chargeBeats;
       const stops = axis ? CHOREO.waveRailZ : CHOREO.waveLaneX;
-      const order = [...stops];
+      const order = [...stops].slice(0, -1); // the last quarter is the EXIT
       if (back) order.push(...order.slice(0, -1).reverse());
       this.begin({
         index: 9950 + this.nextMove,
@@ -279,7 +279,7 @@ export class ChoreoSystem extends createSystem({}) {
     this.cuedSteps.clear();
     this.cuedTicks.clear();
     this.ended = false;
-    this.setlist = generateSetlist(match.seed, match.phrases, trackById(match.trackId)?.banned ?? []);
+    this.setlist = generateSetlist(match.seed, match.phrases, trackById(match.trackId)?.banned ?? [], match.difficulty);
   }
 
   update(delta: number): void {
@@ -651,7 +651,7 @@ export class ChoreoSystem extends createSystem({}) {
   private strikeFx(z: LiveZone, parent: NonNullable<ReturnType<typeof platformRoot>>): void {
     switch (z.zone.kind) {
       case 'lane':
-        this.strikes.beam(parent, z.zone.x, z.zone.yaw ?? 0);
+        this.strikes.beam(parent, z.zone.x, z.zone.yaw ?? 0, z.zone.halfW);
         break;
       case 'sweep':
         this.strikes.sweep(parent, sweepSide(z.moveIdx, z.landingIdx));

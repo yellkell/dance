@@ -43,7 +43,7 @@ import {
   type Intersection,
   type Object3D,
 } from 'three';
-import { RING, TOUR } from '../config.js';
+import { DIFFICULTY, RING, TOUR } from '../config.js';
 import * as sfx from '../audio/sfx.js';
 import { musicVolume, preload, setMusicVolume } from '../audio/music.js';
 import { pickRaidTrack, trackById, tracksFor } from '../audio/tracks.js';
@@ -64,6 +64,7 @@ import { Quaternion } from 'three';
 
 const SEATS_KEY = 'gdr-seats';
 const TRACK_KEY = 'gdr-track';
+const DIFF_KEY = 'gdr-diff';
 
 /** Canvas geometry of the board. */
 const W = 1660;
@@ -126,6 +127,8 @@ export class MenuSystem extends createSystem({}) {
       }
       const track = localStorage.getItem(TRACK_KEY);
       if (track && trackById(track)) match.preferredTrack = track;
+      const diff = Number(localStorage.getItem(DIFF_KEY));
+      if (Number.isFinite(diff) && diff >= 0 && diff <= 2) match.difficulty = diff;
     } catch {
       /* fine */
     }
@@ -318,6 +321,13 @@ export class MenuSystem extends createSystem({}) {
       } catch {
         /* fine */
       }
+    } else if (id.startsWith('diff')) {
+      match.difficulty = Math.max(0, Math.min(2, Number(id.slice(4))));
+      try {
+        localStorage.setItem(DIFF_KEY, String(match.difficulty));
+      } catch {
+        /* fine */
+      }
     } else if (id === 'vol-' || id === 'vol+') {
       setMusicVolume(musicVolume() + (id === 'vol+' ? 0.1 : -0.1));
     } else if (id === 'track') {
@@ -375,6 +385,7 @@ export class MenuSystem extends createSystem({}) {
       this.pauseUp,
       this.joinCode.join(''),
       match.seats,
+      match.difficulty,
       Math.round(musicVolume() * 10),
       net.phase,
       net.code,
@@ -523,7 +534,7 @@ export class MenuSystem extends createSystem({}) {
         g.textAlign = 'left';
         g.font = "700 23px 'Arial Black', system-ui, sans-serif";
         g.fillStyle = UI.goop;
-        g.fillText(`tour ${done}/${TOUR.sets.length * 3}`, CONTENT_X, 740);
+        g.fillText(`tour ${done}/${TOUR.sets.length * 3}`, CONTENT_X, 836);
       }
     }
   }
@@ -586,6 +597,21 @@ export class MenuSystem extends createSystem({}) {
       small: true,
     });
     buttons.push({ id: 'seats+', label: '+', x: 1324, y: 392, w: 104, h: 112, disabled: match.seats >= RING.maxSeats });
+
+    // DIFFICULTY: the act floor for the whole song — no more trivially
+    // easy opening third. Rides the ball online, like the song pick.
+    DIFFICULTY.labels.forEach((label, i) => {
+      buttons.push({
+        id: `diff${i}`,
+        label,
+        accent: match.difficulty === i ? UI.goop : undefined,
+        x: CONTENT_X + i * 442,
+        y: 668,
+        w: 416,
+        h: 104,
+        small: true,
+      });
+    });
 
     if (online === 'hosting' || online === 'joined') {
       // A live room is worth knowing about from any tab that starts a set.
