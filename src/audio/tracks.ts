@@ -93,8 +93,8 @@ export const TRACKS: Track[] = [
     downbeat: 0.4909,
     seconds: 186.67,
     lufs: -13.2,
-    // Gave its PEAK HOURS slot to DISCO BALL and joined the quick-raid
-    // pool — the MONEY precedent.
+    // Back in PEAK HOURS (slot 2, between DISCO BALL's strut and DYNASTY's
+    // finale) — LOOP took its old seat in the quick-raid pool.
     roles: ['raid'],
   },
   {
@@ -106,7 +106,7 @@ export const TRACKS: Track[] = [
     seconds: 126.62,
     lufs: -12.6,
     // The night after the first goop falls: PEAK HOURS opens on a slow
-    // strut — the tour's victory lap before LOOP kicks the doors in. At
+    // strut — the tour's victory lap before COMBAT kicks the doors in. At
     // 73 BPM nobody should be ducking; the groove is the point.
     roles: ['raid'],
     banned: ['sweep'],

@@ -97,7 +97,11 @@ npm run dev          # → http://localhost:5173
 - **Desktop**: the IWSDK dev plugin injects a WebXR emulator (IWER) — click
   ENTER THE RAVE and fly with WASD + mouse; the emulated controllers click the
   menus.
-- **Mid-set escape hatch**: right controller **Ⓐ** bails back to the lobby.
+- **Mid-set escape hatch**: right controller **Ⓐ** raises **THE PAUSE
+  CARD** — a small pop-up dead ahead with KEEP DANCING / LEAVE THE SET.
+  The set keeps playing behind it (a shared clock can't pause for one
+  dancer); it exists so leaving is a decision, never a slipped button.
+  Ⓐ again puts it away.
 
 There's also a debug hook in the console:
 `__gdr.startRaid({ seats: 24 })`, `__gdr.match`.
@@ -231,8 +235,8 @@ files**, not guessed — the whole game is quantized to them, so they had to be:
 | TARGET | 91 | 11 phrases | −9.5 LUFS | tour |
 | CAPTURE | 117 | 13 phrases | −15.0 LUFS | tour: first goop finale |
 | DISCO BALL | 73.33 | 4 phrases | −12.6 LUFS | tour: peak-hours opener — the night after the first goop falls · no ducking |
-| COMBAT | 135 | 12 phrases | −13.2 LUFS | quick raid |
-| LOOP | 150 | 17 phrases | −11.2 LUFS | tour: peak hours |
+| COMBAT | 135 | 12 phrases | −13.2 LUFS | tour: peak hours |
+| LOOP | 150 | 17 phrases | −11.2 LUFS | quick raid |
 | DYNASTY | 155 | 10 phrases | −9.6 LUFS | tour: peak-hours finale |
 | INFECTION | 138 | 15 phrases | −10.9 LUFS | tour: after hours |
 | SPREAD | 150 | 17 phrases | −13.1 LUFS | tour: after hours · skips 6 bars in |

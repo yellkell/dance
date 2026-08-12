@@ -21,8 +21,13 @@
  * One rail, one content region, no floating sub-panels. TOUR is its own
  * flow screen; PLAY, MULTIPLAYER and SYSTEM are in-panel modes of the
  * lobby. MULTIPLAYER stays locked (greyed) until the first boss falls —
- * tour set 1's finale — then the club opens for good. Mid-set the board
- * vanishes and the right controller's A button is the only way out.
+ * tour set 1's finale — then the club opens for good.
+ *
+ * Mid-set the board vanishes and the right controller's A button raises
+ * THE PAUSE CARD — a small pop-up dead ahead (the Beat Saber posture):
+ * KEEP DANCING or LEAVE THE SET. Nothing stops while it's up — a shared
+ * clock can't pause for one dancer — it exists so leaving is a decision,
+ * never a slipped button.
  */
 
 import { createSystem, InputComponent } from '@iwsdk/core';
@@ -100,6 +105,8 @@ interface Pointer {
 export class MenuSystem extends createSystem({}) {
   private board!: Panel;
   private exit!: Panel;
+  private pause!: Panel;
+  private pauseUp = false;
   private pointers!: Record<'left' | 'right', Pointer>;
   private ray = new Raycaster();
   private hits: Intersection[] = [];
@@ -132,6 +139,13 @@ export class MenuSystem extends createSystem({}) {
     this.exit.group.rotation.y = -0.5;
     this.scene.add(this.exit.group);
 
+    // THE PAUSE CARD: dead ahead, a touch below the count-in's eye line so
+    // it never fights the HUD wedge (down-left) or the flair pops (up-right).
+    this.pause = new Panel(0.56, 0.36, 560, 360);
+    this.pause.group.position.set(0, 1.28, -1.05);
+    this.pause.group.visible = false;
+    this.scene.add(this.pause.group);
+
     this.pointers = { left: this.makePointer(), right: this.makePointer() };
 
     autoJoinFromUrl();
@@ -162,20 +176,27 @@ export class MenuSystem extends createSystem({}) {
   update(): void {
     const screen = match.screen;
 
-    // Mid-set escape hatch: right A bails.
-    if (screen === 'raid' || screen === 'countdown') {
+    // Mid-set, right A raises (or lowers) THE PAUSE CARD — leaving is a
+    // decision on a button, never the button itself.
+    const inSet = screen === 'raid' || screen === 'countdown';
+    if (inSet) {
       if (this.input.xr.gamepads.right?.getButtonDown(InputComponent.A_Button)) {
         sfx.uiClick();
-        toLobby();
+        this.pauseUp = !this.pauseUp;
+        this.lastKey = '';
       }
+    } else if (this.pauseUp) {
+      this.pauseUp = false; // the set ended while the card was up
     }
+    const pauseUp = inSet && this.pauseUp;
 
     const menuRoom = screen === 'lobby' || screen === 'tour';
     const exitUp = screen === 'podium';
     this.board.group.visible = menuRoom;
     this.exit.group.visible = exitUp;
+    this.pause.group.visible = pauseUp;
 
-    if (!menuRoom && !exitUp) {
+    if (!menuRoom && !exitUp && !pauseUp) {
       this.hidePointers();
       return;
     }
@@ -184,6 +205,7 @@ export class MenuSystem extends createSystem({}) {
     const targets: Object3D[] = [];
     if (menuRoom) targets.push(this.board.mesh);
     if (exitUp) targets.push(this.exit.mesh);
+    if (pauseUp) targets.push(this.pause.mesh);
 
     let hover: string | null = null;
     let clicked: string | null = null;
@@ -213,6 +235,7 @@ export class MenuSystem extends createSystem({}) {
   private panelFor(obj: Object3D): Panel | null {
     if (obj === this.board.mesh) return this.board;
     if (obj === this.exit.mesh) return this.exit;
+    if (obj === this.pause.mesh) return this.pause;
     return null;
   }
 
@@ -325,6 +348,11 @@ export class MenuSystem extends createSystem({}) {
       this.joinMode = false;
     } else if (id === 'back') {
       this.joinMode = false;
+    } else if (id === 'resume') {
+      this.pauseUp = false;
+    } else if (id === 'bail') {
+      this.pauseUp = false;
+      toLobby();
     } else if (id === 'exit') {
       if (match.tour) toTour(); // tour podium → back to the map
       else toLobby();
@@ -344,6 +372,7 @@ export class MenuSystem extends createSystem({}) {
       this.hover,
       this.joinMode,
       this.mode,
+      this.pauseUp,
       this.joinCode.join(''),
       match.seats,
       Math.round(musicVolume() * 10),
@@ -357,6 +386,17 @@ export class MenuSystem extends createSystem({}) {
 
     if (match.screen === 'lobby' || match.screen === 'tour') {
       this.paintBoard();
+    }
+    if (this.pauseUp && (match.screen === 'raid' || match.screen === 'countdown')) {
+      this.pause.paint(
+        '',
+        () => {},
+        [
+          { id: 'resume', label: 'KEEP DANCING', accent: UI.goop, x: 24, y: 24, w: 512, h: 148 },
+          { id: 'bail', label: 'LEAVE THE SET', accent: UI.danger, x: 24, y: 196, w: 512, h: 140, small: true },
+        ],
+        this.hover,
+      );
     }
     if (match.screen === 'podium') {
       this.exit.paint(
