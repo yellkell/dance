@@ -42,10 +42,15 @@ win condition from "kill the titan" to "outlast the floor".
 | Phrases | Act | Moves/phrase | Rest | New |
 | --- | --- | --- | --- | --- |
 | 0 | intro | 0 | — | count-in, dance, calibrate |
-| 1–3 | 0 | 2 | 4 beats | beam, sweep, seesaw, gate, crossfire |
+| 1–3 | 0 | 2 | 4 beats | beam, sweep, seesaw, gate (both axes), crossfire |
 | 4–7 | 1 | 3 | 3 beats | trip web, donut one-twos, the routine |
-| 8–10 | 2 | 4 | 2 beats | surge, nova, rail traps, double beams |
+| 8–10 | 2 | 4 | 2 beats | surge, nova, rail traps, double beams, THE X |
 | 11–13 | 3 | 5 | 1 beat | duck donut, 5-stage seesaws, tight novas |
+
+One law above the table: the choreographer tracks each move's dodge VERB
+(lateral, depth, radial, duck, still…) and damps any candidate that would
+repeat the previous one — the floor is kept travelling in every axis, not
+sidestepping in place.
 
 Ends at the final downbeat — or the moment one dancer remains.
 
@@ -126,14 +131,14 @@ The law of the land is **three places — where you are is what you're doing**:
    a horizon beyond. The platform is BUILT: a neon-rimmed hex deck with an
    inlay of hairline rings and a crown of ticks, six radial ribs and a
    tapered keel underneath (half of what anyone sees of a floating thing
-   is its underside). The board floats at its heart, the MC poses beside
-   it, and a moon-gate PORTAL stands at the north edge, shimmering shut
-   until a room of yours is open beyond it. Solo players never leave.
-2. **THE CLUB** (social place): host/join a room and the portal opens on
-   the full hall — the warm human room between the voids. Everything the
-   pub had, remade elegant; everything the raid needs, foreshadowed (the
-   dance floor's brass inlay is the raid ring's ghost — 24 seat ticks and
-   all).
+   is its underside). The board floats at its heart and the MC poses
+   beside it — the club's door is the board's MULTIPLAYER seat, not a
+   thing in the room. Solo players never leave.
+2. **THE CLUB** (social place): ENTER THE CLUB (host) or join a room and
+   the full hall swaps in — the warm human room between the voids.
+   Everything the pub had, remade elegant; everything the raid needs,
+   foreshadowed (the dance floor's brass inlay is the raid ring's ghost —
+   24 seat ticks and all).
 3. **THE SET** (game place): the raid, wrapped in THE VOID — an actual
    environment sharing the foyer's language at arena scale. Both interiors
    pack away; the rig re-plants at the spawn so "my platform IS the world

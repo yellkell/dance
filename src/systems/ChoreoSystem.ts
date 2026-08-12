@@ -83,12 +83,16 @@ export interface LiveZone {
 export const choreoView: {
   zones: readonly LiveZone[];
   dropRoutine?: () => void;
-  /** Dev: string a trip web NOW (act 3 by default, so the filled cells show). */
+  /** Dev: string a trip web NOW — four safe windows, flood everywhere else. */
   dropWire?: (act?: number) => void;
   /** Dev: throw THE TRAP now — both side rails on one beat. */
   dropTrap?: () => void;
   /** Dev: throw DUCK DONUT now — the blade and the closing rim together. */
   dropDuckDonut?: () => void;
+  /** Dev: throw THE X now — two diagonal beams crossing dead centre. */
+  dropX?: () => void;
+  /** Dev: drop a gate now (axis 1 = the horizontal cousin, a clear row). */
+  dropGate?: (axis?: 0 | 1) => void;
 } = { zones: [] };
 
 const HEAD_R = 0.1; // projected head radius for floor-zone tests
@@ -110,12 +114,15 @@ function sweepSide(moveIdx: number, landingIdx: number): 1 | -1 {
  *  one giant's mime is honest for the whole ring). */
 function cueDirection(zone: Zone, moveIdx: number, landingIdx: number): Partial<GestureCue> {
   switch (zone.kind) {
+    case 'lane':
+      // THE X leads with a spun arm — the MC's sticks cross for it.
+      return zone.yaw ? { crossed: true } : {};
     case 'sweep':
       return { side: sweepSide(moveIdx, landingIdx) };
     case 'half':
       return { side: zone.side, axis: zone.axis };
     case 'gate':
-      return { gapX: zone.x };
+      return { gapX: zone.at, axis: zone.axis };
     case 'quad':
       // The whole routine travels with the cue: the boss teaches it by
       // pointing each corner out while the marks are still lit.
@@ -169,15 +176,45 @@ export class ChoreoSystem extends createSystem({}) {
       if (!match.playing || !Number.isFinite(match.beat)) return;
       const tele = match.beat + 0.25;
       const land = tele + MOVES.wire.chargeBeats;
-      const fillCount = CHOREO.wireFillCells[Math.min(act, CHOREO.wireFillCells.length - 1)];
-      const filled = [5, 10, 3, 12, 6].slice(0, fillCount);
+      const safe = [1, 6, 8, 15]; // a spread of windows to inspect
       this.begin({
         index: 9500 + this.nextMove,
         kind: 'wire',
         telegraphBeat: tele,
         landBeat: land,
         act,
-        landings: [{ beat: land, zone: { kind: 'wire', hold: CHOREO.wireHoldBeats, filled } }],
+        landings: [{ beat: land, zone: { kind: 'wire', hold: CHOREO.wireHoldBeats, safe } }],
+      });
+    };
+    choreoView.dropX = () => {
+      if (!match.playing || !Number.isFinite(match.beat)) return;
+      const tele = match.beat + 0.25;
+      const land = tele + MOVES.beam.chargeBeats;
+      this.begin({
+        index: 9800 + this.nextMove,
+        kind: 'beam',
+        telegraphBeat: tele,
+        landBeat: land,
+        act: 3,
+        landings: [
+          { beat: land, zone: { kind: 'lane', x: 0, halfW: CHOREO.beamHalfWidth, yaw: Math.PI / 4 } },
+          { beat: land, zone: { kind: 'lane', x: 0, halfW: CHOREO.beamHalfWidth, yaw: -Math.PI / 4 } },
+        ],
+      });
+    };
+    choreoView.dropGate = (axis = 1) => {
+      if (!match.playing || !Number.isFinite(match.beat)) return;
+      const tele = match.beat + 0.25;
+      const land = tele + MOVES.gate.chargeBeats;
+      this.begin({
+        index: 9900 + this.nextMove,
+        kind: 'gate',
+        telegraphBeat: tele,
+        landBeat: land,
+        act: 2,
+        landings: [
+          { beat: land, zone: { kind: 'gate', at: axis ? 0.2 : 0.3, half: CHOREO.gateHalfW, axis } },
+        ],
       });
     };
     choreoView.dropTrap = () => {
@@ -431,6 +468,20 @@ export class ChoreoSystem extends createSystem({}) {
   private buildTelegraph(zone: Zone, seat: number, moveIdx: number, landingIdx: number): Telegraph | null {
     switch (zone.kind) {
       case 'lane': {
+        if (zone.yaw) {
+          // THE X's arm: a strip spun about the deck centre. Length spans
+          // the diagonal; the group sits at the strip's near end, pushed
+          // out along its own run so the strip crosses dead centre.
+          const len = Math.hypot(OCTAGON_HALF_WIDTH * 2, OCTAGON_HALF_DEPTH * 2) + 0.6;
+          const tg = beamTelegraph(zone.halfW, len);
+          tg.group.rotation.y = zone.yaw;
+          tg.group.position.set(
+            Math.sin(zone.yaw) * (len / 2) + Math.cos(zone.yaw) * zone.x,
+            0.05,
+            Math.cos(zone.yaw) * (len / 2) - Math.sin(zone.yaw) * zone.x,
+          );
+          return tg;
+        }
         const tg = beamTelegraph(zone.halfW, OCTAGON_HALF_DEPTH * 2 + 0.8);
         // Strip runs down local −Z (toward the stage); origin at the near edge.
         tg.group.position.set(zone.x, 0.05, OCTAGON_HALF_DEPTH + 0.4);
@@ -457,7 +508,7 @@ export class ChoreoSystem extends createSystem({}) {
         return tg;
       }
       case 'gate': {
-        const tg = gateTelegraph(OCTAGON_HALF_WIDTH, OCTAGON_HALF_DEPTH, zone.x, zone.halfW);
+        const tg = gateTelegraph(OCTAGON_HALF_WIDTH, OCTAGON_HALF_DEPTH, zone.at, zone.half, zone.axis);
         tg.group.position.y = 0.05;
         return tg;
       }
@@ -471,7 +522,7 @@ export class ChoreoSystem extends createSystem({}) {
           OCTAGON_HALF_WIDTH * 2 + 0.2,
           OCTAGON_HALF_DEPTH * 2 + 0.2,
           CHOREO.wireY,
-          zone.filled,
+          zone.safe,
         );
         return tg;
       }
@@ -513,18 +564,23 @@ export class ChoreoSystem extends createSystem({}) {
     const x = match.headX;
     const z = match.headZ;
     switch (zone.kind) {
-      case 'lane':
-        return Math.abs(x - zone.x) <= zone.halfW + HEAD_R * 0.7;
+      case 'lane': {
+        // A yawed lane (THE X's arm) judges on the perpendicular distance
+        // to its own run — yaw 0 collapses to the plain |x − offset| test.
+        const yaw = zone.yaw ?? 0;
+        const perp = yaw ? Math.cos(yaw) * x - Math.sin(yaw) * z : x;
+        return Math.abs(perp - zone.x) <= zone.halfW + HEAD_R * 0.7;
+      }
       case 'rail':
         return Math.abs(z - zone.z) <= zone.halfD + HEAD_R * 0.7;
       case 'wire': {
         // The web catches MOVEMENT — un-armed (the sensor hasn't gone live
-        // yet) is always clean — and, late on, OCCUPANCY: standing inside a
-        // filled column when it discharges is a hit however still you held.
+        // yet) is always clean — and GROUND: at the discharge you must be
+        // inside one of the safe windows. Everything else is the flood.
         if ((live.wire?.moved ?? 0) > CHOREO.wireSlack) return true;
         const w = OCTAGON_HALF_WIDTH * 2 + 0.2;
         const dpt = OCTAGON_HALF_DEPTH * 2 + 0.2;
-        return zone.filled.some((idx) => {
+        return !zone.safe.some((idx) => {
           const r = wireCellRect(idx, w, dpt);
           return (
             x >= r.x0 - HEAD_R * 0.5 &&
@@ -541,8 +597,8 @@ export class ChoreoSystem extends createSystem({}) {
         return along * zone.side > CHOREO.seesawSafeLip;
       }
       case 'gate':
-        // Danger is everywhere EXCEPT the column — be in the gap.
-        return Math.abs(x - zone.x) > zone.halfW;
+        // Danger is everywhere EXCEPT the band — be in the gap.
+        return Math.abs((zone.axis ? z : x) - zone.at) > zone.half;
       case 'donut':
         // Same forgiveness as the wedge: the head reaching the middle is
         // the dodge, heels or no heels.
@@ -628,7 +684,7 @@ export class ChoreoSystem extends createSystem({}) {
   private strikeFx(z: LiveZone, parent: NonNullable<ReturnType<typeof platformRoot>>): void {
     switch (z.zone.kind) {
       case 'lane':
-        this.strikes.beam(parent, z.zone.x);
+        this.strikes.beam(parent, z.zone.x, z.zone.yaw ?? 0);
         break;
       case 'sweep':
         this.strikes.sweep(parent, sweepSide(z.moveIdx, z.landingIdx));
@@ -637,7 +693,7 @@ export class ChoreoSystem extends createSystem({}) {
         this.strikes.halfFlood(parent, z.zone.side, z.zone.axis);
         break;
       case 'gate':
-        this.strikes.gate(parent, z.zone.x, z.zone.halfW);
+        this.strikes.gate(parent, z.zone.at, z.zone.half, z.zone.axis);
         break;
       case 'rail':
         this.strikes.rail(parent, z.zone.z, z.zone.halfD, z.zone.from);
@@ -646,7 +702,7 @@ export class ChoreoSystem extends createSystem({}) {
         this.strikes.wire(
           parent,
           CHOREO.wireY,
-          z.zone.filled.map((idx) =>
+          z.zone.safe.map((idx) =>
             wireCellRect(idx, OCTAGON_HALF_WIDTH * 2 + 0.2, OCTAGON_HALF_DEPTH * 2 + 0.2),
           ),
         );

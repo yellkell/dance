@@ -25,13 +25,15 @@ import { mix, mulberry32 } from '../game/rng.js';
 
 /** A seat-local danger zone, judged at its landing beat. */
 export type Zone =
-  | { kind: 'lane'; x: number; halfW: number }
+  /** A laser strip. `yaw` spins it about the deck centre (THE X throws two
+   *  at ±45° through the middle); `x` is the perpendicular offset. */
+  | { kind: 'lane'; x: number; halfW: number; yaw?: number }
   /** The crossfire's side laser: a strip ACROSS the deck at local z, fed
    *  from the rail on `from` — step forward or back off it. */
   | { kind: 'rail'; z: number; halfD: number; from: 1 | -1 }
-  /** The trip web: no ground to move to — the whole deck is strung with
-   *  laser wire and the dodge is holding still until it clears. */
-  | { kind: 'wire'; hold: number; filled: readonly number[] }
+  /** The trip web: four SAFE windows in the 4×4 grid and one flooded field
+   *  everywhere else — get into a window, then hold still until it clears. */
+  | { kind: 'wire'; hold: number; safe: readonly number[] }
   /** The rim burns, the middle lives — everything outside `innerR` is
    *  doomed, so the whole ring collapses toward its own centre. */
   | { kind: 'donut'; innerR: number }
@@ -42,8 +44,10 @@ export type Zone =
   | { kind: 'quad'; corner: number; step: number; routine: readonly number[] }
   | { kind: 'sweep' }
   | { kind: 'half'; side: 1 | -1; axis: 0 | 1 }
-  /** Everything burns EXCEPT a clear column at x — stand in the gap. */
-  | { kind: 'gate'; x: number; halfW: number }
+  /** Everything burns EXCEPT a clear band at `at` — stand in the gap.
+   *  axis 0: a COLUMN at local x (sidestep in). axis 1: the horizontal
+   *  cousin — a ROW at local z (step forward or back into it). */
+  | { kind: 'gate'; at: number; half: number; axis: 0 | 1 }
   | { kind: 'nova'; bearing: number; halfAngle: number };
 
 /** One landing within a move (a move may land several beats in a row). */
@@ -84,6 +88,26 @@ export function actOfBeat(beat: number, totalPhrases: number): number {
   return actOfPhrase(Math.floor(Math.max(0, beat) / phraseBeats), totalPhrases);
 }
 
+/**
+ * The MOVEMENT GRAMMAR: every kind's dodge asks the body for one primary
+ * verb. Successive moves are steered AWAY from repeating a verb, so the
+ * floor keeps travelling — out and in, left and right, forward and back —
+ * instead of sidestepping three times in a row.
+ */
+const VERB: Record<MoveKind, string> = {
+  beam: 'lateral',
+  seesaw: 'lateral',
+  gate: 'lateral', // the row gate reads as depth, but the kind leans lateral
+  cross: 'depth',
+  surge: 'depth',
+  donut: 'radial',
+  duckdonut: 'radial',
+  nova: 'compass',
+  wire: 'still',
+  sweep: 'duck',
+  routine: 'corners',
+};
+
 function pickKind(
   rng: () => number,
   act: number,
@@ -100,6 +124,7 @@ function pickKind(
     let w = weights[Math.min(act, weights.length - 1)];
     if (w <= 0) continue;
     if (k === last) w *= 0.3;
+    else if (last && VERB[k] === VERB[last]) w *= 0.45; // same verb, new face — still a rut
     pool.push([k, w]);
     total += w;
   }
@@ -120,6 +145,12 @@ function buildLandings(kind: MoveKind, landBeat: number, act: number, rng: () =>
     if (act < 2) {
       // One laser, and it lands on a SLOT: the middle, or a third out.
       lane(CHOREO.beamSlots[Math.floor(rng() * CHOREO.beamSlots.length)]);
+    } else if (rng() < CHOREO.beamXChance[Math.min(act, CHOREO.beamXChance.length - 1)]) {
+      // THE X: two beams thrown diagonally at once, crossing dead centre.
+      // The safe ground is the four pockets between the arms — the dodge
+      // is radial, out of the cross, not a sidestep off a line.
+      landings.push({ beat: landBeat, zone: { kind: 'lane', x: 0, halfW, yaw: Math.PI / 4 } });
+      landings.push({ beat: landBeat, zone: { kind: 'lane', x: 0, halfW, yaw: -Math.PI / 4 } });
     } else if (rng() < CHOREO.beamSplitChance[Math.min(act, CHOREO.beamSplitChance.length - 1)]) {
       // SPLIT: evenly spaced either side of centre. What's left is a
       // corridor down the middle — the dodge is to stand BETWEEN them.
@@ -207,25 +238,28 @@ function buildLandings(kind: MoveKind, landBeat: number, act: number, rng: () =>
     landings.push({ beat: landBeat, zone: { kind: 'sweep' } });
     landings.push({ beat: landBeat, zone: { kind: 'donut', innerR: CHOREO.donutInnerR } });
   } else if (kind === 'wire') {
-    // From act 2 the web arrives with cells FILLED IN — columns you must
-    // vacate before you freeze. Distinct squares of the 4×4 grid, rolled
+    // Four SAFE windows in the 4×4 grid; every other square — and all the
+    // ground outside them — is one flooded field. Distinct cells, rolled
     // off the same seeded stream as everything else.
-    const fillCount = CHOREO.wireFillCells[Math.min(act, CHOREO.wireFillCells.length - 1)];
-    const filled: number[] = [];
-    while (filled.length < fillCount) {
+    const safe: number[] = [];
+    while (safe.length < CHOREO.wireSafeCells) {
       const c = Math.floor(rng() * 16);
-      if (!filled.includes(c)) filled.push(c);
+      if (!safe.includes(c)) safe.push(c);
     }
-    landings.push({ beat: landBeat, zone: { kind: 'wire', hold: CHOREO.wireHoldBeats, filled } });
+    landings.push({ beat: landBeat, zone: { kind: 'wire', hold: CHOREO.wireHoldBeats, safe } });
   } else if (kind === 'sweep') {
     landings.push({ beat: landBeat, zone: { kind: 'sweep' } });
   } else if (kind === 'gate') {
+    // The doorway — or, half the time, its horizontal cousin: a clear ROW
+    // at a depth line, so the gap asks for a forward/back step instead.
+    const axis: 0 | 1 = rng() < 0.5 ? 1 : 0;
     landings.push({
       beat: landBeat,
       zone: {
         kind: 'gate',
-        x: (rng() * 2 - 1) * 0.5,
-        halfW: act >= 3 ? CHOREO.gateHalfWLate : CHOREO.gateHalfW,
+        at: (rng() * 2 - 1) * (axis ? 0.35 : 0.5),
+        half: act >= 3 ? CHOREO.gateHalfWLate : CHOREO.gateHalfW,
+        axis,
       },
     });
   } else if (kind === 'seesaw' || kind === 'surge') {

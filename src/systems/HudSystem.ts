@@ -251,7 +251,7 @@ export class HudSystem extends createSystem({}) {
     const color = GRADE.colors[letter] ?? '#f4f6fb';
     const faced = d.dodges + d.hits;
 
-    ink(g, d.alive ? 'THE NIGHT SAYS' : 'GAME OVER', CW / 2, 46, 32, d.alive ? 'rgba(232,236,242,0.85)' : '#ff5040');
+    ink(g, d.alive ? 'THE SET SAYS' : 'GAME OVER', CW / 2, 46, 32, d.alive ? 'rgba(232,236,242,0.85)' : '#ff5040');
     // The letter, huge, with its own halo.
     g.shadowColor = color;
     g.shadowBlur = 40;

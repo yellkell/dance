@@ -4,14 +4,13 @@
  *
  *  1. THE FOYER — the menu place, and a piece of THE VOID: a floating
  *     neon-edged platform in the set's own abstract space (pylons, slow
- *     hexes, drifting shards, a horizon with no land), with the board, the
- *     MC, and a moon-gate PORTAL shimmering shut until a room of yours is
- *     open beyond it.
+ *     hexes, drifting shards, a horizon with no land), with the board and
+ *     the MC. The club's door is the board's MULTIPLAYER seat.
  *  2. THE CLUB — the social place, the warm human room between the voids.
- *     Host or join and the portal does the rest: the Art Deco hall swaps
- *     in around you — dance floor, eclipse chandelier, bar, booths,
- *     terrace, still room — with your room-mates live in it
- *     (ClubSocialSystem) and teleport movement (ClubTeleportSystem).
+ *     Host or join and the hall swaps in around you — dance floor, eclipse
+ *     chandelier, bar, booths, terrace, still room — with your room-mates
+ *     live in it (ClubSocialSystem) and teleport movement
+ *     (ClubTeleportSystem).
  *  3. THE SET — the game place. The ball fires (or a solo set starts),
  *     both rooms pack away, and the raid takes over — wrapped in the void
  *     environment (DiscoSystem's business).
@@ -24,8 +23,7 @@
  *    floor's brass inlay (the raid ring's ghost) shimmers; the bar's
  *    ribbed glass pulses slow; candles flicker on one shared flame; the
  *    DJ console blinks; the still room's lamp breathes at rest.
- *  - foyer: the portal shimmer breathes (and flares while the relay is
- *    rung), the pylons roll a slow wave, the hexes turn, shards drift.
+ *  - foyer: the pylons roll a slow wave, the hexes turn, shards drift.
  *
  * Fog belongs to whoever's place is up — this system owns it for the foyer
  * and club and never clobbers the set's (DiscoSystem's) fog.
@@ -101,11 +99,6 @@ export class ClubSystem extends createSystem({}) {
     const bar = beat / 4;
 
     if (wantFoyer) {
-      // The portal: a settled breathing shimmer, flaring while the relay
-      // is being rung — the way in, warming up.
-      const reaching = net.phase === 'connecting';
-      foyer.portalMat.opacity = reaching ? 0.3 + Math.sin(t * 7) * 0.16 : 0.12 + Math.sin(t * 0.9) * 0.05 + pulse * 0.04;
-      foyer.portalRingMat.emissiveIntensity = reaching ? 1.6 + Math.sin(t * 7) * 0.5 : 1.05 + pulse * 0.2;
       // The world around the platform idles on the lobby loop: waves roll
       // the towers, the truss turns, shards drift, the plain breathes.
       foyer.env.update(delta, t, pulse);

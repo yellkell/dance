@@ -79,14 +79,10 @@ export interface ChandelierRing {
 
 /** The FOYER — the menu place. Not an antechamber of the club anymore but
  *  a piece of THE VOID (the set's own space, see arena/voidkit.ts): a
- *  floating platform in reactive darkness, with a portal that opens on the
- *  warm room the moment yours does. */
+ *  floating platform in reactive darkness. The club's door is a button on
+ *  the board, not a thing in the room. */
 export interface FoyerRefs {
   root: Group;
-  /** The portal's inner shimmer — breathes; flares while connecting. */
-  portalMat: MeshBasicMaterial;
-  /** The portal ring's glow. */
-  portalRingMat: MeshStandardMaterial;
   /** The world around the platform — ClubSystem idles it on the loop. */
   env: FoyerEnvironment;
 }
@@ -1351,48 +1347,6 @@ export function buildFoyer(scene: Scene): FoyerRefs {
   // A ring of light standing on the deck's north edge; its inner shimmer
   // breathes while the way is shut, flares while the relay is being rung,
   // and the room swap IS the passage.
-  const portalRingMat = new MeshStandardMaterial({
-    color: 0x0c0b12,
-    emissive: DECOR.cove,
-    emissiveIntensity: 1.1,
-    metalness: 0.4,
-    roughness: 0.35,
-  });
-  const gate = new Mesh(new TorusGeometry(1.3, 0.07, 10, 40), portalRingMat);
-  gate.position.set(0, 1.42, -3.35);
-  root.add(gate);
-  const portalMat = new MeshBasicMaterial({
-    color: DECOR.cove,
-    transparent: true,
-    opacity: 0.14,
-    blending: AdditiveBlending,
-    depthWrite: false,
-    side: DoubleSide,
-  });
-  const shimmer = new Mesh(new CircleGeometry(1.24, 40), portalMat);
-  shimmer.name = 'live-portal-shimmer';
-  shimmer.position.set(0, 1.42, -3.35);
-  root.add(shimmer);
-  const step = new Mesh(
-    new BoxGeometry(2.0, 0.1, 0.7),
-    new MeshStandardMaterial({ color: 0x0b0a12, metalness: 0.8, roughness: 0.35 }),
-  );
-  step.position.set(0, 0.05, -3.3);
-  root.add(step);
-  const floorSign = signPlane(1.42, 0.3, 768, (g, sw, sh) => {
-    g.textAlign = 'center';
-    g.textBaseline = 'middle';
-    g.fillStyle = '#e8d9b0';
-    g.shadowColor = 'rgba(255,196,110,0.85)';
-    g.shadowBlur = 16;
-    g.font = `500 74px Georgia, serif`;
-    g.fillText('T H E   F L O O R', sw / 2, sh * 0.55);
-    g.shadowBlur = 0;
-  });
-  floorSign.name = 'live-floor-sign';
-  floorSign.position.set(0, 3.05, -3.4);
-  root.add(floorSign);
-
   // ── tonight's bill, as a holo card floating off the deck's east edge ──
   const bill = signPlane(0.92, 1.14, 512, (g, sw, sh) => {
     g.fillStyle = 'rgba(7,5,14,0.72)';
@@ -1435,7 +1389,7 @@ export function buildFoyer(scene: Scene): FoyerRefs {
     return false;
   });
 
-  return { root, portalMat, portalRingMat, env };
+  return { root, env };
 }
 
 /* ── real lights: four points + a hemisphere, and not one more ──────────── */

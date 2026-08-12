@@ -301,7 +301,10 @@ const CELL_FRAG = /* glsl */ `
   ${COMMON}
   void main(){
     vec3 col = warnColor();
-    float a = 0.07 + 0.5 * uFill;
+    // Twelve of these tile a deck at once (and eight decks share a sight
+    // line) — the interior stays light so grazing angles don't stack the
+    // additive wash to white; the edges carry the grid.
+    float a = 0.05 + 0.3 * uFill;
     float e = min(min(vUv.x, 1.0 - vUv.x), min(vUv.y, 1.0 - vUv.y));
     a += (1.0 - smoothstep(0.02, 0.06, e)) * (0.3 + 0.6 * uFill);
     a *= pulse();
@@ -310,20 +313,15 @@ const CELL_FRAG = /* glsl */ `
 `;
 
 /**
- * THE TRIP WEB's filled cell, walls: a column of the same danger rising to
- * the web's true ceiling — dense at the floor, thinning as it climbs, with
- * slow bands drifting UP so the volume reads as rising rather than hanging.
- * vUv.y runs 0 at the floor to 1 at WIRE_TOP.
+ * THE TRIP WEB's safe window: a doorframe outline and NOTHING inside —
+ * clear ground, edged the way the gate edges its gap.
  */
-const CELLWALL_FRAG = /* glsl */ `
+const SAFE_FRAME_FRAG = /* glsl */ `
   ${COMMON}
   void main(){
     vec3 col = warnColor();
-    float a = mix(0.34, 0.05, vUv.y) * (0.25 + 0.75 * uFill);
-    float band = step(0.78, fract(vUv.y * 4.0 - uTime * 0.9));
-    a += band * 0.08 * uFill;
-    // A bright lip at the very top — the hitbox's honest ceiling.
-    a += (1.0 - smoothstep(0.0, 0.05, 1.0 - vUv.y)) * 0.3 * uFill;
+    float e = min(min(vUv.x, 1.0 - vUv.x), min(vUv.y, 1.0 - vUv.y));
+    float a = (1.0 - smoothstep(0.025, 0.075, e)) * (0.4 + 0.6 * uFill);
     a *= pulse();
     gl_FragColor = vec4(col, a);
   }
@@ -562,22 +560,17 @@ export function wireCellRect(idx: number, width: number, depth: number): CellRec
 
 /**
  * THE TRIP WEB: a shin-high lattice of laser wire strung across the whole
- * deck. The base move draws NO safe ground, because there isn't any: the
- * answer is to stop moving. Deliberately air-only (floor paint says "move
- * your feet" in every other move) and deliberately dense: from anywhere on
- * the deck a wire crosses your view, so "stepping breaks one of these"
- * needs no explaining. Each wire is a short vertical ribbon — a flat one
- * at shin height is edge-on from standing and renders as nothing.
+ * deck — and FOUR SAFE WINDOWS in its 4×4 grid. Everything that isn't a
+ * window is one flooded field (the deck's outer ground included: there is
+ * no ambiguous rim), so the read is a single sentence: get into a clear
+ * square, then stop moving. The wires overhead keep the second half of
+ * that sentence honest — stepping breaks one, however safe the ground.
  *
- * From act 2 the web starts arriving with CELLS FILLED IN: columns of
- * danger rising off chosen squares of the grid, floor to eye level, amber
- * filling to red like every other zone. A filled cell is ground you must
- * NOT be standing on when the web goes off — so the late-act web asks for
- * both verbs in order: get out of the filled squares while the charge is
- * young, then freeze where you stand. The floor paint under each column
- * keeps the law: paint means move.
+ * Floor law intact: paint means move. The flooded squares are painted;
+ * the windows are clear ground ringed by doorframe edges, exactly the
+ * gate's grammar at cell scale.
  */
-export function wireTelegraph(width: number, depth: number, y: number, filled: readonly number[] = []): Telegraph {
+export function wireTelegraph(width: number, depth: number, y: number, safe: readonly number[] = []): Telegraph {
   const meshes: Mesh[] = [];
   const mats: ShaderMaterial[] = [];
   const h = 0.075;
@@ -599,7 +592,7 @@ export function wireTelegraph(width: number, depth: number, y: number, filled: r
     mats.push(mat);
   }
   // The emitter posts the web is strung between — off at the deck corners,
-  // so the danger still owns the air and nothing paints the ground.
+  // so the danger owns the air as well as the flooded ground.
   for (const sx of [-1, 1] as const) {
     for (const sz of [-1, 1] as const) {
       const mat = warnMat(BLADE_FRAG);
@@ -610,51 +603,48 @@ export function wireTelegraph(width: number, depth: number, y: number, filled: r
       mats.push(mat);
     }
   }
-  // The filled cells: a floor pane (paint = move) and a four-walled open
-  // column running the full height of the web's hitbox.
-  for (const idx of filled) {
+  // The floor: every cell that ISN'T a window floods; each window gets a
+  // doorframe outline instead — clear ground, honestly edged.
+  for (let idx = 0; idx < 16; idx++) {
     const r = wireCellRect(idx, width, depth);
     const cw = r.x1 - r.x0;
     const cd = r.z1 - r.z0;
     const cx = (r.x0 + r.x1) / 2;
     const cz = (r.z0 + r.z1) / 2;
-    const floorMat = warnMat(CELL_FRAG);
-    const pane = new Mesh(new PlaneGeometry(cw, cd), floorMat);
+    const mat = warnMat(safe.includes(idx) ? SAFE_FRAME_FRAG : CELL_FRAG);
+    const pane = new Mesh(new PlaneGeometry(cw, cd), mat);
     pane.rotation.x = -Math.PI / 2;
     pane.position.set(cx, 0.045, cz);
     meshes.push(pane);
-    mats.push(floorMat);
-    const wallH = WIRE_TOP;
-    for (const [wx, wz, ww, yaw] of [
-      [cx, r.z0, cw, 0],
-      [cx, r.z1, cw, 0],
-      [r.x0, cz, cd, Math.PI / 2],
-      [r.x1, cz, cd, Math.PI / 2],
-    ] as const) {
-      const wallMat = warnMat(CELLWALL_FRAG);
-      const wall = new Mesh(new PlaneGeometry(ww, wallH), wallMat);
-      wall.position.set(wx, wallH / 2, wz);
-      wall.rotation.y = yaw;
-      meshes.push(wall);
-      mats.push(wallMat);
-    }
+    mats.push(mat);
   }
   return makeTelegraph(meshes, mats);
 }
 
 /**
- * The gate: a full-deck pane where everything fills EXCEPT one clear column
- * centred at `gapX` (platform-local), `gapHalfW` wide each side. Place the
- * group at the platform centre on the floor.
+ * The gate: a full-deck pane where everything fills EXCEPT one clear band
+ * centred at `gapAt` (platform-local), `gapHalfW` wide each side. axis 0 is
+ * the doorway COLUMN at local x; axis 1 the horizontal cousin — a clear ROW
+ * at local z. Place the group at the platform centre on the floor.
  */
-export function gateTelegraph(halfWidth: number, halfDepth: number, gapX: number, gapHalfW: number): Telegraph {
+export function gateTelegraph(
+  halfWidth: number,
+  halfDepth: number,
+  gapAt: number,
+  gapHalfW: number,
+  axis: 0 | 1 = 0,
+): Telegraph {
   const w = halfWidth * 2 + 0.4;
   const d = halfDepth * 2 + 0.3;
+  // uv.x carries the gap. axis 1 spins the pane in-plane (the rail's trick),
+  // which lays geometry +x along world −z — so the gap coordinate mirrors.
+  const along = axis ? d : w;
+  const gap = axis ? -gapAt : gapAt;
   const mat = warnMat(GATE_FRAG, {
-    uGap: { value: (gapX + w / 2) / w },
-    uHalf: { value: gapHalfW / w },
+    uGap: { value: (gap + along / 2) / along },
+    uHalf: { value: gapHalfW / along },
   });
-  const pane = new Mesh(new PlaneGeometry(w, d), mat);
-  pane.rotation.x = -Math.PI / 2;
+  const pane = new Mesh(new PlaneGeometry(along, axis ? w : d), mat);
+  pane.rotation.set(-Math.PI / 2, 0, axis ? Math.PI / 2 : 0);
   return makeTelegraph([pane], [mat]);
 }

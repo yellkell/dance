@@ -214,7 +214,9 @@ export const MOVES: Record<
     weights: number[];
   }
 > = {
-  beam: { chargeBeats: 4, weights: [2, 3, 3, 3] },
+  // The BEAM shoots on a short fuse — it's the most readable shape on the
+  // deck, so it earns the snappiest wind-up in the set.
+  beam: { chargeBeats: 3, weights: [2, 3, 3, 3] },
   // Ducking is the most physically demanding dodge in the game — a spice,
   // not a staple. At weight 3 it was landing several times every song.
   sweep: { chargeBeats: 4, weights: [1, 2, 2, 2] },
@@ -267,13 +269,19 @@ export const CHOREO = {
   beamSplitX: 0.5,
   beamTwinInner: 0.12,
   beamSplitChance: [0.4, 0.4, 0.55, 0.55],
+  /** THE X: two beams thrown diagonally through the deck centre at once,
+   *  crossing in an X — the safe ground is the four pockets between the
+   *  arms, so the dodge reads radial (out of the cross, not off a line). */
+  beamXChance: [0, 0, 0.3, 0.35],
   /** THE ROUTINE: how many corners you're asked to hold in your head (per
    *  act, clamped to the 2–4 the deck's four quarters can offer without
    *  ever repeating one), and how many beats apart the steps land. Two
    *  beats is a brisk corner-to-corner step — about a metre of travel —
    *  which is the point: the memory has to be ready before the tick. */
   routineSteps: [2, 2, 3, 4],
-  routineStepBeats: 2,
+  /** Three beats corner-to-corner: two read as a shove at raid tempo — the
+   *  memory needs a breath between ticks, not just travel time. */
+  routineStepBeats: 3,
   /** How many beats before each routine step its blocks are already VISIBLY
    *  falling — the DOWN language, upside down: spinning neon polyhedra
    *  descend onto the three quarters you weren't taught, deck rings
@@ -345,10 +353,10 @@ export const CHOREO = {
   wireY: 0.36,
   wireHoldBeats: 2,
   wireSlack: 0.24,
-  /** How many of the web's 16 grid cells arrive FILLED, by act — columns of
-   *  danger you must be out of before you freeze. Acts 0–1 keep the pure
-   *  stillness test; the late web asks for both verbs in order. */
-  wireFillCells: [0, 0, 3, 5],
+  /** How many of the web's 16 grid cells are SAFE. Everything outside those
+   *  windows is danger — one flooded field, four clear squares, no ambiguity
+   *  about the deck's outer ground. Get into a window, then freeze. */
+  wireSafeCells: 4,
   /** Gate: half-width of the safe column; tightens in the last act. */
   gateHalfW: 0.3,
   gateHalfWLate: 0.22,

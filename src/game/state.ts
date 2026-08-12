@@ -55,10 +55,12 @@ export interface GestureCue {
   /** Directional payload so the MC's body can ACT the move out: sweep entry
    *  side / seesaw-surge doomed side (platform-local sign). */
   side?: number;
-  /** half-moves only: 0 = x split (seesaw), 1 = z split (surge). */
+  /** half-moves and gates: 0 = x split/column, 1 = z split/row. */
   axis?: number;
-  /** gate only: the safe column's platform-local x. */
+  /** gate only: the safe band's platform-local offset. */
   gapX?: number;
+  /** beam only: THE X — the arms are thrown crossed. */
+  crossed?: boolean;
   /** routine only: the whole corner sequence, so the boss can TEACH it —
    *  he points each one out in turn while the marks are still lit. */
   routine?: readonly number[];

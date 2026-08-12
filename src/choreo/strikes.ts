@@ -195,7 +195,14 @@ export class StrikeFx {
    *  exactly where the strip said. Recoloured out of the disco's magenta
    *  into the hazard palette, with a white-hot core so it reads as danger
    *  and not as one more laser. */
-  beam(parent: Object3D, x: number): void {
+  beam(parent: Object3D, x: number, yaw = 0): void {
+    // A yawed beam (THE X's arm) runs the deck diagonal; its offset `x` is
+    // perpendicular to its own run.
+    const len = yaw
+      ? Math.hypot(OCTAGON_HALF_WIDTH * 2, OCTAGON_HALF_DEPTH * 2) + 0.7
+      : OCTAGON_HALF_DEPTH * 2 + 0.9;
+    const px = Math.cos(yaw) * x;
+    const pz = -Math.sin(yaw) * x;
     this.spawn(
       parent,
       0.45,
@@ -208,17 +215,13 @@ export class StrikeFx {
         core.scale.x = 1 - k * 0.4;
       },
       (g) => {
-        const wall = new Mesh(
-          new BoxGeometry(CHOREO.beamHalfWidth * 2, 2.4, OCTAGON_HALF_DEPTH * 2 + 0.9),
-          basic(WARN, 0.7),
-        );
-        wall.position.set(x, 1.2, 0);
+        const wall = new Mesh(new BoxGeometry(CHOREO.beamHalfWidth * 2, 2.4, len), basic(WARN, 0.7));
+        wall.position.set(px, 1.2, pz);
+        wall.rotation.y = yaw;
         g.add(wall);
-        const core = new Mesh(
-          new BoxGeometry(CHOREO.beamHalfWidth * 0.7, 2.4, OCTAGON_HALF_DEPTH * 2 + 0.9),
-          basic(HOT, 0.95),
-        );
-        core.position.set(x, 1.2, 0);
+        const core = new Mesh(new BoxGeometry(CHOREO.beamHalfWidth * 0.7, 2.4, len), basic(HOT, 0.95));
+        core.position.set(px, 1.2, pz);
+        core.rotation.y = yaw;
         g.add(core);
       },
     );
@@ -331,7 +334,7 @@ export class StrikeFx {
    *  once and blows apart into embers at shin height. Nothing sweeps and
    *  nothing lands — the whole deck simply answers, which is what makes
    *  having stood still feel like getting away with something. */
-  wire(parent: Object3D, y: number, filled: readonly { x0: number; x1: number; z0: number; z1: number }[] = []): void {
+  wire(parent: Object3D, y: number, safe: readonly { x0: number; x1: number; z0: number; z1: number }[] = []): void {
     const span = OCTAGON_HALF_WIDTH * 2 + 0.5;
     const depth = OCTAGON_HALF_DEPTH * 2 + 0.4;
     const top = 1.6; // WIRE_TOP — the hitbox's honest ceiling
@@ -343,8 +346,8 @@ export class StrikeFx {
       0.48,
       (k, g) => {
         const fade = 1 - k * k;
-        // Children in build order: 6 wires, 6 curtains, filled columns,
-        // then the spark cloud running its own fade.
+        // Children in build order: 6 wires, 6 curtains, 4 posts per safe
+        // window, then the spark cloud running its own fade.
         for (let i = 0; i < 6; i++) {
           const w = g.children[i] as Mesh;
           (w.material as MeshBasicMaterial).opacity = 0.9 * fade;
@@ -360,9 +363,9 @@ export class StrikeFx {
           c.position.y = y + (rise * reach) / 2;
           (c.material as MeshBasicMaterial).opacity = 0.5 * fade;
         }
-        for (let i = 0; i < filled.length; i++) {
+        for (let i = 0; i < safe.length * 4; i++) {
           const c = g.children[12 + i] as Mesh;
-          (c.material as MeshBasicMaterial).opacity = 0.7 * fade;
+          (c.material as MeshBasicMaterial).opacity = 0.95 * (1 - k * k);
         }
         if (!snapped) {
           snapped = true;
@@ -397,15 +400,21 @@ export class StrikeFx {
           c.scale.y = 0.02;
           g.add(c);
         }
-        // Filled cells flare as solid columns — the squares that were
-        // painted go off like the danger they were.
-        for (const r of filled) {
-          const c = new Mesh(
-            new BoxGeometry(r.x1 - r.x0, top, r.z1 - r.z0),
-            basic(WARN, 0),
-          );
-          c.position.set((r.x0 + r.x1) / 2, top / 2, (r.z0 + r.z1) / 2);
-          g.add(c);
+        // The safe windows burn as white-hot doorframes — the standing
+        // rooms were exactly where the telegraph promised.
+        for (const r of safe) {
+          const cx = (r.x0 + r.x1) / 2;
+          const cz = (r.z0 + r.z1) / 2;
+          for (const [px, pz, w, d] of [
+            [cx, r.z0, r.x1 - r.x0, 0.04],
+            [cx, r.z1, r.x1 - r.x0, 0.04],
+            [r.x0, cz, 0.04, r.z1 - r.z0],
+            [r.x1, cz, 0.04, r.z1 - r.z0],
+          ] as const) {
+            const post = new Mesh(new BoxGeometry(w, top, d), basic(HOT, 0));
+            post.position.set(px, top / 2, pz);
+            g.add(post);
+          }
         }
         g.add(sparks.points);
       },
@@ -416,10 +425,18 @@ export class StrikeFx {
   /** The gate slams shut: both danger fields flash as walls of light and
    *  the doorposts of the safe column burn white-hot — the gap is exactly
    *  where the telegraph promised. */
-  gate(parent: Object3D, x: number, halfW: number): void {
-    const edge = OCTAGON_HALF_WIDTH + 0.25;
-    const leftW = Math.max(0.05, x - halfW + edge);
-    const rightW = Math.max(0.05, edge - (x + halfW));
+  gate(parent: Object3D, at: number, half: number, axis: 0 | 1 = 0): void {
+    // axis 0: doorway column at local x. axis 1: the horizontal cousin —
+    // the clear band runs across the deck at local z, so the danger walls
+    // stand before and behind it instead of either side.
+    const edge = (axis ? OCTAGON_HALF_DEPTH : OCTAGON_HALF_WIDTH) + 0.25;
+    const span = axis ? OCTAGON_HALF_WIDTH * 2 + 0.6 : OCTAGON_HALF_DEPTH * 2 + 0.6;
+    const loW = Math.max(0.05, at - half + edge);
+    const hiW = Math.max(0.05, edge - (at + half));
+    const place = (m: Mesh, along: number): void => {
+      if (axis) m.position.set(0, m.position.y, along);
+      else m.position.set(along, m.position.y, 0);
+    };
     this.spawn(
       parent,
       0.45,
@@ -431,16 +448,23 @@ export class StrikeFx {
         (g.children[3] as Mesh & { material: MeshBasicMaterial }).material.opacity = 0.95 * (1 - k * k);
       },
       (g) => {
-        const depth = OCTAGON_HALF_DEPTH * 2 + 0.6;
-        const wallL = new Mesh(new BoxGeometry(leftW, 2.2, depth), basic(WARN, 0.6));
-        wallL.position.set(x - halfW - leftW / 2, 1.1, 0);
-        g.add(wallL);
-        const wallR = new Mesh(new BoxGeometry(rightW, 2.2, depth), basic(WARN, 0.6));
-        wallR.position.set(x + halfW + rightW / 2, 1.1, 0);
-        g.add(wallR);
+        const box = (w: number): BoxGeometry =>
+          axis ? new BoxGeometry(span, 2.2, w) : new BoxGeometry(w, 2.2, span);
+        const wallLo = new Mesh(box(loW), basic(WARN, 0.6));
+        wallLo.position.y = 1.1;
+        place(wallLo, at - half - loW / 2);
+        g.add(wallLo);
+        const wallHi = new Mesh(box(hiW), basic(WARN, 0.6));
+        wallHi.position.y = 1.1;
+        place(wallHi, at + half + hiW / 2);
+        g.add(wallHi);
         for (const side of [-1, 1] as const) {
-          const post = new Mesh(new BoxGeometry(0.045, 2.3, depth), basic(HOT, 0.95));
-          post.position.set(x + side * halfW, 1.15, 0);
+          const post = new Mesh(
+            axis ? new BoxGeometry(span, 2.3, 0.045) : new BoxGeometry(0.045, 2.3, span),
+            basic(HOT, 0.95),
+          );
+          post.position.y = 1.15;
+          place(post, at + side * half);
           g.add(post);
         }
       },

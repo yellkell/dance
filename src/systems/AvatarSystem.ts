@@ -226,6 +226,27 @@ export class AvatarSystem extends createSystem({}) {
     if (zone.kind === 'sweep') return { x: p.tx, z: p.tz };
     switch (zone.kind) {
       case 'lane': {
+        if (zone.yaw) {
+          // THE X's arm: the four pockets between the arms all clear BOTH
+          // diagonals, so the nearest pocket is always the honest dodge.
+          if (!dodge) return { x: Math.cos(zone.yaw) * zone.x, z: -Math.sin(zone.yaw) * zone.x };
+          const pockets = [
+            { x: 0.55, z: 0 },
+            { x: -0.55, z: 0 },
+            { x: 0, z: 0.5 },
+            { x: 0, z: -0.5 },
+          ];
+          let best = pockets[0];
+          let bestD = Infinity;
+          for (const q of pockets) {
+            const d2 = Math.hypot(q.x - p.tx, q.z - p.tz);
+            if (d2 < bestD) {
+              bestD = d2;
+              best = q;
+            }
+          }
+          return best;
+        }
         if (!dodge) return { x: zone.x, z: p.tz };
         const clear = zone.x > 0 ? zone.x - zone.halfW - 0.38 : zone.x + zone.halfW + 0.38;
         return { x: clear, z: p.tz };
@@ -238,24 +259,22 @@ export class AvatarSystem extends createSystem({}) {
       }
       case 'wire': {
         // The whole ring goes STILL — the best picture this game makes.
-        // Late webs first: a dodger caught inside a filled column slides to
-        // the nearest clear square, THEN freezes there. A groupie who is
-        // about to eat it fidgets instead — the twitch you can see IS why
-        // that one got clipped.
+        // A dodger walks into the nearest safe window, THEN freezes there.
+        // A groupie who is about to eat it fidgets in the flood instead —
+        // the twitch you can see IS why that one got clipped.
         if (dodge) {
           const w = OCTAGON_HALF_WIDTH * 2 + 0.2;
           const dpt = OCTAGON_HALF_DEPTH * 2 + 0.2;
-          const inFill = zone.filled.some((idx) => {
+          const inSafe = zone.safe.some((idx) => {
             const r = wireCellRect(idx, w, dpt);
             return p.tx >= r.x0 && p.tx <= r.x1 && p.tz >= r.z0 && p.tz <= r.z1;
           });
-          if (!inFill) return { x: p.tx, z: p.tz };
-          // Nearest clear cell centre, deterministically — every client
-          // walks this groupie to the same square.
+          if (inSafe) return { x: p.tx, z: p.tz };
+          // Nearest window centre, deterministically — every client walks
+          // this groupie to the same square.
           let best = { x: 0, z: 0 };
           let bestD = Infinity;
-          for (let idx = 0; idx < 16; idx++) {
-            if (zone.filled.includes(idx)) continue;
+          for (const idx of zone.safe) {
             const r = wireCellRect(idx, w, dpt);
             const cx = (r.x0 + r.x1) / 2;
             const cz = (r.z0 + r.z1) / 2;
@@ -274,9 +293,12 @@ export class AvatarSystem extends createSystem({}) {
         return zone.axis === 1 ? { x: p.tx, z: target } : { x: target, z: p.tz };
       }
       case 'gate': {
-        // Live: into the safe column. Doomed: square in a danger field.
-        if (dodge) return { x: zone.x, z: p.tz };
-        return { x: zone.x > 0 ? zone.x - zone.halfW - 0.4 : zone.x + zone.halfW + 0.4, z: p.tz };
+        // Live: into the safe band. Doomed: square in a danger field.
+        const off = zone.at > 0 ? zone.at - zone.half - 0.4 : zone.at + zone.half + 0.4;
+        if (zone.axis) {
+          return dodge ? { x: p.tx, z: zone.at } : { x: p.tx, z: off };
+        }
+        return dodge ? { x: zone.at, z: p.tz } : { x: off, z: p.tz };
       }
       case 'nova': {
         const local = zone.bearing - seatBearing(p.seat, match.seats);

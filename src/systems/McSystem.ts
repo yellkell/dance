@@ -286,8 +286,17 @@ export class McSystem extends createSystem({}) {
 
     switch (mime.cue.kind) {
       case 'beam': {
-        // Twin rails, dead ahead (his forward IS toward the crowd).
         const reach = 0.35 + u * 0.3 + strike * 0.25;
+        if (mime.cue.crossed) {
+          // THE X: the sticks thrown CROSSED in front of him — each hand
+          // over the other shoulder's line, scissoring tighter as it lands.
+          const over = 0.16 + u * 0.14 + strike * 0.1;
+          p.lx = over; p.rx = -over;
+          p.ly = 1.3 - strike * 0.15; p.ry = 1.0 + strike * 0.15;
+          p.lz = p.rz = -reach - pump * 0.05;
+          break;
+        }
+        // Twin rails, dead ahead (his forward IS toward the crowd).
         p.lx = -0.18; p.rx = 0.18;
         p.ly = p.ry = 1.15 - strike * 0.1;
         p.lz = p.rz = -reach - pump * 0.05;
@@ -343,10 +352,27 @@ export class McSystem extends createSystem({}) {
         break;
       }
       case 'gate': {
+        const gap = 0.14 + pump * 0.03;
+        if ((mime.cue.axis ?? 0) === 1) {
+          // The horizontal cousin: the clear band runs near/far, so his
+          // body borrows the surge's grammar — a push says the safe row is
+          // behind you (get back), a beckon says it's toward the stage —
+          // with the doorway's tight parallel sticks kept as the noun.
+          const safeNear = (mime.cue.gapX ?? 0) > 0;
+          p.lx = -gap; p.rx = gap;
+          if (safeNear) {
+            p.ly = p.ry = 1.32 + u * 0.1 - strike * 0.4;
+            p.lz = p.rz = -(0.4 + u * 0.25 + strike * 0.2);
+          } else {
+            p.ly = p.ry = 0.95 - u * 0.05 - strike * 0.15;
+            p.lz = p.rz = -0.5 + u * 0.2 + strike * 0.15;
+            p.hy = STAND - 0.08 - strike * 0.12;
+          }
+          break;
+        }
         // The doorway: sticks straight up, tight and parallel, the whole
         // figure leaning to hold the "gap" over the safe column's side.
         const s = this.mir(Math.sign(mime.cue.gapX ?? 0) || 0);
-        const gap = 0.14 + pump * 0.03;
         p.hx = s * 0.25;
         p.lx = p.hx - gap; p.rx = p.hx + gap;
         p.ly = p.ry = STAND + 0.75 + u * 0.15 - strike * 0.5;

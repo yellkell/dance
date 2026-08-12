@@ -428,7 +428,7 @@ export class MenuSystem extends createSystem({}) {
   private tourProgressSub(): string {
     const done = clearedTourNights().size;
     const all = TOUR.sets.length * 3;
-    return done >= all ? 'complete ✓' : `${done}/${all} nights`;
+    return done >= all ? 'complete ✓' : `${done}/${all}`;
   }
 
   private drawShell(g: CanvasRenderingContext2D, tab: Tab): void {
@@ -582,11 +582,13 @@ export class MenuSystem extends createSystem({}) {
       });
       buttons.push({ id: 'leave', label: 'LEAVE', accent: UI.danger, x: CONTENT_X, y: 428, w: 452, h: 116, small: true });
     } else {
+      // First door first: stepping onto the social floor IS opening a room
+      // — the club appears around you and friends join with your code.
       buttons.push({
         id: 'host',
-        label: 'HOST ROOM',
-        sub: 'up to 24 humans',
-        accent: UI.amber,
+        label: 'ENTER THE CLUB',
+        sub: 'the social floor · friends join with your code',
+        accent: UI.goop,
         disabled: online === 'connecting',
         x: CONTENT_X,
         y: 172,
@@ -595,7 +597,7 @@ export class MenuSystem extends createSystem({}) {
       });
       buttons.push({
         id: 'join',
-        label: 'JOIN ROOM',
+        label: 'JOIN A ROOM',
         sub: 'enter a 4-letter code',
         accent: UI.amber,
         disabled: online === 'connecting',

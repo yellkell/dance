@@ -106,14 +106,14 @@ There's also a debug hook in the console:
 
 | Move | The tell | Your answer |
 | --- | --- | --- |
-| **BEAM** | a strip rakes down the deck from the stage — one laser on a slot, or a deliberate **double**: a TWIN pair taking one side and the middle, or a SPLIT evenly either side of centre | **sidestep** the lane; **get across** a twin; **stand between** a split |
+| **BEAM** | a strip rakes down the deck from the stage on a short fuse — one laser on a slot, or a deliberate **double**: a TWIN pair taking one side and the middle, a SPLIT evenly either side of centre, or (late) **THE X**: two thrown diagonally at once, crossing dead centre | **sidestep** the lane; **get across** a twin; **stand between** a split; against the X, **get into a pocket** between the arms |
 | **SWEEP** | a blade hangs at chest height, chevrons cascading **downward** off it | **duck** — and hold it |
 | **SEESAW** | one half of the deck floods, then the other, on the beat | **cross** the centreline |
 | **SURGE** | the seesaw's front/back cousin | **cross**, the other way |
-| **GATE** | the whole deck floods except one clear column — doorposts + chevrons pointing in | **stand in the gap** |
+| **GATE** | the whole deck floods except one clear band — doorposts + chevrons pointing in. Half the time it's the **horizontal cousin**: the clear band runs across the deck at a depth line | **stand in the gap** — sidestep into the column, or step forward/back into the row |
 | **NOVA** | everything burns except one wedge — same compass bearing for the whole ring | **stand** in the safe ground, together |
 | **CROSSFIRE** | a laser is loaded on one side rail and a strip fills **across** the deck (late on, a stage lane crosses it) — and from mid-set it can come as **THE TRAP**: both side rails at once, one ahead of you and one behind, landing on the same beat | **step forward or back** off the strip — diagonally, once it's a lattice; against the trap, **squeeze into the band between the rails** |
-| **TRIP WEB** | a shin-high lattice cuts the deck into a 4×4 grid — and from act 2, chosen cells arrive **filled**: columns of danger rising floor to eye level | **leave the filled squares early**, then **hold still**; on the discharge the whole lattice sweeps up to eye level — the hitbox it always was |
+| **TRIP WEB** | a shin-high lattice cuts the deck into a 4×4 grid with **four clear windows** in it — every other square floods, the deck's outer ground included | **get into a window early**, then **hold still**; on the discharge the whole lattice sweeps up to eye level — the hitbox it always was |
 | **DONUT** | usually a laser straight down the middle, and a bar later the rim closes with chevrons marching **inward** | **step off** the middle, then **run back into it** |
 | **DUCK DONUT** | the finale combination, rare even in act 3: the rim closes **and** the blade hangs at chest height, both on one beat | **get to the middle AND duck** — small and close |
 | **ROUTINE** | the deck splits into quarters and the boss **teaches** a corner sequence — each marked with its step number, each pointed out in turn — then the marks go out and, on every step, three spinning neon blocks **fall from above** onto the quarters you weren't taught | **remember it**, and stand in the taught corner on each tick |
@@ -123,12 +123,19 @@ in it; wherever the doorpost rails and chevrons point, be there. Windups are
 sacred — escalation compresses the gaps between moves, never the read — and
 landings always hit bar downbeats.
 
-Two of those answers are deliberate exceptions, and both are drawn in the
-AIR rather than on the deck — floor paint means "move your feet" everywhere
-else, so a move whose answer is *don't* must never use it. The **sweep**
-says drop; the **trip web** says freeze. The late web's filled cells are
-the exception's exception, and they follow the law exactly: those squares
-ARE painted, because those squares want your feet gone.
+Two of those answers are deliberate exceptions, and both hang their threat
+in the AIR — floor paint means "move your feet" everywhere else, so a move
+whose answer is *don't* must never paint the ground you should stay on.
+The **sweep** says drop; the **trip web** says freeze — and the web's
+flooded squares follow the law exactly: they ARE painted, because those
+squares want your feet gone; the four clear windows are never painted,
+because that's the ground that lives.
+
+The set-list itself keeps you travelling: every move's dodge asks the body
+for a verb — sidestep, step through, get to the middle, hold still, duck —
+and the choreographer steers away from calling the same verb twice in a
+row, so the floor moves out and in, left and right, forward and back all
+night.
 
 The **routine** is the one move that isn't read at all — it's learned. Two
 to four corners, never the same one twice, taught during a two-bar wind-up
@@ -171,12 +178,13 @@ There are **three places**, and where you are is what you're doing:
 1. **THE FOYER** — the menu place, and a piece of THE VOID: a floating
    neon-edged platform in the set's own abstract space (monolith pylons,
    slow hexes, drifting shards, a horizon with no land under it), with the
-   board, the MC posing, and a moon-gate **PORTAL** shimmering shut until a
-   room of yours is open beyond it.
+   board and the MC posing. The club's door is the board's MULTIPLAYER
+   seat, nothing in the room.
 2. **THE CLUB** — the social place, the warm room between the voids.
-   **HOST ROOM** → share the 4-letter code (or the `?room=CODE&name=YOU`
-   link) → friends **JOIN ROOM** — the portal does the rest: your whole
-   room stands in the club together. Every member is a raver figure in
+   **ENTER THE CLUB** (the multiplayer tab's first door — it opens a room
+   around you) → share the 4-letter code (or the `?room=CODE&name=YOU`
+   link) → friends **JOIN A ROOM** — and your whole room stands in the
+   club together. Every member is a raver figure in
    their join colour with a name tag that swells while they talk. Voice is
    **spatial** (each voice comes from its figure, HRTF + distance falloff)
    and rides the same room socket as Int16 PCM — no SFU, no peer soup, the
