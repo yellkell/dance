@@ -200,7 +200,6 @@ export type MoveKind =
   | 'gate'
   | 'nova'
   | 'cross'
-  | 'wire'
   | 'donut'
   | 'routine'
   | 'duckdonut'
@@ -235,14 +234,11 @@ export const MOVES: Record<
   // the only move that regularly asks for a step toward or away from the
   // stage — the ring stops being a left/right game.
   cross: { chargeBeats: 4, weights: [2, 3, 3, 3] },
-  // The TRIP WEB needs a long fuse: you have to see the wires, plant, and
-  // commit to standing still. Held back until the floor is warm, and never
-  // common — stillness is a punchline that stops working if it's constant.
-  wire: { chargeBeats: 6, weights: [0, 2, 2, 2] },
   // The DONUT is the nova's opposite number and mostly arrives as a
   // one-two, so it charges like one: long enough to read the middle laser,
-  // clear it, and still get home.
-  donut: { chargeBeats: 5, weights: [0, 2, 3, 3] },
+  // clear it, and still get home — but no longer: the shape is a one-look
+  // read and the run home is the fun part.
+  donut: { chargeBeats: 4, weights: [0, 2, 3, 3] },
   // THE ROUTINE charges for two bars because the charge IS the lesson —
   // you're being taught, not warned. Rare on purpose: it's the set piece
   // the floor talks about afterwards, and a memory test you meet every
@@ -312,8 +308,8 @@ export const CHOREO = {
    *  peak), how long after the opening laser the ring closes, and how often
    *  it opens with that laser instead of arriving alone. A full bar between
    *  the two is the whole move: driven off centre, then hauled back. */
-  donutInnerR: 0.46,
-  donutInnerRLate: 0.38,
+  donutInnerR: 0.42,
+  donutInnerRLate: 0.34,
   donutRadius: 1.15,
   donutFollowBeats: 4,
   donutOpenChance: 0.7,
@@ -361,20 +357,12 @@ export const CHOREO = {
   /** From this act on, the crossfire lays a stage lane ACROSS the rail: the
    *  safe ground becomes a quarter of the deck and the dodge is diagonal. */
   latticeFromAct: 2,
-  /** THE TRIP WEB: wire height (shin), how many beats before the landing the
-   *  sensor arms, and how much drift is forgiven while it's live. The slack
-   *  is generous on purpose — a dancer sways, and the move punishes
-   *  STEPPING, not breathing. */
-  wireY: 0.36,
-  wireHoldBeats: 2,
-  wireSlack: 0.24,
-  /** How many of the web's 16 grid cells are SAFE. Everything outside those
-   *  windows is danger — one flooded field, four clear squares, no ambiguity
-   *  about the deck's outer ground. Get into a window, then freeze. */
-  wireSafeCells: 4,
-  /** Gate: half-width of the safe column; tightens in the last act. */
+  /** Gate: half-width of the safe band; tightens in the last act. The gap
+   *  never offers the middle of the deck — a doorway you're already
+   *  standing in is a move that asks for nothing. */
   gateHalfW: 0.3,
   gateHalfWLate: 0.22,
+  gateOffsetMin: 0.22,
   /** Moves per phrase by act — the escalation curve. */
   movesPerPhrase: [2, 3, 4, 5],
   /** Minimum clear beats between one landing and the next telegraph —

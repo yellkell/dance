@@ -31,9 +31,6 @@ export type Zone =
   /** The crossfire's side laser: a strip ACROSS the deck at local z, fed
    *  from the rail on `from` — step forward or back off it. */
   | { kind: 'rail'; z: number; halfD: number; from: 1 | -1 }
-  /** The trip web: four SAFE windows in the 4×4 grid and one flooded field
-   *  everywhere else — get into a window, then hold still until it clears. */
-  | { kind: 'wire'; hold: number; safe: readonly number[] }
   /** The rim burns, the middle lives — everything outside `innerR` is
    *  doomed, so the whole ring collapses toward its own centre. */
   | { kind: 'donut'; innerR: number }
@@ -103,7 +100,6 @@ const VERB: Record<MoveKind, string> = {
   donut: 'radial',
   duckdonut: 'radial',
   nova: 'compass',
-  wire: 'still',
   sweep: 'duck',
   routine: 'corners',
   wave: 'travel', // the whole-deck crossing — its own verb, never damped
@@ -203,9 +199,11 @@ function buildLandings(kind: MoveKind, landBeat: number, act: number, rng: () =>
       });
       return landings;
     }
-    const zSign = rng() < 0.5 ? 1 : -1;
-    const z =
-      zSign * (CHOREO.railOffsetMin + rng() * (CHOREO.railOffsetMax - CHOREO.railOffsetMin));
+    // A single rail always lands on the FRONT half (toward the stage,
+    // where your eyes already are) — one strip behind your back was a
+    // read nobody should be asked to make. The trap and the wave keep
+    // their rear ground: both telegraph as a whole-deck event.
+    const z = -(CHOREO.railOffsetMin + rng() * (CHOREO.railOffsetMax - CHOREO.railOffsetMin));
     const from: 1 | -1 = rng() < 0.5 ? 1 : -1;
     landings.push({ beat: landBeat, zone: { kind: 'rail', z, halfD: CHOREO.railHalfDepth, from } });
     if (act >= CHOREO.latticeFromAct) {
@@ -259,27 +257,21 @@ function buildLandings(kind: MoveKind, landBeat: number, act: number, rng: () =>
     // both answers are ones the set already taught.
     landings.push({ beat: landBeat, zone: { kind: 'sweep' } });
     landings.push({ beat: landBeat, zone: { kind: 'donut', innerR: CHOREO.donutInnerR } });
-  } else if (kind === 'wire') {
-    // Four SAFE windows in the 4×4 grid; every other square — and all the
-    // ground outside them — is one flooded field. Distinct cells, rolled
-    // off the same seeded stream as everything else.
-    const safe: number[] = [];
-    while (safe.length < CHOREO.wireSafeCells) {
-      const c = Math.floor(rng() * 16);
-      if (!safe.includes(c)) safe.push(c);
-    }
-    landings.push({ beat: landBeat, zone: { kind: 'wire', hold: CHOREO.wireHoldBeats, safe } });
   } else if (kind === 'sweep') {
     landings.push({ beat: landBeat, zone: { kind: 'sweep' } });
   } else if (kind === 'gate') {
     // The doorway — or, half the time, its horizontal cousin: a clear ROW
     // at a depth line, so the gap asks for a forward/back step instead.
+    // The gap never sits over the middle: a doorway you're probably
+    // already standing in asks for nothing.
     const axis: 0 | 1 = rng() < 0.5 ? 1 : 0;
+    const span = axis ? 0.35 : 0.5;
+    const off = CHOREO.gateOffsetMin + rng() * (span - CHOREO.gateOffsetMin);
     landings.push({
       beat: landBeat,
       zone: {
         kind: 'gate',
-        at: (rng() * 2 - 1) * (axis ? 0.35 : 0.5),
+        at: (rng() < 0.5 ? 1 : -1) * off,
         half: act >= 3 ? CHOREO.gateHalfWLate : CHOREO.gateHalfW,
         axis,
       },

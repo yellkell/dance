@@ -43,7 +43,7 @@ win condition from "kill the titan" to "outlast the floor".
 | --- | --- | --- | --- | --- |
 | 0 | intro | 0 | — | count-in, dance, calibrate |
 | 1–3 | 0 | 2 | 4 beats | beam, sweep, seesaw, gate (both axes), crossfire |
-| 4–7 | 1 | 3 | 3 beats | trip web, donut one-twos, the routine, THE WAVE |
+| 4–7 | 1 | 3 | 3 beats | donut one-twos, the routine, THE WAVE |
 | 8–10 | 2 | 4 | 2 beats | surge, nova, rail traps, double beams, THE X |
 | 11–13 | 3 | 5 | 1 beat | duck donut, return waves, 5-stage seesaws, tight novas |
 

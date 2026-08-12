@@ -20,7 +20,6 @@
 import {
   AdditiveBlending,
   BoxGeometry,
-  PlaneGeometry,
   BufferAttribute,
   BufferGeometry,
   CylinderGeometry,
@@ -330,99 +329,7 @@ export class StrikeFx {
     );
   }
 
-  /** THE TRIP WEB discharges: every wire in the lattice goes white-hot at
-   *  once and blows apart into embers at shin height. Nothing sweeps and
-   *  nothing lands — the whole deck simply answers, which is what makes
-   *  having stood still feel like getting away with something. */
-  wire(parent: Object3D, y: number, safe: readonly { x0: number; x1: number; z0: number; z1: number }[] = []): void {
-    const span = OCTAGON_HALF_WIDTH * 2 + 0.5;
-    const depth = OCTAGON_HALF_DEPTH * 2 + 0.4;
-    const top = 1.6; // WIRE_TOP — the hitbox's honest ceiling
-    const rise = top - y;
-    const sparks = new Sparks(48, WARN);
-    let snapped = false;
-    this.spawn(
-      parent,
-      0.48,
-      (k, g) => {
-        const fade = 1 - k * k;
-        // Children in build order: 6 wires, 6 curtains, 4 posts per safe
-        // window, then the spark cloud running its own fade.
-        for (let i = 0; i < 6; i++) {
-          const w = g.children[i] as Mesh;
-          (w.material as MeshBasicMaterial).opacity = 0.9 * fade;
-          w.scale.y = 1 + k * 2.4; // each wire whips as it lets go
-        }
-        // THE SWEEP UP: the lattice's true hitbox revealed — a curtain of
-        // light rises off every wire to eye level in the first third of the
-        // flash, then burns out with the rest.
-        const reach = Math.min(1, k * 3);
-        for (let i = 0; i < 6; i++) {
-          const c = g.children[6 + i] as Mesh;
-          c.scale.y = Math.max(0.02, reach);
-          c.position.y = y + (rise * reach) / 2;
-          (c.material as MeshBasicMaterial).opacity = 0.5 * fade;
-        }
-        for (let i = 0; i < safe.length * 4; i++) {
-          const c = g.children[12 + i] as Mesh;
-          (c.material as MeshBasicMaterial).opacity = 0.95 * (1 - k * k);
-        }
-        if (!snapped) {
-          snapped = true;
-          for (let i = 0; i < 8; i++) {
-            const a = (i / 8) * Math.PI * 2;
-            sparks.emit(Math.sin(a) * OCTAGON_HALF_WIDTH * 0.7, y, Math.cos(a) * OCTAGON_HALF_DEPTH * 0.7, 6, 1.5);
-          }
-        }
-      },
-      (g) => {
-        for (const dz of [-depth * 0.34, 0, depth * 0.34]) {
-          const w = new Mesh(new BoxGeometry(span, 0.05, 0.05), basic(HOT, 0.9));
-          w.position.set(0, y, dz);
-          g.add(w);
-        }
-        for (const dx of [-span * 0.32, 0, span * 0.32]) {
-          const w = new Mesh(new BoxGeometry(0.05, 0.05, depth), basic(HOT, 0.9));
-          w.position.set(dx, y, 0);
-          g.add(w);
-        }
-        // The rising curtains, one per wire (unit height, scaled live).
-        for (const dz of [-depth * 0.34, 0, depth * 0.34]) {
-          const c = new Mesh(new PlaneGeometry(span, rise), basic(HOT, 0));
-          c.position.set(0, y, dz);
-          c.scale.y = 0.02;
-          g.add(c);
-        }
-        for (const dx of [-span * 0.32, 0, span * 0.32]) {
-          const c = new Mesh(new PlaneGeometry(depth, rise), basic(HOT, 0));
-          c.position.set(dx, y, 0);
-          c.rotation.y = Math.PI / 2;
-          c.scale.y = 0.02;
-          g.add(c);
-        }
-        // The safe windows burn as white-hot doorframes — the standing
-        // rooms were exactly where the telegraph promised.
-        for (const r of safe) {
-          const cx = (r.x0 + r.x1) / 2;
-          const cz = (r.z0 + r.z1) / 2;
-          for (const [px, pz, w, d] of [
-            [cx, r.z0, r.x1 - r.x0, 0.04],
-            [cx, r.z1, r.x1 - r.x0, 0.04],
-            [r.x0, cz, 0.04, r.z1 - r.z0],
-            [r.x1, cz, 0.04, r.z1 - r.z0],
-          ] as const) {
-            const post = new Mesh(new BoxGeometry(w, top, d), basic(HOT, 0));
-            post.position.set(px, top / 2, pz);
-            g.add(post);
-          }
-        }
-        g.add(sparks.points);
-      },
-      (dt) => sparks.step(dt),
-    );
-  }
-
-  /** The gate slams shut: both danger fields flash as walls of light and
+    /** The gate slams shut: both danger fields flash as walls of light and
    *  the doorposts of the safe column burn white-hot — the gap is exactly
    *  where the telegraph promised. */
   gate(parent: Object3D, at: number, half: number, axis: 0 | 1 = 0): void {

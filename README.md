@@ -117,8 +117,7 @@ There's also a debug hook in the console:
 | **GATE** | the whole deck floods except one clear band — doorposts + chevrons pointing in. Half the time it's the **horizontal cousin**: the clear band runs across the deck at a depth line | **stand in the gap** — sidestep into the column, or step forward/back into the row |
 | **NOVA** | everything burns except one wedge — same compass bearing for the whole ring | **stand** in the safe ground, together |
 | **CROSSFIRE** | a laser is loaded on one side rail and a strip fills **across** the deck (late on, a stage lane crosses it) — and from mid-set it can come as **THE TRAP**: both side rails at once, one ahead of you and one behind, landing on the same beat | **step forward or back** off the strip — diagonally, once it's a lattice; against the trap, **squeeze into the band between the rails** |
-| **TRIP WEB** | a shin-high lattice cuts the deck into a 4×4 grid with **four clear windows** in it — every other square floods, the deck's outer ground included | **get into a window early**, then **hold still**; on the discharge the whole lattice sweeps up to eye level — the hitbox it always was |
-| **DONUT** | usually a laser straight down the middle, and a bar later the rim closes with chevrons marching **inward** | **step off** the middle, then **run back into it** |
+| **DONUT** | usually a laser straight down the middle, and a bar later the rim closes fast with chevrons marching **inward** on a tight safe disc | **step off** the middle, then **run back into it** |
 | **DUCK DONUT** | the finale combination, rare even in act 3: the rim closes **and** the blade hangs at chest height, both on one beat | **get to the middle AND duck** — small and close |
 | **THE WAVE** | four beams marching **1-2-3-4** across the whole deck (their staggered fills ARE the count) — sideways, or front-to-back; late acts can send it straight back the way it came | **travel** — cross with the march, or ride just behind the newest strike; on a return wave, across **and back** |
 | **ROUTINE** | the deck splits into quarters and the boss **teaches** a corner sequence — each marked with its step number, each pointed out in turn — then the marks go out and, on every step, three spinning neon blocks **fall from above** onto the quarters you weren't taught | **remember it**, and stand in the taught corner on each tick |
@@ -128,19 +127,20 @@ in it; wherever the doorpost rails and chevrons point, be there. Windups are
 sacred — escalation compresses the gaps between moves, never the read — and
 landings always hit bar downbeats.
 
-Two of those answers are deliberate exceptions, and both hang their threat
-in the AIR — floor paint means "move your feet" everywhere else, so a move
-whose answer is *don't* must never paint the ground you should stay on.
-The **sweep** says drop; the **trip web** says freeze — and the web's
-flooded squares follow the law exactly: they ARE painted, because those
-squares want your feet gone; the four clear windows are never painted,
-because that's the ground that lives.
+One answer is a deliberate exception, and it hangs its threat in the AIR —
+floor paint means "move your feet" everywhere else, so a move whose answer
+is *don't step* must never paint the ground you should stay on. The
+**sweep** says drop, and nothing on the floor contradicts it.
 
 The set-list itself keeps you travelling: every move's dodge asks the body
-for a verb — sidestep, step through, get to the middle, hold still, duck —
-and the choreographer steers away from calling the same verb twice in a
-row, so the floor moves out and in, left and right, forward and back all
-night.
+for a verb — sidestep, step through, get to the middle, duck — and the
+choreographer steers away from calling the same verb twice in a row, so
+the floor moves out and in, left and right, forward and back all night.
+Two more laws serve the same end: a lone crossfire rail never lands
+**behind** you (a strip at your back was a read nobody should be asked to
+make — only the trap and the wave, which telegraph as whole-deck events,
+touch the rear ground), and a gate's gap never sits over the **middle**,
+because a doorway you're already standing in asks for nothing.
 
 The **routine** is the one move that isn't read at all — it's learned. Two
 to four corners, never the same one twice, taught during a two-bar wind-up

@@ -894,16 +894,6 @@ export function railZap(): void {
   tone({ freq: 120, to: 52, type: 'sine', dur: 0.26, gain: 0.24, delay: 0.02 });
 }
 
-/** THE TRIP WEB letting go: every wire in the lattice discharging at once —
- *  a hard electric snap with a dying buzz, and no impact under it, because
- *  nothing actually landed. */
-export function wireSnap(): void {
-  noiseHit(0.07, 0.34, 5200, 1800, 4.0); // the snap
-  tone({ freq: 2400, to: 1500, type: 'square', dur: 0.06, gain: 0.07 });
-  tone({ freq: 300, to: 120, type: 'sawtooth', dur: 0.3, gain: 0.06, delay: 0.03 }); // the buzz dying
-  clank(1400, 0.07, 0.12, 0.02);
-}
-
 /** THE ROUTINE calling a step: a bright bell a beat ahead of each landing,
  *  pitched by step number up a major arpeggio. Once the marks are out this
  *  tick is the ONLY cue, so it has to say two things at once — "now", and

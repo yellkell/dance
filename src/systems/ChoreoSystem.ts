@@ -32,8 +32,6 @@ import {
   railTelegraph,
   routineMarksTelegraph,
   sweepTelegraph,
-  wireCellRect,
-  wireTelegraph,
   type Telegraph,
 } from '../choreo/telegraphs.js';
 import { generateSetlist, type SetMove, type Zone } from '../choreo/setlist.js';
@@ -68,10 +66,6 @@ export interface LiveZone {
   probed: boolean;
   wasInside: boolean;
   resolved: boolean;
-  /** Trip-web runtime (local seat only): where the head was when the sensor
-   *  armed, and the furthest it has strayed since. Judgement is that drift,
-   *  not a position — the web has no safe ground to stand on. */
-  wire?: { x0: number; z0: number; armed: boolean; moved: number };
   /** THE ROUTINE's falling blocks (per seat, per step) — the DOWN-style
    *  descent that made the move readable. Lives past resolve for its crush. */
   blocks?: RoutineBlockfall;
@@ -83,8 +77,6 @@ export interface LiveZone {
 export const choreoView: {
   zones: readonly LiveZone[];
   dropRoutine?: () => void;
-  /** Dev: string a trip web NOW — four safe windows, flood everywhere else. */
-  dropWire?: (act?: number) => void;
   /** Dev: throw THE TRAP now — both side rails on one beat. */
   dropTrap?: () => void;
   /** Dev: throw DUCK DONUT now — the blade and the closing rim together. */
@@ -180,20 +172,6 @@ export class ChoreoSystem extends createSystem({}) {
           beat: land + step * CHOREO.routineStepBeats,
           zone: { kind: 'quad', corner, step, routine },
         })),
-      });
-    };
-    choreoView.dropWire = (act = 3) => {
-      if (!match.playing || !Number.isFinite(match.beat)) return;
-      const tele = match.beat + 0.25;
-      const land = tele + MOVES.wire.chargeBeats;
-      const safe = [1, 6, 8, 15]; // a spread of windows to inspect
-      this.begin({
-        index: 9500 + this.nextMove,
-        kind: 'wire',
-        telegraphBeat: tele,
-        landBeat: land,
-        act,
-        landings: [{ beat: land, zone: { kind: 'wire', hold: CHOREO.wireHoldBeats, safe } }],
       });
     };
     choreoView.dropX = () => {
@@ -385,21 +363,6 @@ export class ChoreoSystem extends createSystem({}) {
         // at once reads as noise, two reads as "THIS side now, THAT next".
         if (z.zone.kind === 'half') z.tg.group.visible = z.dueBeat - beat < 4.2;
       }
-      // THE TRIP WEB: the wires go live `hold` beats out. From that instant
-      // the only thing judged is how far you STRAY from where you were
-      // standing — so the sensor remembers that spot and keeps the worst
-      // drift since (a step out and back still broke the beam).
-      if (z.zone.kind === 'wire' && z.wire && z.seat === match.mySeat) {
-        if (!z.wire.armed && beat >= z.dueBeat - z.zone.hold) {
-          z.wire.armed = true;
-          z.wire.x0 = match.headX;
-          z.wire.z0 = match.headZ;
-          z.wire.moved = 0;
-        }
-        if (z.wire.armed) {
-          z.wire.moved = Math.max(z.wire.moved, Math.hypot(match.headX - z.wire.x0, match.headZ - z.wire.z0));
-        }
-      }
       // The perfect probe: were you still in the fire one beat out?
       if (!z.probed && z.seat === match.mySeat && beat >= z.dueBeat - SCORE.perfectProbeBeats) {
         z.probed = true;
@@ -492,8 +455,6 @@ export class ChoreoSystem extends createSystem({}) {
           probed: false,
           wasInside: false,
           resolved: false,
-          wire:
-            landing.zone.kind === 'wire' ? { x0: 0, z0: 0, armed: false, moved: 0 } : undefined,
           blocks,
         });
       });
@@ -552,15 +513,6 @@ export class ChoreoSystem extends createSystem({}) {
         tg.group.position.set(0, 0.05, zone.z);
         return tg;
       }
-      case 'wire': {
-        const tg = wireTelegraph(
-          OCTAGON_HALF_WIDTH * 2 + 0.2,
-          OCTAGON_HALF_DEPTH * 2 + 0.2,
-          CHOREO.wireY,
-          zone.safe,
-        );
-        return tg;
-      }
       case 'nova': {
         const local = zone.bearing - seatBearing(seat, match.seats);
         const tg = novaTelegraph(CHOREO.novaRadius, local, zone.halfAngle);
@@ -608,23 +560,6 @@ export class ChoreoSystem extends createSystem({}) {
       }
       case 'rail':
         return Math.abs(z - zone.z) <= zone.halfD + HEAD_R * 0.7;
-      case 'wire': {
-        // The web catches MOVEMENT — un-armed (the sensor hasn't gone live
-        // yet) is always clean — and GROUND: at the discharge you must be
-        // inside one of the safe windows. Everything else is the flood.
-        if ((live.wire?.moved ?? 0) > CHOREO.wireSlack) return true;
-        const w = OCTAGON_HALF_WIDTH * 2 + 0.2;
-        const dpt = OCTAGON_HALF_DEPTH * 2 + 0.2;
-        return !zone.safe.some((idx) => {
-          const r = wireCellRect(idx, w, dpt);
-          return (
-            x >= r.x0 - HEAD_R * 0.5 &&
-            x <= r.x1 + HEAD_R * 0.5 &&
-            z >= r.z0 - HEAD_R * 0.5 &&
-            z <= r.z1 + HEAD_R * 0.5
-          );
-        });
-      }
       case 'sweep':
         return !match.ducked;
       case 'half': {
@@ -694,9 +629,6 @@ export class ChoreoSystem extends createSystem({}) {
         case 'rail':
           sfx.railZap();
           break;
-        case 'wire':
-          sfx.wireSnap();
-          break;
         case 'donut':
           sfx.donutSlam();
           break;
@@ -732,15 +664,6 @@ export class ChoreoSystem extends createSystem({}) {
         break;
       case 'rail':
         this.strikes.rail(parent, z.zone.z, z.zone.halfD, z.zone.from);
-        break;
-      case 'wire':
-        this.strikes.wire(
-          parent,
-          CHOREO.wireY,
-          z.zone.safe.map((idx) =>
-            wireCellRect(idx, OCTAGON_HALF_WIDTH * 2 + 0.2, OCTAGON_HALF_DEPTH * 2 + 0.2),
-          ),
-        );
         break;
       case 'donut':
         this.strikes.donut(parent, z.zone.innerR);

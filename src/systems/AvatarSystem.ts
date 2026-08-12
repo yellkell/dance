@@ -23,7 +23,6 @@ import { BOTS, OCTAGON_HALF_DEPTH, OCTAGON_HALF_WIDTH } from '../config.js';
 import { platformRoot } from '../arena/arena.js';
 import { choreoView } from './ChoreoSystem.js';
 import type { Zone } from '../choreo/setlist.js';
-import { wireCellRect } from '../choreo/telegraphs.js';
 import { buildDancer, type DancerPose, type DancerRig } from '../game/avatars.js';
 import { roll } from '../game/rng.js';
 import { seatBearing } from '../game/ring.js';
@@ -256,37 +255,6 @@ export class AvatarSystem extends createSystem({}) {
         // Step off the strip toward whichever side of it has more deck.
         const clear = zone.z > 0 ? zone.z - zone.halfD - 0.32 : zone.z + zone.halfD + 0.32;
         return { x: p.tx, z: clear };
-      }
-      case 'wire': {
-        // The whole ring goes STILL — the best picture this game makes.
-        // A dodger walks into the nearest safe window, THEN freezes there.
-        // A groupie who is about to eat it fidgets in the flood instead —
-        // the twitch you can see IS why that one got clipped.
-        if (dodge) {
-          const w = OCTAGON_HALF_WIDTH * 2 + 0.2;
-          const dpt = OCTAGON_HALF_DEPTH * 2 + 0.2;
-          const inSafe = zone.safe.some((idx) => {
-            const r = wireCellRect(idx, w, dpt);
-            return p.tx >= r.x0 && p.tx <= r.x1 && p.tz >= r.z0 && p.tz <= r.z1;
-          });
-          if (inSafe) return { x: p.tx, z: p.tz };
-          // Nearest window centre, deterministically — every client walks
-          // this groupie to the same square.
-          let best = { x: 0, z: 0 };
-          let bestD = Infinity;
-          for (const idx of zone.safe) {
-            const r = wireCellRect(idx, w, dpt);
-            const cx = (r.x0 + r.x1) / 2;
-            const cz = (r.z0 + r.z1) / 2;
-            const d2 = Math.hypot(cx - p.tx, cz - p.tz);
-            if (d2 < bestD) {
-              bestD = d2;
-              best = { x: cx, z: cz };
-            }
-          }
-          return best;
-        }
-        return { x: p.tx + Math.sin(p.phase * 5) * 0.3, z: p.tz + Math.cos(p.phase * 4) * 0.24 };
       }
       case 'half': {
         const target = dodge ? -zone.side * 0.42 : zone.side * 0.42;

@@ -202,26 +202,6 @@ await shot('vr-blockfall-mid');
 await page.waitForTimeout(700); // the landing + crush
 await shot('vr-blockfall-crush');
 
-// ── THE TRIP WEB v2: filled columns, then the upward discharge ───────────
-console.log('web:');
-await page.evaluate(() => window.__gdr.choreo.dropWire(3));
-// Mid-charge: the lattice plus the filled columns rising to eye level.
-await page.waitForTimeout(1400);
-await shot('vr-web-filled');
-// The discharge: a 0.48 s flash, so BURST — start just before the due
-// beat and take three quick frames; headless screenshot latency decides
-// which one lands mid-sweep.
-const wireWait = await page.evaluate(() => {
-  const z = window.__gdr.choreo.zones.find((q) => q.zone.kind === 'wire');
-  if (!z) return 0;
-  return Math.max(0, (z.dueBeat - window.__gdr.match.beat) * window.__gdr.match.beatLen * 1000);
-});
-await page.waitForTimeout(Math.max(0, wireWait - 40));
-await shot('vr-web-discharge');
-await shot('vr-web-discharge2');
-await shot('vr-web-discharge3');
-await page.waitForTimeout(700);
-
 // One wide look from the deck's rear rim — the architecture shot. Freeze
 // the judge first: a strike landing at point-blank is meant to blind you,
 // and it does, which makes for a useless review frame.
