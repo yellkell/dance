@@ -77,7 +77,7 @@ const phraseBeats = MUSIC.beatsPerBar * MUSIC.barsPerPhrase;
 export function actOfPhrase(phrase: number, total: number, difficulty = 1): number {
   const progress = total > 0 ? phrase / total : 0;
   const base = DIFFICULTY.baseAct[Math.max(0, Math.min(DIFFICULTY.baseAct.length - 1, difficulty))];
-  return Math.min(3, base + (progress >= DIFFICULTY.liftAt ? 1 : 0));
+  return Math.min(DIFFICULTY.maxAct, base + (progress >= DIFFICULTY.liftAt ? 1 : 0));
 }
 
 export function actOfBeat(beat: number, totalPhrases: number, difficulty = 1): number {
@@ -132,8 +132,16 @@ function pickKind(
   return pool[0]?.[0] ?? 'beam';
 }
 
-/** Build one move's landings from the seeded rng (seat-local pattern). */
-function buildLandings(kind: MoveKind, landBeat: number, act: number, rng: () => number): Landing[] {
+/** Build one move's landings from the seeded rng (seat-local pattern).
+ *  `sweptRoutines` is the chart-wide coin for THE SWEPT ROUTINE — rolled
+ *  once per song, so some expert nights carry it and some never do. */
+function buildLandings(
+  kind: MoveKind,
+  landBeat: number,
+  act: number,
+  rng: () => number,
+  sweptRoutines = false,
+): Landing[] {
   const landings: Landing[] = [];
   if (kind === 'beam') {
     const halfW = CHOREO.beamHalfWidth;
@@ -167,7 +175,8 @@ function buildLandings(kind: MoveKind, landBeat: number, act: number, rng: () =>
     // ground left. Out, then back — the whole deck used in four beats.
     // (The ring's own telegraph holds off until the laser has fired; see
     // ChoreoSystem, which gates the second stage's window.)
-    const innerR = act >= 3 ? CHOREO.donutInnerRLate : CHOREO.donutInnerR;
+    const innerR =
+      act >= 4 ? CHOREO.donutInnerRExpert : act >= 3 ? CHOREO.donutInnerRLate : CHOREO.donutInnerR;
     const opens = rng() < CHOREO.donutOpenChance;
     if (opens) {
       landings.push({
@@ -225,11 +234,14 @@ function buildLandings(kind: MoveKind, landBeat: number, act: number, rng: () =>
     }
     const want = CHOREO.routineSteps[Math.min(act, CHOREO.routineSteps.length - 1)];
     const routine = bag.slice(0, Math.max(2, Math.min(4, want)));
+    // THE SWEPT ROUTINE (act 4, on the charts that carry it): every blast
+    // arrives under the sweep's blade — stand in the taught corner AND
+    // duck on each tick. The memory test and the limbo, one body.
+    const swept = sweptRoutines && act >= 4;
     routine.forEach((corner, step) => {
-      landings.push({
-        beat: landBeat + step * CHOREO.routineStepBeats,
-        zone: { kind: 'quad', corner, step, routine },
-      });
+      const beat = landBeat + step * CHOREO.routineStepBeats;
+      landings.push({ beat, zone: { kind: 'quad', corner, step, routine } });
+      if (swept) landings.push({ beat, zone: { kind: 'sweep' } });
     });
   } else if (kind === 'wave') {
     // THE WAVE: beams marching 1-2-3 across the deck — travel with the
@@ -285,7 +297,7 @@ function buildLandings(kind: MoveKind, landBeat: number, act: number, rng: () =>
       zone: {
         kind: 'gate',
         at: (rng() < 0.5 ? 1 : -1) * off,
-        half: act >= 3 ? CHOREO.gateHalfWLate : CHOREO.gateHalfW,
+        half: act >= 4 ? CHOREO.gateHalfWExpert : act >= 3 ? CHOREO.gateHalfWLate : CHOREO.gateHalfW,
         axis,
       },
     });
@@ -306,7 +318,8 @@ function buildLandings(kind: MoveKind, landBeat: number, act: number, rng: () =>
     // disc appears only as the previous pie detonates (ChoreoSystem gates
     // the telegraph per landing) — one pie on the floor at a time, ever.
     const slices = act >= 3 ? 3 : act >= 2 && rng() < 0.45 ? 2 : 1;
-    const halfAngle = act >= 3 ? CHOREO.novaHalfAngleLate : CHOREO.novaHalfAngle;
+    const halfAngle =
+      act >= 4 ? CHOREO.novaHalfAngleExpert : act >= 3 ? CHOREO.novaHalfAngleLate : CHOREO.novaHalfAngle;
     let bearing = rng() * Math.PI * 2;
     const turn = (rng() < 0.5 ? 1 : -1) * CHOREO.novaChainTurn;
     for (let i = 0; i < slices; i++) {
@@ -458,6 +471,11 @@ export function generateSetlist(
 ): SetMove[] {
   const rng = mulberry32(mix(seed, 0xc03e0));
   const moves: SetMove[] = [];
+  // THE SWEPT ROUTINE is a per-CHART coin: some expert nights carry it,
+  // some never do — the hardest challenges stay distinct records, not a
+  // constant garnish. (Rolled for every chart so the stream stays aligned;
+  // it only ever bites at act 4.)
+  const sweptRoutines = rng() < CHOREO.routineSweepChance;
   // Two bars of dancing, then the show starts: the first telegraph blooms at
   // bar 2 and the first landing hits the bar-3 downbeat — you're dodging
   // within seconds of the drop, not a phrase later.
@@ -477,7 +495,7 @@ export function generateSetlist(
       let charge = MOVES[kind].chargeBeats;
       // Land on the next bar downbeat that the telegraph fits in front of.
       let landBeat = Math.ceil((cursor + charge) / barBeats) * barBeats;
-      let landings = buildLandings(kind, landBeat, act, rng);
+      let landings = buildLandings(kind, landBeat, act, rng, sweptRoutines);
       // THE FLOOR MANAGER: a move whose danger never touches the ground
       // the last move parked you on asks for nothing — roll another shape
       // (same seeded stream, so every client re-rolls identically).
@@ -485,7 +503,7 @@ export function generateSetlist(
         kind = pickKind(rng, act, last, banned);
         charge = MOVES[kind].chargeBeats;
         landBeat = Math.ceil((cursor + charge) / barBeats) * barBeats;
-        landings = buildLandings(kind, landBeat, act, rng);
+        landings = buildLandings(kind, landBeat, act, rng, sweptRoutines);
       }
       if (landBeat >= phraseEnd + barBeats) break; // phrase is full — move on
       moves.push({ index: index++, kind, telegraphBeat: landBeat - charge, landBeat, landings, act });

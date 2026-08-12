@@ -128,7 +128,7 @@ export class MenuSystem extends createSystem({}) {
       const track = localStorage.getItem(TRACK_KEY);
       if (track && trackById(track)) match.preferredTrack = track;
       const diff = Number(localStorage.getItem(DIFF_KEY));
-      if (Number.isFinite(diff) && diff >= 0 && diff <= 2) match.difficulty = diff;
+      if (Number.isFinite(diff) && diff >= 0 && diff <= 3) match.difficulty = diff;
     } catch {
       /* fine */
     }
@@ -322,7 +322,7 @@ export class MenuSystem extends createSystem({}) {
         /* fine */
       }
     } else if (id.startsWith('diff')) {
-      match.difficulty = Math.max(0, Math.min(2, Number(id.slice(4))));
+      match.difficulty = Math.max(0, Math.min(3, Number(id.slice(4))));
       try {
         localStorage.setItem(DIFF_KEY, String(match.difficulty));
       } catch {
@@ -605,9 +605,9 @@ export class MenuSystem extends createSystem({}) {
         id: `diff${i}`,
         label,
         accent: match.difficulty === i ? UI.goop : undefined,
-        x: CONTENT_X + i * 442,
+        x: CONTENT_X + i * 331,
         y: 668,
-        w: 416,
+        w: 305,
         h: 104,
         small: true,
       });

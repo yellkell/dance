@@ -49,12 +49,24 @@ still deserves a finale:
 | EASY | 0 → 1 | 2 → 3 | 4 beats |
 | NORMAL | 1 → 2 | 3 → 4 | 3 → 2 beats |
 | HARD | 2 → 3 | 4 → 5 | 2 → 1 beats |
+| EXPERT | 3 → 4 | 5 → 6 | 1 → 0 beats |
 
 What each act brings: act 0 — beam, sweep, seesaw, gate (both axes),
 crossfire; act 1 — donut one-twos, the routine, THE WAVE; act 2 — surge,
-nova, rail traps, double beams, THE X; act 3 — duck donut, return waves,
-5-stage seesaws, tight novas. Online, the ball carries the caller's
-difficulty with the song pick, so the whole ring dances one chart.
+nova, rail traps, double beams, THE X; act 3 — duck donut, 5-stage
+seesaws, tight novas; act 4 (EXPERT's back stretch) — six moves a phrase
+with NO rest, duck donut twice as common, and THE SWEPT ROUTINE: on the
+charts that carry it (a per-song coin, so the hardest nights stay
+distinct), every blast of the routine arrives under the sweep's blade —
+stand in the taught corner AND duck on every tick. Geometry barely
+tightens at act 4 (gate 0.22 → 0.20, nova wedge 0.45 → 0.42 rad, donut
+disc 0.34 → 0.30): expert lives in density and combinations, not in
+slivers of safe ground. Online, the ball carries the caller's difficulty
+with the song pick, so the whole ring dances one chart.
+
+Getting HIT also knocks the rhythm out of your hands: the groove streak
+(the one-up-one-down hand combo and its tally) resets on every clip, so
+a clean grade and a deep groove are the same discipline.
 
 Three laws above the table. The choreographer NEVER calls the same move
 twice running. It tracks each move's dodge VERB (lateral, depth, radial,

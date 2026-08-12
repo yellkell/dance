@@ -50,7 +50,7 @@ export function startRaid(opts: RaidOptions = {}): void {
   match.seats = seats;
   match.mySeat = opts.mySeat ?? 0;
   match.seed = opts.seed ?? freshSeed();
-  if (opts.difficulty !== undefined) match.difficulty = Math.max(0, Math.min(2, opts.difficulty));
+  if (opts.difficulty !== undefined) match.difficulty = Math.max(0, Math.min(3, opts.difficulty));
 
   // The headliner: the MC runs most nights; the GOOP takes tour finales.
   const tourSet = opts.tour ? TOUR.sets[opts.tour.set] : undefined;

@@ -35,6 +35,7 @@ import {
   type Telegraph,
 } from '../choreo/telegraphs.js';
 import { generateSetlist, type SetMove, type Zone } from '../choreo/setlist.js';
+import { grooveView } from './PlayerSystem.js';
 import { finishRaid } from '../game/flow.js';
 import { roll } from '../game/rng.js';
 import { seatBearing } from '../game/ring.js';
@@ -439,11 +440,13 @@ export class ChoreoSystem extends createSystem({}) {
         const tgStartBeat =
           move.kind === 'wave'
             ? landing.beat - MOVES.wave.chargeBeats
-            : landing.zone.kind === 'nova' && landingIdx > 0
-              ? landing.beat - CHOREO.novaChainBeats
-              : landing.zone.kind === 'donut' && landingIdx > 0
-                ? landing.beat - CHOREO.donutFollowBeats
-                : move.telegraphBeat;
+            : move.kind === 'routine' && landing.zone.kind === 'sweep'
+              ? landing.beat - MOVES.sweep.chargeBeats // the swept routine: one blade per tick, staggered
+              : landing.zone.kind === 'nova' && landingIdx > 0
+                ? landing.beat - CHOREO.novaChainBeats
+                : landing.zone.kind === 'donut' && landingIdx > 0
+                  ? landing.beat - CHOREO.donutFollowBeats
+                  : move.telegraphBeat;
         // THE ROUTINE's danger is DOWN blocks descending from above — one
         // per doomed quarter, beat-locked so the landing is the downbeat.
         const blocks =
@@ -739,6 +742,8 @@ export class ChoreoSystem extends createSystem({}) {
       // ends has to be unmissable.
       pushFlair(out ? 'GAME OVER' : d.missChain === GRADE.chainOut - 1 ? 'HIT — ONE MORE' : 'HIT', 'hit');
       sfx.hitTaken();
+      // And the impact knocks the rhythm out of your hands.
+      grooveView.disrupt?.();
     }
     if (out) {
       d.alive = false;

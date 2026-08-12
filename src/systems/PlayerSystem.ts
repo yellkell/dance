@@ -56,7 +56,12 @@ const _white = new Color(0xffffff);
 
 /** Dev window into the groove: `__gdr.sparkle(heat)` fires a burst off the
  *  right stick so the sparkles can be tuned without dancing for them. */
-export const grooveView: { burst?: (heat?: number) => void } = {};
+export const grooveView: {
+  burst?: (heat?: number) => void;
+  /** Getting HIT breaks the hand rhythm — the judge calls this to cut the
+   *  groove streak (and its tally) dead. */
+  disrupt?: () => void;
+} = {};
 
 interface Stick {
   group: Group;
@@ -221,6 +226,14 @@ export class PlayerSystem extends createSystem({}) {
       if (s.attachedTo) s.halo.getWorldPosition(_hand);
       else _hand.set(0.25, 1.35, -0.4);
       this.sparks.burst(_hand, Math.min(1, Math.max(0, heat)), hueToColor(seatHue(match.mySeat), 0.6));
+    };
+    grooveView.disrupt = () => {
+      // A hit knocks the rhythm out of your hands: streak, tally and the
+      // metronome pose all reset — the groove restarts from the first swap.
+      this.streak = 0;
+      this.grooveSide = 0;
+      match.grooveStreak = 0;
+      match.grooveScore = 0;
     };
   }
 

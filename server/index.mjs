@@ -281,7 +281,7 @@ wss.on('connection', (ws) => {
         const pos = Array.isArray(msg.pos) && msg.pos.length === 3 ? msg.pos.map(Number) : [0, 1.5, -1.5];
         const track = typeof msg.track === 'string' ? msg.track.slice(0, 32) : '';
         // The caller's difficulty rides the ball like their song pick does.
-        const diff = Number.isFinite(Number(msg.diff)) ? Math.max(0, Math.min(2, Number(msg.diff))) : 1;
+        const diff = Number.isFinite(Number(msg.diff)) ? Math.max(0, Math.min(3, Number(msg.diff))) : 1;
         // Capture the code now — ws.room clears if the caller walks, and
         // the timeout must still find the room (fireBall re-checks state).
         const code = ws.room;

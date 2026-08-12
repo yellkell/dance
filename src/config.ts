@@ -216,40 +216,40 @@ export const MOVES: Record<
 > = {
   // The BEAM shoots on a short fuse — it's the most readable shape on the
   // deck, so it earns the snappiest wind-up in the set.
-  beam: { chargeBeats: 3, weights: [2, 3, 3, 3] },
+  beam: { chargeBeats: 3, weights: [2, 3, 3, 3, 3] },
   // Ducking is the most physically demanding dodge in the game — a spice,
   // not a staple. At weight 3 it was landing several times every song.
-  sweep: { chargeBeats: 4, weights: [1, 2, 2, 2] },
+  sweep: { chargeBeats: 4, weights: [1, 2, 2, 2, 2] },
   // The gentle 2-stage seesaw joins the openers — crossing is a day-one verb.
-  seesaw: { chargeBeats: 4, weights: [2, 3, 4, 4] },
-  surge: { chargeBeats: 4, weights: [0, 0, 2, 3] },
+  seesaw: { chargeBeats: 4, weights: [2, 3, 4, 4, 4] },
+  surge: { chargeBeats: 4, weights: [0, 0, 2, 3, 3] },
   // The GATE is the early-variety hero: instantly readable, teaches lateral
   // precision, and looks great rippling around the whole ring.
-  gate: { chargeBeats: 4, weights: [3, 3, 2, 2] },
+  gate: { chargeBeats: 4, weights: [3, 3, 2, 2, 2] },
   // The PIE: finding the wedge takes one look,
   // and the old 8-beat wind-up was a 6-second stand-and-wait on slow
   // records. 5 beats keeps the whole-ring rotate honest and lands sooner.
-  nova: { chargeBeats: 5, weights: [0, 0, 2, 3] },
+  nova: { chargeBeats: 5, weights: [0, 0, 2, 3, 3] },
   // CROSSFIRE is a day-one verb (it reads exactly like the beam) and it's
   // the only move that regularly asks for a step toward or away from the
   // stage — the ring stops being a left/right game.
-  cross: { chargeBeats: 4, weights: [2, 3, 3, 3] },
+  cross: { chargeBeats: 4, weights: [2, 3, 3, 3, 3] },
   // The DONUT is the nova's opposite number and mostly arrives as a
   // one-two, so it charges like one: long enough to read the middle laser,
   // clear it, and still get home — but no longer: the shape is a one-look
   // read and the run home is the fun part.
-  donut: { chargeBeats: 4, weights: [0, 2, 3, 3] },
+  donut: { chargeBeats: 4, weights: [0, 2, 3, 3, 3] },
   // THE ROUTINE charges for two bars because the charge IS the lesson —
   // you're being taught, not warned. Rare on purpose: it's the set piece
   // the floor talks about afterwards, and a memory test you meet every
   // phrase stops being one.
-  routine: { chargeBeats: 8, weights: [0, 1, 2, 2] },
+  routine: { chargeBeats: 8, weights: [0, 1, 2, 2, 3] },
   // THE COMBINATION is a finale spice: act 3 only, and rare even there.
-  duckdonut: { chargeBeats: 6, weights: [0, 0, 0, 1] },
+  duckdonut: { chargeBeats: 6, weights: [0, 0, 0, 1, 2] },
   // THE WAVE is the travel move: four beams marching 1-2-3-4 across the
   // whole deck. Each beam gets the beam's own short fuse; the march is
   // the long read.
-  wave: { chargeBeats: 3, weights: [0, 2, 3, 3] },
+  wave: { chargeBeats: 3, weights: [0, 2, 3, 3, 3] },
 };
 
 export const CHOREO = {
@@ -269,13 +269,13 @@ export const CHOREO = {
    *  The split gets likelier at the peak, where precision is the point. */
   beamSplitX: 0.5,
   beamTwinInner: 0.12,
-  beamSplitChance: [0.4, 0.4, 0.55, 0.55],
+  beamSplitChance: [0.4, 0.4, 0.55, 0.55, 0.55],
   /** THE X: two beams thrown diagonally through the deck centre at once,
    *  crossing in an X — the safe ground is the four pockets between the
    *  arms, so the dodge reads radial (out of the cross, not off a line).
    *  The arms run THINNER than a straight beam: two full-width strips on
    *  the diagonals left pockets too tight to trust. */
-  beamXChance: [0, 0, 0.3, 0.35],
+  beamXChance: [0, 0, 0.3, 0.35, 0.4],
   beamXHalfW: 0.17,
   /** THE WAVE: beams marching across the deck in order, one landing per
    *  step, with the far quarter left dark — the EXIT. EVERY wave turns:
@@ -284,7 +284,7 @@ export const CHOREO = {
    *  far side. Sideways = lanes walking x; front/back = rails walking z. */
   waveLaneX: [-0.645, -0.215, 0.215, 0.645],
   waveRailZ: [-0.56, -0.19, 0.19, 0.56],
-  waveStepBeats: [2, 2, 1, 1],
+  waveStepBeats: [2, 2, 1, 1, 1],
   /** Beats between the out-march's last fire and the turn's first — a
    *  double step plus one whole extra beat: you only just reached the
    *  exit, and the breather is what makes the wheel readable. */
@@ -294,7 +294,12 @@ export const CHOREO = {
    *  ever repeating one), and how many beats apart the steps land. Two
    *  beats is a brisk corner-to-corner step — about a metre of travel —
    *  which is the point: the memory has to be ready before the tick. */
-  routineSteps: [2, 2, 3, 4],
+  routineSteps: [2, 2, 3, 4, 4],
+  /** THE SWEPT ROUTINE (act 4): every blast of the routine arrives under
+   *  the sweep's blade — stand in the taught corner AND duck on each tick.
+   *  A per-SONG coin, not a per-move one: some expert charts carry it,
+   *  some never do, so the hardest nights stay distinct. */
+  routineSweepChance: 0.5,
   /** Three beats corner-to-corner: two read as a shove at raid tempo — the
    *  memory needs a breath between ticks, not just travel time. */
   routineStepBeats: 3,
@@ -315,6 +320,7 @@ export const CHOREO = {
    *  the two is the whole move: driven off centre, then hauled back. */
   donutInnerR: 0.42,
   donutInnerRLate: 0.34,
+  donutInnerRExpert: 0.3,
   donutRadius: 1.15,
   donutFollowBeats: 4,
   donutOpenChance: 0.7,
@@ -330,12 +336,15 @@ export const CHOREO = {
   /** Seesaw/surge: beats between half-floods per act. Whole bars early,
    *  half-bars late — every flood lands where the music actually hits (a
    *  3-beat gap straddled the grid and read as random). */
-  seesawGapBeats: [4, 4, 2, 2],
+  seesawGapBeats: [4, 4, 2, 2, 2],
   /** Forgiveness strip either side of the centreline (m). */
   seesawSafeLip: 0.06,
   /** Nova safe-wedge half-angle (radians); tightens in the last act. */
   novaHalfAngle: 0.6,
   novaHalfAngleLate: 0.45,
+  /** Act 4 nudges the wedge, gently — expert lives in density and
+   *  combinations, not in slivers of safe ground. */
+  novaHalfAngleExpert: 0.42,
   novaRadius: 1.15,
   /** THE CHAIN (late-act nova): three SINGULAR pies, one after the other,
    *  each safe wedge a third of the compass further on — three dodges walk
@@ -357,7 +366,7 @@ export const CHOREO = {
   /** THE TRAP (late crossfire): TWO rails land on the same beat, one from
    *  each side emitter, symmetric about the centreline — the safe ground
    *  is the corridor pinned between them. */
-  railTrapChance: [0, 0, 0.35, 0.5],
+  railTrapChance: [0, 0, 0.35, 0.5, 0.5],
   railTrapZ: 0.44,
   /** From this act on, the crossfire lays a stage lane ACROSS the rail: the
    *  safe ground becomes a quarter of the deck and the dodge is diagonal. */
@@ -367,12 +376,13 @@ export const CHOREO = {
    *  standing in is a move that asks for nothing. */
   gateHalfW: 0.3,
   gateHalfWLate: 0.22,
+  gateHalfWExpert: 0.2,
   gateOffsetMin: 0.22,
   /** Moves per phrase by act — the escalation curve. */
-  movesPerPhrase: [2, 3, 4, 5],
+  movesPerPhrase: [2, 3, 4, 5, 6],
   /** Minimum clear beats between one landing and the next telegraph —
    *  bar/half-bar multiples so successive moves stay on the grid. */
-  restBeats: [4, 4, 2, 2],
+  restBeats: [4, 4, 2, 2, 0],
 };
 
 /**
@@ -389,10 +399,13 @@ export const CHOREO = {
  * carries the caller's choice so the whole ring dances one chart.
  */
 export const DIFFICULTY = {
-  labels: ['EASY', 'NORMAL', 'HARD'],
-  baseAct: [0, 1, 2],
+  labels: ['EASY', 'NORMAL', 'HARD', 'EXPERT'],
+  baseAct: [0, 1, 2, 3],
   /** The lift: one more act from this fraction of the set on. */
   liftAt: 0.6,
+  /** The ceiling. Act 4 is EXPERT's back stretch: six moves a phrase with
+   *  no rest between them, and the hardest combinations in the game. */
+  maxAct: 4,
 };
 
 /* ────────────────────────────── THE GROOVE ───────────────────────────────

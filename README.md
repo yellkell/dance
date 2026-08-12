@@ -21,8 +21,9 @@ everyone else.
   floor's polish, and die in the air (nothing ever lies on the floor as
   litter). The HUD's **groove row** keeps the ledger:
   four pips light one per swap as it catches, then give way to a fill bar
-  and the points that streak has paid. Stop, or swap off-rhythm, and it
-  lets go — row and all.
+  and the points that streak has paid. Stop, swap off-rhythm, or **get
+  clipped** — a hit knocks the rhythm out of your hands — and it lets go,
+  row and all.
 - Get clipped → the chain dies. **There are no lives** — you dance the
   whole record and the night **grades** you at the end: **S / A / B / C /
   F**, off the share of landings you survived, with S reserved for a clean
@@ -120,7 +121,7 @@ There's also a debug hook in the console:
 | **DONUT** | usually a laser straight down the middle, and a bar later the rim closes fast with chevrons marching **inward** on a tight safe disc | **step off** the middle, then **run back into it** |
 | **DUCK DONUT** | the finale combination, rare even in act 3: the rim closes **and** the blade hangs at chest height, both on one beat | **get to the middle AND duck** — small and close |
 | **THE WAVE** | beams marching **1-2-3** across the deck (their staggered fills ARE the count) — sideways, or front-to-back — with the far quarter left dark: the **EXIT**. Every wave **TURNS**: the march wheels at the exit — its first return strike is that very square, a double step plus a whole extra beat late — and sweeps back, new exit on the far side | **travel with the march into the exit**; breathe at the turn, then **ride one square behind the return** all the way home |
-| **ROUTINE** | the deck splits into quarters and the boss **teaches** a corner sequence — each marked with its step number, each pointed out in turn — then the marks go out and, on every step, three spinning neon blocks **fall from above** onto the quarters you weren't taught | **remember it**, and stand in the taught corner on each tick |
+| **ROUTINE** | the deck splits into quarters and the boss **teaches** a corner sequence — each marked with its step number, each pointed out in turn — then the marks go out and, on every step, three spinning neon blocks **fall from above** onto the quarters you weren't taught. On some EXPERT charts it comes **SWEPT**: the blade hangs over every blast | **remember it**, and stand in the taught corner on each tick — on a swept routine, **duck there too** |
 
 The telegraph is the whole instruction: whatever fills amber→red, don't be
 in it; wherever the doorpost rails and chevrons point, be there. Windups are
@@ -302,10 +303,13 @@ SHUFFLE derives the record from the match seed, so an online room agrees on the
 song without anyone sending it; a host's explicit pick rides along in the start
 message.
 
-**Picking a difficulty**: the EASY / NORMAL / HARD row under it is the act
-floor for the whole song — every record used to open trivially easy and ramp;
-now you choose the floor and the song lifts one act in its back stretch.
-Online, the ball carries the caller's difficulty with their song pick.
+**Picking a difficulty**: the EASY / NORMAL / HARD / EXPERT row under it is
+the act floor for the whole song — every record used to open trivially easy
+and ramp; now you choose the floor and the song lifts one act in its back
+stretch. EXPERT's back stretch is act 4: six moves a phrase with no rest,
+duck donut twice as common, and — on the charts that carry it — THE SWEPT
+ROUTINE. Online, the ball carries the caller's difficulty with their song
+pick.
 
 **Adding a track**: drop the file in `src/assets/music/`, add a row to
 `TRACKS`, done. Roles decide where it plays. `npm run analyze -- <file…>` prints
