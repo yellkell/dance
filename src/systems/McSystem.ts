@@ -489,6 +489,38 @@ export class McSystem extends createSystem({}) {
         p.hy = STAND - strike * 0.18;
         break;
       }
+      case 'wave': {
+        // THE WAVE: a four-count. One stick chops lane by lane across his
+        // body — or, front-to-back, walks its chops away from or in toward
+        // the crowd — and where the count is IS where the doom is.
+        const start = this.mir(mime.cue.side ?? 1);
+        // 4 stops out (steps 0–3) — and on a return wave the count walks
+        // straight back home (steps 4–6), so his arm rides the march both
+        // ways.
+        const raw = Math.min(6, mime.steps) + strike * 0.6;
+        const frac = raw <= 3 ? Math.min(1, raw / 3) : Math.max(0, (6 - raw) / 3);
+        const chop = Math.max(0, Math.sin(beat * Math.PI)) * 0.16;
+        if ((mime.cue.axis ?? 0) === 1) {
+          // Crowd-near ground is HIS far reach (he faces you): a march
+          // starting near begins at full extension and draws home.
+          const startNear = (mime.cue.side ?? 1) > 0;
+          const reach = startNear ? 0.72 - frac * 0.5 : 0.22 + frac * 0.5;
+          p.rx = 0.18; p.ry = 1.15 - chop; p.rz = -reach;
+          p.lx = -0.3; p.ly = 0.85; p.lz = -0.05;
+        } else {
+          const armX = start * (0.55 - frac * 1.1); // start side → far side
+          const lead = start < 0 ? 'l' : 'r';
+          if (lead === 'l') {
+            p.lx = armX; p.ly = 1.18 - chop; p.lz = -0.2;
+            p.rx = 0.3; p.ry = 0.85; p.rz = -0.05;
+          } else {
+            p.rx = armX; p.ry = 1.18 - chop; p.rz = -0.2;
+            p.lx = -0.3; p.ly = 0.85; p.lz = -0.05;
+          }
+        }
+        p.hy = STAND - chop * 0.3;
+        break;
+      }
       case 'duckdonut': {
         // DUCK DONUT: the gather and the limbo in one body — arms thrown
         // wide and HAULED in as the rim closes, the whole figure sinking

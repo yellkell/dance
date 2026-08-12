@@ -52,6 +52,7 @@ const GESTURE: Record<MoveKind, AttackName> = {
   donut: 'clap', // both arms hauling the rim in on the middle
   duckdonut: 'clap', // rim hauled in while the blade swings
   routine: 'overhand', // the slabs coming down on three quarters
+  wave: 'backfist', // the first swat of the march
 };
 
 /** The quick follow-up strikes inside a multi-landing move. */
@@ -67,6 +68,7 @@ const STEP_GESTURE: Record<MoveKind, AttackName> = {
   donut: 'hook', // the wide arm sweeping the rim inward
   duckdonut: 'hook',
   routine: 'overhand', // one drop per step of the routine
+  wave: 'jab', // one jab per lane of the march
 };
 
 /** The two-step floor pattern, one target per beat of the bar (sim units):

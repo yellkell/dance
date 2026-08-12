@@ -106,6 +106,7 @@ const VERB: Record<MoveKind, string> = {
   wire: 'still',
   sweep: 'duck',
   routine: 'corners',
+  wave: 'travel', // the whole-deck crossing — its own verb, never damped
 };
 
 function pickKind(
@@ -229,6 +230,27 @@ function buildLandings(kind: MoveKind, landBeat: number, act: number, rng: () =>
       landings.push({
         beat: landBeat + step * CHOREO.routineStepBeats,
         zone: { kind: 'quad', corner, step, routine },
+      });
+    });
+  } else if (kind === 'wave') {
+    // THE WAVE: four beams marching 1-2-3-4 across the whole deck — cross
+    // with the march or be caught by it. Sideways (lanes walking x) or
+    // front/back (rails walking z); each stop's telegraph runs the beam's
+    // own short fuse, staggered, so the deck reads as a wave building.
+    // Late acts can send it straight back the way it came: across AND back.
+    const axis: 0 | 1 = rng() < 0.5 ? 1 : 0;
+    const step = CHOREO.waveStepBeats[Math.min(act, CHOREO.waveStepBeats.length - 1)];
+    const back = rng() < CHOREO.waveReturnChance[Math.min(act, CHOREO.waveReturnChance.length - 1)];
+    const stops = axis ? CHOREO.waveRailZ : CHOREO.waveLaneX;
+    const order = rng() < 0.5 ? [...stops] : [...stops].reverse();
+    if (back) order.push(...order.slice(0, -1).reverse());
+    const from: 1 | -1 = rng() < 0.5 ? 1 : -1;
+    order.forEach((at, i) => {
+      landings.push({
+        beat: landBeat + i * step,
+        zone: axis
+          ? { kind: 'rail', z: at, halfD: CHOREO.railHalfDepth, from }
+          : { kind: 'lane', x: at, halfW: CHOREO.beamHalfWidth },
       });
     });
   } else if (kind === 'duckdonut') {

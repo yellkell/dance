@@ -203,7 +203,8 @@ export type MoveKind =
   | 'wire'
   | 'donut'
   | 'routine'
-  | 'duckdonut';
+  | 'duckdonut'
+  | 'wave';
 
 export const MOVES: Record<
   MoveKind,
@@ -249,6 +250,10 @@ export const MOVES: Record<
   routine: { chargeBeats: 8, weights: [0, 1, 2, 2] },
   // THE COMBINATION is a finale spice: act 3 only, and rare even there.
   duckdonut: { chargeBeats: 6, weights: [0, 0, 0, 1] },
+  // THE WAVE is the travel move: four beams marching 1-2-3-4 across the
+  // whole deck. Each beam gets the beam's own short fuse; the march is
+  // the long read.
+  wave: { chargeBeats: 3, weights: [0, 2, 3, 3] },
 };
 
 export const CHOREO = {
@@ -273,6 +278,16 @@ export const CHOREO = {
    *  crossing in an X — the safe ground is the four pockets between the
    *  arms, so the dodge reads radial (out of the cross, not off a line). */
   beamXChance: [0, 0, 0.3, 0.35],
+  /** THE WAVE: four beams marching across the whole deck in order, one
+   *  landing per step — cross with it or be caught. The four stops tile
+   *  the deck edge to edge (adjacent kill widths overlap on purpose: no
+   *  ground survives the full march standing still). Sideways = lanes
+   *  walking x; front/back = rails walking z. Late acts can send the
+   *  march straight back the way it came — across AND back. */
+  waveLaneX: [-0.645, -0.215, 0.215, 0.645],
+  waveRailZ: [-0.56, -0.19, 0.19, 0.56],
+  waveStepBeats: [2, 2, 1, 1],
+  waveReturnChance: [0, 0, 0.4, 0.5],
   /** THE ROUTINE: how many corners you're asked to hold in your head (per
    *  act, clamped to the 2–4 the deck's four quarters can offer without
    *  ever repeating one), and how many beats apart the steps land. Two

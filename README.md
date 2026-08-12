@@ -116,6 +116,7 @@ There's also a debug hook in the console:
 | **TRIP WEB** | a shin-high lattice cuts the deck into a 4×4 grid with **four clear windows** in it — every other square floods, the deck's outer ground included | **get into a window early**, then **hold still**; on the discharge the whole lattice sweeps up to eye level — the hitbox it always was |
 | **DONUT** | usually a laser straight down the middle, and a bar later the rim closes with chevrons marching **inward** | **step off** the middle, then **run back into it** |
 | **DUCK DONUT** | the finale combination, rare even in act 3: the rim closes **and** the blade hangs at chest height, both on one beat | **get to the middle AND duck** — small and close |
+| **THE WAVE** | four beams marching **1-2-3-4** across the whole deck (their staggered fills ARE the count) — sideways, or front-to-back; late acts can send it straight back the way it came | **travel** — cross with the march, or ride just behind the newest strike; on a return wave, across **and back** |
 | **ROUTINE** | the deck splits into quarters and the boss **teaches** a corner sequence — each marked with its step number, each pointed out in turn — then the marks go out and, on every step, three spinning neon blocks **fall from above** onto the quarters you weren't taught | **remember it**, and stand in the taught corner on each tick |
 
 The telegraph is the whole instruction: whatever fills amber→red, don't be
@@ -154,7 +155,10 @@ come in two shapes only, so a glance is enough to know whether you're
 crossing or threading. The donut is built as a **one-two** — the middle laser drives
 everyone off centre, the ring hauls them back a bar later — and its ring
 stays dark until that laser has fired, so there is only ever one shape on
-the deck to read (the same staging the pie chain uses).
+the deck to read (the same staging the pie chain uses). THE WAVE is that
+law's one deliberate exception: its four strips telegraph together on
+staggered fuses, because the SEQUENCE is the shape — a march you read the
+way you read a drum fill.
 
 ## Multiplayer — and the club
 

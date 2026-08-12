@@ -93,6 +93,8 @@ export const choreoView: {
   dropX?: () => void;
   /** Dev: drop a gate now (axis 1 = the horizontal cousin, a clear row). */
   dropGate?: (axis?: 0 | 1) => void;
+  /** Dev: march THE WAVE now (axis 1 = front/back; back = there-and-back). */
+  dropWave?: (axis?: 0 | 1, back?: boolean) => void;
 } = { zones: [] };
 
 const HEAD_R = 0.1; // projected head radius for floor-zone tests
@@ -112,7 +114,15 @@ function sweepSide(moveIdx: number, landingIdx: number): 1 | -1 {
 /** The directional payload a gesture cue carries so the MC's body can ACT
  *  the move out (zones are platform-local and identical for every seat, so
  *  one giant's mime is honest for the whole ring). */
-function cueDirection(zone: Zone, moveIdx: number, landingIdx: number): Partial<GestureCue> {
+function cueDirection(kind: MoveKind, zone: Zone, moveIdx: number, landingIdx: number): Partial<GestureCue> {
+  if (kind === 'wave') {
+    // The march: the FIRST cue carries the start side so the MC's count
+    // begins on the right hand; step cues stay silent on side and let his
+    // steps counter walk the arm across.
+    const axis = zone.kind === 'rail' ? 1 : 0;
+    const at = zone.kind === 'rail' ? zone.z : zone.kind === 'lane' ? zone.x : 0;
+    return landingIdx === 0 ? { side: Math.sign(at) || 1, axis } : { axis };
+  }
   switch (zone.kind) {
     case 'lane':
       // THE X leads with a spun arm — the MC's sticks cross for it.
@@ -200,6 +210,27 @@ export class ChoreoSystem extends createSystem({}) {
           { beat: land, zone: { kind: 'lane', x: 0, halfW: CHOREO.beamHalfWidth, yaw: Math.PI / 4 } },
           { beat: land, zone: { kind: 'lane', x: 0, halfW: CHOREO.beamHalfWidth, yaw: -Math.PI / 4 } },
         ],
+      });
+    };
+    choreoView.dropWave = (axis = 0, back = false) => {
+      if (!match.playing || !Number.isFinite(match.beat)) return;
+      const tele = match.beat + 0.25;
+      const land = tele + MOVES.wave.chargeBeats;
+      const stops = axis ? CHOREO.waveRailZ : CHOREO.waveLaneX;
+      const order = [...stops];
+      if (back) order.push(...order.slice(0, -1).reverse());
+      this.begin({
+        index: 9950 + this.nextMove,
+        kind: 'wave',
+        telegraphBeat: tele,
+        landBeat: land,
+        act: 2,
+        landings: order.map((at, i) => ({
+          beat: land + i * CHOREO.waveStepBeats[2],
+          zone: axis
+            ? ({ kind: 'rail', z: at, halfD: CHOREO.railHalfDepth, from: 1 } as const)
+            : ({ kind: 'lane', x: at, halfW: CHOREO.beamHalfWidth } as const),
+        })),
       });
     };
     choreoView.dropGate = (axis = 1) => {
@@ -323,7 +354,7 @@ export class ChoreoSystem extends createSystem({}) {
       const key = `${z.moveIdx}:${z.landingIdx}`;
       if (this.cuedSteps.has(key)) continue;
       this.cuedSteps.add(key);
-      match.gestures.push({ kind: z.kind, chargeBeats: lead, step: true, ...cueDirection(z.zone, z.moveIdx, z.landingIdx), dueBeat: z.dueBeat });
+      match.gestures.push({ kind: z.kind, chargeBeats: lead, step: true, ...cueDirection(z.kind, z.zone, z.moveIdx, z.landingIdx), dueBeat: z.dueBeat });
     }
 
     // THE ROUTINE calls itself: one tick a beat ahead of every step,
@@ -415,7 +446,7 @@ export class ChoreoSystem extends createSystem({}) {
     match.gestures.push({
       kind: move.kind,
       chargeBeats: MOVES[move.kind].chargeBeats,
-      ...(first ? cueDirection(first.zone, move.index, 0) : {}),
+      ...(first ? cueDirection(move.kind, first.zone, move.index, 0) : {}),
       dueBeat: first?.beat,
     });
     sfx.gooCharge(MOVES[move.kind].chargeBeats * match.beatLen * 0.9);
@@ -431,13 +462,17 @@ export class ChoreoSystem extends createSystem({}) {
         // Staged shapes open their own telegraph window instead of riding
         // the move's: a chained pie appears exactly as the last one goes
         // off, and the donut's ring waits for its opening laser to fire —
-        // one shape to read at a time, always.
+        // one shape to read at a time, always. THE WAVE is the deliberate
+        // exception: every stop telegraphs on its own staggered fuse, so
+        // the deck reads as a march building 1-2-3-4.
         const tgStartBeat =
-          landing.zone.kind === 'nova' && landingIdx > 0
-            ? landing.beat - CHOREO.novaChainBeats
-            : landing.zone.kind === 'donut' && landingIdx > 0
-              ? landing.beat - CHOREO.donutFollowBeats
-              : move.telegraphBeat;
+          move.kind === 'wave'
+            ? landing.beat - MOVES.wave.chargeBeats
+            : landing.zone.kind === 'nova' && landingIdx > 0
+              ? landing.beat - CHOREO.novaChainBeats
+              : landing.zone.kind === 'donut' && landingIdx > 0
+                ? landing.beat - CHOREO.donutFollowBeats
+                : move.telegraphBeat;
         // THE ROUTINE's danger is DOWN blocks descending from above — one
         // per doomed quarter, beat-locked so the landing is the downbeat.
         const blocks =
