@@ -219,9 +219,19 @@ There are **three places**, and where you are is what you're doing:
    party.
 
 Point clients at a hosted relay with `?server=wss://your-host:8788` (the
-production default is `wss://rave-raid-relay.onrender.com` — deploy
-`server/index.mjs` there, or anywhere, and change `DEFAULT_RELAY` in
-`src/config.ts`).
+production default is `DEFAULT_RELAY` in `src/config.ts`).
+
+### Hosting the relay
+
+`render.yaml` in the repo root is a Render blueprint for exactly this
+service: **New → Blueprint → this repo**, and Render builds `server/` and
+runs it. Any Node host works — the relay needs nothing but `ws`, binds
+`process.env.PORT`, and answers `GET /` with a JSON status line for health
+checks. Then set `DEFAULT_RELAY` to the `wss://` URL it hands you.
+
+**Until a relay is live, ENTER THE CLUB fails with "relay unreachable"** —
+the club is a networked room, and there is nowhere to connect. Nothing
+else in the game needs the server: the whole tour is playable solo.
 
 ## The music
 
@@ -235,7 +245,7 @@ files**, not guessed — the whole game is quantized to them, so they had to be:
 | TARGET | 91 | 11 phrases | −9.5 LUFS | tour |
 | CAPTURE | 117 | 13 phrases | −15.0 LUFS | tour: first goop finale |
 | DISCO BALL | 73.33 | 4 phrases | −12.6 LUFS | tour: peak-hours opener — the night after the first goop falls · no ducking |
-| COMBAT | 135 | 12 phrases | −13.2 LUFS | tour: peak hours |
+| COMBAT | 135 | 12 phrases | −13.2 LUFS | quick raid |
 | LOOP | 150 | 17 phrases | −11.2 LUFS | quick raid |
 | DYNASTY | 155 | 10 phrases | −9.6 LUFS | tour: peak-hours finale |
 | INFECTION | 138 | 15 phrases | −10.9 LUFS | tour: after hours |
@@ -244,7 +254,7 @@ files**, not guessed — the whole game is quantized to them, so they had to be:
 | ASSEMBLE | 125 | 16 phrases | −7.5 LUFS | quick raid · drops on the slam |
 | SAKUPENED | 133.964 | 10 phrases | −8.1 LUFS | quick raid |
 | UNITY | 117 | 17 phrases | −13.8 LUFS | quick raid · skips its ambient open |
-| MONEY | 78.395 | 6 phrases | −14.5 LUFS | quick raid · no ducking |
+| MONEY | 78.395 | 6 phrases | −14.5 LUFS | tour: peak hours · no ducking |
 | SWAG | 91.974 | — | −15.7 LUFS | foyer loop |
 | ECLIPSE | 70 | — | −10.4 LUFS | the club's house record |
 
@@ -350,6 +360,7 @@ Two pipelines ship `dist/` (both in `.github/workflows/`):
   ```
 
 The static site is fully playable solo. Online rooms need the relay
-(`server/index.mjs`) hosted somewhere reachable — the client defaults to
-`wss://rave-raid-relay.onrender.com` on https deploys (`DEFAULT_RELAY` in
-`src/config.ts`; any `?server=` wins).
+(`server/index.mjs`) hosted somewhere reachable — see **Hosting the relay**
+above; the client uses `DEFAULT_RELAY` in `src/config.ts` on https deploys
+(any `?server=` wins). Neither deploy workflow ships the relay: they build
+`dist` and upload static files, so the relay is a separate service.

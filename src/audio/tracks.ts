@@ -93,8 +93,8 @@ export const TRACKS: Track[] = [
     downbeat: 0.4909,
     seconds: 186.67,
     lufs: -13.2,
-    // Back in PEAK HOURS (slot 2, between DISCO BALL's strut and DYNASTY's
-    // finale) — LOOP took its old seat in the quick-raid pool.
+    // A quick-raid record: it gave PEAK HOURS up to DISCO BALL, and MONEY
+    // holds the slot it briefly took back.
     roles: ['raid'],
   },
   {
@@ -152,8 +152,8 @@ export const TRACKS: Track[] = [
     downbeat: 0.4934,
     seconds: 173.88,
     lufs: -14.5,
-    // MORNING took its tour night; it plays on in the quick-raid pool —
-    // and a record this laid-back still never asks anyone to duck.
+    // Back on the tour: PEAK HOURS slot 2, holding DISCO BALL's swagger at
+    // 78 BPM before DYNASTY. A record this laid-back never asks for a duck.
     roles: ['raid'],
     banned: ['sweep'],
   },

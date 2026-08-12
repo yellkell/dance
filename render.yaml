@@ -1,0 +1,32 @@
+# RAVE RAID's room relay, as a Render blueprint.
+#
+# The relay is the ONLY server this game has: it mints 4-letter room codes,
+# keeps track of who is on the club floor, relays poses/voice/score lines,
+# and owns THE BALL's clock. It simulates nothing — the choreography is
+# deterministic from the seed on every client.
+#
+# Deploy: Render dashboard → New → Blueprint → pick this repo. Render reads
+# this file, builds `server/` and starts it. Then point DEFAULT_RELAY in
+# src/config.ts at the wss:// URL it gives you.
+#
+# Note the plan: `free` sleeps after ~15 minutes idle and takes ~30 s to
+# wake, which a player sees as a long "REACHING THE RELAY…". Move to
+# `starter` when that stops being charming.
+services:
+  - type: web
+    name: rave-raid-relay
+    runtime: node
+    plan: free
+    region: frankfurt # nearest to the players; oregon/singapore also fine
+    rootDir: server
+    buildCommand: npm install
+    startCommand: node index.mjs
+    # The relay answers plain GET / with a small JSON status, so Render's
+    # health check passes without a bespoke endpoint.
+    healthCheckPath: /
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      # How long THE BALL hangs in the club before it fires (ms).
+      - key: BALL_MS
+        value: "60000"

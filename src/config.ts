@@ -576,11 +576,12 @@ export const TOUR: { sets: TourSet[]; freeSets: number; maxPhrases: number } = {
       id: 'peak',
       name: 'PEAK HOURS',
       // The night after the first goop falls opens on DISCO BALL — a slow
-      // 73 BPM strut, the victory lap — then COMBAT (back in the slot it
-      // held before DISCO BALL arrived) and DYNASTY kick the doors in, so
-      // the set still climbs harder than any other. LOOP went to the
-      // quick-raid pool (the MONEY precedent).
-      songs: ['discoball', 'combat', 'dynasty'], // 73 → 135 → 155 BPM
+      // 73 BPM strut, the victory lap — MONEY keeps the swagger going at
+      // 78, and then DYNASTY kicks the doors in. Two laid-back records
+      // then a hard turn: the climb lives in the last night, not the walk
+      // up to it. Neither opener asks anyone to duck. COMBAT and LOOP both
+      // hold quick-raid seats now.
+      songs: ['discoball', 'money', 'dynasty'], // 73 → 78 → 155 BPM
       tint: { shallow: 0xff6ee0, deep: 0x571040, nucleus: 0xff9ff0 }, // hot magenta
     },
     {
