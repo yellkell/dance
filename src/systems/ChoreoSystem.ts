@@ -85,7 +85,7 @@ export const choreoView: {
   dropX?: () => void;
   /** Dev: drop a gate now (axis 1 = the horizontal cousin, a clear row). */
   dropGate?: (axis?: 0 | 1) => void;
-  /** Dev: march THE WAVE now (axis 1 = front/back; back = there-and-back). */
+  /** Dev: march THE WAVE now (axis 1 = front/back; back=false skips the turn). */
   dropWave?: (axis?: 0 | 1, back?: boolean) => void;
 } = { zones: [] };
 
@@ -190,7 +190,7 @@ export class ChoreoSystem extends createSystem({}) {
         ],
       });
     };
-    choreoView.dropWave = (axis = 0, back = false) => {
+    choreoView.dropWave = (axis = 0, back = true) => {
       if (!match.playing || !Number.isFinite(match.beat)) return;
       const tele = match.beat + 0.25;
       const land = tele + MOVES.wave.chargeBeats;
@@ -199,7 +199,7 @@ export class ChoreoSystem extends createSystem({}) {
       const at: number[] = [...stops].slice(0, -1); // exit = the far quarter
       const beats: number[] = at.map((_, i) => land + i * step);
       if (back) {
-        const turnAt = beats[beats.length - 1] + step * 2; // the breather
+        const turnAt = beats[beats.length - 1] + step * 2 + CHOREO.waveTurnExtraBeats;
         [stops[3], stops[2], stops[1]].forEach((stop, i) => {
           at.push(stop);
           beats.push(turnAt + i * step);

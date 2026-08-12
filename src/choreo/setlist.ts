@@ -239,25 +239,22 @@ function buildLandings(kind: MoveKind, landBeat: number, act: number, rng: () =>
     // beam's own short fuse, staggered, so the deck reads as a wave
     // building.
     //
-    // THE TURN (late acts): the march wheels AT the exit and comes back —
-    // its first return strike is the exit square itself, one EXTRA step
-    // late (you only just got there; the breather is the read), and the
-    // new exit is the far side where the whole thing began. Across, and
-    // all the way back.
+    // THE TURN — on every wave: the march wheels AT the exit and comes
+    // back. Its first return strike is the exit square itself, a double
+    // step plus one whole beat late (you only just got there; the
+    // breather is the read), and the new exit is the far side where the
+    // whole thing began. Across, and all the way back.
     const axis: 0 | 1 = rng() < 0.5 ? 1 : 0;
     const step = CHOREO.waveStepBeats[Math.min(act, CHOREO.waveStepBeats.length - 1)];
-    const back = rng() < CHOREO.waveReturnChance[Math.min(act, CHOREO.waveReturnChance.length - 1)];
     const stops = axis ? CHOREO.waveRailZ : CHOREO.waveLaneX;
     const ordered = rng() < 0.5 ? [...stops] : [...stops].reverse();
     const at: number[] = ordered.slice(0, -1); // out over three; exit = ordered[3]
     const beats: number[] = at.map((_, i) => landBeat + i * step);
-    if (back) {
-      const turnAt = beats[beats.length - 1] + step * 2; // the breather
-      [ordered[3], ordered[2], ordered[1]].forEach((stop, i) => {
-        at.push(stop);
-        beats.push(turnAt + i * step);
-      });
-    }
+    const turnAt = beats[beats.length - 1] + step * 2 + CHOREO.waveTurnExtraBeats;
+    [ordered[3], ordered[2], ordered[1]].forEach((stop, i) => {
+      at.push(stop);
+      beats.push(turnAt + i * step);
+    });
     const from: 1 | -1 = rng() < 0.5 ? 1 : -1;
     at.forEach((stop, i) => {
       landings.push({
@@ -320,11 +317,138 @@ function buildLandings(kind: MoveKind, landBeat: number, act: number, rng: () =>
   return landings;
 }
 
+/* ── THE FLOOR MANAGER ──────────────────────────────────────────────────
+ * The set-list can't see the player (every deck runs the identical chart),
+ * but it CAN know where each move's correct dodge PARKS a dancer who plays
+ * it right: the split's corridor parks you dead centre, the seesaw leaves
+ * you hugging the centreline, the donut ends in the middle by definition.
+ * So the generator carries that parking spot forward and re-rolls any move
+ * whose danger never touches it — a move that asks nothing of the ground
+ * you're standing on is a move that didn't happen. A `null` park means
+ * "somewhere unknowable" (the nova's wedge is a different place on every
+ * deck) and accepts anything.
+ */
+export type Park = { x: number; z: number } | null;
+
+function laneCovers(zone: { x: number; halfW: number; yaw?: number }, p: { x: number; z: number }): boolean {
+  const yaw = zone.yaw ?? 0;
+  const perp = yaw ? Math.cos(yaw) * p.x - Math.sin(yaw) * p.z : p.x;
+  return Math.abs(perp - zone.x) <= zone.halfW + 0.12;
+}
+
+/** Does any landing of this move touch the park — i.e., demand something
+ *  of a dancer standing exactly where the last move left them? */
+export function evictsPark(landings: readonly Landing[], park: Park): boolean {
+  if (!park) return true;
+  return landings.some(({ zone }) => {
+    switch (zone.kind) {
+      case 'lane':
+        return laneCovers(zone, park);
+      case 'rail':
+        return Math.abs(park.z - zone.z) <= zone.halfD + 0.12;
+      case 'donut':
+        return Math.hypot(park.x, park.z) > zone.innerR - 0.05;
+      case 'gate':
+        return Math.abs((zone.axis ? park.z : park.x) - zone.at) > zone.half - 0.05;
+      case 'half':
+        return (zone.axis ? park.z : park.x) * zone.side > -0.06;
+      case 'sweep': // the duck is a demand wherever you stand
+      case 'nova': // dead centre is never safe, and the wedge rotates per seat
+      case 'quad': // the routine makes you commit, corner to corner
+        return true;
+    }
+  });
+}
+
+/** Where this move's correct dodge leaves a dancer standing. */
+export function parkOf(kind: MoveKind, landings: readonly Landing[], prev: Park): Park {
+  const p = prev ?? { x: 0, z: 0 };
+  const cx = (x: number) => Math.max(-0.7, Math.min(0.7, x));
+  const cz = (z: number) => Math.max(-0.6, Math.min(0.6, z));
+  switch (kind) {
+    case 'sweep':
+      return prev; // ducked in place — nobody moved
+    case 'donut':
+    case 'duckdonut':
+      return { x: 0, z: 0 }; // hauled into the middle by definition
+    case 'nova':
+      return null; // the wedge is a different place on every deck
+    case 'routine': {
+      const quads = landings.filter((l) => l.zone.kind === 'quad');
+      const lastQ = quads[quads.length - 1]?.zone;
+      if (lastQ?.kind !== 'quad') return prev;
+      return { x: (lastQ.corner & 1 ? 1 : -1) * 0.45, z: (lastQ.corner & 2 ? 1 : -1) * 0.4 };
+    }
+    case 'seesaw':
+    case 'surge': {
+      // Crossers hug the line — the seesaw centre-parks as surely as the
+      // donut does, which is exactly why the manager has to know it.
+      const lastH = landings[landings.length - 1].zone;
+      if (lastH.kind !== 'half') return prev;
+      const coord = -lastH.side * 0.22;
+      return lastH.axis ? { x: p.x, z: coord } : { x: coord, z: p.z };
+    }
+    case 'gate': {
+      const g = landings[0].zone;
+      if (g.kind !== 'gate') return prev;
+      return g.axis ? { x: p.x, z: g.at } : { x: g.at, z: p.z };
+    }
+    case 'wave': {
+      // Every wave turns, so the final exit is the ground where the march
+      // BEGAN — the first stop's square.
+      const first = landings[0].zone;
+      if (first.kind === 'rail') return { x: p.x, z: first.z };
+      if (first.kind === 'lane') return { x: first.x, z: p.z };
+      return prev;
+    }
+    case 'cross': {
+      const rails = landings.filter((l) => l.zone.kind === 'rail');
+      if (rails.length >= 2) return { x: p.x, z: 0 }; // the trap's middle band
+      const r = rails[0]?.zone;
+      const lane = landings.find((l) => l.zone.kind === 'lane')?.zone;
+      const z = r?.kind === 'rail' ? cz(r.z + r.halfD + 0.3) : p.z; // step off, away from the stage
+      const x = lane?.kind === 'lane' ? cx(lane.x + (p.x >= lane.x ? 1 : -1) * (lane.halfW + 0.2)) : p.x;
+      return { x, z };
+    }
+    case 'beam': {
+      const lanes: { x: number; halfW: number; yaw?: number }[] = [];
+      for (const l of landings) if (l.zone.kind === 'lane') lanes.push(l.zone);
+      if (lanes.some((l) => l.yaw)) {
+        // THE X: the nearest pocket between the arms.
+        const pockets = [
+          { x: 0.55, z: 0 },
+          { x: -0.55, z: 0 },
+          { x: 0, z: 0.5 },
+          { x: 0, z: -0.5 },
+        ];
+        let best = pockets[0];
+        let bd = Infinity;
+        for (const q of pockets) {
+          const d = Math.hypot(q.x - p.x, q.z - p.z);
+          if (d < bd) {
+            bd = d;
+            best = q;
+          }
+        }
+        return best;
+      }
+      if (lanes.length === 2) {
+        return lanes[0].x * lanes[1].x < 0
+          ? { x: 0, z: p.z } // SPLIT: the corridor parks you dead centre
+          : { x: -Math.sign(lanes[0].x || lanes[1].x) * 0.5, z: p.z }; // TWIN: the empty side
+      }
+      const s = lanes[0]?.x ?? 0;
+      const side = p.x >= s ? 1 : -1; // step off the short way
+      return { x: cx(s + side * ((lanes[0]?.halfW ?? 0.24) + 0.24)), z: p.z };
+    }
+  }
+}
+
 /**
- * The full raid set. Pure function of (seed, phrases, banned) — every
- * client, and every rewatch of the same seed, gets the identical show.
- * `banned` comes from the record on the decks (tracks.ts): some songs
- * simply never call certain moves.
+ * The full raid set. Pure function of (seed, phrases, banned, difficulty)
+ * — every client, and every rewatch of the same seed, gets the identical
+ * show. `banned` comes from the record on the decks (tracks.ts): some
+ * songs simply never call certain moves.
  */
 export function generateSetlist(
   seed: number,
@@ -339,6 +463,7 @@ export function generateSetlist(
   // within seconds of the drop, not a phrase later.
   let cursor = MUSIC.introBars * barBeats;
   let last: MoveKind | null = null;
+  let park: Park = { x: 0, z: 0 }; // everyone spawns dead centre
   let index = 0;
 
   for (let phrase = 0; phrase < phrases; phrase++) {
@@ -348,13 +473,23 @@ export function generateSetlist(
     const rest = CHOREO.restBeats[Math.min(act, CHOREO.restBeats.length - 1)];
 
     for (let m = 0; m < want; m++) {
-      const kind = pickKind(rng, act, last, banned);
-      const charge = MOVES[kind].chargeBeats;
+      let kind = pickKind(rng, act, last, banned);
+      let charge = MOVES[kind].chargeBeats;
       // Land on the next bar downbeat that the telegraph fits in front of.
-      const landBeat = Math.ceil((cursor + charge) / barBeats) * barBeats;
+      let landBeat = Math.ceil((cursor + charge) / barBeats) * barBeats;
+      let landings = buildLandings(kind, landBeat, act, rng);
+      // THE FLOOR MANAGER: a move whose danger never touches the ground
+      // the last move parked you on asks for nothing — roll another shape
+      // (same seeded stream, so every client re-rolls identically).
+      for (let attempt = 0; attempt < 6 && !evictsPark(landings, park); attempt++) {
+        kind = pickKind(rng, act, last, banned);
+        charge = MOVES[kind].chargeBeats;
+        landBeat = Math.ceil((cursor + charge) / barBeats) * barBeats;
+        landings = buildLandings(kind, landBeat, act, rng);
+      }
       if (landBeat >= phraseEnd + barBeats) break; // phrase is full — move on
-      const landings = buildLandings(kind, landBeat, act, rng);
       moves.push({ index: index++, kind, telegraphBeat: landBeat - charge, landBeat, landings, act });
+      park = parkOf(kind, landings, park);
       last = kind;
       cursor = landings[landings.length - 1].beat + rest;
     }

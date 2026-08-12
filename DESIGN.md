@@ -56,10 +56,17 @@ nova, rail traps, double beams, THE X; act 3 — duck donut, return waves,
 5-stage seesaws, tight novas. Online, the ball carries the caller's
 difficulty with the song pick, so the whole ring dances one chart.
 
-Two laws above the table: the choreographer NEVER calls the same move
-twice running, and it tracks each move's dodge VERB (lateral, depth,
-radial, duck…), damping any candidate that would repeat the previous one
-— the floor is kept travelling in every axis, not sidestepping in place.
+Three laws above the table. The choreographer NEVER calls the same move
+twice running. It tracks each move's dodge VERB (lateral, depth, radial,
+duck…), damping any candidate that would repeat the previous one. And
+THE FLOOR MANAGER carries a PARK — where the last move's correct dodge
+left a dancer standing (the split's corridor and the seesaw's centreline
+hug both park you middle, as surely as the donut does) — and re-rolls
+any candidate whose danger never touches that ground. The park is a
+model, not a sensor: decks stay identical and deterministic; the manager
+just guarantees the chart itself never contains a "stand still and win"
+step. The nova parks you somewhere unknowable (its wedge rotates per
+seat), so the move after a nova is unconstrained.
 
 Ends at the final downbeat — or the moment one dancer remains.
 

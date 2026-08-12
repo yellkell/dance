@@ -277,16 +277,18 @@ export const CHOREO = {
    *  the diagonals left pockets too tight to trust. */
   beamXChance: [0, 0, 0.3, 0.35],
   beamXHalfW: 0.17,
-  /** THE WAVE: four beams marching across the whole deck in order, one
-   *  landing per step — cross with it or be caught. The four stops tile
-   *  the deck edge to edge (adjacent kill widths overlap on purpose: no
-   *  ground survives the full march standing still). Sideways = lanes
-   *  walking x; front/back = rails walking z. Late acts can send the
-   *  march straight back the way it came — across AND back. */
+  /** THE WAVE: beams marching across the deck in order, one landing per
+   *  step, with the far quarter left dark — the EXIT. EVERY wave turns:
+   *  the march wheels at the exit (its first return strike is that very
+   *  square, after the breather below) and sweeps home, new exit at the
+   *  far side. Sideways = lanes walking x; front/back = rails walking z. */
   waveLaneX: [-0.645, -0.215, 0.215, 0.645],
   waveRailZ: [-0.56, -0.19, 0.19, 0.56],
   waveStepBeats: [2, 2, 1, 1],
-  waveReturnChance: [0, 0, 0.4, 0.5],
+  /** Beats between the out-march's last fire and the turn's first — a
+   *  double step plus one whole extra beat: you only just reached the
+   *  exit, and the breather is what makes the wheel readable. */
+  waveTurnExtraBeats: 1,
   /** THE ROUTINE: how many corners you're asked to hold in your head (per
    *  act, clamped to the 2–4 the deck's four quarters can offer without
    *  ever repeating one), and how many beats apart the steps land. Two

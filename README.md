@@ -119,7 +119,7 @@ There's also a debug hook in the console:
 | **CROSSFIRE** | a laser is loaded on one side rail and a strip fills **across** the deck (late on, a stage lane crosses it) — and from mid-set it can come as **THE TRAP**: both side rails at once, one ahead of you and one behind, landing on the same beat | **step forward or back** off the strip — diagonally, once it's a lattice; against the trap, **squeeze into the band between the rails** |
 | **DONUT** | usually a laser straight down the middle, and a bar later the rim closes fast with chevrons marching **inward** on a tight safe disc | **step off** the middle, then **run back into it** |
 | **DUCK DONUT** | the finale combination, rare even in act 3: the rim closes **and** the blade hangs at chest height, both on one beat | **get to the middle AND duck** — small and close |
-| **THE WAVE** | beams marching **1-2-3** across the deck (their staggered fills ARE the count) — sideways, or front-to-back — with the far quarter left dark: the **EXIT**. Late acts add **THE TURN**: the march wheels at the exit — its first return strike is that very square, one extra step late — and sweeps back, new exit on the far side | **travel with the march into the exit**; at the turn, use the breather, then **ride one square behind the return** all the way home |
+| **THE WAVE** | beams marching **1-2-3** across the deck (their staggered fills ARE the count) — sideways, or front-to-back — with the far quarter left dark: the **EXIT**. Every wave **TURNS**: the march wheels at the exit — its first return strike is that very square, a double step plus a whole extra beat late — and sweeps back, new exit on the far side | **travel with the march into the exit**; breathe at the turn, then **ride one square behind the return** all the way home |
 | **ROUTINE** | the deck splits into quarters and the boss **teaches** a corner sequence — each marked with its step number, each pointed out in turn — then the marks go out and, on every step, three spinning neon blocks **fall from above** onto the quarters you weren't taught | **remember it**, and stand in the taught corner on each tick |
 
 The telegraph is the whole instruction: whatever fills amber→red, don't be
@@ -132,10 +132,17 @@ floor paint means "move your feet" everywhere else, so a move whose answer
 is *don't step* must never paint the ground you should stay on. The
 **sweep** says drop, and nothing on the floor contradicts it.
 
-The set-list itself keeps you travelling: every move's dodge asks the body
-for a verb — sidestep, step through, get to the middle, duck — and the
-choreographer steers away from calling the same verb twice in a row, so
-the floor moves out and in, left and right, forward and back all night.
+The set-list itself keeps you travelling, two ways. Every move's dodge
+asks the body for a verb — sidestep, step through, get to the middle,
+duck — and the choreographer never calls the same move twice running and
+steers away from repeating a verb. And underneath that runs **THE FLOOR
+MANAGER**: the generator knows where each move's correct dodge *parks* a
+dancer who plays it right (the split's corridor parks you dead centre,
+the seesaw leaves you hugging the centreline, the donut ends in the
+middle by definition) — and it re-rolls any move whose danger never
+touches that spot. A split into a bare donut used to ask for nothing;
+now the follow-up is something that wants your square: an X, a beam down
+the middle, a gate somewhere else.
 Two more laws serve the same end: a lone crossfire rail never lands
 **behind** you (a strip at your back was a read nobody should be asked to
 make — only the trap and the wave, which telegraph as whole-deck events,
