@@ -237,21 +237,34 @@ function buildLandings(kind: MoveKind, landBeat: number, act: number, rng: () =>
     // has a destination instead of a countdown. Sideways (lanes walking x)
     // or front/back (rails walking z); each stop's telegraph runs the
     // beam's own short fuse, staggered, so the deck reads as a wave
-    // building. Late acts can send it straight back the way it came —
-    // across and back — and the exit still holds.
+    // building.
+    //
+    // THE TURN (late acts): the march wheels AT the exit and comes back —
+    // its first return strike is the exit square itself, one EXTRA step
+    // late (you only just got there; the breather is the read), and the
+    // new exit is the far side where the whole thing began. Across, and
+    // all the way back.
     const axis: 0 | 1 = rng() < 0.5 ? 1 : 0;
     const step = CHOREO.waveStepBeats[Math.min(act, CHOREO.waveStepBeats.length - 1)];
     const back = rng() < CHOREO.waveReturnChance[Math.min(act, CHOREO.waveReturnChance.length - 1)];
     const stops = axis ? CHOREO.waveRailZ : CHOREO.waveLaneX;
-    const order = (rng() < 0.5 ? [...stops] : [...stops].reverse()).slice(0, -1);
-    if (back) order.push(...order.slice(0, -1).reverse());
+    const ordered = rng() < 0.5 ? [...stops] : [...stops].reverse();
+    const at: number[] = ordered.slice(0, -1); // out over three; exit = ordered[3]
+    const beats: number[] = at.map((_, i) => landBeat + i * step);
+    if (back) {
+      const turnAt = beats[beats.length - 1] + step * 2; // the breather
+      [ordered[3], ordered[2], ordered[1]].forEach((stop, i) => {
+        at.push(stop);
+        beats.push(turnAt + i * step);
+      });
+    }
     const from: 1 | -1 = rng() < 0.5 ? 1 : -1;
-    order.forEach((at, i) => {
+    at.forEach((stop, i) => {
       landings.push({
-        beat: landBeat + i * step,
+        beat: beats[i],
         zone: axis
-          ? { kind: 'rail', z: at, halfD: CHOREO.railHalfDepth, from }
-          : { kind: 'lane', x: at, halfW: CHOREO.beamHalfWidth },
+          ? { kind: 'rail', z: stop, halfD: CHOREO.railHalfDepth, from }
+          : { kind: 'lane', x: stop, halfW: CHOREO.beamHalfWidth },
       });
     });
   } else if (kind === 'duckdonut') {

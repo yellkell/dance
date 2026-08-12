@@ -194,20 +194,28 @@ export class ChoreoSystem extends createSystem({}) {
       if (!match.playing || !Number.isFinite(match.beat)) return;
       const tele = match.beat + 0.25;
       const land = tele + MOVES.wave.chargeBeats;
+      const step = CHOREO.waveStepBeats[2];
       const stops = axis ? CHOREO.waveRailZ : CHOREO.waveLaneX;
-      const order = [...stops].slice(0, -1); // the last quarter is the EXIT
-      if (back) order.push(...order.slice(0, -1).reverse());
+      const at: number[] = [...stops].slice(0, -1); // exit = the far quarter
+      const beats: number[] = at.map((_, i) => land + i * step);
+      if (back) {
+        const turnAt = beats[beats.length - 1] + step * 2; // the breather
+        [stops[3], stops[2], stops[1]].forEach((stop, i) => {
+          at.push(stop);
+          beats.push(turnAt + i * step);
+        });
+      }
       this.begin({
         index: 9950 + this.nextMove,
         kind: 'wave',
         telegraphBeat: tele,
         landBeat: land,
         act: 2,
-        landings: order.map((at, i) => ({
-          beat: land + i * CHOREO.waveStepBeats[2],
+        landings: at.map((stop, i) => ({
+          beat: beats[i],
           zone: axis
-            ? ({ kind: 'rail', z: at, halfD: CHOREO.railHalfDepth, from: 1 } as const)
-            : ({ kind: 'lane', x: at, halfW: CHOREO.beamHalfWidth } as const),
+            ? ({ kind: 'rail', z: stop, halfD: CHOREO.railHalfDepth, from: 1 } as const)
+            : ({ kind: 'lane', x: stop, halfW: CHOREO.beamHalfWidth } as const),
         })),
       });
     };
