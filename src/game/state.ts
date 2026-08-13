@@ -314,3 +314,91 @@ export function tourNightUnlocked(set: number, song: number): boolean {
   return true;
 }
 
+/* ── the record book (localStorage) ─────────────────────────────────────
+ * Two ledgers, both strictly local to this headset:
+ *  - TOUR GRADES: the best letter ever taken home from each campaign
+ *    night (any difficulty) — the map wears them under its stops.
+ *  - SOLO RUNS: per song × difficulty, the top scores of finished solo
+ *    sets (bots only — online raids and campaign nights never post here)
+ *    plus the best letter at that difficulty. The SOLO tab's leaderboard.
+ */
+
+const TOUR_GRADES_KEY = 'gdr-tour-grades';
+const SOLO_KEY = 'gdr-solo';
+const SOLO_TOP = 5;
+
+/** Higher is better; unknown letters rank below F. */
+export function gradeRank(letter: string): number {
+  return ['F', 'C', 'B', 'A', 'S'].indexOf(letter);
+}
+
+function readStore<T>(key: string): T | null {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as T) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeStore(key: string, value: unknown): void {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    /* storage may be unavailable */
+  }
+}
+
+export function bestTourGrade(set: number, song: number): string | null {
+  const book = readStore<Record<string, string>>(TOUR_GRADES_KEY);
+  return book?.[`${set}:${song}`] ?? null;
+}
+
+export function recordTourGrade(set: number, song: number, grade: string): void {
+  const key = `${set}:${song}`;
+  const book = readStore<Record<string, string>>(TOUR_GRADES_KEY) ?? {};
+  const prev = book[key];
+  if (prev !== undefined && gradeRank(prev) >= gradeRank(grade)) return;
+  book[key] = grade;
+  writeStore(TOUR_GRADES_KEY, book);
+}
+
+export interface SoloRun {
+  /** Final score. */
+  s: number;
+  /** The night's letter. */
+  g: string;
+  /** Who set it (the profile name when the run finished). */
+  n: string;
+}
+
+interface SoloEntry {
+  best: string;
+  runs: SoloRun[];
+}
+
+const soloKey = (trackId: string, difficulty: number): string => `${trackId}:${difficulty}`;
+
+/** The song's local leaderboard at one difficulty: best letter + top runs
+ *  (score-sorted, capped). Empty runs = the chart is unclaimed. */
+export function soloBoard(trackId: string, difficulty: number): { best: string | null; runs: SoloRun[] } {
+  const book = readStore<Record<string, SoloEntry>>(SOLO_KEY);
+  const entry = book?.[soloKey(trackId, difficulty)];
+  return { best: entry?.best ?? null, runs: entry?.runs ?? [] };
+}
+
+/** Post a finished solo set. Keeps the top runs by score and the best
+ *  letter by rank (they can disagree: a careful low-score set may out-grade
+ *  a flashy one — both records deserve keeping). */
+export function recordSoloRun(trackId: string, difficulty: number, score: number, grade: string, name: string): void {
+  const key = soloKey(trackId, difficulty);
+  const book = readStore<Record<string, SoloEntry>>(SOLO_KEY) ?? {};
+  const entry = book[key] ?? { best: grade, runs: [] };
+  if (gradeRank(grade) > gradeRank(entry.best)) entry.best = grade;
+  entry.runs.push({ s: Math.round(score), g: grade, n: name });
+  entry.runs.sort((a, b) => b.s - a.s);
+  entry.runs.length = Math.min(entry.runs.length, SOLO_TOP);
+  book[key] = entry;
+  writeStore(SOLO_KEY, book);
+}
+

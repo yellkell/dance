@@ -12,8 +12,17 @@
 
 import { MUSIC, RING, TOUR, countInBeatsFor } from '../config.js';
 import { pickRaidTrack, trackById, trackPhrases, type Track } from '../audio/tracks.js';
+import { profileName } from './profile.js';
 import { freshSeed } from './rng.js';
-import { buildRoster, gradeOf, markTourNightCleared, match, pushFlair } from './state.js';
+import {
+  buildRoster,
+  gradeOf,
+  markTourNightCleared,
+  match,
+  pushFlair,
+  recordSoloRun,
+  recordTourGrade,
+} from './state.js';
 
 const phraseBeats = MUSIC.beatsPerBar * MUSIC.barsPerPhrase;
 
@@ -87,12 +96,21 @@ export function startRaid(opts: RaidOptions = {}): void {
 /** The set resolves — freeze the board, raise the champion, pop confetti. */
 export function finishRaid(): void {
   if (match.screen !== 'raid') return;
-  // A tour night is CLEARED by surviving it — the letter is for bragging.
-  if (match.tour) {
-    const me = match.players.find((p) => p.kind === 'local');
-    if (me?.alive) {
-      markTourNightCleared(match.tour.set, match.tour.song);
-      pushFlair(`NIGHT CLEARED — ${gradeOf(me)}`, 'milestone');
+  const me = match.players.find((p) => p.kind === 'local');
+  if (me) {
+    const grade = gradeOf(me);
+    if (match.tour) {
+      // A tour night is CLEARED by surviving it — the letter is for
+      // bragging, and the map keeps the best one ever taken home.
+      recordTourGrade(match.tour.set, match.tour.song, grade);
+      if (me.alive) {
+        markTourNightCleared(match.tour.set, match.tour.song);
+        pushFlair(`NIGHT CLEARED — ${grade}`, 'milestone');
+      }
+    } else if (!match.online) {
+      // A finished solo set posts to the song's local leaderboard — the
+      // campaign and the club's raids never do.
+      recordSoloRun(match.trackId, match.difficulty, me.score, grade, profileName());
     }
   }
   match.screen = 'podium';

@@ -36,18 +36,26 @@
 
 import { createSystem, InputComponent } from '@iwsdk/core';
 import { Raycaster, Vector3, type Intersection, type Object3D } from 'three';
-import { DIFFICULTY, RING, TOUR } from '../config.js';
+import { DIFFICULTY, GRADE, RING, TOUR } from '../config.js';
 import * as sfx from '../audio/sfx.js';
 import { musicVolume, preload, setMusicVolume } from '../audio/music.js';
-import { pickRaidTrack, trackById, tracksFor } from '../audio/tracks.js';
+import { pickRaidTrack, trackById, tracksFor, type Track } from '../audio/tracks.js';
 import { startRaid, toLobby, toTour } from '../game/flow.js';
-import { clearedTourNights, match, tourNightUnlocked } from '../game/state.js';
+import { NAME_MAX, profileName, setProfileName } from '../game/profile.js';
+import {
+  bestTourGrade,
+  clearedTourNights,
+  match,
+  soloBoard,
+  tourNightUnlocked,
+} from '../game/state.js';
 import {
   CODE_ALPHABET,
   autoJoinFromUrl,
   hostRoom,
   joinRoom,
   net,
+  setDancerName,
 } from '../net/session.js';
 import { font } from '../ui/fonts.js';
 import { Panel, UI, type PanelButton } from '../ui/panel.js';
@@ -66,6 +74,33 @@ const CONTENT_X = 320;
 const CONTENT_W = 1300;
 
 const SET_COLORS = ['#8cff70', '#ff6ee0', '#ffd24a'];
+
+/** SOLO (select song) geometry: the list column and the song page beside
+ *  it. Fifteen rows (SHUFFLE + the raid pool) at a compact pitch. */
+const SOLO_LIST_X = CONTENT_X;
+const SOLO_LIST_W = 700;
+const SOLO_ROW_Y0 = 216;
+const SOLO_ROW_H = 42;
+const SOLO_ROW_PITCH = 47;
+const SOLO_RIGHT_X = 1044;
+const SOLO_RIGHT_W = 576;
+const SOLO_WELL_Y = 292;
+const SOLO_WELL_H = 504;
+
+/** The PROFILE card (header, top right) and its dropdown. */
+const PROF = { x: 1280, y: 34, w: 340, h: 58 };
+const PROF_CARD = { x: 1140, y: 106, w: 480, h: 232 };
+
+/** The rename keyboard: an arcade board, centre stage, modal. */
+const KB = { x: 280, y: 170, w: 1100, h: 690 };
+const KB_ROWS: { keys: string[]; x0: number; y: number }[] = [
+  { keys: [...'1234567890'], x0: 336, y: 356 },
+  { keys: [...'QWERTYUIOP'], x0: 336, y: 456 },
+  { keys: [...'ASDFGHJKL'], x0: 386, y: 556 },
+  { keys: [...'ZXCVBNM'], x0: 486, y: 656 },
+];
+const KB_KEY = 88;
+const KB_PITCH = 100;
 
 /** The treasure trail: nine stops, (set, night) → canvas centre + radius.
  *  Winds bottom-left → right → back left → up to the golden X. */
@@ -95,6 +130,8 @@ export const menuView: {
   setMode?: (m: 'play' | 'multi' | 'sys' | 'join') => void;
   setHover?: (id: string | null) => void;
   setPause?: (on: boolean) => void;
+  /** Press any board button by id — the headless finger. */
+  act?: (id: string) => void;
   /** The board's raw canvas as a data URL — pixel-perfect style checks. */
   snapBoard?: () => string;
   snapPause?: () => string;
@@ -120,6 +157,10 @@ export class MenuSystem extends createSystem({}) {
    *  eased y (canvas space) and its target. NaN until first paint. */
   private railY = NaN;
   private railTargetY = NaN;
+  /** The profile card's dropdown, and the rename keyboard over everything. */
+  private profileOpen = false;
+  private keyboardOpen = false;
+  private nameDraft = '';
 
   init(): void {
     try {
@@ -129,7 +170,10 @@ export class MenuSystem extends createSystem({}) {
       }
       const track = localStorage.getItem(TRACK_KEY);
       if (track && trackById(track)) match.preferredTrack = track;
-      const diff = Number(localStorage.getItem(DIFF_KEY));
+      // NB: a missing key must not read as 0 — Number(null) is 0, and that
+      // silently forced every fresh headset onto EASY.
+      const diffRaw = localStorage.getItem(DIFF_KEY);
+      const diff = diffRaw === null ? NaN : Number(diffRaw);
       if (Number.isFinite(diff) && diff >= 0 && diff <= 3) match.difficulty = diff;
     } catch {
       /* fine */
@@ -154,9 +198,15 @@ export class MenuSystem extends createSystem({}) {
 
     this.pointers = { left: new PointerRay(this.scene), right: new PointerRay(this.scene) };
 
+    // The stored profile signs the club tag from the first frame; a
+    // ?name= share link may still override the session below.
+    setDancerName(profileName());
+
     menuView.setMode = (m) => {
       this.mode = m === 'join' ? 'multi' : m;
       this.joinMode = m === 'join';
+      this.profileOpen = false;
+      this.keyboardOpen = false;
       if (match.screen !== 'lobby') toLobby();
       this.lastKey = '';
     };
@@ -168,6 +218,7 @@ export class MenuSystem extends createSystem({}) {
       this.pauseUp = on;
       this.lastKey = '';
     };
+    menuView.act = (id) => this.action(id);
     menuView.snapBoard = () => (this.board.ctx().canvas as HTMLCanvasElement).toDataURL('image/png');
     menuView.snapPause = () => (this.pause.ctx().canvas as HTMLCanvasElement).toDataURL('image/png');
 
@@ -325,7 +376,27 @@ export class MenuSystem extends createSystem({}) {
   /* ── actions ──────────────────────────────────────────────────────────── */
 
   private action(id: string): void {
-    if (id === 'tab-play') {
+    // Any action that isn't the profile's own closes its dropdown.
+    if (id !== 'profile' && id !== 'rename') this.profileOpen = false;
+
+    if (id === 'profile') {
+      this.profileOpen = !this.profileOpen;
+    } else if (id === 'rename') {
+      this.keyboardOpen = true;
+      this.nameDraft = profileName();
+    } else if (id === 'kb:cancel') {
+      this.keyboardOpen = false;
+    } else if (id === 'kb:done') {
+      setProfileName(this.nameDraft);
+      setDancerName(profileName());
+      this.keyboardOpen = false;
+    } else if (id === 'kb:back') {
+      this.nameDraft = this.nameDraft.slice(0, -1);
+    } else if (id === 'kb:clear') {
+      this.nameDraft = '';
+    } else if (id.startsWith('kb:')) {
+      if (this.nameDraft.length < NAME_MAX) this.nameDraft += id.slice(3);
+    } else if (id === 'tab-play') {
       this.mode = 'play';
       this.joinMode = false;
       if (match.screen !== 'lobby') toLobby();
@@ -365,20 +436,17 @@ export class MenuSystem extends createSystem({}) {
       }
     } else if (id === 'vol-' || id === 'vol+') {
       setMusicVolume(musicVolume() + (id === 'vol+' ? 0.1 : -0.1));
-    } else if (id === 'track') {
-      // Cycle: SHUFFLE → each raid record → back. Picking one warms it so
-      // the drop is instant; SHUFFLE lets the match seed choose (and every
-      // client in a room derives the same record from that seed).
-      const pool = tracksFor('raid');
-      const at = pool.findIndex((t) => t.id === match.preferredTrack);
-      const next = at + 1 >= pool.length ? '' : pool[at + 1].id;
-      match.preferredTrack = next;
+    } else if (id.startsWith('song:')) {
+      // SELECT SONG: pick a record off the list ('' = SHUFFLE, the match
+      // seed chooses). Picking one warms it so the drop is instant.
+      const picked = id.slice(5);
+      match.preferredTrack = picked;
       try {
-        localStorage.setItem(TRACK_KEY, next);
+        localStorage.setItem(TRACK_KEY, picked);
       } catch {
         /* fine */
       }
-      preload(trackById(next) ?? pickRaidTrack(match.seed));
+      preload(trackById(picked) ?? pickRaidTrack(match.seed));
     } else if (id === 'host') {
       hostRoom();
     } else if (id === 'join') {
@@ -419,11 +487,16 @@ export class MenuSystem extends createSystem({}) {
       this.joinCode.join(''),
       match.seats,
       match.difficulty,
+      match.preferredTrack,
       Math.round(musicVolume() * 10),
       net.phase,
       net.code,
       net.members.length,
       clearedTourNights().size,
+      this.profileOpen,
+      this.keyboardOpen,
+      this.nameDraft,
+      profileName(),
     ].join('|');
     if (key === this.lastKey) return;
     this.lastKey = key;
@@ -466,8 +539,17 @@ export class MenuSystem extends createSystem({}) {
 
   /** The shell every tab shares: header, rail — then the content. */
   private paintBoard(): void {
+    // THE RENAME KEYBOARD is modal: while it's up, its keys are the only
+    // buttons alive on the board — the scrim eats every other click.
+    if (this.keyboardOpen) {
+      const buttons: PanelButton[] = [];
+      this.keyboardButtons(buttons);
+      this.board.paint('', (g) => this.drawKeyboard(g), buttons, this.hover);
+      return;
+    }
+
     const tab = this.activeTab();
-    const buttons: PanelButton[] = [];
+    let buttons: PanelButton[] = [];
 
     // The rail: pure hit-areas — drawShell paints the tabs (text + marker,
     // no boxes: the Valorant move), so the highlight can ease.
@@ -491,9 +573,40 @@ export class MenuSystem extends createSystem({}) {
       if (this.joinMode) this.joinContent(buttons);
       else this.multiContent(buttons);
     } else if (tab === 'sys') this.systemContent(buttons);
-    else this.playContent(buttons);
+    else this.soloContent(buttons);
 
-    this.board.paint('', (g) => this.drawShell(g, tab), buttons, this.hover);
+    // THE PROFILE CARD (top right, every tab): a ghost the header paints.
+    // Its dropdown floats over the content — anything underneath loses its
+    // hit area while the card is open.
+    if (this.profileOpen) {
+      buttons = buttons.filter(
+        (b) =>
+          b.x + b.w < PROF_CARD.x ||
+          b.x > PROF_CARD.x + PROF_CARD.w ||
+          b.y + b.h < PROF_CARD.y ||
+          b.y > PROF_CARD.y + PROF_CARD.h + 8,
+      );
+      buttons.push({
+        id: 'rename',
+        label: 'RENAME',
+        x: PROF_CARD.x + 28,
+        y: PROF_CARD.y + PROF_CARD.h - 80,
+        w: 200,
+        h: 56,
+        small: true,
+      });
+    }
+    buttons.push({ id: 'profile', label: profileName(), ghost: true, x: PROF.x, y: PROF.y, w: PROF.w, h: PROF.h });
+
+    this.board.paint(
+      '',
+      (g) => {
+        this.drawShell(g, tab);
+        if (this.profileOpen) this.drawProfileCard(g);
+      },
+      buttons,
+      this.hover,
+    );
   }
 
   private railTabs(clubOpen: boolean): {
@@ -506,7 +619,7 @@ export class MenuSystem extends createSystem({}) {
   }[] {
     return [
       { id: 'tab-tour', tab: 'tour', label: 'THE TOUR', sub: this.tourProgressSub(), y: 152 },
-      { id: 'tab-play', tab: 'play', label: 'QUICK RAID', y: 270 },
+      { id: 'tab-play', tab: 'play', label: 'SOLO', y: 270 },
       {
         id: 'tab-multi',
         tab: 'multi',
@@ -541,7 +654,7 @@ export class MenuSystem extends createSystem({}) {
     const tw = g.measureText(text).width;
     const h = 44;
     const w = tw + 66;
-    const x = W - 40 - w;
+    const x = PROF.x - 20 - w; // parked beside the profile card
     const y = 42;
     g.fillStyle = 'rgba(255,255,255,0.04)';
     g.beginPath();
@@ -564,6 +677,160 @@ export class MenuSystem extends createSystem({}) {
     g.fillStyle = UI.dim;
     g.fillText(text, x + 44, y + h / 2 + 1);
     g.letterSpacing = '0px';
+  }
+
+  /** THE PROFILE CARD, collapsed: identity mark + name + a disclosure
+   *  chevron. A ghost button paints nothing — this is its whole body. */
+  private drawProfileChip(g: CanvasRenderingContext2D): void {
+    const hov = this.board.hoverOf('profile');
+    const open = this.profileOpen;
+    g.beginPath();
+    g.roundRect(PROF.x, PROF.y, PROF.w, PROF.h, 14);
+    g.fillStyle = open ? UI.accentFaint : `rgba(255,255,255,${(0.045 + 0.045 * hov).toFixed(3)})`;
+    g.fill();
+    g.lineWidth = 2;
+    g.strokeStyle = open ? 'rgba(255,42,213,0.9)' : `rgba(255,255,255,${(0.1 + 0.2 * hov).toFixed(3)})`;
+    g.stroke();
+    // The identity mark: the brand diamond, glowing faintly.
+    const dx = PROF.x + 32;
+    const dy = PROF.y + PROF.h / 2;
+    g.save();
+    g.translate(dx, dy);
+    g.rotate(Math.PI / 4);
+    g.fillStyle = UI.accent;
+    g.shadowColor = UI.accentDim;
+    g.shadowBlur = 8;
+    g.fillRect(-8, -8, 16, 16);
+    g.restore();
+    g.shadowBlur = 0;
+    g.textAlign = 'left';
+    g.textBaseline = 'middle';
+    g.font = font(600, 25);
+    g.letterSpacing = '1.5px';
+    g.fillStyle = UI.textHi;
+    g.fillText(profileName(), PROF.x + 58, dy + 1, PROF.w - 108);
+    g.letterSpacing = '0px';
+    g.textAlign = 'center';
+    g.font = font(600, 20);
+    g.fillStyle = UI.dim;
+    g.fillText(open ? '▴' : '▾', PROF.x + PROF.w - 26, dy + 1);
+  }
+
+  /** The dropdown under the card: the signed name, and the door to the
+   *  rename keyboard (the RENAME button itself is a real PanelButton). */
+  private drawProfileCard(g: CanvasRenderingContext2D): void {
+    const c = PROF_CARD;
+    g.save();
+    g.shadowColor = 'rgba(0,0,0,0.55)';
+    g.shadowBlur = 30;
+    g.fillStyle = 'rgba(15,12,26,0.98)';
+    g.beginPath();
+    g.roundRect(c.x, c.y, c.w, c.h, 18);
+    g.fill();
+    g.restore();
+    g.lineWidth = 2;
+    g.strokeStyle = UI.line;
+    g.stroke();
+
+    g.textAlign = 'left';
+    g.textBaseline = 'middle';
+    g.font = font(600, 19);
+    g.letterSpacing = '3px';
+    g.fillStyle = UI.faint;
+    g.fillText('SIGNED AS', c.x + 28, c.y + 42);
+    g.letterSpacing = '1px';
+    g.font = font(700, 42);
+    g.fillStyle = UI.textHi;
+    g.fillText(profileName(), c.x + 28, c.y + 90, c.w - 56);
+    g.letterSpacing = '0px';
+    g.font = font(500, 19);
+    g.fillStyle = UI.dim;
+    g.fillText('your tag in the club · signs your scores', c.x + 28, c.y + 130);
+  }
+
+  /* ── the rename keyboard (modal) ── */
+
+  private keyboardButtons(buttons: PanelButton[]): void {
+    for (const row of KB_ROWS) {
+      row.keys.forEach((ch, i) => {
+        buttons.push({
+          id: `kb:${ch}`,
+          label: ch,
+          px: 40,
+          x: row.x0 + i * KB_PITCH,
+          y: row.y,
+          w: KB_KEY,
+          h: KB_KEY,
+        });
+      });
+    }
+    const last = KB_ROWS[3];
+    buttons.push({
+      id: 'kb:back',
+      label: '⌫',
+      px: 36,
+      x: last.x0 + last.keys.length * KB_PITCH,
+      y: last.y,
+      w: 138,
+      h: KB_KEY,
+    });
+    buttons.push({ id: 'kb:cancel', label: 'CANCEL', tone: UI.danger, small: true, x: 336, y: 756, w: 200, h: KB_KEY });
+    buttons.push({ id: 'kb:clear', label: 'CLEAR', small: true, x: 556, y: 756, w: 180, h: KB_KEY });
+    buttons.push({
+      id: 'kb:done',
+      label: 'DONE',
+      primary: true,
+      disabled: this.nameDraft.trim().length === 0,
+      x: 1104,
+      y: 756,
+      w: 220,
+      h: KB_KEY,
+    });
+  }
+
+  private drawKeyboard(g: CanvasRenderingContext2D): void {
+    // The scrim: the lobby holds its breath while you sign.
+    g.fillStyle = 'rgba(4,2,10,0.8)';
+    g.beginPath();
+    g.roundRect(6, 6, W - 12, H - 12, 30);
+    g.fill();
+
+    // The card.
+    g.fillStyle = 'rgba(14,11,24,0.98)';
+    g.beginPath();
+    g.roundRect(KB.x, KB.y, KB.w, KB.h, 24);
+    g.fill();
+    g.lineWidth = 2;
+    g.strokeStyle = UI.line;
+    g.stroke();
+
+    g.textAlign = 'left';
+    g.textBaseline = 'middle';
+    g.font = font(600, 22);
+    g.letterSpacing = '4px';
+    g.fillStyle = UI.dim;
+    g.fillText('YOUR NAME', KB.x + 40, KB.y + 44);
+    g.letterSpacing = '0px';
+
+    // The preview well: draft, caret, count.
+    g.fillStyle = UI.well;
+    g.beginPath();
+    g.roundRect(KB.x + 40, KB.y + 62, KB.w - 80, 96, 16);
+    g.fill();
+    g.lineWidth = 2;
+    g.strokeStyle = UI.lineFaint;
+    g.stroke();
+    g.textAlign = 'center';
+    g.font = font(700, 52);
+    g.letterSpacing = '6px';
+    const draft = this.nameDraft;
+    g.fillStyle = draft ? UI.textHi : UI.faint;
+    g.fillText(draft ? `${draft}▏` : 'type a name▏', KB.x + KB.w / 2, KB.y + 112);
+    g.letterSpacing = '0px';
+    g.textAlign = 'right';
+    g.font = font(500, 18);
+    g.fillStyle = UI.faint;
+    g.fillText(`${draft.length}/${NAME_MAX}`, KB.x + KB.w - 52, KB.y + 138);
   }
 
   private drawShell(g: CanvasRenderingContext2D, tab: Tab): void {
@@ -640,77 +907,248 @@ export class MenuSystem extends createSystem({}) {
     // Tab-specific body decoration. No slogans, no manuals — the boards
     // carry buttons and progress, and the game teaches itself.
     if (tab === 'tour') this.drawTreasureMap(g);
-    if (tab === 'play') {
-      const done = clearedTourNights().size;
-      if (done > 0) {
-        g.textAlign = 'left';
-        g.font = font(600, 22);
-        g.letterSpacing = '1.5px';
-        g.fillStyle = UI.positive;
-        g.fillText(`TOUR ${done}/${TOUR.sets.length * 3}`, CONTENT_X, 836);
-        g.letterSpacing = '0px';
-      }
-    }
+    if (tab === 'play') this.drawSoloPanel(g);
+
+    // The profile card rides the header on every tab.
+    this.drawProfileChip(g);
   }
 
-  /* ── PLAY ── */
+  /* ── SOLO: select song ─────────────────────────────────────────────────
+   * The whole raid pool as a list — BPM and your best letter (at the
+   * selected difficulty) beside every record — with the song's local
+   * leaderboard on a page to the right. The list and the leaderboard are
+   * body-drawn; the rows are ghost hit-areas, like the rail. */
 
-  private playContent(buttons: PanelButton[]): void {
+  private soloRows(): { id: string; track: Track | null }[] {
+    // Alphabetical — the list is for FINDING a record; the BPM column is
+    // right there for anyone shopping by tempo.
+    const pool = [...tracksFor('raid')].sort((a, b) => a.title.localeCompare(b.title));
+    return [
+      { id: 'song:', track: null }, // SHUFFLE — the seed picks
+      ...pool.map((t) => ({ id: `song:${t.id}`, track: t })),
+    ];
+  }
+
+  private soloContent(buttons: PanelButton[]): void {
     // The board lives in the foyer only, so this is always the solo booking
     // (a room's raids are CALLED from the SOCIAL panel with the ball).
     const cued = trackById(match.preferredTrack);
 
+    // The ring-size stepper, compact in the header strip.
     buttons.push({
-      id: 'raid',
-      label: 'START RAID',
-      sub: `you + ${match.seats - 1} goo-groupies · the MC runs the stage`,
-      primary: true,
-      disabled: net.phase === 'connecting',
-      x: CONTENT_X,
-      y: 152,
-      w: CONTENT_W,
-      h: 210,
+      id: 'seats-',
+      label: '−',
+      x: 1352,
+      y: 140,
+      w: 62,
+      h: 60,
+      small: true,
+      disabled: match.seats <= RING.minSeats,
+    });
+    buttons.push({ id: 'seats', label: `${match.seats} DANCERS`, display: true, px: 22, x: 1422, y: 140, w: 132, h: 60 });
+    buttons.push({
+      id: 'seats+',
+      label: '+',
+      x: 1562,
+      y: 140,
+      w: 58,
+      h: 60,
+      small: true,
+      disabled: match.seats >= RING.maxSeats,
     });
 
-    buttons.push({
-      id: 'track',
-      label: cued ? `♪ ${cued.title}` : '♪ SHUFFLE',
-      sub: cued
-        ? `${cued.bpm.toFixed(cued.bpm % 1 ? 2 : 0)} BPM · ${Math.round(cued.seconds / 6) / 10} min`
-        : 'the match seed picks the record',
-      x: CONTENT_X,
-      y: 392,
-      w: 640,
-      h: 112,
-      small: true,
+    // The songs (ghosts — drawSoloPanel paints the rows).
+    this.soloRows().forEach((row, i) => {
+      buttons.push({
+        id: row.id,
+        label: row.track?.title ?? 'SHUFFLE',
+        ghost: true,
+        x: SOLO_LIST_X,
+        y: SOLO_ROW_Y0 + i * SOLO_ROW_PITCH,
+        w: SOLO_LIST_W,
+        h: SOLO_ROW_H,
+      });
     });
-    buttons.push({ id: 'seats-', label: '−', x: 976, y: 392, w: 104, h: 112, disabled: match.seats <= RING.minSeats });
-    buttons.push({
-      id: 'seats',
-      label: `${match.seats} DANCERS`,
-      x: 1092,
-      y: 392,
-      w: 220,
-      h: 112,
-      display: true,
-      small: true,
-    });
-    buttons.push({ id: 'seats+', label: '+', x: 1324, y: 392, w: 104, h: 112, disabled: match.seats >= RING.maxSeats });
 
-    // DIFFICULTY: the act floor for the whole song — no more trivially
-    // easy opening third.
+    // DIFFICULTY: the act floor for the whole song — and the lens the
+    // list's BEST column reads through.
     DIFFICULTY.labels.forEach((label, i) => {
       buttons.push({
         id: `diff${i}`,
         label,
         selected: match.difficulty === i,
-        x: CONTENT_X + i * 331,
-        y: 668,
-        w: 305,
-        h: 104,
+        x: SOLO_RIGHT_X + i * 148,
+        y: 216,
+        w: 132,
+        h: 60,
         small: true,
       });
     });
+
+    buttons.push({
+      id: 'raid',
+      label: 'START RAID',
+      sub: `${cued ? cued.title : 'the seed picks the record'} · you + ${match.seats - 1} goo-groupies`,
+      primary: true,
+      disabled: net.phase === 'connecting',
+      x: SOLO_RIGHT_X,
+      y: 812,
+      w: SOLO_RIGHT_W,
+      h: 120,
+    });
+  }
+
+  /** The list, the song page and its leaderboard — the SOLO tab's body. */
+  private drawSoloPanel(g: CanvasRenderingContext2D): void {
+    g.textBaseline = 'middle';
+
+    // Kicker + column captions.
+    g.textAlign = 'left';
+    g.font = font(600, 24);
+    g.letterSpacing = '4px';
+    g.fillStyle = UI.dim;
+    g.fillText('SELECT SONG', SOLO_LIST_X + 2, 172);
+    g.letterSpacing = '1.5px';
+    g.font = font(500, 17);
+    g.fillStyle = UI.faint;
+    g.textAlign = 'right';
+    g.fillText('BPM', SOLO_LIST_X + SOLO_LIST_W - 128, 202);
+    g.textAlign = 'center';
+    g.fillText('BEST', SOLO_LIST_X + SOLO_LIST_W - 52, 202);
+    g.letterSpacing = '0px';
+
+    // The rows.
+    this.soloRows().forEach((row, i) => {
+      const y = SOLO_ROW_Y0 + i * SOLO_ROW_PITCH;
+      const selected = (match.preferredTrack || '') === (row.track?.id ?? '');
+      const hov = this.board.hoverOf(row.id);
+      g.beginPath();
+      g.roundRect(SOLO_LIST_X, y, SOLO_LIST_W, SOLO_ROW_H, 10);
+      g.fillStyle = selected ? UI.accentFaint : `rgba(255,255,255,${(0.03 + 0.05 * hov).toFixed(3)})`;
+      g.fill();
+      if (selected) {
+        g.lineWidth = 2;
+        g.strokeStyle = 'rgba(255,42,213,0.9)';
+        g.stroke();
+        g.fillStyle = UI.accent;
+        g.beginPath();
+        g.roundRect(SOLO_LIST_X + 5, y + 8, 4, SOLO_ROW_H - 16, 2);
+        g.fill();
+      }
+      const cy = y + SOLO_ROW_H / 2 + 1;
+      g.textAlign = 'left';
+      g.font = font(600, 25);
+      g.letterSpacing = '1px';
+      g.fillStyle = selected ? UI.textHi : UI.text;
+      g.fillText(row.track?.title ?? 'SHUFFLE', SOLO_LIST_X + 24, cy, SOLO_LIST_W - 250);
+      g.letterSpacing = '0px';
+      g.textAlign = 'right';
+      g.font = font(500, 21);
+      g.fillStyle = UI.dim;
+      g.fillText(row.track ? String(Math.round(row.track.bpm)) : '—', SOLO_LIST_X + SOLO_LIST_W - 128, cy);
+      g.textAlign = 'center';
+      if (row.track) {
+        const best = soloBoard(row.track.id, match.difficulty).best;
+        g.font = font(700, 26);
+        g.fillStyle = best ? (GRADE.colors[best] ?? UI.text) : UI.faint;
+        g.fillText(best ?? '—', SOLO_LIST_X + SOLO_LIST_W - 52, cy);
+      } else {
+        g.font = font(500, 21);
+        g.fillStyle = UI.faint;
+        g.fillText('—', SOLO_LIST_X + SOLO_LIST_W - 52, cy);
+      }
+    });
+
+    // The song page: a recessed well with the record's leaderboard.
+    const wx = SOLO_RIGHT_X;
+    const wy = SOLO_WELL_Y;
+    const ww = SOLO_RIGHT_W;
+    const wh = SOLO_WELL_H;
+    g.fillStyle = UI.well;
+    g.beginPath();
+    g.roundRect(wx, wy, ww, wh, 22);
+    g.fill();
+    g.lineWidth = 2;
+    g.strokeStyle = UI.lineFaint;
+    g.stroke();
+
+    const cued = trackById(match.preferredTrack);
+    if (!cued) {
+      g.textAlign = 'left';
+      g.font = font(700, 32);
+      g.letterSpacing = '2px';
+      g.fillStyle = UI.textHi;
+      g.fillText('SHUFFLE', wx + 28, wy + 56);
+      g.letterSpacing = '0px';
+      g.font = font(500, 21);
+      g.fillStyle = UI.dim;
+      g.fillText('the match seed picks the record', wx + 28, wy + 102);
+      g.font = font(500, 20);
+      g.fillStyle = UI.faint;
+      g.fillText('leaderboards live with the songs —', wx + 28, wy + 156);
+      g.fillText('pick one to see your times', wx + 28, wy + 186);
+      return;
+    }
+
+    g.textAlign = 'left';
+    g.font = font(700, 32);
+    g.letterSpacing = '2px';
+    g.fillStyle = UI.textHi;
+    g.fillText(cued.title, wx + 28, wy + 56, ww - 190);
+    g.letterSpacing = '0px';
+    g.textAlign = 'right';
+    g.font = font(500, 21);
+    g.fillStyle = UI.dim;
+    g.fillText(
+      `${cued.bpm.toFixed(cued.bpm % 1 ? 2 : 0)} BPM · ${Math.round(cued.seconds / 6) / 10} min`,
+      wx + ww - 28,
+      wy + 56,
+    );
+
+    g.textAlign = 'left';
+    g.font = font(600, 19);
+    g.letterSpacing = '2.5px';
+    g.fillStyle = UI.faint;
+    g.fillText(`PERSONAL BEST · ${DIFFICULTY.labels[match.difficulty]}`, wx + 28, wy + 102);
+    g.letterSpacing = '0px';
+    g.fillStyle = UI.lineFaint;
+    g.fillRect(wx + 28, wy + 124, ww - 56, 2);
+
+    const { runs } = soloBoard(cued.id, match.difficulty);
+    if (!runs.length) {
+      g.font = font(500, 24);
+      g.fillStyle = UI.dim;
+      g.fillText('no runs on this chart yet', wx + 28, wy + 176);
+      g.font = font(500, 20);
+      g.fillStyle = UI.faint;
+      g.fillText('finish a solo set to post the first score', wx + 28, wy + 210);
+    } else {
+      runs.forEach((run, i) => {
+        const ry = wy + 168 + i * 62;
+        g.textAlign = 'left';
+        g.font = font(600, 22);
+        g.fillStyle = UI.faint;
+        g.fillText(String(i + 1), wx + 32, ry);
+        g.font = font(600, 24);
+        g.letterSpacing = '1px';
+        g.fillStyle = UI.text;
+        g.fillText(run.n || 'RAVER', wx + 76, ry, 250);
+        g.letterSpacing = '0px';
+        g.textAlign = 'right';
+        g.font = font(700, 28);
+        g.fillStyle = UI.textHi;
+        g.fillText(run.s.toLocaleString('en-US'), wx + ww - 110, ry);
+        g.textAlign = 'center';
+        g.font = font(700, 28);
+        g.fillStyle = GRADE.colors[run.g] ?? UI.text;
+        g.fillText(run.g, wx + ww - 56, ry);
+      });
+    }
+
+    g.textAlign = 'left';
+    g.font = font(500, 18);
+    g.fillStyle = UI.faint;
+    g.fillText('solo runs · this headset', wx + 28, wy + wh - 30);
   }
 
   /* ── MULTIPLAYER: the club's front door ── */
@@ -958,6 +1396,14 @@ export class MenuSystem extends createSystem({}) {
         g.fillStyle = unlocked ? UI.text : 'rgba(233,236,244,0.42)';
         g.fillText(track?.title ?? songId, n.x, n.y + n.r + 26);
         g.letterSpacing = '0px';
+
+        // The best letter ever taken home from this night, under its stop.
+        const bestGrade = bestTourGrade(s, i);
+        if (bestGrade) {
+          g.font = font(700, 27);
+          g.fillStyle = GRADE.colors[bestGrade] ?? UI.text;
+          g.fillText(bestGrade, n.x, n.y + n.r + 56);
+        }
       });
     });
 

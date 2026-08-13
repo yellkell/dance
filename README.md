@@ -301,10 +301,19 @@ the floor (hosting or joined), **ECLIPSE** — the club's own slow-burn
 70 BPM record — takes the decks, and the chandelier phases to it. Step
 into THE STILL ROOM and the mix ducks to a murmur without stopping.
 
-**Picking a record**: the lobby's `♪` row cycles SHUFFLE → each raid track.
-SHUFFLE derives the record from the match seed, so an online room agrees on the
-song without anyone sending it; a host's explicit pick rides along in the start
-message.
+**Picking a record**: the board's **SOLO** tab is a SELECT SONG list — the
+whole raid pool with each record's BPM and your best letter **at the
+selected difficulty** beside it, and the song's page on the right: a local
+**leaderboard** (top five finished solo runs — name, score, grade; campaign
+nights and club raids never post here) over the START RAID seat. SHUFFLE
+heads the list and derives the record from the match seed, so an online
+room agrees on the song without anyone sending it (the club floor picks
+from the SOCIAL panel's `♪` row); a host's explicit pick rides along in
+the start message. Scores are signed by your **profile** — the card at the
+board's top right, born a generic RAVER-#### tag; open it and RENAME on
+the pop-up arcade keyboard. The same name rides your club tag. On THE
+TOUR's map, each stop wears the best letter you've ever taken home from
+that night.
 
 **Picking a difficulty**: the EASY / NORMAL / HARD / EXPERT row under it is
 the act floor for the whole song — every record used to open trivially easy
