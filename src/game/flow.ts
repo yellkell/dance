@@ -12,6 +12,7 @@
 
 import { MUSIC, RING, TOUR, countInBeatsFor } from '../config.js';
 import { pickRaidTrack, trackById, trackPhrases, type Track } from '../audio/tracks.js';
+import { submitWorldScore } from '../net/scores.js';
 import { profileName } from './profile.js';
 import { freshSeed } from './rng.js';
 import {
@@ -108,9 +109,12 @@ export function finishRaid(): void {
         pushFlair(`NIGHT CLEARED — ${grade}`, 'milestone');
       }
     } else if (!match.online) {
-      // A finished solo set posts to the song's local leaderboard — the
-      // campaign and the club's raids never do.
+      // A finished solo set posts to the song's leaderboards — this
+      // headset's book, and the world board. The campaign and the club's
+      // raids never do. The world post is fire-and-forget: it must never
+      // hold up the podium, and a set danced offline is still a set.
       recordSoloRun(match.trackId, match.difficulty, me.score, grade, profileName());
+      void submitWorldScore(match.trackId, match.difficulty, me.score, grade, profileName());
     }
   }
   match.screen = 'podium';

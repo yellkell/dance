@@ -12,6 +12,22 @@
 const NAME_KEY = 'gdr-name';
 export const NAME_MAX = 12;
 
+/** A coarse net over the worst of it — names ride a PUBLIC board now, and
+ *  an arcade tag field with no filter at all becomes a billboard. It
+ *  catches the obvious and nothing subtle; it is not moderation, and a
+ *  board that ever gets real traffic needs a real report path. Matched
+ *  against the name with separators stripped, so B-A-D reads as BAD. */
+const BLOCKED = [
+  'FUCK', 'SHIT', 'CUNT', 'NIGGER', 'NIGGA', 'FAGGOT', 'RAPE', 'NAZI',
+  'HITLER', 'KKK', 'WHORE', 'SLUT', 'RETARD', 'BITCH', 'PEDO', 'DICK',
+  'COCK', 'PUSSY', 'ANUS', 'TWAT', 'WANK',
+];
+
+export function nameIsClean(name: string): boolean {
+  const flat = name.toUpperCase().replace(/[^A-Z]/g, '');
+  return !BLOCKED.some((word) => flat.includes(word));
+}
+
 /** Uppercase arcade alphabet — exactly what the rename keyboard offers. */
 export function sanitizeName(raw: string): string {
   return raw
@@ -49,10 +65,10 @@ export function profileName(): string {
   return cached;
 }
 
-/** Rename: sanitised, persisted, empty falls back to the current name. */
+/** Rename: sanitised, persisted, empty (or blocked) keeps the old name. */
 export function setProfileName(raw: string): string {
   const clean = sanitizeName(raw);
-  if (!clean) return profileName();
+  if (!clean || !nameIsClean(clean)) return profileName();
   cached = clean;
   try {
     localStorage.setItem(NAME_KEY, clean);

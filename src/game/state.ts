@@ -325,7 +325,8 @@ export function tourNightUnlocked(set: number, song: number): boolean {
 
 const TOUR_GRADES_KEY = 'gdr-tour-grades';
 const SOLO_KEY = 'gdr-solo';
-const SOLO_TOP = 5;
+/** Deep enough that the song page's scroll has something to do. */
+const SOLO_TOP = 10;
 
 /** Higher is better; unknown letters rank below F. */
 export function gradeRank(letter: string): number {

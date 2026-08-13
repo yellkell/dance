@@ -1,0 +1,73 @@
+rules_version = '2';
+
+// RAVE RAID — the world board.
+//
+// One document per player per chart, named `<track>__<difficulty>__<uid>`.
+// The document's own name is the proof of ownership: a writer must be
+// signed in (anonymous is fine) and the id must end in their uid, so
+// nobody can write a row that isn't theirs, and nobody can hold more than
+// one row on a chart.
+//
+// Scores only ever go UP. The client asks nicely; this enforces it.
+//
+// The client computes the score, so these rules bound what a liar can do
+// (one row each, sane shape, monotonic) — they cannot make a client
+// honest. Submission would have to move behind the relay for that.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    match /scores/{docId} {
+
+      function data() {
+        return request.resource.data;
+      }
+
+      // Exactly these fields, nothing smuggled alongside.
+      function shapeOk() {
+        return data().keys().hasOnly(['track', 'diff', 'uid', 'name', 'score', 'grade', 'at'])
+          && data().keys().hasAll(['track', 'diff', 'uid', 'name', 'score', 'grade', 'at']);
+      }
+
+      function valuesOk() {
+        return data().track is string
+          && data().track.size() > 0 && data().track.size() <= 32
+          && data().diff is int && data().diff >= 0 && data().diff <= 3
+          && data().name is string
+          && data().name.size() > 0 && data().name.size() <= 12
+          && data().score is int
+          && data().score >= 0 && data().score <= 5000000
+          && data().grade in ['S', 'A', 'B', 'C', 'F']
+          && data().at == request.time;
+      }
+
+      // The id names the owner — and the chart the row claims to be on.
+      function ownedByCaller() {
+        return request.auth != null
+          && data().uid == request.auth.uid
+          && docId == data().track + '__' + string(data().diff) + '__' + request.auth.uid;
+      }
+
+      // A board everyone can read is the whole point.
+      allow read: if true;
+
+      allow create: if ownedByCaller() && shapeOk() && valuesOk();
+
+      // The ratchet: a replacement must beat the run it replaces, and may
+      // never change whose row it is or which chart it sits on.
+      allow update: if ownedByCaller() && shapeOk() && valuesOk()
+        && data().score > resource.data.score
+        && data().uid == resource.data.uid
+        && data().track == resource.data.track
+        && data().diff == resource.data.diff;
+
+      // Records stand. Clearing a chart is a console job.
+      allow delete: if false;
+    }
+
+    // Nothing else in this project is client-writable.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -303,17 +303,39 @@ into THE STILL ROOM and the mix ducks to a murmur without stopping.
 
 **Picking a record**: the board's **SOLO** tab is a SELECT SONG list — the
 whole raid pool with each record's BPM and your best letter **at the
-selected difficulty** beside it, and the song's page on the right: a local
-**leaderboard** (top five finished solo runs — name, score, grade; campaign
-nights and club raids never post here) over the START RAID seat. SHUFFLE
-heads the list and derives the record from the match seed, so an online
-room agrees on the song without anyone sending it (the club floor picks
-from the SOCIAL panel's `♪` row); a host's explicit pick rides along in
-the start message. Scores are signed by your **profile** — the card at the
-board's top right, born a generic RAVER-#### tag; open it and RENAME on
-the pop-up arcade keyboard. The same name rides your club tag. On THE
+selected difficulty** beside it, and the song's page on the right: the
+**leaderboard**, over the GO RAVE seat. SHUFFLE heads the list and derives
+the record from the match seed, so an online room agrees on the song
+without anyone sending it (the club floor picks from the SOCIAL panel's
+`♪` row); a host's explicit pick rides along in the start message. On THE
 TOUR's map, each stop wears the best letter you've ever taken home from
 that night.
+
+**The leaderboards** are per song × difficulty and **solo only** — campaign
+nights and club raids never post. Two views on the song page:
+
+- **WORLD** — everyone's, from Firestore. One row per player per chart
+  (personal bests, not a log), top 100, scrollable with the ▲▼ pager or a
+  thumbstick nudge; your own row is marked. Reads are public, writes need
+  an anonymous sign-in, and the document id carries the writer's uid so
+  nobody can post as somebody else or hold two rows on one chart. Scores
+  only ever go up — the ratchet is in `firestore.rules`, not in the client.
+- **THIS HEADSET** — your own book in `localStorage`, ten deep, and the
+  source of the list's BEST column. It works with no network at all, so a
+  headset that can't reach the world board still keeps every run; the page
+  says so and offers RETRY rather than pretending.
+
+Scores are signed by your **profile** — the card at the board's top right,
+born a generic RAVER-#### tag; open it and RENAME on the pop-up arcade
+keyboard. The same name rides your club tag. Because those names land on a
+public board, the rename field refuses the obvious slurs — a coarse net,
+not moderation.
+
+> **Honest limits.** The client computes the score and posts it, so the
+> rules can only bound what a liar can do (sane shape and ranges, one row
+> each, monotonic) — they can't make a client honest. If the board ever
+> matters enough to attack, submission moves behind the relay, which can
+> validate a run before writing it.
 
 **Picking a difficulty**: the EASY / NORMAL / HARD / EXPERT row under it is
 the act floor for the whole song — every record used to open trivially easy
@@ -386,6 +408,37 @@ Two pipelines ship `dist/` (both in `.github/workflows/`):
     measurementId: 'G-3MV2K6R84H',
   };
   ```
+
+  (This config is baked into `src/net/scores.ts`. It is **public by
+  design** — every client ships it; `firestore.rules` is the security
+  boundary, not the key.)
+
+- **Firestore** — the world leaderboards (`src/net/scores.ts`). The client
+  code, the rules and the index are all in the repo and fail soft, so the
+  game runs fine against a project that has none of it: the world board
+  just reports itself out of reach. Three **console** steps switch it on,
+  and none of them can be done from CI as configured:
+
+  1. **Create the Firestore database** (Firebase console → Build →
+     Firestore Database → Create). Production mode; the rules below replace
+     the default.
+  2. **Enable Anonymous sign-in** (Build → Authentication → Sign-in method
+     → Anonymous). Without it every write is rejected and the board reads
+     as offline.
+  3. **Deploy the rules and index**:
+
+     ```bash
+     firebase deploy --only firestore:rules,firestore:indexes
+     ```
+
+     The `FIREBASE_SERVICE_ACCOUNT` secret used by the hosting workflow
+     only holds **Hosting Admin**, so it cannot do this — deploy from a
+     logged-in machine, or widen the service account to include
+     *Cloud Datastore Owner* / *Firebase Rules Admin* first.
+
+  The composite index (`track`, `diff`, `score ↓`) in
+  `firestore.indexes.json` is what the board's query needs; without it the
+  first read fails and the page shows the error with a RETRY.
 
 The static site is fully playable solo. Online rooms need the relay
 (`server/index.mjs`) hosted somewhere reachable — see **Hosting the relay**

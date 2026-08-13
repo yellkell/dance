@@ -41,7 +41,7 @@ import * as sfx from '../audio/sfx.js';
 import { musicVolume, preload, setMusicVolume } from '../audio/music.js';
 import { pickRaidTrack, trackById, tracksFor, type Track } from '../audio/tracks.js';
 import { startRaid, toLobby, toTour } from '../game/flow.js';
-import { NAME_MAX, profileName, setProfileName } from '../game/profile.js';
+import { NAME_MAX, nameIsClean, profileName, setProfileName } from '../game/profile.js';
 import {
   bestTourGrade,
   clearedTourNights,
@@ -57,6 +57,7 @@ import {
   net,
   setDancerName,
 } from '../net/session.js';
+import { refreshWorldBoard, scores, worldBoard, type WorldRow } from '../net/scores.js';
 import { font } from '../ui/fonts.js';
 import { Panel, UI, type PanelButton } from '../ui/panel.js';
 import { PointerRay } from '../ui/pointer.js';
@@ -86,6 +87,12 @@ const SOLO_RIGHT_X = 1044;
 const SOLO_RIGHT_W = 576;
 const SOLO_WELL_Y = 292;
 const SOLO_WELL_H = 504;
+/** The song page's leaderboard: source toggle, header, scrolling window. */
+const BOARD_TOGGLE_Y = 380;
+const BOARD_HEAD_Y = 446;
+const BOARD_ROW_Y0 = 476;
+const BOARD_ROW_H = 44;
+const BOARD_VISIBLE = 6;
 
 /** The PROFILE card (header, top right) and its dropdown. */
 const PROF = { x: 1280, y: 34, w: 340, h: 58 };
@@ -171,6 +178,13 @@ export class MenuSystem extends createSystem({}) {
   private profileOpen = false;
   private keyboardOpen = false;
   private nameDraft = '';
+  /** Which board the SOLO song page shows, and how far down it's scrolled. */
+  private boardSource: 'world' | 'local' = 'world';
+  private boardScroll = 0;
+  private lastScoresDirty = -1;
+  /** Thumbstick scroll needs a rest between steps or one flick runs the
+   *  whole list past you. */
+  private stickCool = 0;
 
   init(): void {
     try {
@@ -327,6 +341,25 @@ export class MenuSystem extends createSystem({}) {
       this.action(clicked);
     }
 
+    // Thumbstick scrolling on the SOLO page — a flick steps the list a
+    // row, held deflection repeats on a cadence. The laser's ▲▼ page by
+    // a screenful; this is the fine adjustment.
+    this.stickCool = Math.max(0, this.stickCool - delta);
+    if (boardUp && this.activeTab() === 'play' && !this.keyboardOpen && !this.profileOpen) {
+      let flick = 0;
+      for (const hand of ['left', 'right'] as const) {
+        const axes = this.input.xr.gamepads[hand]?.getAxesValues(InputComponent.Thumbstick);
+        const y = axes?.y ?? 0;
+        if (Math.abs(y) > 0.6) flick = y > 0 ? 1 : -1;
+      }
+      if (flick !== 0 && this.stickCool <= 0) {
+        this.stickCool = 0.16;
+        this.scrollBoard(flick);
+      } else if (flick === 0) {
+        this.stickCool = 0;
+      }
+    }
+
     // The rail marker's slide: ease toward the active tab and keep the
     // board repainting for the ~200 ms it's in flight.
     if (boardUp && Number.isFinite(this.railY) && Number.isFinite(this.railTargetY)) {
@@ -439,6 +472,7 @@ export class MenuSystem extends createSystem({}) {
       }
     } else if (id.startsWith('diff')) {
       match.difficulty = Math.max(0, Math.min(3, Number(id.slice(4))));
+      this.boardScroll = 0; // another chart, another list
       try {
         localStorage.setItem(DIFF_KEY, String(match.difficulty));
       } catch {
@@ -446,11 +480,22 @@ export class MenuSystem extends createSystem({}) {
       }
     } else if (id === 'vol-' || id === 'vol+') {
       setMusicVolume(musicVolume() + (id === 'vol+' ? 0.1 : -0.1));
+    } else if (id === 'board-world' || id === 'board-local') {
+      this.boardSource = id === 'board-world' ? 'world' : 'local';
+      this.boardScroll = 0;
+    } else if (id === 'board-retry') {
+      const cued = trackById(match.preferredTrack);
+      if (cued) refreshWorldBoard(cued.id, match.difficulty);
+    } else if (id === 'board-up') {
+      this.scrollBoard(-BOARD_VISIBLE);
+    } else if (id === 'board-down') {
+      this.scrollBoard(BOARD_VISIBLE);
     } else if (id.startsWith('song:')) {
       // SELECT SONG: pick a record off the list ('' = SHUFFLE, the match
       // seed chooses). Picking one warms it so the drop is instant.
       const picked = id.slice(5);
       match.preferredTrack = picked;
+      this.boardScroll = 0; // a new record, a new list — start at the top
       try {
         localStorage.setItem(TRACK_KEY, picked);
       } catch {
@@ -488,6 +533,11 @@ export class MenuSystem extends createSystem({}) {
       this.lastNetDirty = net.dirty;
       this.lastKey = '';
     }
+    // A world board that finished loading (or failed) repaints the page.
+    if (scores.dirty !== this.lastScoresDirty) {
+      this.lastScoresDirty = scores.dirty;
+      this.lastKey = '';
+    }
     const key = [
       match.screen,
       this.hover,
@@ -507,6 +557,8 @@ export class MenuSystem extends createSystem({}) {
       this.keyboardOpen,
       this.nameDraft,
       profileName(),
+      this.boardSource,
+      this.boardScroll,
     ].join('|');
     if (key === this.lastKey) return;
     this.lastKey = key;
@@ -790,7 +842,9 @@ export class MenuSystem extends createSystem({}) {
       id: 'kb:done',
       label: 'DONE',
       primary: true,
-      disabled: this.nameDraft.trim().length === 0,
+      // A name nobody may wear can't be signed off — the well below says
+      // why, so DONE going quiet is never a mystery.
+      disabled: this.nameDraft.trim().length === 0 || !nameIsClean(this.nameDraft),
       x: 1104,
       y: 756,
       w: 220,
@@ -841,6 +895,17 @@ export class MenuSystem extends createSystem({}) {
     g.font = font(500, 18);
     g.fillStyle = UI.faint;
     g.fillText(`${draft.length}/${NAME_MAX}`, KB.x + KB.w - 52, KB.y + 138);
+    // Names ride a public board — say so, and say when one won't do.
+    g.textAlign = 'left';
+    if (draft && !nameIsClean(draft)) {
+      g.font = font(600, 19);
+      g.fillStyle = UI.danger;
+      g.fillText('pick another one — this name goes on a public board', KB.x + 52, KB.y + 138);
+    } else {
+      g.font = font(500, 18);
+      g.fillStyle = UI.faint;
+      g.fillText('this is the name on your scores and your club tag', KB.x + 52, KB.y + 138);
+    }
   }
 
   private drawShell(g: CanvasRenderingContext2D, tab: Tab): void {
@@ -995,6 +1060,75 @@ export class MenuSystem extends createSystem({}) {
       });
     });
 
+    // The board's source, and — when the world can't be reached — the way
+    // to ask again. Only meaningful once a record is actually chosen.
+    if (cued) {
+      buttons.push({
+        id: 'board-world',
+        label: 'WORLD',
+        selected: this.boardSource === 'world',
+        small: true,
+        px: 21,
+        x: SOLO_RIGHT_X + 24,
+        y: BOARD_TOGGLE_Y,
+        w: 146,
+        h: 52,
+      });
+      buttons.push({
+        id: 'board-local',
+        label: 'THIS HEADSET',
+        selected: this.boardSource === 'local',
+        small: true,
+        px: 21,
+        x: SOLO_RIGHT_X + 178,
+        y: BOARD_TOGGLE_Y,
+        w: 190,
+        h: 52,
+      });
+      const world = worldBoard(cued.id, match.difficulty);
+      if (this.boardSource === 'world' && (world.state === 'off' || world.state === 'error')) {
+        buttons.push({
+          id: 'board-retry',
+          label: 'RETRY',
+          tone: UI.info,
+          small: true,
+          px: 20,
+          x: SOLO_RIGHT_X + 396,
+          y: BOARD_TOGGLE_Y,
+          w: 118,
+          h: 52,
+        });
+      }
+      // Paging: the laser's way down a hundred names (a thumbstick works
+      // too — see the scroll in update()).
+      const total = this.boardRows(cued.id).length;
+      if (total > BOARD_VISIBLE) {
+        const top = this.scrollTop(total);
+        buttons.push({
+          id: 'board-up',
+          label: '▲',
+          small: true,
+          px: 20,
+          disabled: top <= 0,
+          x: SOLO_RIGHT_X + SOLO_RIGHT_W - 104,
+          y: SOLO_WELL_Y + SOLO_WELL_H - 50,
+          w: 44,
+          h: 40,
+        });
+        buttons.push({
+          id: 'board-down',
+          label: '▼',
+          small: true,
+          px: 20,
+          disabled: top >= total - BOARD_VISIBLE,
+          x: SOLO_RIGHT_X + SOLO_RIGHT_W - 52,
+          y: SOLO_WELL_Y + SOLO_WELL_H - 50,
+          w: 44,
+          h: 40,
+        });
+      }
+    }
+
     buttons.push({
       id: 'raid',
       label: 'GO RAVE',
@@ -1119,50 +1253,137 @@ export class MenuSystem extends createSystem({}) {
       wy + 56,
     );
 
-    g.textAlign = 'left';
-    g.font = font(600, 19);
-    g.letterSpacing = '2.5px';
-    g.fillStyle = UI.faint;
-    g.fillText(`PERSONAL BEST · ${DIFFICULTY.labels[match.difficulty]}`, wx + 28, wy + 102);
-    g.letterSpacing = '0px';
+    // The rows, and whatever the board has to say for itself.
+    const rows = this.boardRows(cued.id);
+    const status = this.boardStatus(cued.id);
     g.fillStyle = UI.lineFaint;
-    g.fillRect(wx + 28, wy + 124, ww - 56, 2);
+    g.fillRect(wx + 28, BOARD_HEAD_Y + 16, ww - 56, 2);
 
-    const { runs } = soloBoard(cued.id, match.difficulty);
-    if (!runs.length) {
-      g.font = font(500, 24);
+    if (status) {
+      g.textAlign = 'left';
+      g.font = font(500, 23);
       g.fillStyle = UI.dim;
-      g.fillText('no runs on this chart yet', wx + 28, wy + 176);
-      g.font = font(500, 20);
-      g.fillStyle = UI.faint;
-      g.fillText('finish a solo set to post the first score', wx + 28, wy + 210);
+      g.fillText(status.line, wx + 28, BOARD_ROW_Y0 + 14);
+      if (status.hint) {
+        g.font = font(500, 20);
+        g.fillStyle = UI.faint;
+        g.fillText(status.hint, wx + 28, BOARD_ROW_Y0 + 48);
+      }
     } else {
-      runs.forEach((run, i) => {
-        const ry = wy + 168 + i * 62;
+      // Column captions, then the visible window of the list.
+      g.font = font(500, 16);
+      g.letterSpacing = '1.5px';
+      g.fillStyle = UI.faint;
+      g.textAlign = 'right';
+      g.fillText('SCORE', wx + ww - 104, BOARD_HEAD_Y + 40);
+      g.textAlign = 'center';
+      g.fillText('BEST', wx + ww - 52, BOARD_HEAD_Y + 40);
+      g.letterSpacing = '0px';
+
+      const start = this.scrollTop(rows.length);
+      rows.slice(start, start + BOARD_VISIBLE).forEach((row, i) => {
+        const rank = start + i + 1;
+        const ry = BOARD_ROW_Y0 + 30 + i * BOARD_ROW_H;
+        if (row.isMe) {
+          // Your own row, findable at a glance in a hundred strangers.
+          g.fillStyle = UI.accentFaint;
+          g.beginPath();
+          g.roundRect(wx + 16, ry - 22, ww - 32, BOARD_ROW_H - 6, 8);
+          g.fill();
+          g.fillStyle = UI.accent;
+          g.beginPath();
+          g.roundRect(wx + 20, ry - 16, 4, BOARD_ROW_H - 18, 2);
+          g.fill();
+        }
+        g.textAlign = 'right';
+        g.font = font(600, 19);
+        g.fillStyle = rank <= 3 ? UI.text : UI.faint;
+        g.fillText(String(rank), wx + 56, ry);
         g.textAlign = 'left';
         g.font = font(600, 22);
-        g.fillStyle = UI.faint;
-        g.fillText(String(i + 1), wx + 32, ry);
-        g.font = font(600, 24);
         g.letterSpacing = '1px';
-        g.fillStyle = UI.text;
-        g.fillText(run.n || 'RAVER', wx + 76, ry, 250);
+        g.fillStyle = row.isMe ? UI.textHi : UI.text;
+        g.fillText(row.name || 'RAVER', wx + 74, ry, 236);
         g.letterSpacing = '0px';
         g.textAlign = 'right';
-        g.font = font(700, 28);
-        g.fillStyle = UI.textHi;
-        g.fillText(run.s.toLocaleString('en-US'), wx + ww - 110, ry);
+        g.font = font(700, 25);
+        g.fillStyle = row.isMe ? UI.textHi : UI.text;
+        g.fillText(row.score.toLocaleString('en-US'), wx + ww - 104, ry);
         g.textAlign = 'center';
-        g.font = font(700, 28);
-        g.fillStyle = GRADE.colors[run.g] ?? UI.text;
-        g.fillText(run.g, wx + ww - 56, ry);
+        g.font = font(700, 25);
+        g.fillStyle = GRADE.colors[row.grade] ?? UI.text;
+        g.fillText(row.grade, wx + ww - 52, ry);
       });
     }
 
+    // Footer: where you are in the list, and where these runs came from.
     g.textAlign = 'left';
     g.font = font(500, 18);
     g.fillStyle = UI.faint;
-    g.fillText('solo runs · this headset', wx + 28, wy + wh - 30);
+    // Whose runs these are, and which chart they were danced on.
+    const source = this.boardSource === 'world' ? 'worldwide' : 'this headset';
+    g.fillText(`solo runs · ${source} · ${DIFFICULTY.labels[match.difficulty]}`, wx + 28, wy + wh - 28);
+    if (!status && rows.length > BOARD_VISIBLE) {
+      const start = this.scrollTop(rows.length);
+      g.textAlign = 'right';
+      g.fillText(
+        `${start + 1}–${Math.min(start + BOARD_VISIBLE, rows.length)} of ${rows.length}`,
+        wx + ww - 116,
+        wy + wh - 28,
+      );
+    }
+  }
+
+  /* ── the song page's board: source, rows, scroll, state ── */
+
+  /** The rows on show — the world's, or this headset's own book. */
+  private boardRows(trackId: string): WorldRow[] {
+    if (this.boardSource === 'local') {
+      return soloBoard(trackId, match.difficulty).runs.map((run) => ({
+        uid: '',
+        name: run.n || 'RAVER',
+        score: run.s,
+        grade: run.g,
+        // No highlight here: on your own book every row is yours, and
+        // marking all six would say nothing while shouting.
+        isMe: false,
+      }));
+    }
+    return worldBoard(trackId, match.difficulty).rows;
+  }
+
+  /** What to say instead of rows: loading, offline, error, or empty. */
+  private boardStatus(trackId: string): { line: string; hint?: string } | null {
+    if (this.boardSource === 'local') {
+      return soloBoard(trackId, match.difficulty).runs.length
+        ? null
+        : { line: 'no runs on this chart yet', hint: 'finish a solo set to post the first score' };
+    }
+    const board = worldBoard(trackId, match.difficulty);
+    if (board.state === 'loading' || board.state === 'idle') return { line: 'reading the world board…' };
+    if (board.state === 'off') {
+      return { line: 'the world board is out of reach', hint: 'your runs are safe in this headset — RETRY to try again' };
+    }
+    if (board.state === 'error') {
+      return { line: 'the world board did not answer', hint: `${board.note} · RETRY to try again` };
+    }
+    return board.rows.length
+      ? null
+      : { line: 'nobody has danced this chart yet', hint: 'finish a solo set and the first name is yours' };
+  }
+
+  /** Scroll offset, clamped to whatever the list actually holds. */
+  private scrollTop(total: number): number {
+    return Math.max(0, Math.min(this.boardScroll, total - BOARD_VISIBLE));
+  }
+
+  private scrollBoard(by: number): void {
+    const cued = trackById(match.preferredTrack);
+    const total = cued ? this.boardRows(cued.id).length : 0;
+    const next = Math.max(0, Math.min(this.boardScroll + by, Math.max(0, total - BOARD_VISIBLE)));
+    if (next === this.boardScroll) return;
+    this.boardScroll = next;
+    this.lastKey = '';
   }
 
   /* ── MULTIPLAYER: the club's front door ── */
