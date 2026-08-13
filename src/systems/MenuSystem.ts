@@ -102,12 +102,22 @@ const KB_ROWS: { keys: string[]; x0: number; y: number }[] = [
 const KB_KEY = 88;
 const KB_PITCH = 100;
 
+/** The chart's border — ONE rect. The dashed frame, the glow-pool clip and
+ *  the corner ticks all read it, so the chart can't disagree with itself
+ *  about where its own bottom edge is (it used to, and the lowest stop's
+ *  grade letter hung outside the map as a result). */
+const MAP_FRAME = { x: CONTENT_X, y: 186, w: CONTENT_W, h: 766 };
+/** Clearance every stop's caption block needs inside that border. */
+const MAP_PAD = 22;
+
 /** The treasure trail: nine stops, (set, night) → canvas centre + radius.
  *  Winds bottom-left → right → back left → up to the golden X. */
 const MAP_NODES: { x: number; y: number; r: number }[][] = [
   [
     { x: 470, y: 802, r: 46 },
-    { x: 728, y: 848, r: 46 },
+    // The trail's low point — dipped enough to keep the hand-drawn wobble,
+    // but not so low that its label and grade fall off the chart.
+    { x: 728, y: 822, r: 46 },
     { x: 988, y: 788, r: 58 },
   ],
   [
@@ -1238,20 +1248,21 @@ export class MenuSystem extends createSystem({}) {
     g.letterSpacing = '0px';
 
     // Map frame: a dashed chart border with bracket ticks in the corners.
+    const F = MAP_FRAME;
     g.setLineDash([8, 12]);
     g.strokeStyle = 'rgba(244,246,251,0.12)';
     g.lineWidth = 2;
     g.beginPath();
-    g.roundRect(CONTENT_X, 186, CONTENT_W, 746, 26);
+    g.roundRect(F.x, F.y, F.w, F.h, 26);
     g.stroke();
     g.setLineDash([]);
     g.strokeStyle = UI.accentDim;
     g.lineWidth = 2.5;
     for (const [cx, cy, dx, dy] of [
-      [CONTENT_X + 4, 190, 1, 1],
-      [CONTENT_X + CONTENT_W - 4, 190, -1, 1],
-      [CONTENT_X + 4, 928, 1, -1],
-      [CONTENT_X + CONTENT_W - 4, 928, -1, -1],
+      [F.x + 4, F.y + 4, 1, 1],
+      [F.x + F.w - 4, F.y + 4, -1, 1],
+      [F.x + 4, F.y + F.h - 4, 1, -1],
+      [F.x + F.w - 4, F.y + F.h - 4, -1, -1],
     ] as const) {
       g.beginPath();
       g.moveTo(cx, cy + dy * 30);
@@ -1264,7 +1275,7 @@ export class MenuSystem extends createSystem({}) {
     // to the chart, so the light never spills past the frame.
     g.save();
     g.beginPath();
-    g.roundRect(CONTENT_X, 186, CONTENT_W, 746, 26);
+    g.roundRect(F.x, F.y, F.w, F.h, 26);
     g.clip();
     TOUR.sets.forEach((_set, s) => {
       const mid = MAP_NODES[s][1];
@@ -1401,12 +1412,13 @@ export class MenuSystem extends createSystem({}) {
         g.fillText(track?.title ?? songId, n.x, n.y + n.r + 26);
         g.letterSpacing = '0px';
 
-        // The best letter ever taken home from this night, under its stop.
+        // The best letter ever taken home from this night, under its stop —
+        // never past the chart's edge, however low the stop sits.
         const bestGrade = bestTourGrade(s, i);
         if (bestGrade) {
-          g.font = font(700, 27);
+          g.font = font(700, 25);
           g.fillStyle = GRADE.colors[bestGrade] ?? UI.text;
-          g.fillText(bestGrade, n.x, n.y + n.r + 56);
+          g.fillText(bestGrade, n.x, Math.min(n.y + n.r + 50, MAP_FRAME.y + MAP_FRAME.h - MAP_PAD));
         }
       });
     });
