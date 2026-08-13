@@ -207,13 +207,16 @@ There are **three places**, and where you are is what you're doing:
    exact system proven in FIRE FIGHT's pub. Movement is **teleport-only**:
    deflect a thumbstick, aim the arc, roll the stick to set your landing
    facing, release to go; an isolated sideways flick snap-turns. Left
-   **Ⓨ** mutes your mic. Right **Ⓐ** raises the **SOCIAL panel**: MUTE
-   (silence) or BLOCK (silence + vanish) anyone, persisted by name,
-   strictly local — the voice-chat master switch, your ♪ song pick, and
-   **SEND THE BALL UP**. Step into **THE STILL ROOM** (north-west corner)
-   and the music falls to a murmur; voices stay.
+   **Ⓨ** mutes your mic. Right **Ⓐ** raises the **SOCIAL panel** — the
+   club floor's whole console (the big board stays in the foyer; the club
+   keeps no front desk): MUTE (silence) or BLOCK (silence + vanish)
+   anyone, persisted by name, strictly local — the voice-chat master
+   switch, your ♪ song pick, the DIFFICULTY row (your pick rides the ball
+   you call), **SEND THE BALL UP**, and **LEAVE THE CLUB**. Step into
+   **THE STILL ROOM** (north-west corner) and the music falls to a
+   murmur; voices stay.
 3. **THE SET** — the game place, called with **THE BALL**. Anyone sends it
-   up (from the SOCIAL panel or the board); a mirror ball hangs in front
+   up (from the SOCIAL panel); a mirror ball hangs in front
    of them for **60 seconds** wearing a countdown plate — the song, the
    caller, who's touched in. **Touch the ball** (hand close + trigger) to
    join; touch again to step out; the caller's touch cancels. At zero the

@@ -166,7 +166,10 @@ The law of the land is **three places — where you are is what you're doing**:
    the full hall swaps in — the warm human room between the voids.
    Everything the pub had, remade elegant; everything the raid needs,
    foreshadowed (the dance floor's brass inlay is the raid ring's ghost —
-   24 seat ticks and all).
+   24 seat ticks and all). The club keeps NO front desk: the board stays
+   in the foyer, and the floor's controls (song, difficulty, the ball,
+   voice, the door out) live on the SOCIAL panel at right Ⓐ — a console
+   you summon, not furniture blocking the stage.
 3. **THE SET** (game place): the raid, wrapped in THE VOID — an actual
    environment sharing the foyer's language at arena scale. Both interiors
    pack away; the rig re-plants at the spawn so "my platform IS the world
@@ -208,8 +211,8 @@ hand-built pylon groups it replaced.
 ### THE BALL (how a raid is called)
 
 The pub's third lesson, invented here: games are OPT-IN, and the invitation
-is physical. Anyone on the floor sends THE BALL up (SOCIAL panel or board;
-their ♪ pick and ring-size preference ride along) and a mirror ball hangs
+is physical. Anyone on the floor sends THE BALL up (SOCIAL panel; their
+♪ pick, difficulty and ring-size preference ride along) and a mirror ball hangs
 before them for sixty seconds — countdown plate, caller's name, one
 orbiting pip per dancer who has touched in. Touch to join, touch again to
 step out, caller's touch cancels. The RELAY owns the clock: at zero it

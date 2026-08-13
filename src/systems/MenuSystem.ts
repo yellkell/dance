@@ -116,6 +116,10 @@ export class MenuSystem extends createSystem({}) {
   private joinCode = [0, 0, 0, 0];
   private lastNetDirty = -1;
   private clock = 0;
+  /** The rail marker slides between tabs instead of teleporting: current
+   *  eased y (canvas space) and its target. NaN until first paint. */
+  private railY = NaN;
+  private railTargetY = NaN;
 
   init(): void {
     try {
@@ -260,6 +264,19 @@ export class MenuSystem extends createSystem({}) {
       sfx.uiClick();
       clickedPanel?.press(clicked);
       this.action(clicked);
+    }
+
+    // The rail marker's slide: ease toward the active tab and keep the
+    // board repainting for the ~200 ms it's in flight.
+    if (boardUp && Number.isFinite(this.railY) && Number.isFinite(this.railTargetY)) {
+      const gap = this.railTargetY - this.railY;
+      if (Math.abs(gap) > 0.5) {
+        this.railY += gap * Math.min(1, delta / 0.09);
+        this.lastKey = '';
+      } else if (this.railY !== this.railTargetY) {
+        this.railY = this.railTargetY;
+        this.lastKey = '';
+      }
     }
 
     this.repaintIfNeeded();
@@ -578,7 +595,11 @@ export class MenuSystem extends createSystem({}) {
     g.stroke();
 
     const clubOpen = this.multiplayerUnlocked();
-    for (const t of this.railTabs(clubOpen)) {
+    const tabs = this.railTabs(clubOpen);
+    const activeY = tabs.find((t) => tab === t.tab)?.y ?? tabs[0].y;
+    this.railTargetY = activeY + 18;
+    if (!Number.isFinite(this.railY)) this.railY = this.railTargetY;
+    for (const t of tabs) {
       const active = tab === t.tab;
       const hov = this.board.hoverOf(t.id);
       const rx = RAIL_X + 8;
@@ -587,12 +608,6 @@ export class MenuSystem extends createSystem({}) {
         g.fillStyle = `rgba(255,255,255,${(active ? 0.06 : 0.04 * hov).toFixed(3)})`;
         g.beginPath();
         g.roundRect(rx, t.y, rw, 102, 14);
-        g.fill();
-      }
-      if (active) {
-        g.fillStyle = UI.accent;
-        g.beginPath();
-        g.roundRect(rx + 4, t.y + 18, 5, 66, 2.5);
         g.fill();
       }
       g.textAlign = 'left';
@@ -616,6 +631,11 @@ export class MenuSystem extends createSystem({}) {
       }
       g.letterSpacing = '0px';
     }
+    // The marker, mid-slide or parked.
+    g.fillStyle = UI.accent;
+    g.beginPath();
+    g.roundRect(RAIL_X + 12, this.railY, 5, 66, 2.5);
+    g.fill();
 
     // Tab-specific body decoration. No slogans, no manuals — the boards
     // carry buttons and progress, and the game teaches itself.
