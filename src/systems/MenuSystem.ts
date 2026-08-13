@@ -987,8 +987,12 @@ export class MenuSystem extends createSystem({}) {
 
     buttons.push({
       id: 'raid',
-      label: 'START RAID',
-      sub: `${cued ? cued.title : 'the seed picks the record'} · you + ${match.seats - 1} goo-groupies`,
+      label: 'GO RAVE',
+      // The record and its tempo — what you're about to dance to, nothing
+      // about who's filling the ring.
+      sub: cued
+        ? `${cued.title} · ${cued.bpm.toFixed(cued.bpm % 1 ? 2 : 0)} BPM`
+        : 'the seed picks the record',
       primary: true,
       disabled: net.phase === 'connecting',
       x: SOLO_RIGHT_X,
