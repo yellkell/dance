@@ -38,6 +38,7 @@ import {
 } from '../config.js';
 import { seatLocal } from '../game/ring.js';
 import { octagonSlab } from './octagon.js';
+import { font } from '../ui/fonts.js';
 
 export interface PlatformHandle {
   seat: number;
@@ -83,7 +84,7 @@ function nameTexture(text: string, colorCss: string): CanvasTexture {
   c.height = 128;
   const g = c.getContext('2d')!;
   g.clearRect(0, 0, 512, 128);
-  g.font = "900 64px 'Arial Black', system-ui, sans-serif";
+  g.font = font(700, 64);
   g.textAlign = 'center';
   g.textBaseline = 'middle';
   g.shadowColor = colorCss;
@@ -92,7 +93,7 @@ function nameTexture(text: string, colorCss: string): CanvasTexture {
   g.fillText(text, 256, 64, 480);
   g.shadowBlur = 0;
   g.fillStyle = 'rgba(255,255,255,0.92)';
-  g.font = "900 58px 'Arial Black', system-ui, sans-serif";
+  g.font = font(700, 58);
   g.fillText(text, 256, 64, 470);
   return new CanvasTexture(c);
 }

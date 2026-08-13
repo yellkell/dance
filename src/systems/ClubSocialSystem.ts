@@ -61,7 +61,9 @@ import { buildDancer, type DancerPose, type DancerRig } from '../game/avatars.js
 import { match } from '../game/state.js';
 import { clubPoses, remotePoses } from '../net/poses.js';
 import { callBall, cancelBall, leaveRoom, net, onVoice, seatByIdx, sendClubPose, sendVoice } from '../net/session.js';
+import { font } from '../ui/fonts.js';
 import { Panel, UI, type PanelButton } from '../ui/panel.js';
+import { PointerRay } from '../ui/pointer.js';
 
 const TRACK_KEY = 'gdr-track';
 const DIFF_KEY = 'gdr-diff';
@@ -90,7 +92,7 @@ function nameTagTexture(text: string, colorCss: string): CanvasTexture {
   c.width = 512;
   c.height = 128;
   const g = c.getContext('2d')!;
-  g.font = "900 58px 'Arial Black', system-ui, sans-serif";
+  g.font = font(700, 58);
   g.textAlign = 'center';
   g.textBaseline = 'middle';
   g.shadowColor = colorCss;
@@ -99,12 +101,16 @@ function nameTagTexture(text: string, colorCss: string): CanvasTexture {
   g.fillText(text, 256, 64, 470);
   g.shadowBlur = 0;
   g.fillStyle = 'rgba(255,255,255,0.94)';
-  g.font = "900 52px 'Arial Black', system-ui, sans-serif";
+  g.font = font(700, 52);
   g.fillText(text, 256, 64, 460);
   const tex = new CanvasTexture(c);
   tex.colorSpace = SRGBColorSpace;
   return tex;
 }
+
+/** Headless/dev hook (wired into __gdr in main.ts): raise the SOCIAL panel
+ *  without a controller. */
+export const socialView: { show?: (on: boolean) => void; snapSocial?: () => string } = {};
 
 export class ClubSocialSystem extends createSystem({}) {
   private crowd = new Group();
@@ -115,9 +121,11 @@ export class ClubSocialSystem extends createSystem({}) {
   private voiceRetry = 0;
 
   private panel!: Panel;
+  private pointers!: Record<'left' | 'right', PointerRay>;
   private ray = new Raycaster();
   private hover: string | null = null;
   private paintKey = '';
+  private clock = 0;
 
   init(): void {
     this.crowd.name = 'club-crowd';
@@ -129,9 +137,18 @@ export class ClubSocialSystem extends createSystem({}) {
     // With the board gone from the club floor, this panel is the floor's
     // whole console — the extra rows (difficulty, leave) earn it the height.
     this.panel = new Panel(0.6, 0.99, 700, 1155);
-    this.panel.mesh.visible = false;
-    this.panel.mesh.rotation.order = 'YXZ';
+    this.panel.setShown(false, true);
+    this.panel.group.rotation.order = 'YXZ';
     this.scene.add(this.panel.group);
+
+    this.pointers = { left: new PointerRay(this.scene), right: new PointerRay(this.scene) };
+
+    socialView.show = (on) => {
+      this.panel.setShown(on);
+      if (on) this.place();
+      this.paintKey = '';
+    };
+    socialView.snapSocial = () => (this.panel.ctx().canvas as HTMLCanvasElement).toDataURL('image/png');
   }
 
   update(delta: number): void {
@@ -245,7 +262,19 @@ export class ClubSocialSystem extends createSystem({}) {
     }
 
     // ── the SOCIAL panel ────────────────────────────────────────────────
-    this.updatePanel(inClub && (inRoom || net.phase === 'off' || net.phase === 'error'));
+    this.clock += delta;
+    this.updatePanel(delta, inClub && (inRoom || net.phase === 'off' || net.phase === 'error'));
+    this.panel.tick(delta, this.beatPulse());
+  }
+
+  /** The under-halo's beat envelope (the same curve the board uses) —
+   *  ECLIPSE publishes match.beat on the floor; a house clock covers gaps. */
+  private beatPulse(): number {
+    const beat = Number.isFinite(match.beat) ? match.beat : this.clock / 0.86;
+    const f = beat - Math.floor(beat);
+    const att = Math.min(1, f / 0.06);
+    const env = att * (1 - f) ** 3;
+    return env * (Math.floor(beat) % 4 === 0 ? 1 : 0.5);
   }
 
   /* ── roster → puppets ─────────────────────────────────────────────────── */
@@ -342,32 +371,43 @@ export class ClubSocialSystem extends createSystem({}) {
 
   /* ── the SOCIAL panel ─────────────────────────────────────────────────── */
 
-  private updatePanel(allowed: boolean): void {
-    if (!allowed && this.panel.mesh.visible) this.panel.mesh.visible = false;
+  private updatePanel(delta: number, allowed: boolean): void {
+    if (!allowed && this.panel.isShown) this.panel.setShown(false);
     if (allowed && this.input.xr.gamepads.right?.getButtonDown(InputComponent.A_Button)) {
-      this.panel.mesh.visible = !this.panel.mesh.visible;
-      if (this.panel.mesh.visible) this.place();
+      this.panel.setShown(!this.panel.isShown);
+      if (this.panel.isShown) this.place();
       sfx.uiClick();
     }
-    if (!this.panel.mesh.visible) return;
+    if (!this.panel.isShown) {
+      this.pointers.left.hide();
+      this.pointers.right.hide();
+      return;
+    }
 
     // Pointer: either controller ray; trigger clicks the hovered button.
     let hover: string | null = null;
     let clicked: string | null = null;
     for (const hand of ['left', 'right'] as const) {
+      const p = this.pointers[hand];
       const rayObj = this.world.playerSpaceEntities?.raySpaces?.[hand]?.object3D;
-      if (!rayObj) continue;
+      if (!rayObj) {
+        p.hide();
+        continue;
+      }
       rayObj.getWorldPosition(_o);
       rayObj.getWorldQuaternion(_q);
       _d.set(0, 0, -1).applyQuaternion(_q).normalize();
       this.ray.set(_o, _d);
       this.ray.far = 3;
       const hit = this.ray.intersectObject(this.panel.mesh, false)[0];
-      if (!hit?.uv) continue;
-      const id = this.panel.buttonAt(hit.uv.x, hit.uv.y);
+      const id = hit?.uv ? this.panel.buttonAt(hit.uv.x, hit.uv.y) : null;
+      p.update(delta, _o, hit ? hit.point : null, Boolean(id));
       if (!id) continue;
       hover = id;
-      if (this.input.xr.gamepads[hand]?.getButtonDown(InputComponent.Trigger)) clicked = id;
+      if (this.input.xr.gamepads[hand]?.getButtonDown(InputComponent.Trigger)) {
+        clicked = id;
+        p.click();
+      }
     }
     if (hover !== this.hover) {
       this.hover = hover;
@@ -376,6 +416,7 @@ export class ClubSocialSystem extends createSystem({}) {
     }
     if (clicked) {
       sfx.uiClick();
+      this.panel.press(clicked);
       if (clicked === 'voice') {
         setVoiceEnabled(!voiceEnabled());
       } else if (clicked === 'mic') {
@@ -396,7 +437,7 @@ export class ClubSocialSystem extends createSystem({}) {
           /* fine */
         }
       } else if (clicked === 'leave') {
-        this.panel.mesh.visible = false;
+        this.panel.setShown(false);
         leaveRoom();
       } else if (clicked.startsWith('mute:')) {
         toggleSocialMute(clicked.slice(5));
@@ -443,7 +484,7 @@ export class ClubSocialSystem extends createSystem({}) {
     _fwd.y = 0;
     if (_fwd.lengthSq() < 1e-4) _fwd.set(0, 0, -1);
     _fwd.normalize();
-    const m = this.panel.mesh;
+    const m = this.panel.group;
     m.position.set(_cam.x + _fwd.x * 0.6, _cam.y - 0.42, _cam.z + _fwd.z * 0.6);
     m.rotation.set(-0.3, Math.atan2(_cam.x - m.position.x, _cam.z - m.position.z), 0);
     this.paintKey = '';
@@ -473,7 +514,7 @@ export class ClubSocialSystem extends createSystem({}) {
       buttons.push({
         id: `mute:${m.name}`,
         label: socialMuted(m.name) ? 'MUTED' : 'MUTE',
-        accent: socialMuted(m.name) ? UI.danger : UI.amber,
+        tone: socialMuted(m.name) ? UI.danger : undefined,
         x: 396,
         y,
         w: 136,
@@ -483,7 +524,7 @@ export class ClubSocialSystem extends createSystem({}) {
       buttons.push({
         id: `block:${m.name}`,
         label: socialBlocked(m.name) ? 'BLOCKED' : 'BLOCK',
-        accent: socialBlocked(m.name) ? UI.danger : UI.violet,
+        tone: socialBlocked(m.name) ? UI.danger : undefined,
         x: 546,
         y,
         w: 136,
@@ -497,7 +538,6 @@ export class ClubSocialSystem extends createSystem({}) {
       id: 'track',
       label: cued ? `♪ ${cued.title}` : '♪ SHUFFLE',
       sub: cued ? `${cued.bpm.toFixed(cued.bpm % 1 ? 2 : 0)} BPM — rides the ball you call` : 'the seed picks — rides the ball you call',
-      accent: UI.cyan,
       x: 24,
       y: 652,
       w: 652,
@@ -510,7 +550,7 @@ export class ClubSocialSystem extends createSystem({}) {
       buttons.push({
         id: `diff${i}`,
         label,
-        accent: match.difficulty === i ? UI.goop : undefined,
+        selected: match.difficulty === i,
         x: 24 + i * 165,
         y: 740,
         w: 157,
@@ -523,7 +563,7 @@ export class ClubSocialSystem extends createSystem({}) {
         id: 'cancel',
         label: 'CALL IT OFF',
         sub: 'your ball is up — or just touch it',
-        accent: UI.danger,
+        tone: UI.danger,
         x: 24,
         y: 808,
         w: 652,
@@ -531,6 +571,7 @@ export class ClubSocialSystem extends createSystem({}) {
         small: true,
       });
     } else {
+      // The floor's one CTA: the thing this panel exists to let you do.
       buttons.push({
         id: 'call',
         label: ballUp ? 'THE BALL IS UP' : setOut ? 'A SET IS OUT' : 'SEND THE BALL UP',
@@ -539,7 +580,7 @@ export class ClubSocialSystem extends createSystem({}) {
           : setOut
             ? `${net.gamePlayers.size} on the ring — the floor waits for them`
             : 'a ball spawns before you · touchers ride at zero',
-        accent: UI.goop,
+        primary: true,
         disabled: ballUp || setOut,
         x: 24,
         y: 808,
@@ -552,7 +593,7 @@ export class ClubSocialSystem extends createSystem({}) {
     buttons.push({
       id: 'mic',
       label: mic ? 'MIC LIVE — left Ⓨ mutes' : on ? 'MIC MUTED — left Ⓨ opens it' : 'MIC OFF',
-      accent: mic ? UI.goop : UI.danger,
+      tone: mic ? UI.positive : UI.danger,
       x: 24,
       y: 896,
       w: 652,
@@ -563,7 +604,7 @@ export class ClubSocialSystem extends createSystem({}) {
       id: 'voice',
       label: on ? 'VOICE CHAT: ON' : 'VOICE CHAT: OFF',
       sub: on ? 'the room can talk — spatial, by the figure' : 'hear no one, send nothing',
-      accent: on ? UI.cyan : UI.danger,
+      tone: on ? undefined : UI.danger,
       x: 24,
       y: 958,
       w: 652,
@@ -577,7 +618,7 @@ export class ClubSocialSystem extends createSystem({}) {
         id: 'leave',
         label: 'LEAVE THE CLUB',
         sub: 'back to the foyer · the room keeps dancing',
-        accent: UI.danger,
+        tone: UI.danger,
         x: 24,
         y: 1036,
         w: 652,
@@ -591,60 +632,97 @@ export class ClubSocialSystem extends createSystem({}) {
       (g) => {
         g.textAlign = 'left';
         g.textBaseline = 'middle';
-        g.font = "900 44px 'Arial Black', system-ui, sans-serif";
-        g.fillStyle = UI.amber;
+        g.font = font(700, 42);
+        g.letterSpacing = '3px';
+        g.fillStyle = UI.textHi;
         g.fillText('THE ROOM', 28, 56);
-        g.font = "700 22px 'Arial Black', system-ui, sans-serif";
-        g.fillStyle = UI.dim;
-        g.fillText(
-          net.phase === 'hosting' || net.phase === 'joined'
-            ? `${net.code} · mute silences · block also hides · yours to undo`
-            : 'host or join a room and the floor fills up',
-          28,
-          98,
-        );
-        if (net.phase === 'hosting' || net.phase === 'joined') {
-          g.fillText('right Ⓐ closes this panel', 28, 130);
+        g.letterSpacing = '0px';
+        if (inRoom) {
+          // The code IS the invitation — it gets the data colour and the
+          // wide tracking; everything around it stays quiet.
+          g.font = font(600, 20);
+          g.letterSpacing = '2px';
+          g.fillStyle = UI.faint;
+          g.fillText('ROOM', 28, 102);
+          const rw = g.measureText('ROOM').width;
+          g.font = font(700, 30);
+          g.letterSpacing = '8px';
+          g.fillStyle = UI.info;
+          g.fillText(net.code, 28 + rw + 18, 102);
+          const cw = g.measureText(net.code).width;
+          g.font = font(500, 21);
+          g.letterSpacing = '0.5px';
+          g.fillStyle = UI.dim;
+          g.fillText(`· ${net.members.length} on the floor`, 28 + rw + 18 + cw + 16, 102);
+          g.font = font(500, 20);
+          g.fillStyle = UI.faint;
+          g.fillText('mute silences · block also hides · right Ⓐ closes', 28, 138);
+        } else {
+          g.font = font(500, 21);
+          g.letterSpacing = '0.5px';
+          g.fillStyle = UI.dim;
+          g.fillText('host or join a room and the floor fills up', 28, 102);
         }
+        g.letterSpacing = '0px';
+
         members.forEach((m, i) => {
           const y = ROW0 + i * ROW_H + 25;
           const hidden = socialBlocked(m.name);
           const away = net.gamePlayers.has(m.idx);
-          g.font = "900 30px 'Arial Black', system-ui, sans-serif";
+          if (i > 0) {
+            g.fillStyle = UI.lineFaint;
+            g.fillRect(28, y - 29, 652 - 8, 1.5);
+          }
+          g.font = font(600, 29);
+          g.letterSpacing = '1px';
           g.fillStyle = hidden
-            ? 'rgba(172,182,198,0.45)'
+            ? UI.faint
             : `#${hueToColor(seatHue(m.idx), 0.62).toString(16).padStart(6, '0')}`;
           const label = m.name.slice(0, 12);
           g.fillText(label, 28, y);
+          g.letterSpacing = '0px';
           if (hidden) {
             const w = g.measureText(label).width;
             g.strokeStyle = 'rgba(172,182,198,0.6)';
-            g.lineWidth = 3;
+            g.lineWidth = 2.5;
             g.beginPath();
             g.moveTo(28, y);
             g.lineTo(28 + w, y);
             g.stroke();
           }
           if (away) {
-            g.fillStyle = UI.amber;
-            g.font = "700 20px 'Arial Black', system-ui, sans-serif";
-            g.fillText('ON THE RING', 250, y);
+            g.fillStyle = UI.warn;
+            g.font = font(600, 19);
+            g.letterSpacing = '1.5px';
+            g.fillText('ON THE RING', 246, y);
+            g.letterSpacing = '0px';
           } else if (isSpeaking(String(m.idx))) {
-            g.fillStyle = UI.goop;
-            g.font = "700 22px 'Arial Black', system-ui, sans-serif";
-            g.fillText('◉', 340, y);
+            // The presence dot: they're holding the floor right now.
+            g.fillStyle = UI.positive;
+            g.shadowColor = UI.positive;
+            g.shadowBlur = 8;
+            g.beginPath();
+            g.arc(352, y, 6, 0, Math.PI * 2);
+            g.fill();
+            g.shadowBlur = 0;
           }
         });
         if (more > 0) {
-          g.font = "700 22px 'Arial Black', system-ui, sans-serif";
+          g.font = font(500, 21);
           g.fillStyle = UI.dim;
           g.fillText(`…and ${more} more on the floor`, 28, ROW0 + members.length * ROW_H + 22);
         }
         if (!members.length) {
-          g.font = "700 26px 'Arial Black', system-ui, sans-serif";
+          g.font = font(500, 24);
           g.fillStyle = UI.dim;
           g.fillText('nobody else on the floor right now', 28, ROW0 + 30);
         }
+
+        // Section seams: the ball's console, the voice desk, the door.
+        g.fillStyle = UI.lineFaint;
+        g.fillRect(24, 634, 652, 2);
+        g.fillRect(24, 884, 652, 2);
+        if (inRoom) g.fillRect(24, 1024, 652, 2);
       },
       buttons,
       this.hover,

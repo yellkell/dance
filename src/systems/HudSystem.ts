@@ -41,6 +41,7 @@ import {
 import { GRADE, GROOVE, SCORE, TOUR, seatHue } from '../config.js';
 import { trackById } from '../audio/tracks.js';
 import { dodgeRate, gradeOf, match, me } from '../game/state.js';
+import { font } from '../ui/fonts.js';
 
 const SET_COLORS = ['#8cff70', '#ff6ee0', '#ffd24a'];
 
@@ -66,7 +67,7 @@ function ink(
   fill: string,
   maxWidth?: number,
 ): void {
-  g.font = `900 ${px}px 'Arial Black', system-ui, sans-serif`;
+  g.font = font(700, px);
   g.lineJoin = 'round';
   g.lineCap = 'round';
   g.lineWidth = Math.max(6, px * 0.22);
@@ -96,7 +97,7 @@ function neon(
   g.shadowColor = glow;
   g.shadowBlur = Math.max(14, px * 0.4);
   g.fillStyle = fill;
-  g.font = `900 ${px}px 'Arial Black', system-ui, sans-serif`;
+  g.font = font(700, px);
   if (maxWidth) g.fillText(text, x, y, maxWidth);
   else g.fillText(text, x, y);
   g.shadowBlur = 0;

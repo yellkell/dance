@@ -32,6 +32,7 @@ import { PALETTE, hueToColor, seatHue } from '../config.js';
 import { glowSprite } from '../materials/glow.js';
 import { trackById } from '../audio/tracks.js';
 import { CLUB } from './config.js';
+import { font } from '../ui/fonts.js';
 
 export const BALL_TOUCH_RADIUS = 0.42;
 
@@ -145,7 +146,7 @@ export function buildBallVisual(): BallVisual {
     g.textAlign = 'center';
     g.textBaseline = 'middle';
     // The clock — the headline.
-    g.font = "900 92px 'Arial Black', system-ui, sans-serif";
+    g.font = font(700, 92);
     g.fillStyle = seconds <= 10 ? '#ffd24a' : '#f4f6fb';
     if (seconds <= 5) {
       g.shadowColor = '#ffd24a';
@@ -155,15 +156,15 @@ export function buildBallVisual(): BallVisual {
     g.shadowBlur = 0;
 
     const track = trackById(trackId);
-    g.font = "900 30px 'Arial Black', system-ui, sans-serif";
+    g.font = font(700, 30);
     g.fillStyle = '#4fb7ff';
     g.fillText(`♪ ${track ? track.title : 'SHUFFLE'}`, 256, 140);
-    g.font = "700 24px 'Arial Black', system-ui, sans-serif";
+    g.font = font(600, 24);
     g.fillStyle = 'rgba(232,236,242,0.75)';
     g.fillText(`${callerName} calls`, 256, 176);
 
     // One short state line — the touch teaches the rest.
-    g.font = "800 26px 'Arial Black', system-ui, sans-serif";
+    g.font = font(700, 26);
     if (mine) {
       g.fillStyle = '#ff5040';
       g.fillText('touch to call it off', 256, 218);
@@ -176,7 +177,7 @@ export function buildBallVisual(): BallVisual {
     }
 
     if (joinNames.length) {
-      g.font = "700 22px 'Arial Black', system-ui, sans-serif";
+      g.font = font(600, 22);
       g.fillStyle = 'rgba(232,236,242,0.6)';
       const names = joinNames.slice(0, 6).join(' · ');
       const extra = joinNames.length > 6 ? ` +${joinNames.length - 6}` : '';

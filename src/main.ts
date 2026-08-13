@@ -138,6 +138,8 @@ import { finishRaid, startRaid, toLobby, toTour } from './game/flow.js';
 import { match } from './game/state.js';
 import { arena } from './arena/arena.js';
 import { choreoView } from './systems/ChoreoSystem.js';
+import { menuView } from './systems/MenuSystem.js';
+import { socialView } from './systems/ClubSocialSystem.js';
 import { grooveView } from './systems/PlayerSystem.js';
 import { callBall, cancelBall, hostRoom, joinBall, joinRoom, leaveRoom, net, setDancerName } from './net/session.js';
 import { clubPoses } from './net/poses.js';
@@ -167,6 +169,9 @@ declare global {
       };
       /** THE BALL, drivable headlessly: call one, touch in, call it off. */
       club: { call: typeof callBall; touch: typeof joinBall; cancel: typeof cancelBall };
+      /** The menus, drivable headlessly: board mode/hover, the pause card,
+       *  the SOCIAL panel — the style-iteration hooks. */
+      menu: typeof menuView & typeof socialView;
       /** Park the player rig at (x, z) facing `yaw` — headless club walks. */
       rig: (x: number, z: number, yaw?: number, y?: number) => void;
     };
@@ -195,6 +200,12 @@ window.__gdr = {
     poses: clubPoses,
   },
   club: { call: callBall, touch: joinBall, cancel: cancelBall },
+  menu: new Proxy({} as typeof menuView & typeof socialView, {
+    // The views are populated in each system's init — resolve lazily.
+    get: (_t, key) =>
+      (menuView as Record<string | symbol, unknown>)[key] ??
+      (socialView as Record<string | symbol, unknown>)[key],
+  }),
   rig: (x, z, yaw = 0, y = 0) => {
     const w = worldRef;
     if (!w) return;
