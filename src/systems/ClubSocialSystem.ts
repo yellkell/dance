@@ -34,7 +34,7 @@ import {
   SRGBColorSpace,
   Vector3,
 } from 'three';
-import { hueToColor, seatHue } from '../config.js';
+import { DIFFICULTY, hueToColor, seatHue } from '../config.js';
 import * as sfx from '../audio/sfx.js';
 import { preload } from '../audio/music.js';
 import { pickRaidTrack, trackById, tracksFor } from '../audio/tracks.js';
@@ -60,10 +60,11 @@ import {
 import { buildDancer, type DancerPose, type DancerRig } from '../game/avatars.js';
 import { match } from '../game/state.js';
 import { clubPoses, remotePoses } from '../net/poses.js';
-import { callBall, cancelBall, net, onVoice, seatByIdx, sendClubPose, sendVoice } from '../net/session.js';
+import { callBall, cancelBall, leaveRoom, net, onVoice, seatByIdx, sendClubPose, sendVoice } from '../net/session.js';
 import { Panel, UI, type PanelButton } from '../ui/panel.js';
 
 const TRACK_KEY = 'gdr-track';
+const DIFF_KEY = 'gdr-diff';
 
 const _v = new Vector3();
 const _q = new Quaternion();
@@ -125,7 +126,9 @@ export class ClubSocialSystem extends createSystem({}) {
     // Inbound voice frames route straight to their spatial speaker.
     onVoice((id, frame) => pushVoiceFrame(id, frame));
 
-    this.panel = new Panel(0.6, 0.9, 700, 1050);
+    // With the board gone from the club floor, this panel is the floor's
+    // whole console — the extra rows (difficulty, leave) earn it the height.
+    this.panel = new Panel(0.6, 0.99, 700, 1155);
     this.panel.mesh.visible = false;
     this.panel.mesh.rotation.order = 'YXZ';
     this.scene.add(this.panel.group);
@@ -383,6 +386,18 @@ export class ClubSocialSystem extends createSystem({}) {
         this.callFromHere();
       } else if (clicked === 'cancel') {
         cancelBall();
+      } else if (clicked.startsWith('diff')) {
+        // The act floor for the chart my ball calls — same store the board
+        // uses, so the foyer and the floor always agree.
+        match.difficulty = Math.max(0, Math.min(3, Number(clicked.slice(4))));
+        try {
+          localStorage.setItem(DIFF_KEY, String(match.difficulty));
+        } catch {
+          /* fine */
+        }
+      } else if (clicked === 'leave') {
+        this.panel.mesh.visible = false;
+        leaveRoom();
       } else if (clicked.startsWith('mute:')) {
         toggleSocialMute(clicked.slice(5));
       } else if (clicked.startsWith('block:')) {
@@ -443,9 +458,10 @@ export class ClubSocialSystem extends createSystem({}) {
     const ballUp = net.ball !== null;
     const mine = ballUp && net.ball!.callerIdx === net.myIdx;
     const setOut = net.gamePlayers.size > 0;
+    const inRoom = net.phase === 'hosting' || net.phase === 'joined';
     const key =
       members.map((m) => `${m.name}|${socialMuted(m.name) ? 1 : 0}${socialBlocked(m.name) ? 1 : 0}`).join(';') +
-      `#${this.hover ?? ''}#${on ? 1 : 0}#${mic ? 1 : 0}#${net.phase}#${cued?.id ?? ''}#${ballUp ? (mine ? 'B' : 'b') : ''}#${setOut ? net.gamePlayers.size : 0}#${more}`;
+      `#${this.hover ?? ''}#${on ? 1 : 0}#${mic ? 1 : 0}#${net.phase}#${cued?.id ?? ''}#${ballUp ? (mine ? 'B' : 'b') : ''}#${setOut ? net.gamePlayers.size : 0}#${more}#${match.difficulty}`;
     if (key === this.paintKey) return;
     this.paintKey = key;
 
@@ -476,17 +492,31 @@ export class ClubSocialSystem extends createSystem({}) {
       });
     });
 
-    // ── calling a raid: the song pick + the ball ────────────────────────
+    // ── calling a raid: the song pick, the chart, the ball ──────────────
     buttons.push({
       id: 'track',
       label: cued ? `♪ ${cued.title}` : '♪ SHUFFLE',
       sub: cued ? `${cued.bpm.toFixed(cued.bpm % 1 ? 2 : 0)} BPM — rides the ball you call` : 'the seed picks — rides the ball you call',
       accent: UI.cyan,
       x: 24,
-      y: 668,
+      y: 652,
       w: 652,
       h: 74,
       small: true,
+    });
+    // DIFFICULTY: the chart's act floor — the caller's pick rides the ball
+    // with the song (the board's row, moved in with the rest of the desk).
+    DIFFICULTY.labels.forEach((label, i) => {
+      buttons.push({
+        id: `diff${i}`,
+        label,
+        accent: match.difficulty === i ? UI.goop : undefined,
+        x: 24 + i * 165,
+        y: 740,
+        w: 157,
+        h: 54,
+        small: true,
+      });
     });
     if (mine) {
       buttons.push({
@@ -495,7 +525,7 @@ export class ClubSocialSystem extends createSystem({}) {
         sub: 'your ball is up — or just touch it',
         accent: UI.danger,
         x: 24,
-        y: 752,
+        y: 808,
         w: 652,
         h: 74,
         small: true,
@@ -512,7 +542,7 @@ export class ClubSocialSystem extends createSystem({}) {
         accent: UI.goop,
         disabled: ballUp || setOut,
         x: 24,
-        y: 752,
+        y: 808,
         w: 652,
         h: 74,
         small: true,
@@ -524,9 +554,9 @@ export class ClubSocialSystem extends createSystem({}) {
       label: mic ? 'MIC LIVE — left Ⓨ mutes' : on ? 'MIC MUTED — left Ⓨ opens it' : 'MIC OFF',
       accent: mic ? UI.goop : UI.danger,
       x: 24,
-      y: 844,
+      y: 896,
       w: 652,
-      h: 56,
+      h: 54,
       small: true,
     });
     buttons.push({
@@ -535,11 +565,26 @@ export class ClubSocialSystem extends createSystem({}) {
       sub: on ? 'the room can talk — spatial, by the figure' : 'hear no one, send nothing',
       accent: on ? UI.cyan : UI.danger,
       x: 24,
-      y: 908,
+      y: 958,
       w: 652,
-      h: 64,
+      h: 60,
       small: true,
     });
+    if (inRoom) {
+      // The board's LEAVE moved in with the desk — the one door out of the
+      // room that isn't a set.
+      buttons.push({
+        id: 'leave',
+        label: 'LEAVE THE CLUB',
+        sub: 'back to the foyer · the room keeps dancing',
+        accent: UI.danger,
+        x: 24,
+        y: 1036,
+        w: 652,
+        h: 64,
+        small: true,
+      });
+    }
 
     this.panel.paint(
       '',

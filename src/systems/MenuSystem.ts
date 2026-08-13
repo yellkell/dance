@@ -194,19 +194,24 @@ export class MenuSystem extends createSystem({}) {
     const pauseUp = inSet && this.pauseUp;
 
     const menuRoom = screen === 'lobby' || screen === 'tour';
+    // THE CLUB keeps no front desk: with a room open you're standing on the
+    // social floor, and the floor's controls live on the SOCIAL panel
+    // (right Ⓐ). The board belongs to the foyer.
+    const social = net.phase === 'hosting' || net.phase === 'joined';
+    const boardUp = menuRoom && !social;
     const exitUp = screen === 'podium';
-    this.board.group.visible = menuRoom;
+    this.board.group.visible = boardUp;
     this.exit.group.visible = exitUp;
     this.pause.group.visible = pauseUp;
 
-    if (!menuRoom && !exitUp && !pauseUp) {
+    if (!boardUp && !exitUp && !pauseUp) {
       this.hidePointers();
       return;
     }
 
     // Pointers + hover + click.
     const targets: Object3D[] = [];
-    if (menuRoom) targets.push(this.board.mesh);
+    if (boardUp) targets.push(this.board.mesh);
     if (exitUp) targets.push(this.exit.mesh);
     if (pauseUp) targets.push(this.pause.mesh);
 
@@ -395,7 +400,8 @@ export class MenuSystem extends createSystem({}) {
     if (key === this.lastKey) return;
     this.lastKey = key;
 
-    if (match.screen === 'lobby' || match.screen === 'tour') {
+    const social = net.phase === 'hosting' || net.phase === 'joined';
+    if ((match.screen === 'lobby' || match.screen === 'tour') && !social) {
       this.paintBoard();
     }
     if (this.pauseUp && (match.screen === 'raid' || match.screen === 'countdown')) {
