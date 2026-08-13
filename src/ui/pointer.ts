@@ -63,7 +63,10 @@ export class PointerRay {
     this.line.visible = on;
     this.dot.visible = on;
     if (!on) {
+      // Reset the feedback, not just hide it — a stale click pop or hover
+      // swell must not reappear when the ray finds a panel again.
       this.hoverAmt = 0;
+      this.clickAmt = 0;
       return;
     }
 
