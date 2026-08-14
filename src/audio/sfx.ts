@@ -310,7 +310,8 @@ function servo(from: number, to: number, dur: number, gain = 0.07, delay = 0): v
   osc.stop(t0 + dur + 0.05);
 }
 
-// --- Drone Hunt (arcade cabinet) -----------------------------------------
+// --- SUPER OCTAGON (the club's arcade cabinet) ----------------------------
+// Carried over from FIRE FIGHT's pub cabinet, where these four were born.
 
 /** The light-gun shot: a fast downward zap "pew". */
 export function huntShot(): void {

@@ -16,6 +16,7 @@ import { launchXR, SessionMode, World } from '@iwsdk/core';
 import { Color } from 'three';
 import { ensureAudio } from './audio/sfx.js';
 import { VOID_BG } from './arena/voidkit.js';
+import { ArcadeSystem } from './systems/ArcadeSystem.js';
 import { ArenaSystem } from './systems/ArenaSystem.js';
 import { AvatarSystem } from './systems/AvatarSystem.js';
 import { ChoreoSystem } from './systems/ChoreoSystem.js';
@@ -87,6 +88,7 @@ World.create(container, {
   world.registerSystem(ClubTeleportSystem);
   world.registerSystem(ClubSocialSystem);
   world.registerSystem(ClubBallSystem);
+  world.registerSystem(ArcadeSystem);
   world.registerSystem(MusicSystem);
   world.registerSystem(ChoreoSystem);
   world.registerSystem(GoopliathSystem);

@@ -49,6 +49,7 @@ import {
   SRGBColorSpace,
   TorusGeometry,
   Vector2,
+  Vector3,
   type Object3D,
   type Scene,
 } from 'three';
@@ -71,6 +72,7 @@ import {
   velvetTexture,
 } from './materials.js';
 import { collapseStatic } from './merge.js';
+import { registerArcade } from './arcade.js';
 import { font, onFontsReady } from '../ui/fonts.js';
 
 export interface ChandelierRing {
@@ -202,6 +204,7 @@ export function buildClub(scene: Scene): ClubRefs {
   buildTerrace(root);
   buildVestibule(root);
   const stillLampMat = buildStillRoom(root, candleMat);
+  buildArcade(root);
   const inlayMat = buildFloorInlay(root);
   buildLights(root);
 
@@ -1276,6 +1279,176 @@ function buildStillRoom(root: Group, candleMat: SpriteMaterial): MeshStandardMat
   root.add(lampGlowHolder);
 
   return lampMat;
+}
+
+/* ── THE ARCADE: SUPER OCTAGON's room, the still room's loud mirror ─────── */
+
+function buildArcade(root: Group): void {
+  const A = CLUB.arcade;
+  const H = 2.5;
+  const plaster = new MeshStandardMaterial({ map: plasterTexture([3, 1.4]), roughness: 0.95, metalness: 0.02 });
+
+  // Interior walls (west + south split around the door), lintel, low cap —
+  // the same envelope as the still room, mirrored across the hall.
+  const wWall = new Mesh(new PlaneGeometry(A.maxZ - A.minZ, H), plaster);
+  wWall.position.set(A.minX, H / 2, (A.minZ + A.maxZ) / 2);
+  wWall.rotation.y = Math.PI / 2;
+  (wWall.material as MeshStandardMaterial).side = DoubleSide;
+  root.add(wWall);
+  const south = (x0: number, x1: number): void => {
+    const m = new Mesh(new PlaneGeometry(x1 - x0, H), plaster);
+    m.position.set((x0 + x1) / 2, H / 2, A.maxZ);
+    (m.material as MeshStandardMaterial).side = DoubleSide;
+    root.add(m);
+  };
+  south(A.minX, A.doorX0);
+  south(A.doorX1, A.maxX);
+  const lintel = new Mesh(new PlaneGeometry(A.doorX1 - A.doorX0, H - 2.05), plaster);
+  lintel.position.set((A.doorX0 + A.doorX1) / 2, (H + 2.05) / 2, A.maxZ);
+  (lintel.material as MeshStandardMaterial).side = DoubleSide;
+  root.add(lintel);
+  const cap = new Mesh(new PlaneGeometry(A.maxX - A.minX, A.maxZ - A.minZ), new MeshStandardMaterial({
+    color: 0x191720,
+    roughness: 0.95,
+  }));
+  cap.rotation.x = Math.PI / 2;
+  cap.position.set((A.minX + A.maxX) / 2, H, (A.minZ + A.maxZ) / 2);
+  root.add(cap);
+  // Door dressing + nameplate, the still room's twin — but this door
+  // promises noise, so the plate glows the cabinet's magenta.
+  for (const x of [A.doorX0, A.doorX1]) box(root, bronzeMat(), 0.08, 2.05, 0.1, x, 1.025, A.maxZ);
+  box(root, bronzeMat(), A.doorX1 - A.doorX0 + 0.08, 0.09, 0.1, (A.doorX0 + A.doorX1) / 2, 2.05, A.maxZ);
+  const plate = signPlane(0.96, 0.24, 512, (g, sw, sh) => {
+    g.fillStyle = 'rgba(13,10,18,0.85)';
+    g.beginPath();
+    g.roundRect(4, 4, sw - 8, sh - 8, 14);
+    g.fill();
+    g.strokeStyle = 'rgba(255,42,213,0.5)';
+    g.lineWidth = 2.5;
+    g.stroke();
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.fillStyle = '#ffd9f6';
+    g.shadowColor = css(PALETTE.magenta);
+    g.shadowBlur = 10;
+    g.font = font(600, 58);
+    g.letterSpacing = '8px';
+    g.fillText('ARCADE', sw / 2, sh / 2 + 2);
+    g.letterSpacing = '0px';
+    g.shadowBlur = 0;
+  });
+  plate.name = 'live-arcade-plate';
+  plate.position.set((A.doorX0 + A.doorX1) / 2, 2.34, A.maxZ + 0.06);
+  root.add(plate);
+
+  // ── THE CABINET: SUPER OCTAGON, against the north wall, facing the door.
+  const cx = (A.minX + A.maxX) / 2;
+  const cz = A.minZ + 0.45;
+  const cab = new Group();
+  cab.position.set(cx, 0, cz);
+  const shellMat = blackSteelMat();
+  const body = new Mesh(new BoxGeometry(0.62, 1.75, 0.6), shellMat);
+  body.position.y = 0.875;
+  cab.add(body);
+  // Neon side stripes — hazard amber in FIRE FIGHT; house magenta here.
+  const stripeMat = new MeshBasicMaterial({ color: PALETTE.magenta });
+  for (const sx of [-0.315, 0.315]) {
+    const stripe = new Mesh(new BoxGeometry(0.012, 1.6, 0.5), stripeMat);
+    stripe.position.set(sx, 0.9, 0);
+    cab.add(stripe);
+  }
+  // Marquee: the game's name in lights.
+  const marqueeBox = new Mesh(new BoxGeometry(0.66, 0.24, 0.34), shellMat);
+  marqueeBox.position.set(0, 1.94, 0.05);
+  cab.add(marqueeBox);
+  const marquee = signPlane(0.62, 0.18, 512, (g, sw, sh) => {
+    g.fillStyle = '#0d0a14';
+    g.fillRect(0, 0, sw, sh);
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.fillStyle = '#ffd9f6';
+    g.shadowColor = css(PALETTE.magenta);
+    g.shadowBlur = 16;
+    g.font = font(700, 64);
+    g.letterSpacing = '4px';
+    g.fillText('SUPER OCTAGON', sw / 2, sh / 2 + 2, sw - 24);
+    g.letterSpacing = '0px';
+    g.shadowBlur = 0;
+  });
+  marquee.name = 'live-octagon-marquee';
+  marquee.position.set(0, 1.94, 0.226);
+  cab.add(marquee);
+
+  // The CRT: bezel + the live screen plane the lasers aim at.
+  const bezel = new Mesh(new BoxGeometry(0.54, 0.44, 0.1), shellMat);
+  bezel.position.set(0, 1.42, 0.28);
+  bezel.rotation.x = -0.18;
+  cab.add(bezel);
+  const screenCanvas = document.createElement('canvas');
+  screenCanvas.width = 384;
+  screenCanvas.height = 300;
+  const sg = screenCanvas.getContext('2d')!;
+  sg.fillStyle = '#08060e';
+  sg.fillRect(0, 0, 384, 300);
+  const screenTex = new CanvasTexture(screenCanvas);
+  screenTex.colorSpace = SRGBColorSpace;
+  screenTex.minFilter = LinearFilter;
+  const screen = new Mesh(new PlaneGeometry(0.46, 0.36), new MeshBasicMaterial({ map: screenTex }));
+  screen.name = 'live-octagon-screen';
+  screen.position.set(0, 1.42, 0.335);
+  screen.rotation.x = -0.18;
+  cab.add(screen);
+
+  // The deck: a lit plate and two chunky buttons (set dressing — the game
+  // is played with the controller lasers, the way everything here is).
+  const deck = new Mesh(new BoxGeometry(0.6, 0.06, 0.34), shellMat);
+  deck.position.set(0, 1.06, 0.32);
+  deck.rotation.x = 0.32;
+  cab.add(deck);
+  for (const bxn of [-0.12, 0.12]) {
+    const btn = new Mesh(new CylinderGeometry(0.035, 0.04, 0.03, 14), stripeMat);
+    btn.position.set(bxn, 1.1, 0.33);
+    btn.rotation.x = 0.32;
+    cab.add(btn);
+  }
+  root.add(cab);
+
+  // ── THE BOARD: the wall leaderboard beside the cabinet.
+  const boardCanvas = document.createElement('canvas');
+  boardCanvas.width = 512;
+  boardCanvas.height = 736;
+  const bg = boardCanvas.getContext('2d')!;
+  bg.fillStyle = '#0d0a14';
+  bg.fillRect(0, 0, 512, 736);
+  const boardTex = new CanvasTexture(boardCanvas);
+  boardTex.colorSpace = SRGBColorSpace;
+  boardTex.minFilter = LinearFilter;
+  const board = new Mesh(new PlaneGeometry(0.82, 1.18), new MeshBasicMaterial({ map: boardTex, transparent: true }));
+  board.name = 'live-octagon-board';
+  board.position.set(A.maxX - 0.03, 1.55, (A.minZ + A.maxZ) / 2 + 0.5);
+  board.rotation.y = -Math.PI / 2;
+  root.add(board);
+
+  // A cove strip so the room reads arcade-warm from the hall — and the
+  // cabinet's own glow, the fifth (and last) real light in the venue: the
+  // room is a sealed box under its low cap, and plaster with no light is
+  // just black (FIRE FIGHT's cabinet carried its own marquee light for
+  // exactly this reason).
+  const cove = new Mesh(new BoxGeometry(A.maxX - A.minX - 0.4, 0.03, 0.03), new MeshBasicMaterial({ color: PALETTE.magenta }));
+  cove.position.set(cx, H - 0.12, A.minZ + 0.08);
+  root.add(cove);
+  const glow = new PointLight(0xff6ad8, 1.5, 5.5, 1.4);
+  glow.position.set(cx, 2.1, cz + 0.9);
+  root.add(glow);
+
+  registerArcade({
+    screen,
+    screenCanvas,
+    screenTex,
+    boardCanvas,
+    boardTex,
+    cabinetPos: new Vector3(cx, 0, cz),
+  });
 }
 
 /* ═════════════════════════════ THE FOYER ═════════════════════════════════
