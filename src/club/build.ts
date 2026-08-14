@@ -70,6 +70,7 @@ import {
   velvetTexture,
 } from './materials.js';
 import { collapseStatic } from './merge.js';
+import { font, onFontsReady } from '../ui/fonts.js';
 
 export interface ChandelierRing {
   pivot: Group;
@@ -156,6 +157,13 @@ function signPlane(w: number, h: number, px: number, draw: (g: CanvasRenderingCo
   const tex = new CanvasTexture(c);
   tex.colorSpace = SRGBColorSpace;
   tex.minFilter = LinearFilter;
+  // The venue is built before the house woff2s land — re-ink the signage
+  // the moment the real glyphs arrive (first paint used the fallback).
+  onFontsReady(() => {
+    g.clearRect(0, 0, c.width, c.height);
+    draw(g, c.width, c.height);
+    tex.needsUpdate = true;
+  });
   const mesh = new Mesh(
     new PlaneGeometry(w, h),
     new MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false }),
@@ -1111,7 +1119,7 @@ function buildVestibule(root: Group): void {
     g.fillStyle = css(PALETTE.magenta);
     g.shadowColor = css(PALETTE.magenta);
     g.shadowBlur = 12;
-    g.font = `700 34px 'Arial Black', system-ui, sans-serif`;
+    g.font = font(600, 34);
     g.fillText('RAVE RAID', sw / 2, sh * 0.74);
   });
   plaque.name = 'live-plaque';
@@ -1360,11 +1368,11 @@ export function buildFoyer(scene: Scene): FoyerRefs {
     g.fillStyle = css(PALETTE.cyan);
     g.shadowColor = css(PALETTE.cyan);
     g.shadowBlur = 14;
-    g.font = `900 46px 'Arial Black', system-ui, sans-serif`;
+    g.font = font(700, 46);
     g.fillText('TONIGHT', sw / 2, 92);
     g.shadowBlur = 0;
     g.fillStyle = 'rgba(232,236,242,0.88)';
-    g.font = `900 32px 'Arial Black', system-ui, sans-serif`;
+    g.font = font(700, 32);
     ['OPENING SET', 'PEAK HOURS', 'AFTER HOURS'].forEach((line, i) => {
       g.fillText(line, sw / 2, 220 + i * 100);
     });

@@ -15,6 +15,7 @@ import {
   MeshBasicMaterial,
   PlaneGeometry,
 } from 'three';
+import { font } from './fonts.js';
 
 const W = 768;
 const H = 1024;
@@ -31,7 +32,7 @@ function ink(
   maxWidth?: number,
 ): void {
   g.textAlign = align;
-  g.font = `900 ${px}px 'Arial Black', system-ui, sans-serif`;
+  g.font = font(700, px);
   g.lineJoin = 'round';
   g.lineCap = 'round';
   g.lineWidth = Math.max(6, px * 0.22);
