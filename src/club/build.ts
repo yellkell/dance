@@ -1280,11 +1280,11 @@ function buildArcade(root: Group): void {
   const P: [number, number][] = [
     [-0.30, 0.0],   // back foot
     [0.30, 0.0],    // front foot (kick plate)
-    [0.30, 0.72],   // front panel, up to the knee
-    [0.345, 0.80],  // the control deck's nose, jutting a little proud
-    [0.345, 0.86],
-    [0.12, 1.05],   // the deck's slope, running up and back
-    [0.12, 1.13],   // the lip under the screen
+    [0.30, 0.90],   // front panel, up to the shelf
+    [0.315, 0.95],  // a shallow shelf where a control deck would be — this
+    [0.315, 0.99],  // cabinet is played with the lasers, so it's a ledge,
+    [0.12, 1.09],   // not a console: no stick, no buttons, nothing fake to
+    [0.12, 1.13],   // reach for and find isn't there.
     [0.215, 1.20],  // the monitor bay leans out at the bottom...
     [0.115, 1.78],  // ...and back in at the top, the way a CRT sits
     [0.265, 1.86],  // the marquee shelf steps forward again
@@ -1319,7 +1319,7 @@ function buildArcade(root: Group): void {
       cab.add(bar);
     }
   };
-  edge(0.30, 0.06, 0.30, 0.72); // the front panel's two corners
+  edge(0.30, 0.06, 0.30, 0.88); // the front panel's two corners
 
   // Marquee: the game's name, backlit, sitting ON the shelf the profile cut.
   const marquee = signPlane(0.56, 0.2, 512, (g, sw, sh) => {
@@ -1375,35 +1375,16 @@ function buildArcade(root: Group): void {
   screen.rotation.x = -tilt;
   cab.add(screen);
 
-  // The control deck: a brushed plate on the profile's slope, with a stick
-  // and three modest buttons. Set dressing — the game is played with the
-  // controller lasers, the way everything here is — so they read as
-  // hardware, not as lamps: bronze caps catching the marquee, no glow.
-  const deckTilt = Math.atan2(0.345 - 0.12, 1.05 - 0.86) - Math.PI / 2;
-  const deckMat = new MeshStandardMaterial({ color: 0x1a1720, roughness: 0.42, metalness: 0.65 });
-  const deckPlate = new Mesh(new PlaneGeometry(0.58, 0.28), deckMat);
-  deckPlate.position.set(0, 0.958, 0.238);
-  deckPlate.rotation.x = deckTilt;
-  cab.add(deckPlate);
-  const capMat = new MeshStandardMaterial({ color: 0xc9a86a, roughness: 0.34, metalness: 0.8 });
-  for (let i = 0; i < 3; i++) {
-    const bx = 0.02 + i * 0.075;
-    const btn = new Mesh(new CylinderGeometry(0.019, 0.021, 0.012, 14), capMat);
-    btn.position.set(bx, 0.968 + i * 0.004, 0.243 - i * 0.004);
-    btn.rotation.x = deckTilt + Math.PI / 2;
-    cab.add(btn);
-  }
-  // The stick: a bronze shaft off a steel dish, ball on top.
-  const dish = new Mesh(new CylinderGeometry(0.032, 0.034, 0.008, 14), deckMat);
-  dish.position.set(-0.15, 0.962, 0.242);
-  dish.rotation.x = deckTilt + Math.PI / 2;
-  cab.add(dish);
-  const shaft = new Mesh(new CylinderGeometry(0.008, 0.008, 0.062, 8), bronzeMat());
-  shaft.position.set(-0.15, 0.992, 0.238);
-  cab.add(shaft);
-  const knob = new Mesh(new SphereGeometry(0.019, 10, 8), new MeshStandardMaterial({ color: 0x5e1f26, roughness: 0.5, metalness: 0.1 }));
-  knob.position.set(-0.15, 1.026, 0.236);
-  cab.add(knob);
+  // The ledge gets a brushed plate and nothing else. Fake hardware you
+  // can't touch is worse than no hardware: in a room where everything is
+  // reached with the lasers, a stick and a row of buttons only promise a
+  // control scheme that doesn't exist.
+  const ledgeTilt = Math.atan2(0.315 - 0.12, 1.09 - 0.99) - Math.PI / 2;
+  const ledgeMat = new MeshStandardMaterial({ color: 0x1a1720, roughness: 0.42, metalness: 0.65 });
+  const ledge = new Mesh(new PlaneGeometry(0.58, 0.2), ledgeMat);
+  ledge.position.set(0, 1.043, 0.222);
+  ledge.rotation.x = ledgeTilt;
+  cab.add(ledge);
 
   // A coin door, because the eye looks for one on a cabinet this size.
   const coinDoor = new Mesh(new PlaneGeometry(0.2, 0.13), new MeshStandardMaterial({ color: 0x241f2b, roughness: 0.6, metalness: 0.5 }));

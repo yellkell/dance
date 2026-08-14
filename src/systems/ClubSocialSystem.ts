@@ -110,7 +110,12 @@ function nameTagTexture(text: string, colorCss: string): CanvasTexture {
 
 /** Headless/dev hook (wired into __gdr in main.ts): raise the SOCIAL panel
  *  without a controller. */
-export const socialView: { show?: (on: boolean) => void; snapSocial?: () => string } = {};
+export const socialView: {
+  show?: (on: boolean) => void;
+  snapSocial?: () => string;
+  snapSongs?: () => string;
+  openSongs?: (on: boolean) => void;
+} = {};
 
 export class ClubSocialSystem extends createSystem({}) {
   private crowd = new Group();
@@ -121,6 +126,10 @@ export class ClubSocialSystem extends createSystem({}) {
   private voiceRetry = 0;
 
   private panel!: Panel;
+  /** The song list, flown out beside the desk (see SONGS). */
+  private songs!: Panel;
+  private songsOpen = false;
+  private songsKey = '';
   private pointers!: Record<'left' | 'right', PointerRay>;
   private ray = new Raycaster();
   private hover: string | null = null;
@@ -141,13 +150,25 @@ export class ClubSocialSystem extends createSystem({}) {
     this.panel.group.rotation.order = 'YXZ';
     this.scene.add(this.panel.group);
 
+    // THE SONG LIST, as a leaf off the desk: the ♪ row used to CYCLE, so
+    // finding a record meant tapping through fourteen of them and reading
+    // the label each time. It flies out to the left instead, whole, and
+    // rides the desk (a child of its group) wherever the desk is placed.
+    this.songs = new Panel(0.38, 0.777, 440, 900);
+    this.songs.setShown(false, true);
+    this.songs.group.position.set(-0.51, 0.107, 0.008);
+    this.panel.group.add(this.songs.group);
+
     this.pointers = { left: new PointerRay(this.scene), right: new PointerRay(this.scene) };
 
     socialView.show = (on) => {
       this.panel.setShown(on);
+      if (!on) this.closeSongs();
       if (on) this.place();
       this.paintKey = '';
     };
+    socialView.snapSongs = () => (this.songs.ctx().canvas as HTMLCanvasElement).toDataURL('image/png');
+    socialView.openSongs = (on) => this.openSongs(on);
     socialView.snapSocial = () => (this.panel.ctx().canvas as HTMLCanvasElement).toDataURL('image/png');
   }
 
@@ -264,7 +285,9 @@ export class ClubSocialSystem extends createSystem({}) {
     // ── the SOCIAL panel ────────────────────────────────────────────────
     this.clock += delta;
     this.updatePanel(delta, inClub && (inRoom || net.phase === 'off' || net.phase === 'error'));
-    this.panel.tick(delta, this.beatPulse());
+    const pulse = this.beatPulse();
+    this.panel.tick(delta, pulse);
+    this.songs.tick(delta, pulse);
   }
 
   /** The under-halo's beat envelope (the same curve the board uses) —
@@ -399,8 +422,14 @@ export class ClubSocialSystem extends createSystem({}) {
       _d.set(0, 0, -1).applyQuaternion(_q).normalize();
       this.ray.set(_o, _d);
       this.ray.far = 3;
-      const hit = this.ray.intersectObject(this.panel.mesh, false)[0];
-      const id = hit?.uv ? this.panel.buttonAt(hit.uv.x, hit.uv.y) : null;
+      // Both surfaces when the list is out — nearest hit wins, and the id
+      // says which panel owns it ('song:' is the list's).
+      const hit = this.ray.intersectObjects(
+        this.songsOpen ? [this.panel.mesh, this.songs.mesh] : [this.panel.mesh],
+        false,
+      )[0];
+      const owner = hit?.object === this.songs.mesh ? this.songs : this.panel;
+      const id = hit?.uv ? owner.buttonAt(hit.uv.x, hit.uv.y) : null;
       p.update(delta, _o, hit ? hit.point : null, Boolean(id));
       if (!id) continue;
       hover = id;
@@ -413,16 +442,22 @@ export class ClubSocialSystem extends createSystem({}) {
       this.hover = hover;
       if (hover) sfx.uiHover();
       this.paintKey = '';
+      this.songsKey = '';
     }
     if (clicked) {
       sfx.uiClick();
-      this.panel.press(clicked);
-      if (clicked === 'voice') {
+      const onList = clicked.startsWith('song:');
+      (onList ? this.songs : this.panel).press(clicked);
+      if (onList) {
+        const pick = clicked.slice(5);
+        if (pick !== 'close') this.setTrack(pick === 'shuffle' ? '' : pick);
+        this.closeSongs();
+      } else if (clicked === 'voice') {
         setVoiceEnabled(!voiceEnabled());
       } else if (clicked === 'mic') {
         toggleVoiceMuted();
       } else if (clicked === 'track') {
-        this.cycleTrack();
+        this.openSongs(!this.songsOpen);
       } else if (clicked === 'call') {
         this.callFromHere();
       } else if (clicked === 'cancel') {
@@ -438,6 +473,7 @@ export class ClubSocialSystem extends createSystem({}) {
         }
       } else if (clicked === 'leave') {
         this.panel.setShown(false);
+        this.closeSongs();
         leaveRoom();
       } else if (clicked.startsWith('mute:')) {
         toggleSocialMute(clicked.slice(5));
@@ -448,21 +484,124 @@ export class ClubSocialSystem extends createSystem({}) {
     }
 
     this.paint();
+    if (this.songsOpen) this.paintSongs();
   }
 
-  /** Cycle my song pick: SHUFFLE → each raid record → back. The pick rides
-   *  the ball when I call one (same store the board's ♪ row uses). */
-  private cycleTrack(): void {
-    const pool = tracksFor('raid');
-    const at = pool.findIndex((t) => t.id === match.preferredTrack);
-    const next = at + 1 >= pool.length ? '' : pool[at + 1].id;
-    match.preferredTrack = next;
+  /* ── SONGS: the list that flies out of the ♪ row ──────────────────────── */
+
+  private openSongs(on: boolean): void {
+    this.songsOpen = on;
+    this.songs.setShown(on);
+    this.songsKey = '';
+    this.paintKey = '';
+    if (on) this.paintSongs();
+  }
+
+  private closeSongs(): void {
+    if (this.songsOpen) this.openSongs(false);
+  }
+
+  /** Take a record (or '' for SHUFFLE). The pick rides the ball when I call
+   *  one — same store the foyer's board uses, so the two always agree. */
+  private setTrack(id: string): void {
+    match.preferredTrack = id;
     try {
-      localStorage.setItem(TRACK_KEY, next);
+      localStorage.setItem(TRACK_KEY, id);
     } catch {
       /* fine */
     }
-    preload(trackById(next) ?? pickRaidTrack(match.seed));
+    preload(trackById(id) ?? pickRaidTrack(match.seed));
+  }
+
+  private paintSongs(): void {
+    const pool = tracksFor('raid');
+    const cur = match.preferredTrack || '';
+    const key = `${cur}#${this.hover ?? ''}#${pool.length}`;
+    if (key === this.songsKey) return;
+    this.songsKey = key;
+
+    const Y0 = 104;
+    const CLOSE_Y = 848;
+    const rows: { id: string; title: string; bpm: string }[] = [
+      { id: 'shuffle', title: 'SHUFFLE', bpm: '—' },
+      ...pool.map((t) => ({ id: t.id, title: t.title, bpm: String(Math.round(t.bpm)) })),
+    ];
+    // The whole shelf fits on one surface, however long the shelf gets: the
+    // pitch tightens rather than running a record off the bottom edge.
+    const PITCH = Math.min(46, (CLOSE_Y - Y0) / rows.length);
+    const ROW_H = PITCH - 4;
+    // Ghost hit-areas: the body paints the rows itself so the title and the
+    // BPM can share one line (the kit's label/sub would stack them).
+    const buttons: PanelButton[] = rows.map((r, i) => ({
+      id: `song:${r.id}`,
+      label: r.title,
+      ghost: true,
+      x: 16,
+      y: Y0 + i * PITCH,
+      w: 408,
+      h: ROW_H,
+    }));
+    buttons.push({
+      id: 'song:close',
+      label: 'CLOSE',
+      x: 16,
+      y: CLOSE_Y,
+      w: 408,
+      h: 44,
+      small: true,
+    });
+
+    this.songs.paint(
+      '',
+      (g) => {
+        g.textBaseline = 'middle';
+        g.textAlign = 'left';
+        g.font = font(600, 22);
+        g.letterSpacing = '4px';
+        g.fillStyle = UI.dim;
+        g.fillText('SELECT SONG', 22, 50);
+        g.letterSpacing = '1.5px';
+        g.font = font(500, 15);
+        g.fillStyle = UI.faint;
+        g.textAlign = 'right';
+        g.fillText('BPM', 424, 50);
+        g.letterSpacing = '0px';
+        g.fillStyle = UI.lineFaint;
+        g.fillRect(22, 76, 402, 2);
+
+        rows.forEach((r, i) => {
+          const y = Y0 + i * PITCH;
+          const selected = cur === (r.id === 'shuffle' ? '' : r.id);
+          const hov = this.songs.hoverOf(`song:${r.id}`);
+          g.beginPath();
+          g.roundRect(16, y, 408, ROW_H, 9);
+          g.fillStyle = selected ? UI.accentFaint : `rgba(255,255,255,${(0.03 + 0.05 * hov).toFixed(3)})`;
+          g.fill();
+          if (selected) {
+            g.lineWidth = 2;
+            g.strokeStyle = UI.accentDim;
+            g.stroke();
+            g.fillStyle = UI.accent;
+            g.beginPath();
+            g.roundRect(21, y + 8, 4, ROW_H - 16, 2);
+            g.fill();
+          }
+          const cy = y + ROW_H / 2 + 1;
+          g.textAlign = 'left';
+          g.font = font(600, Math.min(23, ROW_H - 19));
+          g.letterSpacing = '1px';
+          g.fillStyle = selected ? UI.textHi : UI.text;
+          g.fillText(r.title, 38, cy, 286);
+          g.letterSpacing = '0px';
+          g.textAlign = 'right';
+          g.font = font(500, 20);
+          g.fillStyle = UI.dim;
+          g.fillText(r.bpm, 408, cy);
+        });
+      },
+      buttons,
+      this.hover,
+    );
   }
 
   /** Send the ball up just ahead of me, and warm my record for the drop. */
@@ -502,7 +641,7 @@ export class ClubSocialSystem extends createSystem({}) {
     const inRoom = net.phase === 'hosting' || net.phase === 'joined';
     const key =
       members.map((m) => `${m.name}|${socialMuted(m.name) ? 1 : 0}${socialBlocked(m.name) ? 1 : 0}`).join(';') +
-      `#${this.hover ?? ''}#${on ? 1 : 0}#${mic ? 1 : 0}#${net.phase}#${cued?.id ?? ''}#${ballUp ? (mine ? 'B' : 'b') : ''}#${setOut ? net.gamePlayers.size : 0}#${more}#${match.difficulty}`;
+      `#${this.hover ?? ''}#${on ? 1 : 0}#${mic ? 1 : 0}#${net.phase}#${cued?.id ?? ''}#${ballUp ? (mine ? 'B' : 'b') : ''}#${setOut ? net.gamePlayers.size : 0}#${more}#${match.difficulty}#${this.songsOpen ? 1 : 0}`;
     if (key === this.paintKey) return;
     this.paintKey = key;
 
@@ -536,8 +675,11 @@ export class ClubSocialSystem extends createSystem({}) {
     // ── calling a raid: the song pick, the chart, the ball ──────────────
     buttons.push({
       id: 'track',
-      label: cued ? `♪ ${cued.title}` : '♪ SHUFFLE',
+      // The chevron says the row opens onto something, rather than
+      // advancing one notch per press.
+      label: `${this.songsOpen ? '◂' : '▸'}  ♪ ${cued ? cued.title : 'SHUFFLE'}`,
       sub: cued ? `${cued.bpm.toFixed(cued.bpm % 1 ? 2 : 0)} BPM` : undefined,
+      selected: this.songsOpen,
       x: 24,
       y: 652,
       w: 652,

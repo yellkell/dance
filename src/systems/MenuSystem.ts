@@ -1275,29 +1275,32 @@ export class MenuSystem extends createSystem({}) {
         g.fillText(status.hint, wx + 28, BOARD_ROW_Y0 + 48);
       }
     } else {
-      // Column captions, then the visible window of the list.
+      // Column captions, tucked under the rule, then the visible window of
+      // the list. The captions sit ABOVE the first row's highlight band —
+      // they used to share those pixels, and a top-ranked local run drew
+      // its accent straight through SCORE and BEST.
       g.font = font(500, 16);
       g.letterSpacing = '1.5px';
       g.fillStyle = UI.faint;
       g.textAlign = 'right';
-      g.fillText('SCORE', wx + ww - 104, BOARD_HEAD_Y + 40);
+      g.fillText('SCORE', wx + ww - 104, BOARD_HEAD_Y + 32);
       g.textAlign = 'center';
-      g.fillText('BEST', wx + ww - 52, BOARD_HEAD_Y + 40);
+      g.fillText('BEST', wx + ww - 52, BOARD_HEAD_Y + 32);
       g.letterSpacing = '0px';
 
       const start = this.scrollTop(rows.length);
       rows.slice(start, start + BOARD_VISIBLE).forEach((row, i) => {
         const rank = start + i + 1;
-        const ry = BOARD_ROW_Y0 + 30 + i * BOARD_ROW_H;
+        const ry = BOARD_ROW_Y0 + 40 + i * BOARD_ROW_H;
         if (row.isMe) {
           // Your own row, findable at a glance in a hundred strangers.
           g.fillStyle = UI.accentFaint;
           g.beginPath();
-          g.roundRect(wx + 16, ry - 22, ww - 32, BOARD_ROW_H - 6, 8);
+          g.roundRect(wx + 16, ry - 19, ww - 32, BOARD_ROW_H - 8, 8);
           g.fill();
           g.fillStyle = UI.accent;
           g.beginPath();
-          g.roundRect(wx + 20, ry - 16, 4, BOARD_ROW_H - 18, 2);
+          g.roundRect(wx + 20, ry - 13, 4, BOARD_ROW_H - 22, 2);
           g.fill();
         }
         g.textAlign = 'right';
