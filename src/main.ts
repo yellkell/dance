@@ -21,6 +21,7 @@ import { ArenaSystem } from './systems/ArenaSystem.js';
 import { AvatarSystem } from './systems/AvatarSystem.js';
 import { ChoreoSystem } from './systems/ChoreoSystem.js';
 import { ClubBallSystem } from './systems/ClubBallSystem.js';
+import { ClubPropsSystem } from './systems/ClubPropsSystem.js';
 import { ClubSocialSystem } from './systems/ClubSocialSystem.js';
 import { ClubSystem } from './systems/ClubSystem.js';
 import { ClubTeleportSystem } from './systems/ClubTeleportSystem.js';
@@ -89,6 +90,7 @@ World.create(container, {
   world.registerSystem(ClubSocialSystem);
   world.registerSystem(ClubBallSystem);
   world.registerSystem(ArcadeSystem);
+  world.registerSystem(ClubPropsSystem);
   world.registerSystem(MusicSystem);
   world.registerSystem(ChoreoSystem);
   world.registerSystem(GoopliathSystem);

@@ -214,7 +214,20 @@ There are **three places**, and where you are is what you're doing:
    switch, your ♪ song pick, the DIFFICULTY row (your pick rides the ball
    you call), **SEND THE BALL UP**, and **LEAVE THE CLUB**. Step into
    **THE STILL ROOM** (north-west corner) and the music falls to a
-   murmur; voices stay.
+   murmur; voices stay. Its loud mirror in the north-east corner is
+   **THE ARCADE**: the **SUPER OCTAGON** cabinet — aim at the CRT with
+   the laser, trigger to shoot the octagons, streaks build a ×4
+   multiplier, three through the glass ends the night — with a wall
+   leaderboard riding the same world scores collection as the songs
+   (pseudo-chart `superoctagon`). At the bar, **THE DUMBWAITER** serves:
+   a brass square rises with a cocktail; aim at it (or any resting
+   glass) and squeeze to take it — five-frame throw velocity, per-wall
+   bounce heights, glasses that settle upright, and a sip near your face
+   empties the drink. Teleport can land **on the booth tables** (and the
+   still room's), the north corridors, and the backstage walk — the
+   perimeter is a loop. Props and the cabinet are local-per-headset for
+   now: syncing them across the room needs relay verbs the wire doesn't
+   carry yet.
 3. **THE SET** — the game place, called with **THE BALL**. Anyone sends it
    up (from the SOCIAL panel); a mirror ball hangs in front
    of them for **60 seconds** wearing a countdown plate — the song, the

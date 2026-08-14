@@ -607,6 +607,13 @@ export function dartStick(): void {
   whooshNoise(0.04, 0.12, 1300, 320);
 }
 
+/** The dumbwaiter's little lift — a soft servo travel with a settle tick.
+ *  `up` pitches the run rising or sinking. */
+export function dumbwaiter(up: boolean): void {
+  servo(up ? 110 : 200, up ? 200 : 110, 0.55, 0.045);
+  clank(up ? 900 : 600, 0.05, 0.06, 0.5);
+}
+
 
 /** UI: a relay snapping closed. */
 export function uiClick(): void {
