@@ -738,9 +738,10 @@ export class ChoreoSystem extends createSystem({}) {
     d.missChain += 1;
     const out = d.missChain >= GRADE.chainOut;
     if (d.kind === 'local') {
-      // The chain counts up out loud: the last warning before the night
-      // ends has to be unmissable.
-      pushFlair(out ? 'GAME OVER' : d.missChain === GRADE.chainOut - 1 ? 'HIT — ONE MORE' : 'HIT', 'hit');
+      // Just HIT — every time. The pop is a reflex, not a readout: the
+      // chain marks on the wedge already count how close the end is, and
+      // the wedge says SPECTATING the moment it arrives.
+      pushFlair('HIT', 'hit');
       sfx.hitTaken();
       // And the impact knocks the rhythm out of your hands.
       grooveView.disrupt?.();
