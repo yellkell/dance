@@ -22,10 +22,20 @@
  *  - DRINK: bring it to your face and the cocktail's gone (the fill
  *    empties with a slurp). New glasses come full.
  *
- * Local-only for now: every dancer runs their own dumbwaiter and sees
- * their own glasses. Syncing props across the room needs relay verbs
- * (grab/release/stream/settle) the wire doesn't carry yet — the FIRE
- * FIGHT server has the pattern when we want it.
+ * And SHARED, the FIRE FIGHT server pattern (server/index.mjs, DRINKS):
+ * the relay brokers ownership and owns the serve clock, so the whole room
+ * watches ONE plate raise ONE glass:
+ *
+ *  - GRAB is optimistic — the hand takes the glass instantly and asks the
+ *    relay; if somebody's claim landed first, the relay names the real
+ *    holder and the glass leaves the loser's hand. Mid-FLIGHT glasses
+ *    are fair game — a catch — exactly the FIRE FIGHT grant rule.
+ *  - One owner simulates each moving glass and streams pose + fill at
+ *    ~20 Hz; everyone else eases toward the stream (k = 1 − e^(−18Δ),
+ *    snapping across big jumps). A settled throw posts its final pose;
+ *    resting glasses are server-remembered and walk into late joiners'
+ *    'props' snapshots. Dancers dealt onto the ring drop what they held.
+ *  - An older relay with no drink words? The plate just stays down.
  */
 
 import { createSystem, InputComponent } from '@iwsdk/core';
@@ -34,31 +44,46 @@ import * as sfx from '../audio/sfx.js';
 import { CLUB, DECOR, floorYAt } from '../club/config.js';
 import { buildCoupe, PROP_PHYS, PROP_SURFACES, PROP_WALLS, type CoupeRefs } from '../club/props.js';
 import { match } from '../game/state.js';
-import { net } from '../net/session.js';
+import {
+  net,
+  onProp,
+  sendPropGrab,
+  sendPropPose,
+  sendPropRelease,
+  sendPropRest,
+  type PropWire,
+} from '../net/session.js';
 
 const HANDS = ['left', 'right'] as const;
 type Hand = (typeof HANDS)[number];
 
+/** Glass pool size — MUST match the relay's PROP_COUNT (server/index.mjs). */
 const POOL = 6;
-/** The dumbwaiter's square, set into the bar top mid-counter. */
+/** The dumbwaiter's square, set into the bar top mid-counter. The relay owns
+ *  its clock; this side only plays the plate's travel (exp ease). */
 const WAITER = {
   x: CLUB.bar.x + CLUB.bar.depth / 2,
   z: -3.2,
   top: CLUB.bar.top,
   size: 0.26,
   drop: 0.32,
-  sinkS: 0.7,
-  holdS: 0.9,
-  riseS: 0.7,
+  ease: 8,
 };
 /** Drink detection: glass near your face while held. */
 const SIP_DIST = 0.28;
+/** Owner pose stream cadence (s) — ~20 Hz, FIRE FIGHT's rate. */
+const STREAM_S = 0.05;
+/** Remote glasses ease toward the stream at this rate; snap beyond 2 m. */
+const NET_EASE = 18;
 
 type Mode = 'idle' | 'pedestal' | 'held' | 'flight' | 'rest';
 
 interface Glass {
+  id: number;
   refs: CoupeRefs;
   mode: Mode;
+  /** Who simulates it while it moves: my idx, a room-mate's, or nobody. */
+  owner: number | null;
   vel: Vector3;
   /** Tumble axis+rate while flying. */
   spinAxis: Vector3;
@@ -69,19 +94,24 @@ interface Glass {
   ring: { pos: Vector3; t: number }[];
   /** Age counter for recycling the oldest resting glass. */
   restedAt: number;
+  /** The owner's streamed pose (world), and when it last arrived. */
+  netPos: Vector3;
+  netQuat: Quaternion;
+  netAt: number;
 }
 
-type WaiterPhase = 'up' | 'sinking' | 'holding' | 'rising';
+type WaiterPhase = 'down' | 'sinking' | 'rising' | 'up';
 
 export class ClubPropsSystem extends createSystem({}) {
   private group = new Group();
   private glasses: Glass[] = [];
   private plate!: Mesh;
-  private waiterPhase: WaiterPhase = 'holding';
-  private waiterT = 0;
+  private waiterPhase: WaiterPhase = 'down';
   private served: Glass | null = null;
   private highlight: Partial<Record<Hand, Glass | null>> = {};
   private clock = 0;
+  private streamT = 0;
+  private hadRoom = false;
 
   init(): void {
     this.group.name = 'club-props';
@@ -109,8 +139,10 @@ export class ClubPropsSystem extends createSystem({}) {
       refs.root.visible = false;
       this.group.add(refs.root);
       this.glasses.push({
+        id: i,
         refs,
         mode: 'idle',
+        owner: null,
         vel: new Vector3(),
         spinAxis: new Vector3(0, 1, 0),
         spin: 0,
@@ -118,109 +150,104 @@ export class ClubPropsSystem extends createSystem({}) {
         full: true,
         ring: [],
         restedAt: 0,
+        netPos: new Vector3(),
+        netQuat: new Quaternion(),
+        netAt: 0,
       });
     }
+
+    // The wire mutates the glasses directly — even while we're away on the
+    // ring (the group hides, but the state stays true to the room).
+    onProp((msg) => this.onWire(msg));
   }
 
   update(delta: number): void {
-    const inClub =
-      (match.screen === 'lobby' || match.screen === 'tour') &&
-      (net.phase === 'hosting' || net.phase === 'joined');
-    if (this.group.visible !== inClub) {
-      this.group.visible = inClub;
-      if (!inClub) this.packAway();
+    const inRoom = net.phase === 'hosting' || net.phase === 'joined' || net.phase === 'live';
+    if (!inRoom) {
+      if (this.hadRoom) {
+        this.hadRoom = false;
+        this.packAway();
+      }
+      return;
     }
-    if (!inClub) return;
+    this.hadRoom = true;
+    const onFloor = match.screen === 'lobby' || match.screen === 'tour';
+    if (this.group.visible !== onFloor) this.group.visible = onFloor;
 
     this.clock += delta;
     this.stepWaiter(delta);
-    this.stepHands(delta);
+
+    if (onFloor) {
+      this.stepHands(delta);
+      this.streamOwned(delta);
+    } else {
+      this.shelveHeld();
+    }
+
     for (const glass of this.glasses) {
-      if (glass.mode === 'flight') this.stepFlight(glass, delta);
-      else if (glass.mode === 'rest') this.stepRest(glass, delta);
+      const mine = glass.owner === net.myIdx;
+      if ((glass.mode === 'held' || glass.mode === 'flight') && !mine) {
+        this.easeToStream(glass, delta);
+      } else if (glass.mode === 'flight' && mine) {
+        this.stepFlight(glass, delta);
+      } else if (glass.mode === 'rest') {
+        this.stepRest(glass, delta);
+      }
     }
   }
 
-  /** A set booked the floor (or we left the room): everything goes home. */
+  /** We left the room entirely: everything goes home, the plate parks. */
   private packAway(): void {
     for (const g of this.glasses) {
       g.mode = 'idle';
+      g.owner = null;
       g.hand = null;
+      g.netAt = 0;
       g.refs.root.visible = false;
-      if (g.refs.root.parent !== this.group) this.group.attach(g.refs.root);
+      this.toGroup(g);
     }
     this.served = null;
-    this.waiterPhase = 'holding';
-    this.waiterT = 0;
+    this.waiterPhase = 'down';
+    this.plate.position.y = WAITER.top - WAITER.drop;
+    this.highlight = {};
+    this.group.visible = false;
   }
 
-  /* ── the dumbwaiter ───────────────────────────────────────────────────── */
+  /** Dealt onto the ring mid-drink: nothing rides the controllers into the
+   *  set. Unhand locally; the relay's drop ('prop-rest') places the glass. */
+  private shelveHeld(): void {
+    for (const glass of this.glasses) {
+      if (glass.owner !== net.myIdx) continue;
+      if (glass.mode !== 'held' && glass.mode !== 'flight') continue;
+      glass.mode = 'rest';
+      glass.owner = null;
+      glass.hand = null;
+      glass.restedAt = this.clock;
+      this.toGroup(glass);
+    }
+  }
+
+  /* ── the dumbwaiter (event-driven: 'serve' raises, a grab sinks) ──────── */
 
   private stepWaiter(delta: number): void {
-    const plateY = (k: number): number => WAITER.top - WAITER.drop + (WAITER.drop + 0.012) * k;
-    this.waiterT += delta;
-
-    if (this.waiterPhase === 'up') {
-      // Waiting with a drink on offer. The moment it's taken, sink.
-      if (!this.served || this.served.mode !== 'pedestal') {
-        this.served = null;
-        this.waiterPhase = 'sinking';
-        this.waiterT = 0;
-        sfx.dumbwaiter(false);
-      }
-    } else if (this.waiterPhase === 'sinking') {
-      const k = Math.min(1, this.waiterT / WAITER.sinkS);
-      this.plate.position.y = plateY(1 - k * k);
-      if (k >= 1) {
-        this.waiterPhase = 'holding';
-        this.waiterT = 0;
-      }
-    } else if (this.waiterPhase === 'holding') {
-      this.plate.position.y = plateY(0);
-      if (this.waiterT >= WAITER.holdS) {
-        const next = this.takeIdleGlass();
-        if (next) {
-          this.served = next;
-          next.mode = 'pedestal';
-          next.full = true;
-          next.refs.fill.visible = true;
-          next.refs.root.visible = true;
-          next.refs.root.quaternion.identity();
-          this.waiterPhase = 'rising';
-          this.waiterT = 0;
-          sfx.dumbwaiter(true);
-        } else {
-          this.waiterT = 0; // every glass is out on the floor — bide time
-        }
-      }
-    } else {
-      const k = Math.min(1, this.waiterT / WAITER.riseS);
-      const e = 1 - (1 - k) * (1 - k);
-      this.plate.position.y = plateY(e);
-      if (k >= 1) {
-        this.waiterPhase = 'up';
-        this.waiterT = 0;
-        sfx.glassTap(false);
-      }
+    const topY = WAITER.top + 0.012;
+    const downY = WAITER.top - WAITER.drop;
+    const up = this.waiterPhase === 'rising' || this.waiterPhase === 'up';
+    const target = up ? topY : downY;
+    const y = this.plate.position.y;
+    const next = y + (target - y) * (1 - Math.exp(-WAITER.ease * delta));
+    this.plate.position.y = next;
+    if (this.waiterPhase === 'rising' && Math.abs(target - next) < 0.004) {
+      this.waiterPhase = 'up';
+      if (this.group.visible) sfx.glassTap(false);
+    } else if (this.waiterPhase === 'sinking' && Math.abs(target - next) < 0.004) {
+      this.waiterPhase = 'down';
     }
 
     // The served glass rides the plate.
     if (this.served && this.served.mode === 'pedestal') {
       this.served.refs.root.position.set(WAITER.x, this.plate.position.y + 0.012, WAITER.z);
     }
-  }
-
-  /** An unused glass for the pedestal — idle first, else the longest-
-   *  resting one on the floor (the house quietly tidies). */
-  private takeIdleGlass(): Glass | null {
-    const idle = this.glasses.find((g) => g.mode === 'idle');
-    if (idle) return idle;
-    let oldest: Glass | null = null;
-    for (const g of this.glasses) {
-      if (g.mode !== 'rest') continue;
-      if (!oldest || g.restedAt < oldest.restedAt) oldest = g;
-    }
-    return oldest;
   }
 
   /* ── hands: highlight, grab, hold, drink, release ─────────────────────── */
@@ -231,7 +258,10 @@ export class ClubPropsSystem extends createSystem({}) {
       const rayObj = this.world.playerSpaceEntities?.raySpaces?.[hand]?.object3D;
       if (!gp || !rayObj) continue;
 
-      const held = this.glasses.find((g) => g.mode === 'held' && g.hand === hand) ?? null;
+      const held =
+        this.glasses.find(
+          (g) => g.mode === 'held' && g.hand === hand && g.owner === net.myIdx,
+        ) ?? null;
 
       if (held) {
         // Sample the hand's motion for the throw, and watch for the sip.
@@ -242,7 +272,7 @@ export class ClubPropsSystem extends createSystem({}) {
         if (held.full) {
           this.camera.getWorldPosition(_head);
           if (_p.distanceTo(_head) < SIP_DIST) {
-            held.full = false;
+            held.full = false; // the stream carries the empty to the room
             held.refs.fill.visible = false;
             sfx.slurp();
           }
@@ -277,7 +307,9 @@ export class ClubPropsSystem extends createSystem({}) {
     let best: Glass | null = null;
     let bestScore = -Infinity;
     for (const g of this.glasses) {
-      if (g.mode !== 'rest' && g.mode !== 'pedestal') continue;
+      // Resting, on the pedestal, or mid-air (anyone's throw — a catch).
+      // Never out of someone's closed hand.
+      if (g.mode !== 'rest' && g.mode !== 'pedestal' && g.mode !== 'flight') continue;
       g.refs.root.getWorldPosition(_p);
       _p.y += 0.11; // aim at the bowl, not the foot
       _v.copy(_p).sub(_o);
@@ -300,9 +332,10 @@ export class ClubPropsSystem extends createSystem({}) {
     mat.emissiveIntensity = on ? 0.45 : 0;
   }
 
+  /** Take it on spec — the relay's grant (or correction) follows. */
   private grab(glass: Glass, hand: Hand, rayObj: import('three').Object3D): void {
-    if (glass === this.served) this.served = null; // the waiter notices
     glass.mode = 'held';
+    glass.owner = net.myIdx;
     glass.hand = hand;
     glass.ring.length = 0;
     this.setGlow(glass, false);
@@ -312,11 +345,12 @@ export class ClubPropsSystem extends createSystem({}) {
     glass.refs.root.position.set(0, -0.03, -0.06);
     glass.refs.root.quaternion.identity();
     sfx.glassTap(false);
+    sendPropGrab(glass.id);
   }
 
   private release(glass: Glass): void {
     glass.hand = null;
-    this.scene.attach(glass.refs.root);
+    this.toGroup(glass);
 
     // The throw: displacement across the ring buffer over its time span.
     const ring = glass.ring;
@@ -336,7 +370,8 @@ export class ClubPropsSystem extends createSystem({}) {
     if (glass.spinAxis.lengthSq() < 1e-6) glass.spinAxis.set(1, 0, 0);
     glass.spinAxis.normalize();
     glass.spin = Math.min(PROP_PHYS.spinMax, speed * PROP_PHYS.spinFromThrow);
-    glass.mode = 'flight';
+    glass.mode = 'flight'; // still mine to simulate — and now catchable
+    sendPropRelease(glass.id);
   }
 
   /* ── flight, landing, rest ────────────────────────────────────────────── */
@@ -403,10 +438,17 @@ export class ClubPropsSystem extends createSystem({}) {
       const vy = Math.abs(glass.vel.y);
       if (glass.vel.length() < PROP_PHYS.settleSpeed || vy < 0.5) {
         glass.mode = 'rest';
+        glass.owner = null;
         glass.restedAt = this.clock;
         glass.vel.set(0, 0, 0);
         glass.spin = 0;
         sfx.glassTap(false);
+        // The pose sticks room-wide — and frees the glass for anyone.
+        sendPropRest(
+          glass.id,
+          [root.position.x, root.position.y, root.position.z],
+          [root.quaternion.x, root.quaternion.y, root.quaternion.z, root.quaternion.w],
+        );
       } else {
         glass.vel.y = vy * PROP_PHYS.restitution;
         glass.vel.x *= 0.7;
@@ -417,7 +459,9 @@ export class ClubPropsSystem extends createSystem({}) {
     } else if (root.position.y < -2) {
       // Fell out of the world somehow — back to the pool.
       glass.mode = 'idle';
+      glass.owner = null;
       glass.refs.root.visible = false;
+      sendPropRest(glass.id, null, null);
     }
   }
 
@@ -439,6 +483,230 @@ export class ClubPropsSystem extends createSystem({}) {
       }
     }
   }
+
+  /* ── the wire: the room's glasses, kept true ──────────────────────────── */
+
+  /** Remote-owned glasses ease toward the owner's stream. */
+  private easeToStream(glass: Glass, delta: number): void {
+    if (glass.netAt <= 0) return; // no pose yet — hold still until one lands
+    const root = glass.refs.root;
+    const k = 1 - Math.exp(-NET_EASE * delta);
+    if (root.position.distanceToSquared(glass.netPos) > 4) root.position.copy(glass.netPos);
+    else root.position.lerp(glass.netPos, k);
+    root.quaternion.slerp(glass.netQuat, k);
+  }
+
+  /** Ship poses of everything I simulate, ~20 Hz. */
+  private streamOwned(delta: number): void {
+    this.streamT += delta;
+    if (this.streamT < STREAM_S) return;
+    this.streamT = 0;
+    for (const glass of this.glasses) {
+      if (glass.owner !== net.myIdx) continue;
+      if (glass.mode !== 'held' && glass.mode !== 'flight') continue;
+      glass.refs.root.getWorldPosition(_p);
+      glass.refs.root.getWorldQuaternion(_wq);
+      sendPropPose(glass.id, [_p.x, _p.y, _p.z, _wq.x, _wq.y, _wq.z, _wq.w, glass.full ? 1 : 0]);
+    }
+  }
+
+  private onWire(msg: PropWire): void {
+    if (msg.t === 'props') {
+      for (const p of msg.props) this.applyWireState(p);
+      return;
+    }
+    const glass = this.glasses[msg.id];
+    if (!glass) return;
+    switch (msg.t) {
+      case 'serve':
+        this.applyServe(glass);
+        break;
+      case 'prop-grab':
+        this.applyGrabbed(glass, msg.idx);
+        break;
+      case 'prop-release':
+        // Their throw: catchable, and still theirs to fly.
+        if (msg.idx !== net.myIdx) {
+          glass.owner = msg.idx;
+          glass.mode = 'flight';
+        }
+        break;
+      case 'prop':
+        this.applyStream(glass, msg.idx, msg.d);
+        break;
+      case 'prop-rest':
+        this.applyRest(glass, msg);
+        break;
+    }
+  }
+
+  /** A fresh coupe rises — wherever this glass was, it's the pedestal's. */
+  private applyServe(glass: Glass): void {
+    // The sub-RTT race: the server picked a glass MY optimistic grab was
+    // already holding. Don't rip it from the hand — my in-flight claim
+    // lands right behind this serve, and its grant sinks the plate again.
+    if (glass.owner === net.myIdx && glass.mode === 'held') {
+      this.served = glass;
+      this.waiterPhase = 'rising';
+      return;
+    }
+    this.disown(glass);
+    glass.mode = 'pedestal';
+    glass.full = true;
+    glass.refs.fill.visible = true;
+    glass.refs.root.visible = true;
+    glass.refs.root.quaternion.identity();
+    glass.refs.root.position.set(WAITER.x, this.plate.position.y + 0.012, WAITER.z);
+    glass.vel.set(0, 0, 0);
+    glass.spin = 0;
+    glass.netAt = 0;
+    this.served = glass;
+    this.waiterPhase = 'rising';
+    if (this.group.visible) sfx.dumbwaiter(true);
+  }
+
+  /** The relay's word on who holds a glass — grant, echo, or correction. */
+  private applyGrabbed(glass: Glass, idx: number): void {
+    // Whoever took the plate's drink, the plate reacts the same way.
+    if (glass === this.served) {
+      this.served = null;
+      this.waiterPhase = 'sinking';
+      if (this.group.visible) sfx.dumbwaiter(false);
+    }
+    if (idx === net.myIdx) return; // my own grant — it's already in hand
+    // Someone else's hand (their claim landed first, or plain theirs).
+    this.disown(glass);
+    glass.owner = idx;
+    glass.mode = 'held';
+    glass.refs.root.visible = true;
+    glass.netAt = 0; // hold this pose until their stream lands
+  }
+
+  /** The owner's ~20 Hz pose+fill line. */
+  private applyStream(glass: Glass, idx: number, d: number[]): void {
+    if (idx === net.myIdx || !Array.isArray(d) || d.length < 8) return;
+    for (let i = 0; i < 8; i++) if (!Number.isFinite(d[i])) return; // no NaN poses
+    glass.owner = idx;
+    if (glass.mode !== 'held' && glass.mode !== 'flight') glass.mode = 'held';
+    this.toGroup(glass);
+    glass.refs.root.visible = true;
+    glass.netPos.set(d[0], d[1], d[2]);
+    glass.netQuat.set(d[3], d[4], d[5], d[6]);
+    glass.netAt = this.clock;
+    const full = d[7] > 0.5;
+    if (full !== glass.full) {
+      glass.full = full;
+      glass.refs.fill.visible = full;
+    }
+  }
+
+  /** A settled (or dropped, or lost) glass: the pose sticks, ownership ends. */
+  private applyRest(glass: Glass, msg: { idle?: boolean; pos?: number[]; quat?: number[] }): void {
+    this.disown(glass);
+    if (msg.idle || !Array.isArray(msg.pos) || msg.pos.length < 3 || msg.pos.some((n) => !Number.isFinite(n))) {
+      glass.mode = 'idle';
+      glass.refs.root.visible = false;
+      glass.netAt = 0;
+      return;
+    }
+    glass.mode = 'rest';
+    glass.refs.root.visible = true;
+    // Recompute the shelf height locally: a drop streamed at chest height
+    // still lands on whatever surface is under it, same on every client.
+    glass.refs.root.position.set(msg.pos[0], this.restingYAt(msg.pos[0], msg.pos[2]), msg.pos[2]);
+    if (Array.isArray(msg.quat) && msg.quat.length >= 4 && msg.quat.every((n) => Number.isFinite(n))) {
+      glass.refs.root.quaternion.set(msg.quat[0], msg.quat[1], msg.quat[2], msg.quat[3]);
+    } else {
+      glass.refs.root.quaternion.identity();
+    }
+    glass.vel.set(0, 0, 0);
+    glass.spin = 0;
+    glass.restedAt = this.clock;
+    glass.netAt = 0;
+  }
+
+  /** A late joiner's snapshot line — one glass, as the room knows it. */
+  private applyWireState(p: {
+    id: number;
+    holder: number | null;
+    mode: string;
+    pos: number[] | null;
+    quat: number[] | null;
+    full: boolean;
+  }): void {
+    const glass = this.glasses[p.id];
+    if (!glass) return;
+    glass.full = p.full !== false;
+    glass.refs.fill.visible = glass.full;
+    glass.hand = null;
+    glass.vel.set(0, 0, 0);
+    glass.spin = 0;
+    if (p.mode === 'pedestal') {
+      glass.mode = 'pedestal';
+      glass.owner = null;
+      this.toGroup(glass);
+      glass.refs.root.visible = true;
+      glass.refs.root.quaternion.identity();
+      this.served = glass;
+      // Walked in mid-serve: the plate is simply up — no theatre to replay.
+      this.waiterPhase = 'up';
+      this.plate.position.y = WAITER.top + 0.012;
+      glass.refs.root.position.set(WAITER.x, this.plate.position.y + 0.012, WAITER.z);
+    } else if ((p.mode === 'held' || p.mode === 'flight') && p.holder !== null && p.holder !== net.myIdx) {
+      glass.mode = p.mode;
+      glass.owner = p.holder;
+      this.toGroup(glass);
+      if (p.pos && p.pos.length >= 3) {
+        glass.refs.root.position.set(p.pos[0], p.pos[1], p.pos[2]);
+        glass.netPos.set(p.pos[0], p.pos[1], p.pos[2]);
+        if (p.quat && p.quat.length >= 4) {
+          glass.refs.root.quaternion.set(p.quat[0], p.quat[1], p.quat[2], p.quat[3]);
+          glass.netQuat.set(p.quat[0], p.quat[1], p.quat[2], p.quat[3]);
+        }
+        glass.netAt = this.clock;
+        glass.refs.root.visible = true;
+      } else {
+        // No pose yet — it appears with the owner's first stream packet.
+        glass.netAt = 0;
+        glass.refs.root.visible = false;
+      }
+    } else if (p.mode === 'rest' && p.pos && p.pos.length >= 3) {
+      glass.mode = 'rest';
+      glass.owner = null;
+      this.toGroup(glass);
+      glass.refs.root.position.set(p.pos[0], this.restingYAt(p.pos[0], p.pos[2]), p.pos[2]);
+      if (p.quat && p.quat.length >= 4) {
+        glass.refs.root.quaternion.set(p.quat[0], p.quat[1], p.quat[2], p.quat[3]);
+      } else {
+        glass.refs.root.quaternion.identity();
+      }
+      glass.restedAt = this.clock;
+      glass.refs.root.visible = true;
+    } else {
+      glass.mode = 'idle';
+      glass.owner = null;
+      this.toGroup(glass);
+      glass.refs.root.visible = false;
+      glass.netAt = 0;
+    }
+  }
+
+  /* ── little helpers ───────────────────────────────────────────────────── */
+
+  /** Out of any hand of mine, glow off, back under the props group. */
+  private disown(glass: Glass): void {
+    glass.hand = null;
+    this.setGlow(glass, false);
+    for (const hand of HANDS) {
+      if (this.highlight[hand] === glass) this.highlight[hand] = null;
+    }
+    this.toGroup(glass);
+  }
+
+  /** Parent under the props group (identity), keeping the world pose. */
+  private toGroup(glass: Glass): void {
+    if (glass.refs.root.parent !== this.group) this.group.attach(glass.refs.root);
+  }
 }
 
 const _o = new Vector3();
@@ -448,3 +716,4 @@ const _v = new Vector3();
 const _prev = new Vector3();
 const _head = new Vector3();
 const _q = new Quaternion();
+const _wq = new Quaternion();

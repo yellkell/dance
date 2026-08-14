@@ -178,6 +178,8 @@ declare global {
       menu: typeof menuView & typeof socialView;
       /** Park the player rig at (x, z) facing `yaw` — headless club walks. */
       rig: (x: number, z: number, yaw?: number, y?: number) => void;
+      /** The live scene graph — headless probes walk it by name. */
+      scene: () => import('three').Scene | null;
     };
   }
 }
@@ -216,4 +218,6 @@ window.__gdr = {
     w.player.position.set(x, y, z);
     w.player.rotation.set(0, yaw, 0);
   },
+  scene: () =>
+    (worldRef as unknown as { scene?: import('three').Scene } | null)?.scene ?? null,
 };

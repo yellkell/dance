@@ -23,6 +23,16 @@
  *    keep dancing, newcomers keep joining, and a 'game' broadcast tells
  *    everyone who is away playing. Players fold back with 'game-out' when
  *    their set resolves; when the last one returns the ball may rise again.
+ *  - DRINKS: the FIRE FIGHT prop broker, poured into this house. The room
+ *    keeps a registry of PROP_COUNT glasses; the server owns the DUMBWAITER
+ *    clock (like the ball's), so one shared coupe rises on one shared plate:
+ *    'serve' names the glass on the pedestal. Ownership is brokered —
+ *    'prop-grab' is granted when a glass is free, mid-flight (a catch), or
+ *    already the asker's; a losing asker is told who really holds it. The
+ *    owner streams pose+fill ('prop', ~20 Hz, stored and fanned out),
+ *    'prop-release' marks a throw catchable, and 'prop-rest' parks the
+ *    final pose — which is what late joiners get in their 'props' snapshot.
+ *    Leavers and dancers dealt onto the ring drop whatever they held.
  *  - A departing host is replaced by the longest-standing member instead of
  *    folding the party.
  *
@@ -40,6 +50,9 @@ const BALL_MS = Number(process.env.BALL_MS || 60_000);
 const CODE_ALPHABET = 'ABCDEFGH';
 const MAX_ROOM = 24;
 const START_IN_MS = 5500; // count-in cushion: 8 beats at 128 BPM is 3750 ms
+const PROP_COUNT = 6; // mirrors the client's glass pool (ClubPropsSystem)
+const SERVE_MS = 1600; // the plate's sink + pause before the next coupe rises
+const SERVE_RETRY_MS = 900; // every glass out on the floor — bide, try again
 
 /**
  * code → {
@@ -47,6 +60,8 @@ const START_IN_MS = 5500; // count-in cushion: 8 beats at 128 BPM is 3750 ms
  *   host: ws,
  *   ball: { caller: idx, track, diff, seats, pos, joins: Set<idx>, timer, deadline } | null,
  *   playing: Set<idx>,   // members currently away on the ring
+ *   props: [{ holder: idx|null, mode, pos, quat, full, restedAt }],  // the glasses
+ *   serveTimer,          // the dumbwaiter's clock (server-owned, like the ball's)
  * }
  */
 const rooms = new Map();
@@ -96,6 +111,84 @@ function clearBall(room) {
   room.ball = null;
 }
 
+/* ── DRINKS: the dumbwaiter's clock and the glass registry ──────────────── */
+
+function freshProps() {
+  return Array.from({ length: PROP_COUNT }, () => ({
+    holder: null, // member idx simulating it (held or mid-throw), or free
+    mode: 'idle', // idle | pedestal | held | flight | rest
+    pos: null, // last owner-streamed / settled [x,y,z]
+    quat: null, // ... and [x,y,z,w]
+    full: true,
+    restedAt: 0, // when it settled — the house recycles the longest-resting
+  }));
+}
+
+/** The room's glasses as a late joiner needs them. */
+function snapshotProps(room) {
+  return room.props.map((p, id) => ({
+    id, holder: p.holder, mode: p.mode, pos: p.pos, quat: p.quat, full: p.full,
+  }));
+}
+
+function clearServe(room) {
+  if (room.serveTimer) {
+    clearTimeout(room.serveTimer);
+    room.serveTimer = null;
+  }
+}
+
+function armServe(code, room, ms = SERVE_MS) {
+  clearServe(room);
+  room.serveTimer = setTimeout(() => fireServe(code), ms);
+}
+
+/** The plate rises: put the next coupe on the pedestal — a fresh glass
+ *  first, else the longest-resting one (the house quietly tidies). */
+function fireServe(code) {
+  const room = rooms.get(code);
+  if (!room) return;
+  room.serveTimer = null;
+  let id = room.props.findIndex((p) => p.mode === 'idle' && p.holder === null);
+  if (id < 0) {
+    let oldest = Infinity;
+    room.props.forEach((p, i) => {
+      if (p.mode === 'rest' && p.holder === null && p.restedAt < oldest) {
+        oldest = p.restedAt;
+        id = i;
+      }
+    });
+  }
+  if (id < 0) {
+    armServe(code, room, SERVE_RETRY_MS);
+    return;
+  }
+  const prop = room.props[id];
+  prop.holder = null;
+  prop.mode = 'pedestal';
+  prop.full = true;
+  prop.pos = null;
+  prop.quat = null;
+  broadcast(room, { t: 'serve', id });
+}
+
+/** A member leaves the floor (room exit, or dealt onto the ring): whatever
+ *  they were holding or had mid-air drops where it last was. */
+function dropProps(room, idx) {
+  room.props?.forEach((prop, id) => {
+    if (prop.holder !== idx) return;
+    prop.holder = null;
+    if (prop.pos) {
+      prop.mode = 'rest';
+      prop.restedAt = Date.now();
+      broadcast(room, { t: 'prop-rest', id, pos: prop.pos, quat: prop.quat });
+    } else {
+      prop.mode = 'idle';
+      broadcast(room, { t: 'prop-rest', id, idle: true });
+    }
+  });
+}
+
 function broadcastGame(room) {
   broadcast(room, { t: 'game', players: [...room.playing].sort((a, b) => a - b) });
 }
@@ -131,6 +224,8 @@ function fireBall(code) {
   }
   room.playing = new Set(players.map(([, info]) => info.idx));
   broadcastGame(room);
+  // Nobody carries a coupe onto the ring — held drinks drop to the floor.
+  for (const [, info] of players) dropProps(room, info.idx);
   console.log(`[dance-raid] room ${code}: the ball fired — ${players.length} on a ${seats}-ring, ${room.members.size - players.length} hold the floor`);
 }
 
@@ -145,6 +240,7 @@ function leaveRoom(ws) {
 
   if (room.members.size === 0) {
     clearBall(room);
+    clearServe(room);
     rooms.delete(code);
     return;
   }
@@ -157,7 +253,9 @@ function leaveRoom(ws) {
     console.log(`[dance-raid] room ${code}: host left, ${heir[1].name} inherits`);
   }
   if (info) {
-    // Their touch on the ball goes with them; a caller's exit cancels it.
+    // Their drink drops where it last was; their touch on the ball goes
+    // with them; a caller's exit cancels it.
+    dropProps(room, info.idx);
     if (room.ball) {
       if (room.ball.caller === info.idx) {
         clearBall(room);
@@ -221,12 +319,23 @@ wss.on('connection', (ws) => {
           send(ws, { t: 'err', m: 'no room codes free' });
           break;
         }
-        const room = { members: new Map(), host: ws, ball: null, playing: new Set() };
+        const room = {
+          members: new Map(),
+          host: ws,
+          ball: null,
+          playing: new Set(),
+          props: freshProps(),
+          serveTimer: null,
+        };
         room.members.set(ws, { name: sanitizeName(msg.name), idx: 0, seat: 0 });
         rooms.set(code, room);
         ws.room = code;
         send(ws, { t: 'room', code, host: true, idx: 0 });
         send(ws, { t: 'roster', players: roster(room) });
+        // The snapshot doubles as "this relay speaks drinks"; the first
+        // coupe rises on the dumbwaiter's own clock.
+        send(ws, { t: 'props', props: snapshotProps(room) });
+        armServe(code, room);
         console.log(`[dance-raid] room ${code} opened`);
         break;
       }
@@ -264,6 +373,8 @@ wss.on('connection', (ws) => {
           });
         }
         if (room.playing.size) send(ws, { t: 'game', players: [...room.playing].sort((a, b) => a - b) });
+        // ... and the drinks as they stand: the pedestal, the floor, the air.
+        send(ws, { t: 'props', props: snapshotProps(room) });
         break;
       }
 
@@ -365,6 +476,85 @@ wss.on('connection', (ws) => {
         const info = room.members.get(ws);
         if (!info) break;
         broadcast(room, { t: 'cp', idx: info.idx, d: msg.d }, ws);
+        break;
+      }
+
+      /* ── DRINKS: the FIRE FIGHT prop broker ───────────────────────── */
+
+      case 'prop-grab': {
+        // Granted when the glass is free, mid-flight (a catch), or already
+        // theirs. Everyone hears the grant; a losing asker hears the truth.
+        const room = rooms.get(ws.room);
+        const info = room?.members.get(ws);
+        const id = Number(msg.id);
+        const prop = room?.props?.[id];
+        if (!room || !info || !prop) break;
+        if (prop.holder === null || prop.mode === 'flight' || prop.holder === info.idx) {
+          const wasServed = prop.mode === 'pedestal';
+          prop.holder = info.idx;
+          prop.mode = 'held';
+          broadcast(room, { t: 'prop-grab', id, idx: info.idx });
+          // The plate's drink was taken — sink, pause, rise with the next.
+          if (wasServed) armServe(ws.room, room);
+        } else {
+          send(ws, { t: 'prop-grab', id, idx: prop.holder });
+        }
+        break;
+      }
+
+      case 'prop-release': {
+        // A throw: the glass goes catchable, the thrower keeps simulating
+        // (and streaming) the arc until it settles or someone snags it.
+        const room = rooms.get(ws.room);
+        const info = room?.members.get(ws);
+        const prop = room?.props?.[Number(msg.id)];
+        if (!room || !info || !prop || prop.holder !== info.idx) break;
+        prop.mode = 'flight';
+        broadcast(room, { t: 'prop-release', id: Number(msg.id), idx: info.idx }, ws);
+        break;
+      }
+
+      case 'prop': {
+        // The owner's pose+fill stream (~20 Hz): stored — it's the drop
+        // spot if they vanish, and the snapshot pose — then fanned out.
+        const room = rooms.get(ws.room);
+        const info = room?.members.get(ws);
+        const prop = room?.props?.[Number(msg.id)];
+        if (!room || !info || !prop || prop.holder !== info.idx) break;
+        if (!Array.isArray(msg.d) || msg.d.length < 8) break;
+        const d = msg.d.slice(0, 8).map(Number);
+        if (d.some((n) => !Number.isFinite(n))) break; // one NaN would poison every client
+        prop.pos = [d[0], d[1], d[2]];
+        prop.quat = [d[3], d[4], d[5], d[6]];
+        prop.full = d[7] > 0.5;
+        broadcast(room, { t: 'prop', id: Number(msg.id), idx: info.idx, d }, ws);
+        break;
+      }
+
+      case 'prop-rest': {
+        // The owner's flight settled (or fell out of the world: idle) —
+        // the final pose sticks and the glass goes free.
+        const room = rooms.get(ws.room);
+        const info = room?.members.get(ws);
+        const id = Number(msg.id);
+        const prop = room?.props?.[id];
+        if (!room || !info || !prop || prop.holder !== info.idx) break;
+        prop.holder = null;
+        if (msg.idle) {
+          prop.mode = 'idle';
+          prop.pos = null;
+          prop.quat = null;
+          broadcast(room, { t: 'prop-rest', id, idle: true }, ws);
+        } else {
+          const fin = (a, n) => Array.isArray(a) && a.length === n && a.map(Number).every(Number.isFinite);
+          const pos = fin(msg.pos, 3) ? msg.pos.map(Number) : prop.pos;
+          const quat = fin(msg.quat, 4) ? msg.quat.map(Number) : prop.quat;
+          prop.mode = 'rest';
+          prop.pos = pos;
+          prop.quat = quat;
+          prop.restedAt = Date.now();
+          broadcast(room, { t: 'prop-rest', id, pos, quat }, ws);
+        }
         break;
       }
     }
