@@ -61,6 +61,12 @@ export function startRaid(opts: RaidOptions = {}): void {
   match.mySeat = opts.mySeat ?? 0;
   match.seed = opts.seed ?? freshSeed();
   if (opts.difficulty !== undefined) match.difficulty = Math.max(0, Math.min(3, opts.difficulty));
+  // THE CAMPAIGN CURVE: tour nights ignore every picker. The road teaches —
+  // EASY through the opening set, NORMAL through peak hours, HARD after
+  // hours — and EXPERT stays a thing you choose on the SOLO shelf, never
+  // something the entry night ambushes you with because the difficulty row
+  // happened to be parked high. (toLobby/toTour hand the picker back.)
+  if (opts.tour) match.difficulty = Math.min(2, opts.tour.set);
 
   // The headliner: the MC runs most nights; the GOOP takes tour finales.
   const tourSet = opts.tour ? TOUR.sets[opts.tour.set] : undefined;
@@ -120,11 +126,24 @@ export function finishRaid(): void {
   match.screen = 'podium';
 }
 
+/** The campaign clamps match.difficulty per set; leaving a night hands the
+ *  SOLO picker's stored choice back so the shelf shows what YOU set. */
+function restorePickedDifficulty(): void {
+  try {
+    const raw = localStorage.getItem('gdr-diff');
+    const n = raw === null ? NaN : Number(raw);
+    match.difficulty = Number.isFinite(n) && n >= 0 && n <= 3 ? n : 1;
+  } catch {
+    match.difficulty = 1;
+  }
+}
+
 /** The tour screen (the campaign of song sets). */
 export function toTour(): void {
   match.screen = 'tour';
   match.playing = false;
   match.beat = -Infinity;
+  restorePickedDifficulty();
   match.generation++;
 }
 
@@ -134,5 +153,6 @@ export function toLobby(): void {
   match.playing = false;
   match.beat = -Infinity;
   match.tour = null;
+  restorePickedDifficulty();
   match.generation++;
 }

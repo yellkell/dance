@@ -819,8 +819,10 @@ export interface ShardField {
   commit(): void;
 }
 
-/** Angular shards adrift in the middle distance, dark bodies with a bright
- *  wire ghost — instanced, so a cloud costs what one used to. */
+/** OCTAGONS adrift in the middle distance — the game's own sigil floating
+ *  through its abstract spaces (they used to be octahedra, which read as
+ *  squares in silhouette). Dark plates with a bright ghost — instanced,
+ *  so a cloud costs what one used to. */
 export function buildShardField(
   count: number,
   rMin: number,
@@ -831,19 +833,22 @@ export function buildShardField(
 ): ShardField {
   const group = new Group();
   const rnd = rng(seed);
-  const bodies = darkBank(new OctahedronGeometry(0.5, 0), count, 0x0c0b14);
-  const halos = new GlowBank(new OctahedronGeometry(0.5, 0), count, { additive: true, opacity: 0.3 });
+  const bodies = darkBank(new CircleGeometry(0.5, 8), count, 0x0c0b14);
+  const halos = new GlowBank(new CircleGeometry(0.5, 8), count, { additive: true, opacity: 0.3 });
   const base: { x: number; y: number; z: number; s: Vector3; spin: number; bob: number; phase: number; rot: Euler }[] =
     [];
   for (let i = 0; i < count; i++) {
     const a = rnd() * Math.PI * 2;
     const r = rMin + rnd() * (rMax - rMin);
     const y = yMin + rnd() * (yMax - yMin);
+    // Octagon plates: near-regular, sized with real spread, tilted so the
+    // cloud never lines up.
+    const plate = 0.9 + rnd() * 1.8;
     base.push({
       x: Math.sin(a) * r,
       y,
       z: Math.cos(a) * r,
-      s: new Vector3(0.4 + rnd() * 0.5, 1.8 + rnd() * 2.4, 0.4 + rnd() * 0.5),
+      s: new Vector3(plate * (0.9 + rnd() * 0.2), plate, 1),
       spin: (rnd() - 0.5) * 0.5,
       bob: 0.25 + rnd() * 0.7,
       phase: rnd() * Math.PI * 2,

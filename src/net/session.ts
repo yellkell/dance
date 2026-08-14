@@ -182,6 +182,31 @@ export function onVoice(fn: (id: string, frame: ArrayBuffer) => void): void {
   voiceHook = fn;
 }
 
+/** Everything the relay says about drinks (see server/index.mjs, DRINKS). */
+export type PropWire =
+  | { t: 'serve'; id: number }
+  | {
+      t: 'props';
+      props: {
+        id: number;
+        holder: number | null;
+        mode: string;
+        pos: number[] | null;
+        quat: number[] | null;
+        full: boolean;
+      }[];
+    }
+  | { t: 'prop-grab'; id: number; idx: number }
+  | { t: 'prop-release'; id: number; idx: number }
+  | { t: 'prop'; id: number; idx: number; d: number[] }
+  | { t: 'prop-rest'; id: number; idle?: boolean; pos?: number[]; quat?: number[] };
+
+/** ClubPropsSystem keeps the shared glasses true to the wire. */
+let propHook: ((msg: PropWire) => void) | null = null;
+export function onProp(fn: (msg: PropWire) => void): void {
+  propHook = fn;
+}
+
 function handle(msg: Record<string, unknown>): void {
   switch (msg.t) {
     case 'room': {
@@ -344,6 +369,15 @@ function handle(msg: Record<string, unknown>): void {
       net.dirty++;
       break;
     }
+    case 'serve':
+    case 'props':
+    case 'prop-grab':
+    case 'prop-release':
+    case 'prop':
+    case 'prop-rest':
+      // Drinks traffic goes straight to the glasses (ClubPropsSystem).
+      propHook?.(msg as unknown as PropWire);
+      break;
     case 'pong': {
       const t0 = Number(msg.t0);
       if (Number.isFinite(t0)) net.rttMs = performance.now() - t0;
@@ -417,6 +451,33 @@ export function sendPose(d: number[]): void {
 /** My spot on the club floor (world space) — for the room-mates' view. */
 export function sendClubPose(d: number[]): void {
   if (net.phase === 'hosting' || net.phase === 'joined') send({ t: 'cp', d });
+}
+
+/* ── DRINKS: the glasses' side of the wire (see PropWire) ──────────────── */
+
+function onClubFloor(): boolean {
+  return net.phase === 'hosting' || net.phase === 'joined';
+}
+
+/** Ask the relay for glass `id` — the hand has already taken it on spec. */
+export function sendPropGrab(id: number): void {
+  if (onClubFloor()) send({ t: 'prop-grab', id });
+}
+
+/** The glass left my hand — mark it catchable; I still fly it. */
+export function sendPropRelease(id: number): void {
+  if (onClubFloor()) send({ t: 'prop-release', id });
+}
+
+/** Owner pose stream: [px,py,pz, qx,qy,qz,qw, full01] at ~20 Hz. */
+export function sendPropPose(id: number, d: number[]): void {
+  if (onClubFloor()) send({ t: 'prop', id, d });
+}
+
+/** My throw settled at pos/quat — or fell out of the world (nulls: idle). */
+export function sendPropRest(id: number, pos: number[] | null, quat: number[] | null): void {
+  if (!onClubFloor()) return;
+  send(pos && quat ? { t: 'prop-rest', id, pos, quat } : { t: 'prop-rest', id, idle: true });
 }
 
 /** Ship one local voice frame to the room (binary; any connected phase). */

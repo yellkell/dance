@@ -16,10 +16,12 @@ import { launchXR, SessionMode, World } from '@iwsdk/core';
 import { Color } from 'three';
 import { ensureAudio } from './audio/sfx.js';
 import { VOID_BG } from './arena/voidkit.js';
+import { ArcadeSystem } from './systems/ArcadeSystem.js';
 import { ArenaSystem } from './systems/ArenaSystem.js';
 import { AvatarSystem } from './systems/AvatarSystem.js';
 import { ChoreoSystem } from './systems/ChoreoSystem.js';
 import { ClubBallSystem } from './systems/ClubBallSystem.js';
+import { ClubPropsSystem } from './systems/ClubPropsSystem.js';
 import { ClubSocialSystem } from './systems/ClubSocialSystem.js';
 import { ClubSystem } from './systems/ClubSystem.js';
 import { ClubTeleportSystem } from './systems/ClubTeleportSystem.js';
@@ -87,6 +89,8 @@ World.create(container, {
   world.registerSystem(ClubTeleportSystem);
   world.registerSystem(ClubSocialSystem);
   world.registerSystem(ClubBallSystem);
+  world.registerSystem(ArcadeSystem);
+  world.registerSystem(ClubPropsSystem);
   world.registerSystem(MusicSystem);
   world.registerSystem(ChoreoSystem);
   world.registerSystem(GoopliathSystem);
@@ -174,6 +178,8 @@ declare global {
       menu: typeof menuView & typeof socialView;
       /** Park the player rig at (x, z) facing `yaw` — headless club walks. */
       rig: (x: number, z: number, yaw?: number, y?: number) => void;
+      /** The live scene graph — headless probes walk it by name. */
+      scene: () => import('three').Scene | null;
     };
   }
 }
@@ -212,4 +218,6 @@ window.__gdr = {
     w.player.position.set(x, y, z);
     w.player.rotation.set(0, yaw, 0);
   },
+  scene: () =>
+    (worldRef as unknown as { scene?: import('three').Scene } | null)?.scene ?? null,
 };

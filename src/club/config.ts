@@ -75,6 +75,10 @@ export const CLUB = {
    *  ambient mix ducks to a murmur inside; voices stay. */
   quiet: { minX: -8.7, maxX: -4.9, minZ: -11.2, maxZ: -8.45, doorX0: -6.6, doorX1: -5.4 },
 
+  /** THE ARCADE — the still room's loud mirror, north-east corner: the
+   *  SUPER OCTAGON cabinet and its leaderboard live here. */
+  arcade: { minX: 4.9, maxX: 8.7, minZ: -11.2, maxZ: -8.45, doorX0: 5.4, doorX1: 6.6 },
+
   /** The eclipse chandelier: ring radii + counter-rotation speeds (rad/s).
    *  Hangs over the dance floor centre at `y`. */
   chandelier: {
@@ -132,8 +136,27 @@ export interface FloorArea {
 
 const Q = CLUB.quiet;
 const T = CLUB.terrace;
+const A = CLUB.arcade;
+
+/** Booth marble tabletop height (top.y 0.745 + half its 0.035 slab). */
+const BOOTH_TABLE_Y = 0.763;
 
 export const TELEPORT_AREAS: FloorArea[] = [
+  // ── STANDABLE FURNITURE — small islands, listed FIRST so they win the
+  // area lookup over the floor beneath them. Dancing on the tables is not
+  // an accident in this venue; it is the venue.
+  // The booth tables (inside each velvet horseshoe).
+  ...CLUB.boothZs.map((bz) => ({
+    minX: CLUB.boothX - 0.42,
+    maxX: CLUB.boothX + 0.42,
+    minZ: bz - 0.42,
+    maxZ: bz + 0.42,
+    y: BOOTH_TABLE_Y,
+  })),
+  // The still room's low table — a quieter pedestal.
+  { minX: -7.14, maxX: -6.46, minZ: -9.62, maxZ: -8.94, y: 0.36 },
+
+  // ── THE FLOOR ──
   // The hall floor: dance floor, lounge aisle, everything up to the bar
   // front and the stage lip.
   { minX: -8.55, maxX: CLUB.bar.x - 0.15, minZ: -8.15, maxZ: T.z0 - 0.12, y: 0 },
@@ -144,9 +167,19 @@ export const TELEPORT_AREAS: FloorArea[] = [
   { minX: -8.55, maxX: -T.gapHalfW - 0.15, minZ: T.z0 + 0.12, maxZ: T.z1 - 0.1, y: T.h },
   { minX: T.gapHalfW + 0.15, maxX: 8.55, minZ: T.z0 + 0.12, maxZ: T.z1 - 0.1, y: T.h },
   // The vestibule landing between the wings, floor level.
-  { minX: -T.gapHalfW + 0.1, maxX: T.gapHalfW - 0.1, minZ: T.z0, maxZ: 4.55, y: 0 },
-  // The still room.
+  { minX: -T.gapHalfW + 0.1, maxX: T.gapHalfW - 0.1, minZ: T.z0, maxZ: 4.8, y: 0 },
+  // The still room, and the strip through its doorway (the old dead band
+  // where arcs aimed at the door just died).
   { minX: Q.minX + 0.25, maxX: Q.maxX - 0.25, minZ: Q.minZ + 0.25, maxZ: Q.maxZ - 0.2, y: 0 },
+  { minX: Q.doorX0 + 0.05, maxX: Q.doorX1 - 0.05, minZ: Q.maxZ - 0.05, maxZ: -8.1, y: 0 },
+  // THE ARCADE room, and its doorway strip.
+  { minX: A.minX + 0.25, maxX: A.maxX - 0.25, minZ: A.minZ + 0.25, maxZ: A.maxZ - 0.2, y: 0 },
+  { minX: A.doorX0 + 0.05, maxX: A.doorX1 - 0.05, minZ: A.maxZ - 0.05, maxZ: -8.1, y: 0 },
+  // The north corridors flanking the stage, and the backstage walk behind
+  // it — the whole perimeter is a loop now, not a set of dead ends.
+  { minX: -4.85, maxX: -3.45, minZ: -11.3, maxZ: -8.1, y: 0 },
+  { minX: 3.45, maxX: 4.85, minZ: -11.3, maxZ: -8.1, y: 0 },
+  { minX: -3.45, maxX: 3.45, minZ: -11.3, maxZ: -9.45, y: 0 },
 ];
 
 /** Floor height under a point, for arcs and rigs (0 if outside any area). */
@@ -174,6 +207,10 @@ export const WALL_SEGMENTS: Array<[number, number, number, number]> = [
   [Q.maxX, Q.minZ, Q.maxX, Q.maxZ],
   [Q.minX, Q.maxZ, Q.doorX0, Q.maxZ],
   [Q.doorX1, Q.maxZ, Q.maxX, Q.maxZ],
+  // THE ARCADE: its west wall, and the south wall split around its doorway.
+  [A.minX, A.minZ, A.minX, A.maxZ],
+  [A.minX, A.maxZ, A.doorX0, A.maxZ],
+  [A.doorX1, A.maxZ, A.maxX, A.maxZ],
   // The stage face — the performer's ground, not the crowd's.
   [-CLUB.stage.r - 0.4, CLUB.stage.z + CLUB.stage.r + 0.35, CLUB.stage.r + 0.4, CLUB.stage.z + CLUB.stage.r + 0.35],
   // The bar counter line (its south end at z1 stays open into the aisle).
