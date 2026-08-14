@@ -38,8 +38,10 @@ import dynastyUrl from '../assets/music/dynasty.mp3';
 import spreadUrl from '../assets/music/spread.m4a';
 import morningUrl from '../assets/music/morning.mp3';
 import assembleUrl from '../assets/music/assemble.m4a';
+import chillUrl from '../assets/music/chill.m4a';
 import discoballUrl from '../assets/music/discoball.mp3';
 import eclipseUrl from '../assets/music/eclipse.mp3';
+import vfallUrl from '../assets/music/vfall.mp3';
 import type { MoveKind } from '../config.js';
 
 export type TrackRole = 'raid' | 'lobby' | 'club';
@@ -247,19 +249,30 @@ export const TRACKS: Track[] = [
     roles: ['raid'],
   },
   {
-    id: 'eclipse',
-    title: 'ECLIPSE',
-    url: eclipseUrl,
-    bpm: 70.0,
-    downbeat: 3.4248,
-    seconds: 154.03,
-    lufs: -10.4,
-    // The club's own record — a slow-burn 70 BPM groove that holds
-    // the club whenever an online room has the floor between sets. The
-    // chandelier phases to it. Never a raid record: at this tempo the ring
-    // would be a waiting room, and the club deserves a house sound no set
-    // ever borrows.
+    id: 'chill',
+    title: 'CHILL',
+    url: chillUrl,
+    bpm: 125.001,
+    downbeat: 1.4922,
+    seconds: 232.32,
+    lufs: -8.9,
+    // The club's record now — CHILL holds the social floor whenever an
+    // online room is up, and the chandelier phases to it. Never a raid
+    // record: the club deserves a house sound no set ever borrows.
     roles: ['club'],
+  },
+  {
+    id: 'vfall',
+    title: 'VFALL',
+    url: vfallUrl,
+    bpm: 66.006,
+    downbeat: 2.5553,
+    seconds: 125.23,
+    lufs: -9.4,
+    // The slowest record on the SOLO shelf — a heavy 66 BPM lean. (The
+    // analyser may have locked half-time; if charts ever feel like they
+    // land between the kicks, 132.012 is the one-number fix.)
+    roles: ['raid'],
   },
   {
     id: 'swag',
@@ -272,6 +285,19 @@ export const TRACKS: Track[] = [
     // The soft one — it holds the room before the drop instead of fighting
     // it. (Its groove proper starts around 17.8 s; the lobby loop just rides
     // the whole thing, intro and all.)
+    roles: ['lobby'],
+  },
+  {
+    id: 'eclipse',
+    title: 'ECLIPSE',
+    url: eclipseUrl,
+    bpm: 70.0,
+    downbeat: 3.4248,
+    seconds: 154.03,
+    lufs: -10.4,
+    // CHILL took the club; ECLIPSE joins the foyer rotation — it plays
+    // second, after SWAG, and the pair trade all night. Never a raid
+    // record: at this tempo the ring would be a waiting room.
     roles: ['lobby'],
   },
 ];

@@ -75,12 +75,14 @@ export class MusicSystem extends createSystem({}) {
         this.generation = -1; // the next countdown always re-drops
       }
       if (screen === 'lobby' || screen === 'tour') {
-        // The house sound: SWAG holds the club solo; the moment a room has
-        // the floor (hosting or joined — the SOCIAL night), ECLIPSE takes
-        // the decks. startAmbient switches cleanly when the id changes.
+        // The house sound: the foyer runs its ROTATION (SWAG opens, ECLIPSE
+        // follows, and they trade all night); the moment a room has the
+        // floor (hosting or joined — the SOCIAL night), CHILL takes the
+        // decks and loops. startAmbient switches cleanly when the set
+        // changes and no-ops while a rotation is mid-spin.
         const social = net.phase === 'hosting' || net.phase === 'joined';
-        const room = (social ? tracksFor('club')[0] : undefined) ?? tracksFor('lobby')[0];
-        if (room) startAmbient(room, social ? 0.7 : 0.55);
+        const room = social ? tracksFor('club') : tracksFor('lobby');
+        if (room.length) startAmbient(room, social ? 0.7 : 0.55);
         // Warm the raid record while the room track holds the floor, so the
         // drop is instant when someone hits START.
         if (!this.warmed) {

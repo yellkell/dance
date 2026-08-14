@@ -84,6 +84,10 @@ let ambZero = 0;
 let ambToken = 0;
 let ambBase = 0;
 let ambDuck = 1;
+/** The rotation: the records the room trades between, and where it is. */
+let ambSet: Track[] = [];
+let ambIdx = 0;
+let ambKey = '';
 
 export function musicVolume(): number {
   return musicVol;
@@ -298,34 +302,73 @@ export function stopSet(fade = 0.5): void {
 /* ── the lobby loop ─────────────────────────────────────────────────────── */
 
 /**
- * The room is never dead: the soft track loops under the lobby and the
- * rehearsal map at reduced level, and publishes its own beat so the mirror
- * ball, the lasers and the GOOPLIATH's idle bounce are already grooving
- * before anyone starts a set.
+ * The room is never dead: the house sound plays under the lobby and the
+ * club at reduced level, and publishes its own beat so the mirror ball,
+ * the lasers and the GOOPLIATH's idle bounce are already grooving before
+ * anyone starts a set.
+ *
+ * Hand it ONE record and it loops the musical body seamlessly (the club's
+ * behaviour). Hand it SEVERAL and the room runs a ROTATION: each record
+ * plays through and the next takes the decks — the foyer's SWAG → ECLIPSE
+ * trade. The published beat always belongs to whichever record is on.
  */
-export function startAmbient(track: Track, level = 0.55): void {
-  if (ambTrack?.id === track.id && ambSrc) return;
+export function startAmbient(tracks: Track | Track[], level = 0.55): void {
+  const set = Array.isArray(tracks) ? tracks : [tracks];
+  if (!set.length) return;
+  const key = set.map((t) => t.id).join('>');
+  if (key === ambKey && ambSrc) return; // this rotation already has the decks
   stopAmbient(0.3);
+  ambKey = key;
+  ambSet = set;
+  ambIdx = 0;
+  spinAmbient(level);
+}
+
+/** Put the rotation's current record on; single-record sets loop in place,
+ *  longer sets hand the decks over when the record runs out. `hops` counts
+ *  consecutive failed decodes so a broken record is skipped, not fatal —
+ *  and a rotation of nothing but broken records gives up instead of
+ *  spinning forever. */
+function spinAmbient(level: number, hops = 0): void {
+  if (hops >= ambSet.length) return;
   const token = ++ambToken;
+  const track = ambSet[ambIdx];
   ambTrack = track;
 
   const c = ctx();
   if (!c) return;
   void loadTrack(track).then((buf) => {
-    if (token !== ambToken || !buf) return;
+    if (token !== ambToken) return;
+    if (!buf) {
+      if (ambSet.length > 1) {
+        ambIdx = (ambIdx + 1) % ambSet.length;
+        spinAmbient(level, hops + 1);
+      }
+      return;
+    }
     const gain = c.createGain();
     ambBase = trackGain(track) * level;
     gain.gain.value = ambBase * ambDuck;
     gain.connect(chain(c));
     const src = c.createBufferSource();
     src.buffer = buf;
-    src.loop = true;
-    // Loop the musical body, not the file: out of the last whole bar, back
-    // to the first downbeat — so the lobby groove never hiccups.
-    const bar = beatLenOf(track) * 4;
-    const bars = Math.floor((buf.duration - track.downbeat) / bar);
-    src.loopStart = track.downbeat;
-    src.loopEnd = track.downbeat + bars * bar;
+    if (ambSet.length === 1) {
+      src.loop = true;
+      // Loop the musical body, not the file: out of the last whole bar, back
+      // to the first downbeat — so the groove never hiccups.
+      const bar = beatLenOf(track) * 4;
+      const bars = Math.floor((buf.duration - track.downbeat) / bar);
+      src.loopStart = track.downbeat;
+      src.loopEnd = track.downbeat + bars * bar;
+    } else {
+      src.onended = () => {
+        // Only a natural run-out advances the rotation — a stopAmbient (or
+        // a newer spin) has already bumped the token past this record.
+        if (token !== ambToken) return;
+        ambIdx = (ambIdx + 1) % ambSet.length;
+        spinAmbient(level);
+      };
+    }
     src.connect(gain);
     const at = c.currentTime + 0.1;
     src.start(at);
@@ -337,6 +380,7 @@ export function startAmbient(track: Track, level = 0.55): void {
 
 export function stopAmbient(fade = 0.4): void {
   ambToken++;
+  ambKey = '';
   const c = audioContext();
   const src = ambSrc;
   const gain = ambGain;

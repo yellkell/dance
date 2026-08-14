@@ -38,6 +38,7 @@ import { createSystem, InputComponent } from '@iwsdk/core';
 import { Raycaster, Vector3, type Intersection, type Object3D } from 'three';
 import { DIFFICULTY, GRADE, RING, TOUR } from '../config.js';
 import * as sfx from '../audio/sfx.js';
+import { setSfxVolume, sfxVolume } from '../audio/sfx.js';
 import { musicVolume, preload, setMusicVolume } from '../audio/music.js';
 import { pickRaidTrack, trackById, tracksFor, type Track } from '../audio/tracks.js';
 import { startRaid, toLobby, toTour } from '../game/flow.js';
@@ -480,6 +481,9 @@ export class MenuSystem extends createSystem({}) {
       }
     } else if (id === 'vol-' || id === 'vol+') {
       setMusicVolume(musicVolume() + (id === 'vol+' ? 0.1 : -0.1));
+    } else if (id === 'sfx-' || id === 'sfx+') {
+      setSfxVolume(sfxVolume() + (id === 'sfx+' ? 0.1 : -0.1));
+      sfx.gooCharge(0.5); // an attack cue to judge the new level by
     } else if (id === 'board-world' || id === 'board-local') {
       this.boardSource = id === 'board-world' ? 'world' : 'local';
       this.boardScroll = 0;
@@ -549,6 +553,7 @@ export class MenuSystem extends createSystem({}) {
       match.difficulty,
       match.preferredTrack,
       Math.round(musicVolume() * 10),
+      Math.round(sfxVolume() * 10),
       net.phase,
       net.code,
       net.members.length,
@@ -1722,6 +1727,22 @@ export class MenuSystem extends createSystem({}) {
       small: true,
     });
     buttons.push({ id: 'vol+', label: '+', x: CONTENT_X + 472, y: 172, w: 110, h: 110 });
+
+    // The SFX fader — attack cues, UI ticks, the goop's foley. Stepping it
+    // plays a charge whine so the new level is judged on the sound that
+    // matters most.
+    buttons.push({ id: 'sfx-', label: '−', x: CONTENT_X, y: 312, w: 110, h: 110 });
+    buttons.push({
+      id: 'sfx',
+      label: `EFFECTS ${Math.round(sfxVolume() * 100)}%`,
+      x: CONTENT_X + 126,
+      y: 312,
+      w: 330,
+      h: 110,
+      display: true,
+      small: true,
+    });
+    buttons.push({ id: 'sfx+', label: '+', x: CONTENT_X + 472, y: 312, w: 110, h: 110 });
   }
 }
 
