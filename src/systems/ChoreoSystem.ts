@@ -306,7 +306,11 @@ export class ChoreoSystem extends createSystem({}) {
     this.cuedSteps.clear();
     this.cuedTicks.clear();
     this.ended = false;
-    this.setlist = generateSetlist(match.seed, match.phrases, trackById(match.trackId)?.banned ?? [], match.difficulty);
+    // A record's bans: the ones it always carries, plus the ones that only
+    // hold on an authored campaign night.
+    const record = trackById(match.trackId);
+    const banned = [...(record?.banned ?? []), ...(match.tour ? (record?.tourBanned ?? []) : [])];
+    this.setlist = generateSetlist(match.seed, match.phrases, banned, match.difficulty);
   }
 
   update(delta: number): void {

@@ -67,6 +67,13 @@ export interface Track {
    *  skips them entirely. Same trackId on every client, so a ban never
    *  desyncs a room. */
   banned?: MoveKind[];
+  /** Optional: move kinds banned only on a CAMPAIGN night. A tour night is
+   *  authored — its record was chosen for the beat it plays in the story,
+   *  and a ban there is staging. The same record on the SOLO shelf is just
+   *  a record: you picked it, so you get the whole vocabulary. (Never
+   *  desyncs a room either — online raids are never tour nights, so
+   *  `match.tour` is null on every client in one.) */
+  tourBanned?: MoveKind[];
 }
 
 /**
@@ -110,10 +117,11 @@ export const TRACKS: Track[] = [
     // The night after the first goop falls: PEAK HOURS opens on the strut —
     // the tour's victory lap before COMBAT kicks the doors in. (The first
     // analysis locked the shuffle's dotted lattice and called it 73.33 —
-    // exactly 2/3 of the real grid; the kicks sit on 110.) No sweeps: the
-    // groove is the point of this night, so nobody ducks through it.
+    // exactly 2/3 of the real grid; the kicks sit on 110.) No sweeps ON THE
+    // TOUR: the groove is the point of that night. Take it to SOLO and the
+    // blade comes with it — your pick, your problem.
     roles: ['raid'],
-    banned: ['sweep'],
+    tourBanned: ['sweep'],
   },
   {
     id: 'loop',
@@ -158,10 +166,10 @@ export const TRACKS: Track[] = [
     lufs: -14.5,
     // Back on the tour: PEAK HOURS slot 2, holding the swagger before
     // DYNASTY. (First measured 78.4 — the 4/5 lattice of the real pulse;
-    // the 98 grid scores double.) It keeps its no-sweep character: this
-    // night swaggers, it doesn't duck.
+    // the 98 grid scores double.) The tour night swaggers, it doesn't duck
+    // — but on the SOLO shelf it ducks like everything else.
     roles: ['raid'],
-    banned: ['sweep'],
+    tourBanned: ['sweep'],
   },
   {
     id: 'target',
