@@ -38,8 +38,9 @@ import {
   MeshBasicMaterial,
   PlaneGeometry,
 } from 'three';
-import { GRADE, GROOVE, SCORE, TOUR, seatHue } from '../config.js';
+import { GRADE, GROOVE, SCORE, TOUR } from '../config.js';
 import { trackById } from '../audio/tracks.js';
+import { danceHue } from '../game/profile.js';
 import { dodgeRate, gradeOf, match, me } from '../game/state.js';
 import { font } from '../ui/fonts.js';
 
@@ -316,7 +317,7 @@ export class HudSystem extends createSystem({}) {
     g.textBaseline = 'middle';
 
     const d = me();
-    const seatCss = seatNeonCss(seatHue(match.mySeat));
+    const seatCss = seatNeonCss(danceHue(match.mySeat, true));
     const cx = SW / 2;
 
     // Score — big and white with the faintest white bloom (the whites are

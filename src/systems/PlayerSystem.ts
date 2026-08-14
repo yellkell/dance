@@ -45,8 +45,9 @@ import {
   SpriteMaterial,
   type Object3D,
 } from 'three';
-import { CHOREO, GROOVE, hueToColor, seatHue } from '../config.js';
+import { CHOREO, GROOVE, hueToColor } from '../config.js';
 import { glintTexture, glowSprite } from '../materials/glow.js';
+import { danceHue } from '../game/profile.js';
 import { match, me } from '../game/state.js';
 import { net } from '../net/session.js';
 
@@ -226,7 +227,7 @@ export class PlayerSystem extends createSystem({}) {
       const s = this.sticks.right;
       if (s.attachedTo) s.halo.getWorldPosition(_hand);
       else _hand.set(0.25, 1.35, -0.4);
-      this.sparks.burst(_hand, Math.min(1, Math.max(0, heat)), hueToColor(seatHue(match.mySeat), 0.6));
+      this.sparks.burst(_hand, Math.min(1, Math.max(0, heat)), hueToColor(danceHue(match.mySeat, true), 0.6));
     };
     grooveView.disrupt = () => {
       // A hit knocks the rhythm out of your hands: streak, tally and the
@@ -304,8 +305,9 @@ export class PlayerSystem extends createSystem({}) {
   /* ── the sticks ───────────────────────────────────────────────────────── */
 
   private updateSticks(delta: number): void {
-    // Your seat's colour (it can change per match online).
-    const hue = seatHue(match.mySeat);
+    // Your colour: the one you picked, else your seat's (it can change per
+    // match online).
+    const hue = danceHue(match.mySeat, true);
     if (hue !== this.stickHue) {
       this.stickHue = hue;
       const color = hueToColor(hue, 0.6);

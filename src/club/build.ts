@@ -98,8 +98,6 @@ export interface ClubRefs {
   chandelier: {
     group: Group;
     rings: ChandelierRing[];
-    moonMat: MeshStandardMaterial;
-    coronaMat: SpriteMaterial;
   };
   /** The brass inlay rings set into the dance floor (beat shimmer). */
   inlayMat: MeshBasicMaterial;
@@ -340,7 +338,14 @@ function buildWalls(root: Group, W: number, NZ: number, SZ: number, H: number): 
   // varies subtly (the anti-repetition rule: no five modules identical).
   const coreMat = bronzeMat();
   const reedMat = brassMat(0.3);
+  // The hall's wall dressing stops at the side rooms' doors: a pilaster or
+  // a sconce that lands inside the arcade is hall furniture standing in
+  // somebody's room. (Generic, so the rooms can be moved again.)
+  const A = CLUB.arcade;
+  const inRoom = (x: number, z: number): boolean =>
+    x > A.minX && x < A.maxX && z > A.minZ && z < A.maxZ;
   const pilaster = (x: number, z: number): void => {
+    if (inRoom(x, z)) return;
     const g = new Group();
     g.position.set(x, 0, z);
     const plinthL = new Mesh(new BoxGeometry(0.4, 0.14, 0.24), skirt);
@@ -380,6 +385,7 @@ function buildWalls(root: Group, W: number, NZ: number, SZ: number, H: number): 
     opacity: 0.5,
   });
   const sconce = (x: number, z: number, ry: number): void => {
+    if (inRoom(x, z)) return;
     const g = new Group();
     g.position.set(x, 1.78, z);
     g.rotation.y = ry;
@@ -510,37 +516,14 @@ function buildChandelier(root: Group): ClubRefs['chandelier'] {
     rings.push({ pivot, glowMat, speed: def.speed });
   });
 
-  // The moon at the heart — a disc of moon-white with a bronze occluder
-  // easing across it: the eclipse. The corona halo breathes on the bar.
-  const moonMat = new MeshStandardMaterial({
-    color: 0x2a2a33,
-    emissive: DECOR.moon,
-    emissiveIntensity: 1.1,
-    roughness: 0.5,
-    metalness: 0.1,
-  });
-  const moon = new Mesh(new CylinderGeometry(0.3, 0.3, 0.05, 28), moonMat);
-  group.add(moon);
-  const shadowMat = new MeshStandardMaterial({ color: 0x14100e, roughness: 0.8, metalness: 0.3 });
-  const occluder = new Mesh(new CylinderGeometry(0.27, 0.27, 0.056, 28), shadowMat);
-  occluder.position.set(0.13, 0, 0.05);
-  group.add(occluder);
-  const coronaMat = new SpriteMaterial({
-    map: glowTexture(),
-    color: DECOR.moon,
-    transparent: true,
-    blending: AdditiveBlending,
-    depthWrite: false,
-    opacity: 0.55,
-  });
-  const corona = new Sprite(coronaMat);
-  corona.scale.setScalar(1.5);
-  group.add(corona);
+  // No moon at the heart. The crescent disc and its corona used to hang in
+  // the middle of the rings; the rings are the fixture, and they read
+  // better as an open eclipse with nothing in the eye of it.
   const stem = new Mesh(new CylinderGeometry(0.012, 0.012, 1.6, 6), cableMat);
   stem.position.y = 0.8;
   group.add(stem);
 
-  return { group, rings, moonMat, coronaMat };
+  return { group, rings };
 }
 
 /* ── the stage: crescent riser, DJ console, sunburst, drapes ────────────── */
@@ -989,8 +972,10 @@ function buildTerrace(root: Group): void {
   const rail = brassMat(0.26);
 
   for (const side of [-1, 1] as const) {
+    // The east wing stops at the arcade's wall — the back-right corner is
+    // a room now, so that gallery is the shorter of the two.
     const x0 = side < 0 ? -CLUB.halfW : T.gapHalfW;
-    const x1 = side < 0 ? -T.gapHalfW : CLUB.halfW;
+    const x1 = side < 0 ? -T.gapHalfW : CLUB.arcade.minX - 0.12;
     const cx = (x0 + x1) / 2;
     const wdt = x1 - x0;
     // Deck + face + brass nosing.
@@ -1206,23 +1191,24 @@ function buildArcade(root: Group): void {
   const H = 2.5;
   const plaster = new MeshStandardMaterial({ map: plasterTexture([3, 1.4]), roughness: 0.95, metalness: 0.02 });
 
-  // Interior walls (west + south split around the door), lintel, low cap —
-  // the same envelope as the still room, mirrored across the hall.
+  // Interior walls (west + NORTH split around the door), lintel, low cap.
+  // The room stands in the hall's back-right corner, so the shell covers
+  // its east and south sides and the door looks out over the floor.
   const wWall = new Mesh(new PlaneGeometry(A.maxZ - A.minZ, H), plaster);
   wWall.position.set(A.minX, H / 2, (A.minZ + A.maxZ) / 2);
   wWall.rotation.y = Math.PI / 2;
   (wWall.material as MeshStandardMaterial).side = DoubleSide;
   root.add(wWall);
-  const south = (x0: number, x1: number): void => {
+  const north = (x0: number, x1: number): void => {
     const m = new Mesh(new PlaneGeometry(x1 - x0, H), plaster);
-    m.position.set((x0 + x1) / 2, H / 2, A.maxZ);
+    m.position.set((x0 + x1) / 2, H / 2, A.minZ);
     (m.material as MeshStandardMaterial).side = DoubleSide;
     root.add(m);
   };
-  south(A.minX, A.doorX0);
-  south(A.doorX1, A.maxX);
+  north(A.minX, A.doorX0);
+  north(A.doorX1, A.maxX);
   const lintel = new Mesh(new PlaneGeometry(A.doorX1 - A.doorX0, H - 2.05), plaster);
-  lintel.position.set((A.doorX0 + A.doorX1) / 2, (H + 2.05) / 2, A.maxZ);
+  lintel.position.set((A.doorX0 + A.doorX1) / 2, (H + 2.05) / 2, A.minZ);
   (lintel.material as MeshStandardMaterial).side = DoubleSide;
   root.add(lintel);
   const cap = new Mesh(new PlaneGeometry(A.maxX - A.minX, A.maxZ - A.minZ), new MeshStandardMaterial({
@@ -1234,8 +1220,8 @@ function buildArcade(root: Group): void {
   root.add(cap);
   // Door dressing + nameplate, the still room's twin — but this door
   // promises noise, so the plate glows the cabinet's magenta.
-  for (const x of [A.doorX0, A.doorX1]) box(root, bronzeMat(), 0.08, 2.05, 0.1, x, 1.025, A.maxZ);
-  box(root, bronzeMat(), A.doorX1 - A.doorX0 + 0.08, 0.09, 0.1, (A.doorX0 + A.doorX1) / 2, 2.05, A.maxZ);
+  for (const x of [A.doorX0, A.doorX1]) box(root, bronzeMat(), 0.08, 2.05, 0.1, x, 1.025, A.minZ);
+  box(root, bronzeMat(), A.doorX1 - A.doorX0 + 0.08, 0.09, 0.1, (A.doorX0 + A.doorX1) / 2, 2.05, A.minZ);
   const plate = signPlane(0.96, 0.24, 512, (g, sw, sh) => {
     g.fillStyle = 'rgba(13,10,18,0.85)';
     g.beginPath();
@@ -1256,10 +1242,11 @@ function buildArcade(root: Group): void {
     g.shadowBlur = 0;
   });
   plate.name = 'live-arcade-plate';
-  plate.position.set((A.doorX0 + A.doorX1) / 2, 2.34, A.maxZ + 0.06);
+  plate.position.set((A.doorX0 + A.doorX1) / 2, 2.34, A.minZ - 0.06);
+  plate.rotation.y = Math.PI; // the nameplate reads from the floor side
   root.add(plate);
 
-  // ── THE CABINET: SUPER OCTAGON, against the north wall, facing the door.
+  // ── THE CABINET: SUPER OCTAGON, against the back wall, facing the door.
   //
   // ONE SILHOUETTE. The first cut stacked boxes — a marquee hovering over
   // a gap, glowing magenta slabs bolted to the sides — and it read exactly
@@ -1268,10 +1255,12 @@ function buildArcade(root: Group): void {
   // continuous edge. So this is that profile, extruded across the width;
   // the headboard can't float because it isn't a separate object.
   const cx = (A.minX + A.maxX) / 2;
-  const cz = A.minZ + 0.45;
+  const cz = A.maxZ - 0.45;
   const CW = 0.66; // cabinet width
   const cab = new Group();
   cab.position.set(cx, 0, cz);
+  // Built facing +z, then turned to face the door across the room.
+  cab.rotation.y = Math.PI;
   const shellMat = blackSteelMat();
 
   // The side profile, drawn in (depth, height) — front is +depth. It gets
@@ -1423,10 +1412,10 @@ function buildArcade(root: Group): void {
   // all — came out the colour of the bulb. The house's own warm light lets
   // the metal read as metal and leaves magenta to the marquee and the game.
   const cove = new Mesh(new BoxGeometry(A.maxX - A.minX - 0.4, 0.03, 0.03), brassGlowMat(1.5));
-  cove.position.set(cx, H - 0.12, A.minZ + 0.08);
+  cove.position.set(cx, H - 0.12, A.maxZ - 0.08);
   root.add(cove);
   const glow = new PointLight(0xffcb96, 1.7, 5.5, 1.4);
-  glow.position.set(cx, 2.1, cz + 0.9);
+  glow.position.set(cx, 2.1, cz - 0.9);
   root.add(glow);
 
   registerArcade({

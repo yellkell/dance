@@ -34,8 +34,8 @@ import {
   RING,
   hueToColor,
   ringRadius,
-  seatHue,
 } from '../config.js';
+import { danceHue } from '../game/profile.js';
 import { seatLocal } from '../game/ring.js';
 import { octagonSlab } from './octagon.js';
 import { font } from '../ui/fonts.js';
@@ -106,7 +106,7 @@ function buildPlatform(seat: number, name: string, isMine: boolean): PlatformHan
   const root = new Group();
   root.name = `platform-${seat}`;
 
-  const hue = seatHue(seat);
+  const hue = danceHue(seat, isMine);
   const accent = hueToColor(hue, 0.6);
 
   // The slab: near-black glass so the neon owns it.

@@ -65,10 +65,10 @@ export const PROP_WALLS: Array<{ ax: number; az: number; bx: number; bz: number;
   { ax: CLUB.quiet.maxX, az: CLUB.quiet.minZ, bx: CLUB.quiet.maxX, bz: CLUB.quiet.maxZ, h: 2.5 },
   { ax: CLUB.quiet.minX, az: CLUB.quiet.maxZ, bx: CLUB.quiet.doorX0, bz: CLUB.quiet.maxZ, h: 2.5 },
   { ax: CLUB.quiet.doorX1, az: CLUB.quiet.maxZ, bx: CLUB.quiet.maxX, bz: CLUB.quiet.maxZ, h: 2.5 },
-  // Arcade interior walls.
+  // Arcade interior walls (west, and the north face split by its door).
   { ax: CLUB.arcade.minX, az: CLUB.arcade.minZ, bx: CLUB.arcade.minX, bz: CLUB.arcade.maxZ, h: 2.5 },
-  { ax: CLUB.arcade.minX, az: CLUB.arcade.maxZ, bx: CLUB.arcade.doorX0, bz: CLUB.arcade.maxZ, h: 2.5 },
-  { ax: CLUB.arcade.doorX1, az: CLUB.arcade.maxZ, bx: CLUB.arcade.maxX, bz: CLUB.arcade.maxZ, h: 2.5 },
+  { ax: CLUB.arcade.minX, az: CLUB.arcade.minZ, bx: CLUB.arcade.doorX0, bz: CLUB.arcade.minZ, h: 2.5 },
+  { ax: CLUB.arcade.doorX1, az: CLUB.arcade.minZ, bx: CLUB.arcade.maxX, bz: CLUB.arcade.minZ, h: 2.5 },
   // The bar counter's front line — knee-to-top height only.
   { ax: CLUB.bar.x, az: CLUB.bar.z0 - 0.4, bx: CLUB.bar.x, bz: CLUB.bar.z1, h: CLUB.bar.top },
   // The stage face.

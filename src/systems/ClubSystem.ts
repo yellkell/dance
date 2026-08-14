@@ -117,8 +117,6 @@ export class ClubSystem extends createSystem({}) {
         ring.glowMat.emissiveIntensity = 1.05 + phase * 0.5 + pulse * 0.28;
       });
       club.chandelier.group.rotation.y += delta * 0.02; // stately drift
-      club.chandelier.moonMat.emissiveIntensity = 1.0 + pulse * 0.3;
-      club.chandelier.coronaMat.opacity = 0.42 + pulse * 0.2 + Math.sin(t * 0.7) * 0.06;
 
       // ── the floor's brass ghost-ring ──────────────────────────────────
       club.inlayMat.opacity = 0.34 + pulse * 0.3;
