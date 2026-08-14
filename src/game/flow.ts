@@ -20,7 +20,6 @@ import {
   gradeOf,
   markTourNightCleared,
   match,
-  pushFlair,
   recordSoloRun,
   recordTourGrade,
 } from './state.js';
@@ -110,10 +109,10 @@ export function finishRaid(): void {
       // A tour night is CLEARED by surviving it — the letter is for
       // bragging, and the map keeps the best one ever taken home.
       recordTourGrade(match.tour.set, match.tour.song, grade);
-      if (me.alive) {
-        markTourNightCleared(match.tour.set, match.tour.song);
-        pushFlair(`NIGHT CLEARED — ${grade}`, 'milestone');
-      }
+      // No pop for the clear: that strip says HIT and PERFECT and nothing
+      // else. The grade card, the podium board and the map's fresh ✓ all
+      // carry the news anyway.
+      if (me.alive) markTourNightCleared(match.tour.set, match.tour.song);
     } else if (!match.online) {
       // A finished solo set posts to the song's leaderboards — this
       // headset's book, and the world board. The campaign and the club's

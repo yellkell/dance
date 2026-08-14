@@ -4,7 +4,8 @@
  * a couple of tiny queues ("buses") for cross-system one-shots.
  */
 
-import { BOTS, GRADE, MUSIC, RING, seatHue, type MoveKind } from '../config.js';
+import { BOTS, GRADE, MUSIC, RING, type MoveKind } from '../config.js';
+import { danceHue } from './profile.js';
 import { mix, mulberry32 } from './rng.js';
 
 export type Screen =
@@ -209,7 +210,7 @@ export function buildRoster(seats: number, seed: number, mySeat: number, humans?
       seat,
       kind: seat === mySeat ? 'local' : human ? 'remote' : 'bot',
       name: human?.name ?? botName,
-      hue: seatHue(seat),
+      hue: danceHue(seat, seat === mySeat),
       skill: BOTS.skillMin + rng() * (BOTS.skillMax - BOTS.skillMin),
       score: 0,
       combo: 0,

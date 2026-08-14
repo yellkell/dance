@@ -99,22 +99,91 @@ const NOVA_FRAG = /* glsl */ `
     vec2 p = vUv * 2.0 - 1.0;
     float r = length(p);
     if (r > 1.0) discard;
+    vec2 q = p * uPaneR;
     // World-space angle: the plane is rotated flat, so uv v runs down −z.
     float ang = atan(p.x, -p.y);
     float d = abs(mod(ang - uAngle + 3.14159, 6.28318) - 3.14159);
-    float inWedge = step(d, uHalf);
+    // The doomed sector, soft-edged at the wedge line.
+    float danger = smoothstep(uHalf - 0.015, uHalf + 0.03, d);
     vec3 col = warnColor();
     float a = 0.0;
-    // The flood: everything OUTSIDE the wedge fills and pulses.
-    a += (1.0 - inWedge) * (0.16 + 0.5 * uFill);
-    // Rim ring all the way round, dimmer through the wedge.
-    a += smoothstep(0.9, 0.95, r) * (1.0 - smoothstep(0.98, 1.0, r)) * (1.0 - inWedge * 0.7);
-    // The wedge's edge rays — the doorposts of the safe ground.
-    float edge = smoothstep(0.06, 0.0, abs(d - uHalf));
-    a += edge * 0.9;
+    // A quiet scrim over the doomed ground — the flat flood read as a
+    // cheap wash, so the danger is textured now, not poured:
+    a += danger * (0.06 + 0.18 * uFill);
+    // …fine radial spokes drifting through it (compass, not paint)…
+    float spokes = smoothstep(0.62, 0.95, 0.5 + 0.5 * sin(ang * 24.0 - uTime * 1.3));
+    a += danger * spokes * smoothstep(0.05, 0.2, r) * (0.05 + 0.12 * uFill);
+    // …and shock arcs breathing OUTWARD from the core, quicker as the
+    // fuse runs down — the countdown, read radially.
+    float arc = smoothstep(0.82, 0.98, 0.5 + 0.5 * sin(r * 16.0 - uTime * (2.0 + 9.0 * uFill)));
+    a += danger * arc * (0.10 + 0.28 * uFill);
+    // The blast's own heart, swelling at the centre as it charges.
+    float core = 1.0 - smoothstep(0.08 + 0.08 * uFill, 0.2 + 0.12 * uFill, r);
+    a += core * (0.22 + 0.5 * uFill);
+    // The deck's own edge burns through the doomed sector — the rim the
+    // octagon actually has, not a circle the deck hasn't.
+    float m = octMask(q);
+    float rim = m - octMask(q * 1.1);
+    a += danger * rim * 0.6;
+    // The doorposts: one hard hairline per wedge edge with a soft halo,
+    // CONSTANT-WIDTH in metres (angular width fattened into a blob near
+    // the centre before) — the two rays that mean "between these".
+    float er = abs(d - uHalf) * max(r, 0.03) * uPaneR;
+    a += (1.0 - smoothstep(0.0, 0.02, er)) * 1.0;
+    a += (1.0 - smoothstep(0.02, 0.1, er)) * 0.28;
     a *= pulse();
-    // …and none of it past the deck's own edge.
-    a *= octMask(p * uPaneR);
+    a *= m;
+    gl_FragColor = vec4(col, a);
+  }
+`;
+
+/**
+ * THE X: both diagonal arms drawn as ONE pane. As two spun strips the
+ * crossing double-blended into a white blob and the loose ends glowed off
+ * past the rim; one shader means the union composes — a single scrim, edge
+ * hairlines that trace the union's outline (never through the middle), a
+ * ringed diamond KNOT where the arms meet, and both arms filling from
+ * their far ends toward the crossing as the fuse runs down.
+ */
+const X_FRAG = /* glsl */ `
+  ${COMMON}
+  ${OCT_MASK}
+  uniform float uHalfW, uPaneR;
+  void main(){
+    vec2 q = (vUv * 2.0 - 1.0) * uPaneR;
+    float d1 = abs(q.x - q.y) * 0.7071;
+    float d2 = abs(q.x + q.y) * 0.7071;
+    float t1 = (q.x + q.y) * 0.7071;
+    float t2 = (q.x - q.y) * 0.7071;
+    vec3 col = warnColor();
+    float a = 0.0;
+    float in1 = 1.0 - smoothstep(uHalfW - 0.015, uHalfW + 0.015, d1);
+    float in2 = 1.0 - smoothstep(uHalfW - 0.015, uHalfW + 0.015, d2);
+    // One scrim for the union — the crossing never doubles.
+    float arm = max(in1, in2);
+    a += arm * (0.1 + 0.15 * uFill);
+    // Chevrons drawing INTO the knot along each arm.
+    float ch1 = in1 * step(0.55, fract(abs(t1) * 2.6 + uTime * 1.5));
+    float ch2 = in2 * step(0.55, fract(abs(t2) * 2.6 + uTime * 1.5));
+    a += max(ch1, ch2) * 0.13;
+    // The advance: both arms light from their far ends toward the crossing
+    // (lit where |t| > front, and the front walks in as the fuse runs down;
+    // edges ascending — reversed-edge smoothstep is undefined in GLSL).
+    float front = (1.0 - uFill) * uPaneR;
+    a += max(in1 * smoothstep(front - 0.14, front, abs(t1)),
+             in2 * smoothstep(front - 0.14, front, abs(t2))) * 0.24;
+    // Edge hairlines along the UNION's outline — |min(d)−w| is zero on the
+    // outer rails and never inside the crossing, so no lines cut the knot.
+    float eu = abs(min(d1, d2) - uHalfW);
+    a += (1.0 - smoothstep(0.0, 0.02, eu)) * 0.95;
+    a += (1.0 - smoothstep(0.02, 0.09, eu)) * 0.22;
+    // THE KNOT: the diamond where the arms cross is the deadliest ground —
+    // a ringed frame just proud of the rails, and a heart that heats up.
+    float kd = max(d1, d2);
+    a += (1.0 - smoothstep(0.0, 0.025, abs(kd - (uHalfW + 0.03)))) * (0.45 + 0.45 * uFill);
+    a += (1.0 - smoothstep(uHalfW * 0.5, uHalfW, kd)) * (0.08 + 0.3 * uFill);
+    a *= pulse();
+    a *= octMask(q);
     gl_FragColor = vec4(col, a);
   }
 `;
@@ -365,6 +434,19 @@ export function novaTelegraph(radius: number, angle: number, halfAngle: number):
   const disc = new Mesh(new PlaneGeometry(radius * 2, radius * 2), mat);
   disc.rotation.x = -Math.PI / 2;
   return makeTelegraph([disc], [mat]);
+}
+
+/**
+ * THE X, whole: one full-deck pane carrying both diagonal arms and the
+ * knot. Place the group at the platform centre on the floor — the shader
+ * owns the geometry, and the octagon mask trims it to the deck.
+ */
+export function xTelegraph(halfW: number): Telegraph {
+  const R = 1.2; // spans the deck's diagonal; the mask trims the rest
+  const mat = warnMat(X_FRAG, { uHalfW: { value: halfW }, uPaneR: { value: R } });
+  const pane = new Mesh(new PlaneGeometry(R * 2, R * 2), mat);
+  pane.rotation.x = -Math.PI / 2;
+  return makeTelegraph([pane], [mat]);
 }
 
 /**

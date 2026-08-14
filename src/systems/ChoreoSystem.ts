@@ -24,6 +24,7 @@ import { RoutineBlockfall } from '../choreo/blockfall.js';
 import { StrikeFx } from '../choreo/strikes.js';
 import {
   beamTelegraph,
+  xTelegraph,
   donutTelegraph,
   gateTelegraph,
   halfTelegraph,
@@ -86,6 +87,8 @@ export const choreoView: {
   dropX?: () => void;
   /** Dev: drop a gate now (axis 1 = the horizontal cousin, a clear row). */
   dropGate?: (axis?: 0 | 1) => void;
+  /** Dev: throw THE PIE now at `bearing` (world radians). */
+  dropNova?: (bearing?: number) => void;
   /** Dev: march THE WAVE now (axis 1 = front/back; back=false skips the turn). */
   dropWave?: (axis?: 0 | 1, back?: boolean) => void;
 } = { zones: [] };
@@ -220,6 +223,21 @@ export class ChoreoSystem extends createSystem({}) {
         })),
       });
     };
+    choreoView.dropNova = (bearing = 0.8) => {
+      if (!match.playing || !Number.isFinite(match.beat)) return;
+      const tele = match.beat + 0.25;
+      const land = tele + MOVES.nova.chargeBeats;
+      this.begin({
+        index: 9970 + this.nextMove,
+        kind: 'nova',
+        telegraphBeat: tele,
+        landBeat: land,
+        act: 2,
+        landings: [
+          { beat: land, zone: { kind: 'nova', bearing, halfAngle: CHOREO.novaHalfAngle } },
+        ],
+      });
+    };
     choreoView.dropGate = (axis = 1) => {
       if (!match.playing || !Number.isFinite(match.beat)) return;
       const tele = match.beat + 0.25;
@@ -288,7 +306,11 @@ export class ChoreoSystem extends createSystem({}) {
     this.cuedSteps.clear();
     this.cuedTicks.clear();
     this.ended = false;
-    this.setlist = generateSetlist(match.seed, match.phrases, trackById(match.trackId)?.banned ?? [], match.difficulty);
+    // A record's bans: the ones it always carries, plus the ones that only
+    // hold on an authored campaign night.
+    const record = trackById(match.trackId);
+    const banned = [...(record?.banned ?? []), ...(match.tour ? (record?.tourBanned ?? []) : [])];
+    this.setlist = generateSetlist(match.seed, match.phrases, banned, match.difficulty);
   }
 
   update(delta: number): void {
@@ -326,7 +348,15 @@ export class ChoreoSystem extends createSystem({}) {
 
     // New telegraphs due?
     while (this.nextMove < this.setlist.length && this.setlist[this.nextMove].telegraphBeat <= beat) {
-      this.begin(this.setlist[this.nextMove]);
+      const move = this.setlist[this.nextMove];
+      // THE WAVE, aimed (solo only): too often the seed's coin flip put
+      // the exit on the quarter the dancer already held, and the whole
+      // out-leg asked nothing. Solo has one dancer, so the march can start
+      // from THEIR side — first strike at their end, exit across the deck,
+      // the crossing always a real crossing. Online charts stay pure seed:
+      // every seat must agree with the one giant's mime.
+      if (move.kind === 'wave' && !match.online) this.aimWave(move);
+      this.begin(move);
       this.nextMove++;
     }
 
@@ -472,21 +502,35 @@ export class ChoreoSystem extends createSystem({}) {
     }
   }
 
+  /** Rewrite a wave's stops so the march starts on the local dancer's side
+   *  of the deck. The beat scaffold (stagger, the turn) is untouched — only
+   *  which stop fires when: out over their three, exit far, back again. */
+  private aimWave(move: SetMove): void {
+    if (move.landings.length !== 6) return; // dev one-way drops stay as thrown
+    const first = move.landings[0].zone;
+    const axis = first.kind === 'rail' ? 1 : 0;
+    const stops = axis ? CHOREO.waveRailZ : CHOREO.waveLaneX;
+    const pos = axis ? match.headZ : match.headX;
+    const ordered = pos >= 0 ? [...stops].reverse() : [...stops];
+    const seq = [ordered[0], ordered[1], ordered[2], ordered[3], ordered[2], ordered[1]];
+    move.landings.forEach((landing, i) => {
+      if (landing.zone.kind === 'rail') landing.zone.z = seq[i];
+      else if (landing.zone.kind === 'lane') landing.zone.x = seq[i];
+    });
+  }
+
   private buildTelegraph(zone: Zone, seat: number, moveIdx: number, landingIdx: number): Telegraph | null {
     switch (zone.kind) {
       case 'lane': {
         if (zone.yaw) {
-          // THE X's arm: a strip spun about the deck centre. Length spans
-          // the diagonal; the group sits at the strip's near end, pushed
-          // out along its own run so the strip crosses dead centre.
-          const len = Math.hypot(OCTAGON_HALF_WIDTH * 2, OCTAGON_HALF_DEPTH * 2) + 0.6;
-          const tg = beamTelegraph(zone.halfW, len);
-          tg.group.rotation.y = zone.yaw;
-          tg.group.position.set(
-            Math.sin(zone.yaw) * (len / 2) + Math.cos(zone.yaw) * zone.x,
-            0.05,
-            Math.cos(zone.yaw) * (len / 2) - Math.sin(zone.yaw) * zone.x,
-          );
+          // THE X, drawn whole: both arms come as a ± yaw pair in one move,
+          // so the POSITIVE arm carries the single combined pane (scrim,
+          // union-edge rails, the knot) and its twin draws nothing. Two
+          // spun strips used to double-blend at the crossing into a blob.
+          // Judgement is untouched — both zones still cut their own lane.
+          if (zone.yaw < 0) return null;
+          const tg = xTelegraph(zone.halfW);
+          tg.group.position.y = 0.05;
           return tg;
         }
         const tg = beamTelegraph(zone.halfW, OCTAGON_HALF_DEPTH * 2 + 0.8);
@@ -738,9 +782,10 @@ export class ChoreoSystem extends createSystem({}) {
     d.missChain += 1;
     const out = d.missChain >= GRADE.chainOut;
     if (d.kind === 'local') {
-      // The chain counts up out loud: the last warning before the night
-      // ends has to be unmissable.
-      pushFlair(out ? 'GAME OVER' : d.missChain === GRADE.chainOut - 1 ? 'HIT — ONE MORE' : 'HIT', 'hit');
+      // Just HIT — every time. The pop is a reflex, not a readout: the
+      // chain marks on the wedge already count how close the end is, and
+      // the wedge says SPECTATING the moment it arrives.
+      pushFlair('HIT', 'hit');
       sfx.hitTaken();
       // And the impact knocks the rhythm out of your hands.
       grooveView.disrupt?.();

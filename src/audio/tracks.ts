@@ -67,6 +67,13 @@ export interface Track {
    *  skips them entirely. Same trackId on every client, so a ban never
    *  desyncs a room. */
   banned?: MoveKind[];
+  /** Optional: move kinds banned only on a CAMPAIGN night. A tour night is
+   *  authored — its record was chosen for the beat it plays in the story,
+   *  and a ban there is staging. The same record on the SOLO shelf is just
+   *  a record: you picked it, so you get the whole vocabulary. (Never
+   *  desyncs a room either — online raids are never tour nights, so
+   *  `match.tour` is null on every client in one.) */
+  tourBanned?: MoveKind[];
 }
 
 /**
@@ -103,15 +110,18 @@ export const TRACKS: Track[] = [
     id: 'discoball',
     title: 'DISCO BALL',
     url: discoballUrl,
-    bpm: 73.33,
-    downbeat: 2.1763,
+    bpm: 109.965,
+    downbeat: 2.1295,
     seconds: 126.62,
     lufs: -12.6,
-    // The night after the first goop falls: PEAK HOURS opens on a slow
-    // strut — the tour's victory lap before COMBAT kicks the doors in. At
-    // 73 BPM nobody should be ducking; the groove is the point.
+    // The night after the first goop falls: PEAK HOURS opens on the strut —
+    // the tour's victory lap before COMBAT kicks the doors in. (The first
+    // analysis locked the shuffle's dotted lattice and called it 73.33 —
+    // exactly 2/3 of the real grid; the kicks sit on 110.) No sweeps ON THE
+    // TOUR: the groove is the point of that night. Take it to SOLO and the
+    // blade comes with it — your pick, your problem.
     roles: ['raid'],
-    banned: ['sweep'],
+    tourBanned: ['sweep'],
   },
   {
     id: 'loop',
@@ -150,14 +160,16 @@ export const TRACKS: Track[] = [
     id: 'money',
     title: 'MONEY',
     url: moneyUrl,
-    bpm: 78.395,
-    downbeat: 0.4934,
+    bpm: 97.994,
+    downbeat: 0.6094,
     seconds: 173.88,
     lufs: -14.5,
-    // Back on the tour: PEAK HOURS slot 2, holding DISCO BALL's swagger at
-    // 78 BPM before DYNASTY. A record this laid-back never asks for a duck.
+    // Back on the tour: PEAK HOURS slot 2, holding the swagger before
+    // DYNASTY. (First measured 78.4 — the 4/5 lattice of the real pulse;
+    // the 98 grid scores double.) The tour night swaggers, it doesn't duck
+    // — but on the SOLO shelf it ducks like everything else.
     roles: ['raid'],
-    banned: ['sweep'],
+    tourBanned: ['sweep'],
   },
   {
     id: 'target',
@@ -265,13 +277,14 @@ export const TRACKS: Track[] = [
     id: 'vfall',
     title: 'VFALL',
     url: vfallUrl,
-    bpm: 66.006,
-    downbeat: 2.5553,
+    bpm: 165.015,
+    downbeat: 2.5048,
     seconds: 125.23,
     lufs: -9.4,
-    // The slowest record on the SOLO shelf — a heavy 66 BPM lean. (The
-    // analyser may have locked half-time; if charts ever feel like they
-    // land between the kicks, 132.012 is the one-number fix.)
+    // Fast techno, and the chart finally says so. The first analysis
+    // called it 66.006 — not half-time but a 2/5 lattice of the real grid
+    // (66.006 × 5/2 = 165.015, which out-scores 66, 110 AND 132 on the
+    // kick evidence). One of the quickest records on the SOLO shelf now.
     roles: ['raid'],
   },
   {

@@ -36,13 +36,21 @@
 
 import { createSystem, InputComponent } from '@iwsdk/core';
 import { Raycaster, Vector3, type Intersection, type Object3D } from 'three';
-import { DIFFICULTY, GRADE, RING, TOUR } from '../config.js';
+import { DIFFICULTY, GRADE, RING, TOUR, seatHue } from '../config.js';
 import * as sfx from '../audio/sfx.js';
 import { setSfxVolume, sfxVolume } from '../audio/sfx.js';
 import { musicVolume, preload, setMusicVolume } from '../audio/music.js';
 import { pickRaidTrack, trackById, tracksFor, type Track } from '../audio/tracks.js';
 import { startRaid, toLobby, toTour } from '../game/flow.js';
-import { NAME_MAX, nameIsClean, profileName, setProfileName } from '../game/profile.js';
+import {
+  NAME_MAX,
+  danceHue,
+  nameIsClean,
+  profileHue,
+  profileName,
+  setProfileHue,
+  setProfileName,
+} from '../game/profile.js';
 import {
   bestTourGrade,
   clearedTourNights,
@@ -101,6 +109,12 @@ const PROF_CARD = { x: 1140, y: 106, w: 480, h: 232 };
 
 /** The rename keyboard: an arcade board, centre stage, modal. */
 const KB = { x: 280, y: 170, w: 1100, h: 690 };
+
+/** The colour wheel: same modal footing as the keyboard. The ring is a
+ *  hue wheel you point AT — the ray's uv lands anywhere on it, so the pick
+ *  is continuous rather than a tray of swatches. */
+const CW_CARD = { x: 470, y: 180, w: 720, h: 680 };
+const CW_WHEEL = { cx: 830, cy: 452, rOuter: 186, rInner: 102 };
 const KB_ROWS: { keys: string[]; x0: number; y: number }[] = [
   { keys: [...'1234567890'], x0: 336, y: 356 },
   { keys: [...'QWERTYUIOP'], x0: 336, y: 456 },
@@ -150,6 +164,9 @@ export const menuView: {
   setPause?: (on: boolean) => void;
   /** Press any board button by id — the headless finger. */
   act?: (id: string) => void;
+  /** Park the ray's landing point in canvas space — the colour wheel reads
+   *  it, so a headless `act('cw:wheel')` exercises the real angle maths. */
+  pointAt?: (x: number, y: number) => void;
   /** The board's raw canvas as a data URL — pixel-perfect style checks. */
   snapBoard?: () => string;
   snapPause?: () => string;
@@ -175,9 +192,14 @@ export class MenuSystem extends createSystem({}) {
    *  eased y (canvas space) and its target. NaN until first paint. */
   private railY = NaN;
   private railTargetY = NaN;
-  /** The profile card's dropdown, and the rename keyboard over everything. */
+  /** The profile card's dropdown, and the modals over everything. */
   private profileOpen = false;
   private keyboardOpen = false;
+  private colourOpen = false;
+  /** The hue under consideration while the wheel is up (null = the seat's). */
+  private hueDraft: number | null = null;
+  /** Canvas-space point of the last ray hit — the wheel reads it. */
+  private hitPx: { x: number; y: number } | null = null;
   private nameDraft = '';
   /** Which board the SOLO song page shows, and how far down it's scrolled. */
   private boardSource: 'world' | 'local' = 'world';
@@ -244,6 +266,9 @@ export class MenuSystem extends createSystem({}) {
       this.lastKey = '';
     };
     menuView.act = (id) => this.action(id);
+    menuView.pointAt = (x, y) => {
+      this.hitPx = { x, y };
+    };
     menuView.snapBoard = () => (this.board.ctx().canvas as HTMLCanvasElement).toDataURL('image/png');
     menuView.snapPause = () => (this.pause.ctx().canvas as HTMLCanvasElement).toDataURL('image/png');
 
@@ -323,6 +348,9 @@ export class MenuSystem extends createSystem({}) {
         const panel = this.panelFor(hit.object);
         const id = panel?.buttonAt(hit.uv.x, hit.uv.y) ?? null;
         if (id) {
+          // The wheel needs WHERE on the board, not just which button: the
+          // hue is read off the ray's landing point.
+          if (panel === this.board) this.hitPx = { x: hit.uv.x * W, y: (1 - hit.uv.y) * H };
           hover = id;
           if (this.input.xr.gamepads[hand]?.getButtonDown(InputComponent.Trigger)) {
             clicked = id;
@@ -421,13 +449,33 @@ export class MenuSystem extends createSystem({}) {
 
   private action(id: string): void {
     // Any action that isn't the profile's own closes its dropdown.
-    if (id !== 'profile' && id !== 'rename') this.profileOpen = false;
+    if (id !== 'profile' && id !== 'rename' && id !== 'colour') this.profileOpen = false;
 
     if (id === 'profile') {
       this.profileOpen = !this.profileOpen;
     } else if (id === 'rename') {
       this.keyboardOpen = true;
       this.nameDraft = profileName();
+    } else if (id === 'colour') {
+      this.colourOpen = true;
+      this.hueDraft = profileHue();
+    } else if (id === 'cw:wheel') {
+      // The ray landed on the ring — the angle it landed at IS the hue.
+      const p = this.hitPx;
+      if (p) {
+        const a = Math.atan2(p.y - CW_WHEEL.cy, p.x - CW_WHEEL.cx);
+        this.hueDraft = ((a / (Math.PI * 2)) % 1 + 1) % 1;
+      }
+    } else if (id === 'cw:seat') {
+      this.hueDraft = null; // hand the colour back to the seat
+    } else if (id === 'cw:cancel') {
+      this.colourOpen = false;
+    } else if (id === 'cw:done') {
+      setProfileHue(this.hueDraft);
+      // A live platform is already built in the old colour — rebuild it so
+      // the choice shows without leaving the room.
+      match.generation++;
+      this.colourOpen = false;
     } else if (id === 'kb:cancel') {
       this.keyboardOpen = false;
     } else if (id === 'kb:done') {
@@ -614,6 +662,33 @@ export class MenuSystem extends createSystem({}) {
       this.board.paint('', (g) => this.drawKeyboard(g), buttons, this.hover);
       return;
     }
+    // THE COLOUR WHEEL is modal on the same terms.
+    if (this.colourOpen) {
+      const D = CW_WHEEL.rOuter;
+      this.board.paint(
+        '',
+        (g) => this.drawColourWheel(g),
+        [
+          // The ring's hit area is its bounding square; drawColourWheel
+          // paints the wheel and the action reads the landing angle.
+          { id: 'cw:wheel', label: '', ghost: true, x: CW_WHEEL.cx - D, y: CW_WHEEL.cy - D, w: D * 2, h: D * 2 },
+          {
+            id: 'cw:seat',
+            label: 'SEAT COLOUR',
+            selected: this.hueDraft === null,
+            small: true,
+            x: CW_CARD.x + 40,
+            y: CW_CARD.y + CW_CARD.h - 168,
+            w: 280,
+            h: 56,
+          },
+          { id: 'cw:cancel', label: 'CANCEL', tone: UI.danger, small: true, x: CW_CARD.x + 40, y: CW_CARD.y + CW_CARD.h - 96, w: 280, h: 60 },
+          { id: 'cw:done', label: 'DONE', primary: true, x: CW_CARD.x + CW_CARD.w - 320, y: CW_CARD.y + CW_CARD.h - 96, w: 280, h: 60 },
+        ],
+        this.hover,
+      );
+      return;
+    }
 
     const tab = this.activeTab();
     let buttons: PanelButton[] = [];
@@ -657,6 +732,15 @@ export class MenuSystem extends createSystem({}) {
         id: 'rename',
         label: 'RENAME',
         x: PROF_CARD.x + 28,
+        y: PROF_CARD.y + PROF_CARD.h - 80,
+        w: 200,
+        h: 56,
+        small: true,
+      });
+      buttons.push({
+        id: 'colour',
+        label: 'COLOUR',
+        x: PROF_CARD.x + 244,
         y: PROF_CARD.y + PROF_CARD.h - 80,
         w: 200,
         h: 56,
@@ -813,6 +897,113 @@ export class MenuSystem extends createSystem({}) {
     g.font = font(500, 19);
     g.fillStyle = UI.dim;
     g.fillText('your tag in the club · signs your scores', c.x + 28, c.y + 130);
+
+    // The colour you dance in, as a chip beside the name.
+    const hue = danceHue(match.mySeat, true);
+    g.beginPath();
+    g.arc(c.x + c.w - 46, c.y + 74, 22, 0, Math.PI * 2);
+    g.fillStyle = `hsl(${Math.round(hue * 360)}, 100%, 62%)`;
+    g.shadowColor = g.fillStyle;
+    g.shadowBlur = 16;
+    g.fill();
+    g.shadowBlur = 0;
+  }
+
+  /* ── the colour wheel (modal) ── */
+
+  /** The pick under the cursor: the draft if you've made one, else the
+   *  seat's own neon (so the preview always shows something real). */
+  private draftHue(): number {
+    return this.hueDraft === null ? seatHue(match.mySeat) : this.hueDraft;
+  }
+
+  private drawColourWheel(g: CanvasRenderingContext2D): void {
+    // The scrim, then the card — the keyboard's staging, so the two modals
+    // feel like the same drawer.
+    g.fillStyle = 'rgba(4,2,10,0.8)';
+    g.beginPath();
+    g.roundRect(6, 6, W - 12, H - 12, 30);
+    g.fill();
+    const c = CW_CARD;
+    g.fillStyle = 'rgba(14,11,24,0.98)';
+    g.beginPath();
+    g.roundRect(c.x, c.y, c.w, c.h, 24);
+    g.fill();
+    g.lineWidth = 2;
+    g.strokeStyle = UI.line;
+    g.stroke();
+
+    g.textAlign = 'left';
+    g.textBaseline = 'middle';
+    g.font = font(600, 22);
+    g.letterSpacing = '4px';
+    g.fillStyle = UI.dim;
+    g.fillText('YOUR COLOUR', c.x + 40, c.y + 44);
+    g.letterSpacing = '0px';
+
+    // THE WHEEL: wedges around the ring, each at full neon. Drawn as 90
+    // slices rather than a gradient because a canvas conic gradient is not
+    // available everywhere the headset browsers go.
+    const { cx, cy, rOuter, rInner } = CW_WHEEL;
+    const SLICES = 90;
+    for (let i = 0; i < SLICES; i++) {
+      const a0 = (i / SLICES) * Math.PI * 2;
+      const a1 = ((i + 1.02) / SLICES) * Math.PI * 2;
+      g.beginPath();
+      g.arc(cx, cy, rOuter, a0, a1);
+      g.arc(cx, cy, rInner, a1, a0, true);
+      g.closePath();
+      g.fillStyle = `hsl(${Math.round((i / SLICES) * 360)}, 100%, 58%)`;
+      g.fill();
+    }
+    // The ring's edges, so it reads as a dial and not a spill.
+    g.lineWidth = 2;
+    g.strokeStyle = 'rgba(255,255,255,0.16)';
+    for (const r of [rInner, rOuter]) {
+      g.beginPath();
+      g.arc(cx, cy, r, 0, Math.PI * 2);
+      g.stroke();
+    }
+
+    // The marker: a white-cased knob sitting on the chosen angle. It only
+    // appears once you've PICKED — on the seat's colour the wheel is just
+    // a wheel, which is how you can tell you haven't chosen yet.
+    const hue = this.draftHue();
+    if (this.hueDraft !== null) {
+      const a = hue * Math.PI * 2;
+      const mx = cx + Math.cos(a) * (rInner + rOuter) / 2;
+      const my = cy + Math.sin(a) * (rInner + rOuter) / 2;
+      g.beginPath();
+      g.arc(mx, my, 22, 0, Math.PI * 2);
+      g.lineWidth = 5;
+      g.strokeStyle = '#ffffff';
+      g.stroke();
+      g.lineWidth = 2;
+      g.strokeStyle = 'rgba(0,0,0,0.55)';
+      g.beginPath();
+      g.arc(mx, my, 26, 0, Math.PI * 2);
+      g.stroke();
+    }
+
+    // The preview at the wheel's heart: a disc in the pick, glowing the way
+    // the platform rim will.
+    g.beginPath();
+    g.arc(cx, cy, rInner - 18, 0, Math.PI * 2);
+    g.fillStyle = `hsl(${Math.round(hue * 360)}, 100%, 62%)`;
+    g.shadowColor = g.fillStyle;
+    g.shadowBlur = 34;
+    g.fill();
+    g.shadowBlur = 0;
+
+    g.textAlign = 'center';
+    g.font = font(500, 20);
+    g.fillStyle = UI.dim;
+    g.fillText(
+      this.hueDraft === null ? 'your seat picks it' : 'your platform · sticks · HUD',
+      cx,
+      c.y + c.h - 208,
+    );
+    g.textAlign = 'left';
   }
 
   /* ── the rename keyboard (modal) ── */
@@ -1275,29 +1466,32 @@ export class MenuSystem extends createSystem({}) {
         g.fillText(status.hint, wx + 28, BOARD_ROW_Y0 + 48);
       }
     } else {
-      // Column captions, then the visible window of the list.
+      // Column captions, tucked under the rule, then the visible window of
+      // the list. The captions sit ABOVE the first row's highlight band —
+      // they used to share those pixels, and a top-ranked local run drew
+      // its accent straight through SCORE and BEST.
       g.font = font(500, 16);
       g.letterSpacing = '1.5px';
       g.fillStyle = UI.faint;
       g.textAlign = 'right';
-      g.fillText('SCORE', wx + ww - 104, BOARD_HEAD_Y + 40);
+      g.fillText('SCORE', wx + ww - 104, BOARD_HEAD_Y + 32);
       g.textAlign = 'center';
-      g.fillText('BEST', wx + ww - 52, BOARD_HEAD_Y + 40);
+      g.fillText('BEST', wx + ww - 52, BOARD_HEAD_Y + 32);
       g.letterSpacing = '0px';
 
       const start = this.scrollTop(rows.length);
       rows.slice(start, start + BOARD_VISIBLE).forEach((row, i) => {
         const rank = start + i + 1;
-        const ry = BOARD_ROW_Y0 + 30 + i * BOARD_ROW_H;
+        const ry = BOARD_ROW_Y0 + 40 + i * BOARD_ROW_H;
         if (row.isMe) {
           // Your own row, findable at a glance in a hundred strangers.
           g.fillStyle = UI.accentFaint;
           g.beginPath();
-          g.roundRect(wx + 16, ry - 22, ww - 32, BOARD_ROW_H - 6, 8);
+          g.roundRect(wx + 16, ry - 19, ww - 32, BOARD_ROW_H - 8, 8);
           g.fill();
           g.fillStyle = UI.accent;
           g.beginPath();
-          g.roundRect(wx + 20, ry - 16, 4, BOARD_ROW_H - 18, 2);
+          g.roundRect(wx + 20, ry - 13, 4, BOARD_ROW_H - 22, 2);
           g.fill();
         }
         g.textAlign = 'right';
@@ -1627,6 +1821,33 @@ export class MenuSystem extends createSystem({}) {
           g.letterSpacing = '2px';
           g.fillStyle = UI.info;
           g.fillText('▼ NEXT', n.x, n.y - n.r - 30);
+          g.letterSpacing = '0px';
+        }
+
+        // THE UNLOCK FLAG: multiplayer opens when this night is cleared, so
+        // the map says which night that is — and stops saying it the moment
+        // it's yours. It sits above NEXT when they land on the same stop.
+        if (s === 0 && i === 2 && !this.multiplayerUnlocked()) {
+          const label = 'UNLOCKS MULTIPLAYER';
+          g.font = font(700, 19);
+          g.letterSpacing = '2px';
+          const pw = g.measureText(label).width + 40;
+          const py = n.y - n.r - (next ? 58 : 30);
+          // A leader down to the stop — a pill hanging in the white space
+          // between three nodes belongs to whichever one you assume.
+          g.strokeStyle = UI.info;
+          g.lineWidth = 2;
+          g.beginPath();
+          g.moveTo(n.x, py + 18);
+          g.lineTo(n.x, n.y - n.r - 2);
+          g.stroke();
+          g.beginPath();
+          g.roundRect(n.x - pw / 2, py - 18, pw, 36, 18);
+          g.fillStyle = 'rgba(111,200,255,0.14)';
+          g.fill();
+          g.stroke();
+          g.fillStyle = UI.info;
+          g.fillText(label, n.x, py + 1);
           g.letterSpacing = '0px';
         }
 

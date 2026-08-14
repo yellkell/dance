@@ -9,7 +9,10 @@
  * club tag without touching the stored profile.
  */
 
+import { seatHue } from '../config.js';
+
 const NAME_KEY = 'gdr-name';
+const HUE_KEY = 'gdr-hue';
 export const NAME_MAX = 12;
 
 /** A coarse net over the worst of it — names ride a PUBLIC board now, and
@@ -63,6 +66,51 @@ export function profileName(): string {
     /* fine */
   }
   return cached;
+}
+
+/* ── the colour ─────────────────────────────────────────────────────────── */
+
+/**
+ * YOUR COLOUR: the hue your platform, your sticks and your HUD wear.
+ *
+ * Seats hand out 24 distinct neons by a golden-angle walk, and that stays
+ * the default — but a dancer who thinks of themselves as the green one
+ * should get to be the green one on every stage. Stored as a hue (0..1),
+ * null = whatever the seat says.
+ *
+ * It is a LOCAL preference and does not ride the wire: over in a room, the
+ * others still see you in your seat's colour, so nobody can paint
+ * themselves the same as the dancer beside them.
+ */
+let cachedHue: number | null | undefined;
+
+export function profileHue(): number | null {
+  if (cachedHue !== undefined) return cachedHue;
+  try {
+    const raw = localStorage.getItem(HUE_KEY);
+    const n = raw === null ? NaN : Number(raw);
+    cachedHue = Number.isFinite(n) && n >= 0 && n < 1 ? n : null;
+  } catch {
+    cachedHue = null;
+  }
+  return cachedHue;
+}
+
+/** Take a hue (0..1), or null to hand the colour back to the seat. */
+export function setProfileHue(hue: number | null): void {
+  cachedHue = hue === null ? null : ((hue % 1) + 1) % 1;
+  try {
+    if (cachedHue === null) localStorage.removeItem(HUE_KEY);
+    else localStorage.setItem(HUE_KEY, cachedHue.toFixed(4));
+  } catch {
+    /* fine */
+  }
+}
+
+/** The hue a dancer wears: yours if you picked one, else the seat's. */
+export function danceHue(seat: number, isMine: boolean): number {
+  const mine = isMine ? profileHue() : null;
+  return mine === null ? seatHue(seat) : mine;
 }
 
 /** Rename: sanitised, persisted, empty (or blocked) keeps the old name. */

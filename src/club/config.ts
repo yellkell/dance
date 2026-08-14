@@ -75,9 +75,15 @@ export const CLUB = {
    *  ambient mix ducks to a murmur inside; voices stay. */
   quiet: { minX: -8.7, maxX: -4.9, minZ: -11.2, maxZ: -8.45, doorX0: -6.6, doorX1: -5.4 },
 
-  /** THE ARCADE — the still room's loud mirror, north-east corner: the
-   *  SUPER OCTAGON cabinet and its leaderboard live here. */
-  arcade: { minX: 4.9, maxX: 8.7, minZ: -11.2, maxZ: -8.45, doorX0: 5.4, doorX1: 6.6 },
+  /** THE ARCADE — the still room's loud mirror, and its POLAR opposite:
+   *  the still room is front-left by the stage, so the noise goes
+   *  back-right, by the door. Its own door faces north, onto the floor.
+   *  (It used to sit beside the stage, which put the quiet room and the
+   *  loud room on the same wall — mirrored, but not opposite.) */
+  // maxX/maxZ ARE the shell (halfW, maxZ): a room tucked into a corner has
+  // to meet the outer walls, or the leftover slot shows daylight from the
+  // hall over the top of its low ceiling.
+  arcade: { minX: 4.9, maxX: 9, minZ: 2.05, maxZ: 5, doorX0: 5.4, doorX1: 6.6 },
 
   /** The eclipse chandelier: ring radii + counter-rotation speeds (rad/s).
    *  Hangs over the dance floor centre at `y`. */
@@ -163,18 +169,20 @@ export const TELEPORT_AREAS: FloorArea[] = [
   // Behind the bar — the keeper's aisle is open to anyone who fancies
   // playing host (enter round the counter's south end).
   { minX: CLUB.bar.x + CLUB.bar.depth + 0.25, maxX: 8.45, minZ: CLUB.bar.z0 + 0.15, maxZ: CLUB.bar.z1 + 0.9, y: 0 },
-  // Terrace wings (raised) either side of the vestibule.
+  // Terrace wings (raised) either side of the vestibule. The east wing
+  // stops at the arcade's wall — that corner is a room now.
   { minX: -8.55, maxX: -T.gapHalfW - 0.15, minZ: T.z0 + 0.12, maxZ: T.z1 - 0.1, y: T.h },
-  { minX: T.gapHalfW + 0.15, maxX: 8.55, minZ: T.z0 + 0.12, maxZ: T.z1 - 0.1, y: T.h },
+  { minX: T.gapHalfW + 0.15, maxX: A.minX - 0.15, minZ: T.z0 + 0.12, maxZ: T.z1 - 0.1, y: T.h },
   // The vestibule landing between the wings, floor level.
   { minX: -T.gapHalfW + 0.1, maxX: T.gapHalfW - 0.1, minZ: T.z0, maxZ: 4.8, y: 0 },
   // The still room, and the strip through its doorway (the old dead band
   // where arcs aimed at the door just died).
   { minX: Q.minX + 0.25, maxX: Q.maxX - 0.25, minZ: Q.minZ + 0.25, maxZ: Q.maxZ - 0.2, y: 0 },
   { minX: Q.doorX0 + 0.05, maxX: Q.doorX1 - 0.05, minZ: Q.maxZ - 0.05, maxZ: -8.1, y: 0 },
-  // THE ARCADE room, and its doorway strip.
-  { minX: A.minX + 0.25, maxX: A.maxX - 0.25, minZ: A.minZ + 0.25, maxZ: A.maxZ - 0.2, y: 0 },
-  { minX: A.doorX0 + 0.05, maxX: A.doorX1 - 0.05, minZ: A.maxZ - 0.05, maxZ: -8.1, y: 0 },
+  // THE ARCADE room, and its doorway strip — its door faces north now, so
+  // the strip runs back toward the floor rather than up toward the stage.
+  { minX: A.minX + 0.25, maxX: A.maxX - 0.25, minZ: A.minZ + 0.2, maxZ: A.maxZ - 0.25, y: 0 },
+  { minX: A.doorX0 + 0.05, maxX: A.doorX1 - 0.05, minZ: A.minZ - 0.75, maxZ: A.minZ + 0.05, y: 0 },
   // The north corridors flanking the stage, and the backstage walk behind
   // it — the whole perimeter is a loop now, not a set of dead ends.
   { minX: -4.85, maxX: -3.45, minZ: -11.3, maxZ: -8.1, y: 0 },
@@ -207,10 +215,11 @@ export const WALL_SEGMENTS: Array<[number, number, number, number]> = [
   [Q.maxX, Q.minZ, Q.maxX, Q.maxZ],
   [Q.minX, Q.maxZ, Q.doorX0, Q.maxZ],
   [Q.doorX1, Q.maxZ, Q.maxX, Q.maxZ],
-  // THE ARCADE: its west wall, and the south wall split around its doorway.
+  // THE ARCADE: its west wall, and the NORTH wall split around its doorway
+  // (the room sits against the south shell, so it opens onto the floor).
   [A.minX, A.minZ, A.minX, A.maxZ],
-  [A.minX, A.maxZ, A.doorX0, A.maxZ],
-  [A.doorX1, A.maxZ, A.maxX, A.maxZ],
+  [A.minX, A.minZ, A.doorX0, A.minZ],
+  [A.doorX1, A.minZ, A.maxX, A.minZ],
   // The stage face — the performer's ground, not the crowd's.
   [-CLUB.stage.r - 0.4, CLUB.stage.z + CLUB.stage.r + 0.35, CLUB.stage.r + 0.4, CLUB.stage.z + CLUB.stage.r + 0.35],
   // The bar counter line (its south end at z1 stays open into the aisle).
