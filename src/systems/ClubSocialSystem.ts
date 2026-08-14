@@ -537,7 +537,7 @@ export class ClubSocialSystem extends createSystem({}) {
     buttons.push({
       id: 'track',
       label: cued ? `♪ ${cued.title}` : '♪ SHUFFLE',
-      sub: cued ? `${cued.bpm.toFixed(cued.bpm % 1 ? 2 : 0)} BPM — rides the ball you call` : 'the seed picks — rides the ball you call',
+      sub: cued ? `${cued.bpm.toFixed(cued.bpm % 1 ? 2 : 0)} BPM` : undefined,
       x: 24,
       y: 652,
       w: 652,
@@ -562,7 +562,6 @@ export class ClubSocialSystem extends createSystem({}) {
       buttons.push({
         id: 'cancel',
         label: 'CALL IT OFF',
-        sub: 'your ball is up — or just touch it',
         tone: UI.danger,
         x: 24,
         y: 808,
@@ -571,15 +570,13 @@ export class ClubSocialSystem extends createSystem({}) {
         small: true,
       });
     } else {
-      // The floor's one CTA: the thing this panel exists to let you do.
+      // The floor's one CTA. It says what it does and nothing else: the
+      // subtitle used to explain the ball's whole ritual to a room that
+      // can see the ball hanging in front of them.
       buttons.push({
         id: 'call',
-        label: ballUp ? 'THE BALL IS UP' : setOut ? 'A SET IS OUT' : 'SEND THE BALL UP',
-        sub: ballUp
-          ? 'touch it to dance — 60 s from the call'
-          : setOut
-            ? `${net.gamePlayers.size} on the ring — the floor waits for them`
-            : 'a ball spawns before you · touchers ride at zero',
+        label: ballUp ? 'BALL IS UP' : setOut ? 'SET IS OUT' : 'HOST',
+        sub: setOut ? `${net.gamePlayers.size} on the ring` : undefined,
         primary: true,
         disabled: ballUp || setOut,
         x: 24,
@@ -603,7 +600,6 @@ export class ClubSocialSystem extends createSystem({}) {
     buttons.push({
       id: 'voice',
       label: on ? 'VOICE CHAT: ON' : 'VOICE CHAT: OFF',
-      sub: on ? 'the room can talk — spatial, by the figure' : 'hear no one, send nothing',
       tone: on ? undefined : UI.danger,
       x: 24,
       y: 958,
@@ -617,7 +613,6 @@ export class ClubSocialSystem extends createSystem({}) {
       buttons.push({
         id: 'leave',
         label: 'LEAVE THE CLUB',
-        sub: 'back to the foyer · the room keeps dancing',
         tone: UI.danger,
         x: 24,
         y: 1036,
@@ -656,12 +651,12 @@ export class ClubSocialSystem extends createSystem({}) {
           g.fillText(`· ${net.members.length} on the floor`, 28 + rw + 18 + cw + 16, 102);
           g.font = font(500, 20);
           g.fillStyle = UI.faint;
-          g.fillText('mute silences · block also hides · right Ⓐ closes', 28, 138);
+          g.fillText('right Ⓐ closes', 28, 138);
         } else {
           g.font = font(500, 21);
           g.letterSpacing = '0.5px';
           g.fillStyle = UI.dim;
-          g.fillText('host or join a room and the floor fills up', 28, 102);
+          g.fillText('host or join a room', 28, 102);
         }
         g.letterSpacing = '0px';
 

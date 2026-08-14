@@ -31,6 +31,7 @@ import {
   CircleGeometry,
   CylinderGeometry,
   DoubleSide,
+  ExtrudeGeometry,
   Group,
   HemisphereLight,
   LatheGeometry,
@@ -661,41 +662,8 @@ function buildStage(root: Group): MeshBasicMaterial {
   }
   root.add(console);
 
-  // The house mark over the stage: no name, just the sign of the place —
-  // an eclipsed moon in a thin double keyline, flanked by its phases. The
-  // room doesn't say what it's called; it just is.
-  const sign = signPlane(3.2, 0.85, 1024, (s, sw, sh) => {
-    s.strokeStyle = 'rgba(201,168,106,0.9)';
-    s.lineWidth = 3;
-    s.strokeRect(10, 10, sw - 20, sh - 20);
-    s.lineWidth = 1.5;
-    s.strokeRect(20, 20, sw - 40, sh - 40);
-    // The glyph, centre: a moon disc bitten by its shadow — and a phase
-    // march either side, waxing in, waning out.
-    const moon = (gx: number, r: number, bite: number): void => {
-      s.shadowColor = 'rgba(242,236,255,0.8)';
-      s.shadowBlur = 14;
-      s.beginPath();
-      s.arc(gx, sh / 2, r, 0, Math.PI * 2);
-      s.fillStyle = '#f2ecff';
-      s.fill();
-      s.shadowBlur = 0;
-      if (bite > 0) {
-        s.beginPath();
-        s.arc(gx + r * bite, sh / 2, r * 0.92, 0, Math.PI * 2);
-        s.fillStyle = '#0d0a14';
-        s.fill();
-      }
-    };
-    moon(sw / 2, 64, 0.42);
-    moon(sw * 0.26, 30, 0.85);
-    moon(sw * 0.74, 30, -0.0001);
-    moon(sw * 0.13, 20, 1.15);
-    moon(sw * 0.87, 20, 0.6);
-  });
-  sign.name = 'live-house-sign';
-  sign.position.set(0, 2.95, CLUB.minZ + 0.6);
-  root.add(sign);
+  // Nothing hangs over the stage: the wall behind the MC is his backdrop,
+  // not a billboard. (The moon-phase house mark used to live here.)
 
   // Footlights along the stage lip: a run of small warm scallops so the
   // riser face reads and the MC gets his uplight.
@@ -1101,59 +1069,9 @@ function buildVestibule(root: Group): void {
     root.add(spoke);
   }
 
-  // The velvet rope: two brass stanchions and a lazy catenary swag — the
-  // little theatre of arrival, just inside the doors.
-  const post = (x: number): void => {
-    const g = new Group();
-    g.position.set(x, 0, SZ - 1.05);
-    const stem = new Mesh(new CylinderGeometry(0.02, 0.025, 0.95, 10), brassMat(0.25));
-    stem.position.y = 0.475;
-    g.add(stem);
-    const ball = new Mesh(new CylinderGeometry(0.045, 0.045, 0.05, 12), brassMat(0.2));
-    ball.position.y = 0.97;
-    g.add(ball);
-    const foot = new Mesh(new CylinderGeometry(0.13, 0.15, 0.03, 14), bronzeMat());
-    foot.position.y = 0.015;
-    g.add(foot);
-    root.add(g);
-  };
-  post(-0.85);
-  post(0.85);
-  const ropeMat = new MeshStandardMaterial({ color: DECOR.velvet, roughness: 0.9, metalness: 0.05 });
-  const SEGS = 9;
-  for (let i = 0; i < SEGS; i++) {
-    const t0 = i / SEGS;
-    const t1 = (i + 1) / SEGS;
-    const sag = (t: number): number => 0.95 - Math.sin(t * Math.PI) * 0.16;
-    const xa = -0.85 + t0 * 1.7;
-    const xb = -0.85 + t1 * 1.7;
-    const ya = sag(t0);
-    const yb = sag(t1);
-    const seg = new Mesh(new CylinderGeometry(0.018, 0.018, Math.hypot(xb - xa, yb - ya) + 0.01, 6), ropeMat);
-    seg.position.set((xa + xb) / 2, (ya + yb) / 2, SZ - 1.05);
-    seg.rotation.z = Math.atan2(xb - xa, yb - ya);
-    root.add(seg);
-  }
-
-  // House plaque beside the portal — no name on the door, just who it's for.
-  const plaque = signPlane(0.92, 0.5, 512, (g, sw, sh) => {
-    g.strokeStyle = 'rgba(201,168,106,0.85)';
-    g.lineWidth = 3;
-    g.strokeRect(8, 8, sw - 16, sh - 16);
-    g.textAlign = 'center';
-    g.fillStyle = '#e8d9b0';
-    g.font = `500 48px Georgia, serif`;
-    g.fillText('members & dancers', sw / 2, sh * 0.42);
-    g.fillStyle = css(PALETTE.magenta);
-    g.shadowColor = css(PALETTE.magenta);
-    g.shadowBlur = 12;
-    g.font = font(600, 34);
-    g.fillText('RAVE RAID', sw / 2, sh * 0.74);
-  });
-  plaque.name = 'live-plaque';
-  plaque.rotation.y = Math.PI;
-  plaque.position.set(-1.75, 1.6, SZ - 0.12);
-  root.add(plaque);
+  // The velvet rope and the members-&-dancers plaque used to stand here.
+  // The way in is a doorway, not a queue: nothing to sidestep, nothing to
+  // read on your way past.
 }
 
 /* ── THE STILL ROOM: the quiet decompression corner ─────────────────────── */
@@ -1342,26 +1260,69 @@ function buildArcade(root: Group): void {
   root.add(plate);
 
   // ── THE CABINET: SUPER OCTAGON, against the north wall, facing the door.
+  //
+  // ONE SILHOUETTE. The first cut stacked boxes — a marquee hovering over
+  // a gap, glowing magenta slabs bolted to the sides — and it read exactly
+  // like what it was. A real upright is a single sheet of ply cut to a
+  // profile: kick, control deck, screen slope, marquee, canopy, all one
+  // continuous edge. So this is that profile, extruded across the width;
+  // the headboard can't float because it isn't a separate object.
   const cx = (A.minX + A.maxX) / 2;
   const cz = A.minZ + 0.45;
+  const CW = 0.66; // cabinet width
   const cab = new Group();
   cab.position.set(cx, 0, cz);
   const shellMat = blackSteelMat();
-  const body = new Mesh(new BoxGeometry(0.62, 1.75, 0.6), shellMat);
-  body.position.y = 0.875;
-  cab.add(body);
-  // Neon side stripes — hazard amber in FIRE FIGHT; house magenta here.
-  const stripeMat = new MeshBasicMaterial({ color: PALETTE.magenta });
-  for (const sx of [-0.315, 0.315]) {
-    const stripe = new Mesh(new BoxGeometry(0.012, 1.6, 0.5), stripeMat);
-    stripe.position.set(sx, 0.9, 0);
-    cab.add(stripe);
-  }
-  // Marquee: the game's name in lights.
-  const marqueeBox = new Mesh(new BoxGeometry(0.66, 0.24, 0.34), shellMat);
-  marqueeBox.position.set(0, 1.94, 0.05);
-  cab.add(marqueeBox);
-  const marquee = signPlane(0.62, 0.18, 512, (g, sw, sh) => {
+
+  // The side profile, drawn in (depth, height) — front is +depth. It gets
+  // extruded along the cabinet's width, so the shape's own faces become
+  // the two side panels and the extrusion wrap becomes front/top/back.
+  const P: [number, number][] = [
+    [-0.30, 0.0],   // back foot
+    [0.30, 0.0],    // front foot (kick plate)
+    [0.30, 0.72],   // front panel, up to the knee
+    [0.345, 0.80],  // the control deck's nose, jutting a little proud
+    [0.345, 0.86],
+    [0.12, 1.05],   // the deck's slope, running up and back
+    [0.12, 1.13],   // the lip under the screen
+    [0.215, 1.20],  // the monitor bay leans out at the bottom...
+    [0.115, 1.78],  // ...and back in at the top, the way a CRT sits
+    [0.265, 1.86],  // the marquee shelf steps forward again
+    [0.265, 2.10],  // the marquee face
+    [0.30, 2.15],   // canopy lip over the lights
+    [-0.26, 2.19],  // the top, sloping gently back
+    [-0.30, 2.12],
+  ];
+  const profile = new Shape();
+  profile.moveTo(P[0][0], P[0][1]);
+  for (let i = 1; i < P.length; i++) profile.lineTo(P[i][0], P[i][1]);
+  profile.closePath();
+  const shell = new Mesh(
+    new ExtrudeGeometry(profile, { depth: CW, bevelEnabled: true, bevelSize: 0.008, bevelThickness: 0.008, bevelSegments: 1, steps: 1 }),
+    shellMat,
+  );
+  // Stand the profile up facing the door: local +depth → world +z.
+  shell.rotation.y = -Math.PI / 2;
+  shell.position.x = CW / 2;
+  cab.add(shell);
+
+  // Brass edge trim following the cabinet's front line — the venue's metal,
+  // where a real cabinet wears its T-molding. It replaces the neon siding:
+  // the shape reads on its own, so the light can stay in the marquee.
+  const trimMat = brassMat(0.3);
+  const edge = (d0: number, h0: number, d1: number, h1: number): void => {
+    const len = Math.hypot(d1 - d0, h1 - h0);
+    for (const sx of [-CW / 2 + 0.012, CW / 2 - 0.012]) {
+      const bar = new Mesh(new BoxGeometry(0.016, len, 0.016), trimMat);
+      bar.position.set(sx, (h0 + h1) / 2, (d0 + d1) / 2);
+      bar.rotation.x = -Math.atan2(d1 - d0, h1 - h0);
+      cab.add(bar);
+    }
+  };
+  edge(0.30, 0.06, 0.30, 0.72); // the front panel's two corners
+
+  // Marquee: the game's name, backlit, sitting ON the shelf the profile cut.
+  const marquee = signPlane(0.56, 0.2, 512, (g, sw, sh) => {
     g.fillStyle = '#0d0a14';
     g.fillRect(0, 0, sw, sh);
     g.textAlign = 'center';
@@ -1376,14 +1337,20 @@ function buildArcade(root: Group): void {
     g.shadowBlur = 0;
   });
   marquee.name = 'live-octagon-marquee';
-  marquee.position.set(0, 1.94, 0.226);
+  // Proud of the bevel — the extrusion's rounded edge pushes the shell's
+  // face out by bevelSize, and a sign flush to the drawn profile vanishes
+  // inside it.
+  marquee.position.set(0, 1.985, 0.279);
   cab.add(marquee);
+  // The lamp under the canopy, washing the header from above.
+  const header = new Mesh(new BoxGeometry(0.5, 0.012, 0.012), brassGlowMat(1.8));
+  header.position.set(0, 2.135, 0.272);
+  cab.add(header);
 
-  // The CRT: bezel + the live screen plane the lasers aim at.
-  const bezel = new Mesh(new BoxGeometry(0.54, 0.44, 0.1), shellMat);
-  bezel.position.set(0, 1.42, 0.28);
-  bezel.rotation.x = -0.18;
-  cab.add(bezel);
+  // The CRT: a black bay recessed into the profile's monitor slope, and the
+  // live screen plane the lasers aim at. The slope is ~9.8° off vertical
+  // ((0.215,1.20) → (0.115,1.78)), so the glass matches it.
+  const tilt = Math.atan2(0.215 - 0.115, 1.78 - 1.20);
   const screenCanvas = document.createElement('canvas');
   screenCanvas.width = 384;
   screenCanvas.height = 300;
@@ -1393,23 +1360,59 @@ function buildArcade(root: Group): void {
   const screenTex = new CanvasTexture(screenCanvas);
   screenTex.colorSpace = SRGBColorSpace;
   screenTex.minFilter = LinearFilter;
-  const screen = new Mesh(new PlaneGeometry(0.46, 0.36), new MeshBasicMaterial({ map: screenTex }));
+  // A surface, not a hole: the bezel takes light so the bay doesn't read as
+  // a black void with a picture hanging in it.
+  const bezel = new Mesh(
+    new PlaneGeometry(0.58, 0.57),
+    new MeshStandardMaterial({ color: 0x171320, roughness: 0.5, metalness: 0.35 }),
+  );
+  bezel.position.set(0, 1.49, 0.182);
+  bezel.rotation.x = -tilt;
+  cab.add(bezel);
+  const screen = new Mesh(new PlaneGeometry(0.52, 0.41), new MeshBasicMaterial({ map: screenTex }));
   screen.name = 'live-octagon-screen';
-  screen.position.set(0, 1.42, 0.335);
-  screen.rotation.x = -0.18;
+  screen.position.set(0, 1.505, 0.188);
+  screen.rotation.x = -tilt;
   cab.add(screen);
 
-  // The deck: a lit plate and two chunky buttons (set dressing — the game
-  // is played with the controller lasers, the way everything here is).
-  const deck = new Mesh(new BoxGeometry(0.6, 0.06, 0.34), shellMat);
-  deck.position.set(0, 1.06, 0.32);
-  deck.rotation.x = 0.32;
-  cab.add(deck);
-  for (const bxn of [-0.12, 0.12]) {
-    const btn = new Mesh(new CylinderGeometry(0.035, 0.04, 0.03, 14), stripeMat);
-    btn.position.set(bxn, 1.1, 0.33);
-    btn.rotation.x = 0.32;
+  // The control deck: a brushed plate on the profile's slope, with a stick
+  // and three modest buttons. Set dressing — the game is played with the
+  // controller lasers, the way everything here is — so they read as
+  // hardware, not as lamps: bronze caps catching the marquee, no glow.
+  const deckTilt = Math.atan2(0.345 - 0.12, 1.05 - 0.86) - Math.PI / 2;
+  const deckMat = new MeshStandardMaterial({ color: 0x1a1720, roughness: 0.42, metalness: 0.65 });
+  const deckPlate = new Mesh(new PlaneGeometry(0.58, 0.28), deckMat);
+  deckPlate.position.set(0, 0.958, 0.238);
+  deckPlate.rotation.x = deckTilt;
+  cab.add(deckPlate);
+  const capMat = new MeshStandardMaterial({ color: 0xc9a86a, roughness: 0.34, metalness: 0.8 });
+  for (let i = 0; i < 3; i++) {
+    const bx = 0.02 + i * 0.075;
+    const btn = new Mesh(new CylinderGeometry(0.019, 0.021, 0.012, 14), capMat);
+    btn.position.set(bx, 0.968 + i * 0.004, 0.243 - i * 0.004);
+    btn.rotation.x = deckTilt + Math.PI / 2;
     cab.add(btn);
+  }
+  // The stick: a bronze shaft off a steel dish, ball on top.
+  const dish = new Mesh(new CylinderGeometry(0.032, 0.034, 0.008, 14), deckMat);
+  dish.position.set(-0.15, 0.962, 0.242);
+  dish.rotation.x = deckTilt + Math.PI / 2;
+  cab.add(dish);
+  const shaft = new Mesh(new CylinderGeometry(0.008, 0.008, 0.062, 8), bronzeMat());
+  shaft.position.set(-0.15, 0.992, 0.238);
+  cab.add(shaft);
+  const knob = new Mesh(new SphereGeometry(0.019, 10, 8), new MeshStandardMaterial({ color: 0x5e1f26, roughness: 0.5, metalness: 0.1 }));
+  knob.position.set(-0.15, 1.026, 0.236);
+  cab.add(knob);
+
+  // A coin door, because the eye looks for one on a cabinet this size.
+  const coinDoor = new Mesh(new PlaneGeometry(0.2, 0.13), new MeshStandardMaterial({ color: 0x241f2b, roughness: 0.6, metalness: 0.5 }));
+  coinDoor.position.set(0, 0.5, 0.302);
+  cab.add(coinDoor);
+  for (const sx of [-0.045, 0.045]) {
+    const slot = new Mesh(new BoxGeometry(0.006, 0.03, 0.004), trimMat);
+    slot.position.set(sx, 0.53, 0.305);
+    cab.add(slot);
   }
   root.add(cab);
 
@@ -1434,10 +1437,14 @@ function buildArcade(root: Group): void {
   // room is a sealed box under its low cap, and plaster with no light is
   // just black (FIRE FIGHT's cabinet carried its own marquee light for
   // exactly this reason).
-  const cove = new Mesh(new BoxGeometry(A.maxX - A.minX - 0.4, 0.03, 0.03), new MeshBasicMaterial({ color: PALETTE.magenta }));
+  // Warm, not pink: a magenta bulb was the only light in this sealed room,
+  // so every steel and brass surface in it — the cabinet's buttons most of
+  // all — came out the colour of the bulb. The house's own warm light lets
+  // the metal read as metal and leaves magenta to the marquee and the game.
+  const cove = new Mesh(new BoxGeometry(A.maxX - A.minX - 0.4, 0.03, 0.03), brassGlowMat(1.5));
   cove.position.set(cx, H - 0.12, A.minZ + 0.08);
   root.add(cove);
-  const glow = new PointLight(0xff6ad8, 1.5, 5.5, 1.4);
+  const glow = new PointLight(0xffcb96, 1.7, 5.5, 1.4);
   glow.position.set(cx, 2.1, cz + 0.9);
   root.add(glow);
 
