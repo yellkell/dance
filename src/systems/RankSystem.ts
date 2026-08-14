@@ -1,5 +1,5 @@
 /**
- * RankSystem — who's winning the night.
+ * RankSystem — who's winning the set.
  *
  * The law: the living rank above the fallen; the living rank by score; the
  * fallen rank by who lasted longest. Lifts are ABSOLUTE: the top ten ride
@@ -164,13 +164,10 @@ export class RankSystem extends createSystem({}) {
     for (const d of top) rows.push(this.row(d, podium));
     if (me && !top.includes(me)) rows.push(this.row(me, podium));
 
-    const winner = order[0];
-    this.board.redraw(
-      podium ? '🏆 FINAL' : '',
-      podium && winner ? `${winner.name} OWNS THE NIGHT` : '',
-      rows,
-      podium ? '#ffd75e' : '#ff2ad5',
-    );
+    // No subtitle: the winner is already rank 1 in gold at the top of the
+    // board, and "OWNS THE NIGHT" spoke in campaign language on a board
+    // that shows up for solo sets and club raids too.
+    this.board.redraw(podium ? '🏆 FINAL' : '', '', rows, podium ? '#ffd75e' : '#ff2ad5');
   }
 
   private row(d: Dancer, podium: boolean): BoardRow {
