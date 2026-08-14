@@ -164,9 +164,12 @@ export class HudSystem extends createSystem({}) {
       depthWrite: false,
       side: DoubleSide,
     });
-    this.flair = new Mesh(new PlaneGeometry(1.1, 0.34), this.flairMat);
+    // Smaller than it was, and BENEATH the wedge instead of floating high
+    // right: the pop and the numbers it explains now live in one glance,
+    // and the action line above stays clear.
+    this.flair = new Mesh(new PlaneGeometry(0.76, 0.24), this.flairMat);
     this.flair.renderOrder = 31;
-    this.flair.position.set(0.62, 1.5, -1.25); // high right — off the action line
+    this.flair.position.set(-0.52, 0.93, -0.88);
     this.scene.add(this.flair);
   }
 
@@ -424,13 +427,24 @@ export class HudSystem extends createSystem({}) {
   private drawFlair(text: string, tone: 'dodge' | 'perfect' | 'hit' | 'milestone' | 'info'): void {
     const g = this.flairCanvas.getContext('2d')!;
     g.clearRect(0, 0, 512, 160);
+    // The house semantic set — quieter than the old neon shout, and each
+    // tone unmistakably its own: green survived, gold rode the last beat,
+    // red got clipped, magenta is a milestone, cyan is information.
     const color =
-      tone === 'perfect' ? '#ffd75e' : tone === 'hit' ? '#ff5040' : tone === 'milestone' ? '#ff2ad5' : '#b9ffc4';
+      tone === 'perfect'
+        ? '#ffd75e'
+        : tone === 'hit'
+          ? '#ff5266'
+          : tone === 'milestone'
+            ? '#ff2ad5'
+            : tone === 'info'
+              ? '#6fc8ff'
+              : '#2be28a';
     g.textAlign = 'center';
     g.textBaseline = 'middle';
     g.shadowColor = color;
-    g.shadowBlur = 26;
-    ink(g, text, 256, 80, 72, color, 490);
+    g.shadowBlur = 12;
+    ink(g, text, 256, 80, 52, color, 490);
     g.shadowBlur = 0;
     this.flairTex.needsUpdate = true;
   }

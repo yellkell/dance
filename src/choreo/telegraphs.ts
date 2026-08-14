@@ -73,9 +73,28 @@ const STRIP_FRAG = /* glsl */ `
  * edges are drawn as two bright rays — the one telegraph that means
  * "stand HERE". uAngle = wedge centre (radians), uHalf = wedge half-width.
  */
+/**
+ * The platform's own silhouette, as a soft mask. The pie and the donut
+ * used to be honest circles — which meant a metre of warning paint
+ * hanging off the deck into the void. The danger never left the platform;
+ * now the picture doesn't either. `q` is platform-local metres; constants
+ * are the octagon from config (half-width .86, half-depth .75, chamfer
+ * plane 0.375|x|+0.485|z| = 0.5044, normalised by its length).
+ */
+const OCT_MASK = /* glsl */ `
+  float octMask(vec2 q){
+    q = abs(q);
+    float m = smoothstep(0.0, 0.045, 0.86 - q.x);
+    m = min(m, smoothstep(0.0, 0.045, 0.75 - q.y));
+    m = min(m, smoothstep(0.0, 0.045, (0.5044 - (0.375 * q.x + 0.485 * q.y)) / 0.613));
+    return m;
+  }
+`;
+
 const NOVA_FRAG = /* glsl */ `
   ${COMMON}
-  uniform float uAngle, uHalf;
+  ${OCT_MASK}
+  uniform float uAngle, uHalf, uPaneR;
   void main(){
     vec2 p = vUv * 2.0 - 1.0;
     float r = length(p);
@@ -94,6 +113,8 @@ const NOVA_FRAG = /* glsl */ `
     float edge = smoothstep(0.06, 0.0, abs(d - uHalf));
     a += edge * 0.9;
     a *= pulse();
+    // …and none of it past the deck's own edge.
+    a *= octMask(p * uPaneR);
     gl_FragColor = vec4(col, a);
   }
 `;
@@ -160,7 +181,8 @@ const QUARTER_FRAG = /* glsl */ `
  */
 const DONUT_FRAG = /* glsl */ `
   ${COMMON}
-  uniform float uInner;
+  ${OCT_MASK}
+  uniform float uInner, uPaneR;
   void main(){
     vec2 p = vUv * 2.0 - 1.0;
     float r = length(p);
@@ -176,9 +198,9 @@ const DONUT_FRAG = /* glsl */ `
     // pattern to smaller radii as the clock runs).
     float band = step(0.68, fract((r - uInner) * 5.5 + uTime * 1.9));
     a += band * (1.0 - safe) * (0.12 + 0.2 * uFill);
-    // Outer rim ring, so the doomed annulus has a far edge too.
-    a += smoothstep(0.92, 0.97, r) * (1.0 - smoothstep(0.99, 1.0, r)) * 0.6;
     a *= pulse();
+    // The deck's edge IS the far edge now — nothing paints past it.
+    a *= octMask(p * uPaneR);
     gl_FragColor = vec4(col, a);
   }
 `;
@@ -335,7 +357,11 @@ function makeTelegraph(meshes: Mesh[], mats: ShaderMaterial[]): Telegraph {
  * at the platform centre on the floor.
  */
 export function novaTelegraph(radius: number, angle: number, halfAngle: number): Telegraph {
-  const mat = warnMat(NOVA_FRAG, { uAngle: { value: angle }, uHalf: { value: halfAngle } });
+  const mat = warnMat(NOVA_FRAG, {
+    uAngle: { value: angle },
+    uHalf: { value: halfAngle },
+    uPaneR: { value: radius },
+  });
   const disc = new Mesh(new PlaneGeometry(radius * 2, radius * 2), mat);
   disc.rotation.x = -Math.PI / 2;
   return makeTelegraph([disc], [mat]);
@@ -381,7 +407,7 @@ export function quarterTelegraph(halfWidth: number, halfDepth: number): Telegrap
  * disc. Place the group at the platform centre on the floor.
  */
 export function donutTelegraph(radius: number, innerR: number): Telegraph {
-  const mat = warnMat(DONUT_FRAG, { uInner: { value: innerR / radius } });
+  const mat = warnMat(DONUT_FRAG, { uInner: { value: innerR / radius }, uPaneR: { value: radius } });
   const disc = new Mesh(new PlaneGeometry(radius * 2, radius * 2), mat);
   disc.rotation.x = -Math.PI / 2;
   return makeTelegraph([disc], [mat]);

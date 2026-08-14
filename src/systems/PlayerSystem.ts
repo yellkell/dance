@@ -48,6 +48,7 @@ import {
 import { CHOREO, GROOVE, hueToColor, seatHue } from '../config.js';
 import { glintTexture, glowSprite } from '../materials/glow.js';
 import { match, me } from '../game/state.js';
+import { net } from '../net/session.js';
 
 const _head = new Vector3();
 const _hand = new Vector3();
@@ -314,6 +315,13 @@ export class PlayerSystem extends createSystem({}) {
       }
     }
 
+    // The sticks are RING kit. On the club floor your hands are hands —
+    // drinks to hold, panels to poke, an arcade to shoot — so the
+    // glowsticks stay in the bag until a set takes you back to the ring.
+    const clubFloor =
+      (match.screen === 'lobby' || match.screen === 'tour') &&
+      (net.phase === 'hosting' || net.phase === 'joined');
+
     for (const hand of ['left', 'right'] as const) {
       const s = this.sticks[hand];
       const obj = this.world.playerSpaceEntities?.raySpaces?.[hand]?.object3D ?? null;
@@ -322,6 +330,7 @@ export class PlayerSystem extends createSystem({}) {
         s.attachedTo = obj;
         if (obj) obj.add(s.group);
       }
+      s.group.visible = !clubFloor;
       // Brighter the deeper the groove; the pulse pops it on a rewarded swap.
       s.pulse = Math.max(0, s.pulse - delta * 4);
       const grooveGlow = Math.min(this.streak, 50) / 50;
