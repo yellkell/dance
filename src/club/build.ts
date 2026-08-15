@@ -597,7 +597,9 @@ function buildStage(root: Group): MeshBasicMaterial {
   // and two platters — where the MC earns the name.
   const deskMat = new MeshStandardMaterial({ map: oakTexture([2, 1]), roughness: 0.5, metalness: 0.08 });
   const console = new Group();
-  console.position.set(0, S.h, S.z + 0.9);
+  // Stood on the footprint the physics tables read, so the desk the drinks
+  // ring off is the desk you can see (club/config.ts, stage.desk).
+  console.position.set(0, S.h, S.desk.z);
   // The desk WORKS for the MC: fascia, fader surface and platters face HIM
   // (he stands north of it, deeper on the stage) — the crowd gets the oak
   // back of a working console, the way a real booth reads.
@@ -605,8 +607,12 @@ function buildStage(root: Group): MeshBasicMaterial {
   const body = new Mesh(new BoxGeometry(2.2, 0.92, 0.6), deskMat);
   body.position.y = 0.46;
   console.add(body);
-  const fascia = new Mesh(new BoxGeometry(2.24, 0.2, 0.62), brassMat(0.35));
-  fascia.position.y = 0.86;
+  // Width, depth and TOP all come from the config: the brass fascia is the
+  // widest, tallest part of the desk, so it's the part the drinks' collision
+  // box describes. Sizing it from there means the two can't drift apart.
+  const FASCIA_H = 0.2;
+  const fascia = new Mesh(new BoxGeometry(S.desk.halfW * 2, FASCIA_H, S.desk.halfD * 2), brassMat(0.35));
+  fascia.position.y = S.desk.top - S.h - FASCIA_H / 2;
   console.add(fascia);
   // The lit control surface (canvas: faders, dials, a spectrum bar).
   const cc = document.createElement('canvas');

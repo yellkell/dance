@@ -189,6 +189,45 @@ else pass('neither glass passed through the other');
 if (!hit.bounced) fail('contact never pushed either glass back — no impulse exchanged');
 else pass('the contact reversed them: they traded momentum');
 
+// THE DJ DESK: a drink thrown flat at it must come back, and one lobbed
+// onto it must land on the top rather than inside the oak.
+const desk = await page.evaluate(async () => {
+  const P = window.__gdr.props;
+  const { CLUB } = await import('/src/club/config.ts');
+  const D = CLUB.stage.desk;
+  const run = (id, cap) =>
+    new Promise((done) => {
+      let n = 0;
+      let reversed = false;
+      let minClear = Infinity;
+      const tick = () => {
+        const g = P.glasses()[id];
+        if (g.vel[2] < -0.1) reversed = true; // thrown +z, so a bounce is −z
+        if (g.mode !== 'idle') minClear = Math.min(minClear, g.clearance);
+        if (g.mode === 'rest' || ++n > cap) return done({ g, reversed, minClear });
+        requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    });
+  // Flat into the front of the desk, from the crowd side.
+  P.launch(4, [0, D.top - 0.25, D.z + 1.4], [0, 0, -3.2]);
+  const smack = await run(4, 400);
+  // Dropped straight onto the desk top — it is a surface a drink can be
+  // set down on, not just a thing to bounce off.
+  P.launch(5, [0, D.top + 0.7, D.z], [0, -1.2, 0]);
+  const land = await run(5, 600);
+  return { smack, land, top: D.top, z: D.z, halfD: D.halfD };
+});
+if (!desk.smack.reversed) fail('a drink thrown at the DJ desk did not come back off it');
+else pass(`a drink thrown flat at the desk rang off it (rest z=${desk.smack.g.pos[2].toFixed(2)})`);
+if (desk.smack.g.pos[2] < desk.z + desk.halfD - 0.02) {
+  fail(`the drink ended up inside/behind the desk (z=${desk.smack.g.pos[2].toFixed(2)})`);
+} else pass('it stayed on the crowd side of the desk');
+if (desk.land.minClear < -0.005) fail(`the drink sank into the desk (${desk.land.minClear.toFixed(3)} m)`);
+else if (Math.abs(desk.land.g.pos[1] - desk.top) > 0.03) {
+  fail(`a drink dropped on the desk settled at y=${desk.land.g.pos[1].toFixed(3)}, not the top (${desk.top})`);
+} else pass(`a drink set down on the desk rests on its top (y=${desk.land.g.pos[1].toFixed(3)})`);
+
 // 4. Nothing anywhere ends up inside the floor.
 const finals = await read();
 const sunk = finals.filter((f) => f.mode !== 'idle' && f.mode !== 'held' && f.clearance < -0.005);

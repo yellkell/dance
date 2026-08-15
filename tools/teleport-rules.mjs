@@ -53,6 +53,8 @@ const results = await page.evaluate(async () => {
   const onBar = [CLUB.bar.x + CLUB.bar.depth / 2, barMidZ];
   const inHall = [5.4, barMidZ];
   const inAisle = [8.0, barMidZ];
+  const inFrontOfStage = [0, -5.0];
+  const onStage = [0, -7.6];
 
   const cases = [
     ['hall → ON THE BAR', inHall, onBar, true],
@@ -64,7 +66,14 @@ const results = await page.evaluate(async () => {
     ['hall → in through the still room door', [-6.0, -8.6], [-6.8, -10.0], true],
     ['hall → onto a booth table', [-6.0, -3.4], [CLUB.boothX, CLUB.boothZs[1]], true],
     ['hall → onto the terrace', [0, 2.0], [-4.0, 3.6], true],
-    ['hall → up on the stage', [0, -7.0], [0, -9.3], false],
+    ['hall → UP ON THE STAGE', inFrontOfStage, onStage, true],
+    ['stage → back down to the hall', onStage, inFrontOfStage, true],
+    ['stage → into a wing beside the decks', onStage, [2.0, -8.5], true],
+    ['hall → over the stage to backstage', [0, -5.0], [0, -10.4], false],
+    ['stage → out the back to backstage', onStage, [0, -10.4], false],
+    ['hall → the pocket under the stage', [0, -5.0], [0, -7.0], false],
+    ['beside the stage → up onto it', [-3.3, -7.0], onStage, true],
+    ['hall → inside the DJ desk', inFrontOfStage, [0, -8.4], false],
   ];
 
   return cases.map(([name, from, to, want]) => {

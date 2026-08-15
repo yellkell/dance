@@ -114,6 +114,16 @@ export const PROP_SURFACES: Array<{ minX: number; maxX: number; minZ: number; ma
   { minX: CLUB.bar.x, maxX: CLUB.bar.x + CLUB.bar.depth, minZ: CLUB.bar.z0, maxZ: CLUB.bar.z1, y: CLUB.bar.top },
   // The stage (a square heart of the crescent — close enough for a glass).
   { minX: -2.6, maxX: 2.6, minZ: CLUB.stage.z - 0.2, maxZ: CLUB.stage.z + 2.6, y: CLUB.stage.h },
+  // THE DJ CONSOLE's top. Listed after the stage but it wins anyway: the
+  // surface lookup takes the HIGHEST match under the glass, and the desk
+  // stands on the stage.
+  {
+    minX: -CLUB.stage.desk.halfW,
+    maxX: CLUB.stage.desk.halfW,
+    minZ: CLUB.stage.desk.z - CLUB.stage.desk.halfD,
+    maxZ: CLUB.stage.desk.z + CLUB.stage.desk.halfD,
+    y: CLUB.stage.desk.top,
+  },
 ];
 
 /** Walls a flying glass reflects off — 2D segments with a HEIGHT, so a
@@ -143,6 +153,14 @@ export const PROP_WALLS: Array<{ ax: number; az: number; bx: number; bz: number;
     bz: CLUB.stage.z + CLUB.stage.r + 0.35,
     h: CLUB.stage.h,
   },
+  // THE DJ CONSOLE — four sides of oak and brass to ring off. Height is the
+  // desk top, so a lob clears it onto the surface and anything flatter
+  // clatters off the fascia, which is exactly what a drink thrown at a
+  // working booth should do.
+  { ax: -CLUB.stage.desk.halfW, az: CLUB.stage.desk.z - CLUB.stage.desk.halfD, bx: CLUB.stage.desk.halfW, bz: CLUB.stage.desk.z - CLUB.stage.desk.halfD, h: CLUB.stage.desk.top },
+  { ax: -CLUB.stage.desk.halfW, az: CLUB.stage.desk.z + CLUB.stage.desk.halfD, bx: CLUB.stage.desk.halfW, bz: CLUB.stage.desk.z + CLUB.stage.desk.halfD, h: CLUB.stage.desk.top },
+  { ax: -CLUB.stage.desk.halfW, az: CLUB.stage.desk.z - CLUB.stage.desk.halfD, bx: -CLUB.stage.desk.halfW, bz: CLUB.stage.desk.z + CLUB.stage.desk.halfD, h: CLUB.stage.desk.top },
+  { ax: CLUB.stage.desk.halfW, az: CLUB.stage.desk.z - CLUB.stage.desk.halfD, bx: CLUB.stage.desk.halfW, bz: CLUB.stage.desk.z + CLUB.stage.desk.halfD, h: CLUB.stage.desk.top },
 ];
 
 export interface CoupeRefs {

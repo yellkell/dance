@@ -50,8 +50,19 @@ export const CLUB = {
   spawn: { x: 0, z: 0 },
 
   /** The stage: a raised crescent hugging the north wall, DJ console at its
-   *  heart, brass sunburst behind. Not teleportable — the stage performs. */
-  stage: { z: -9.3, r: 3.0, h: 0.45 },
+   *  heart, brass sunburst behind. You can get up on it (TELEPORT_AREAS) —
+   *  the deck is a half-drum, so the standable spots are cut to fit inside
+   *  the curve rather than one rectangle overhanging its lip.
+   *
+   *  `desk` is the DJ console's world footprint, kept here because two
+   *  places need to agree on it: build.ts stands the console on it, and the
+   *  drinks bounce off it (props.ts). */
+  stage: {
+    z: -9.3,
+    r: 3.0,
+    h: 0.45,
+    desk: { z: -8.4, halfW: 1.12, halfD: 0.31, top: 1.41 },
+  },
 
   /** Bar along the east wall. Counter FRONT face at `x`; the keeper's aisle
    *  runs between the counter back and the back-bar shelf wall. The `top` is
@@ -165,6 +176,15 @@ export const TELEPORT_AREAS: FloorArea[] = [
     maxZ: CLUB.bar.z1 - 0.2,
     y: CLUB.bar.top,
   },
+  // THE STAGE. Three patches, not one rectangle: the deck is a half-drum
+  // of radius 3 centred on the north wall, so a single box big enough to be
+  // worth standing on would hang its corners out over the lip. A wide strip
+  // in FRONT of the decks (where anyone performing actually stands), and a
+  // wing either side of the console — every corner inside r = 2.85, which
+  // leaves the brass nosing to itself.
+  { minX: -2.0, maxX: 2.0, minZ: -8.0, maxZ: -7.35, y: CLUB.stage.h },
+  { minX: -2.5, maxX: -1.25, minZ: -9.05, maxZ: -8.0, y: CLUB.stage.h },
+  { minX: 1.25, maxX: 2.5, minZ: -9.05, maxZ: -8.0, y: CLUB.stage.h },
   // The booth tables (inside each velvet horseshoe).
   ...CLUB.boothZs.map((bz) => ({
     minX: CLUB.boothX - 0.42,
@@ -178,8 +198,15 @@ export const TELEPORT_AREAS: FloorArea[] = [
 
   // ── THE FLOOR ──
   // The hall floor: dance floor, lounge aisle, everything up to the bar
-  // front and the stage lip.
-  { minX: -8.55, maxX: CLUB.bar.x - 0.15, minZ: -8.15, maxZ: T.z0 - 0.12, y: 0 },
+  // front and the stage lip. THREE rectangles, because the stage is in the
+  // way of one: as a single box reaching z = −8.15 it ran clean under the
+  // drum, so the middle of the hall let you stand inside the stage — and
+  // from in there, hop out the back to the backstage walk without ever
+  // crossing the stage face. The centre band stops at the face; the wings
+  // either side of the drum keep the full depth they always had.
+  { minX: -3.2, maxX: 3.2, minZ: -5.9, maxZ: T.z0 - 0.12, y: 0 },
+  { minX: -8.55, maxX: -3.2, minZ: -8.15, maxZ: T.z0 - 0.12, y: 0 },
+  { minX: 3.2, maxX: CLUB.bar.x - 0.15, minZ: -8.15, maxZ: T.z0 - 0.12, y: 0 },
   // Behind the bar — the keeper's aisle is open to anyone who fancies
   // playing host (enter round the counter's south end).
   { minX: CLUB.bar.x + CLUB.bar.depth + 0.25, maxX: 8.45, minZ: CLUB.bar.z0 + 0.15, maxZ: CLUB.bar.z1 + 0.9, y: 0 },
@@ -245,8 +272,20 @@ export const WALL_SEGMENTS: WallSegment[] = [
   [A.minX, A.minZ, A.minX, A.maxZ],
   [A.minX, A.minZ, A.doorX0, A.minZ],
   [A.doorX1, A.minZ, A.maxX, A.minZ],
-  // The stage face — the performer's ground, not the crowd's.
-  [-CLUB.stage.r - 0.4, CLUB.stage.z + CLUB.stage.r + 0.35, CLUB.stage.r + 0.4, CLUB.stage.z + CLUB.stage.r + 0.35],
+  // The stage face, silled at the deck like the bar counter: step UP onto
+  // the stage and back down, but a hop at floor level still can't use it as
+  // a shortcut to the backstage walk behind.
+  [
+    -CLUB.stage.r - 0.4,
+    CLUB.stage.z + CLUB.stage.r + 0.35,
+    CLUB.stage.r + 0.4,
+    CLUB.stage.z + CLUB.stage.r + 0.35,
+    CLUB.stage.h,
+  ],
+  // The stage's flat BACK — a closed panelled face, so the way onto the
+  // stage is its steps, not a hop through the scenery from the backstage
+  // walk. No sill: solid at every height.
+  [-CLUB.stage.r, CLUB.stage.z - 0.05, CLUB.stage.r, CLUB.stage.z - 0.05],
   // The bar counter line (its south end at z1 stays open into the aisle).
   // Silled at the worktop: solid to anyone on the floor, a step to anyone
   // standing on it.
