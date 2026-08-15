@@ -962,13 +962,13 @@ export class MenuSystem extends createSystem({}) {
 
     g.font = font(700, 76);
     g.letterSpacing = '18px';
-    g.fillText('RAVE RAID', W / 2, 176);
+    g.fillText('RAVE RAID', W / 2, 160);
     g.letterSpacing = '0px';
 
     g.font = font(500, 24);
     g.fillStyle = 'rgba(255,255,255,0.55)';
     g.letterSpacing = '10px';
-    g.fillText('THE TOUR IS FINISHED', W / 2, 246);
+    g.fillText('THE TOUR IS FINISHED', W / 2, 228);
     g.letterSpacing = '0px';
 
     // Role, then the names under it. One block per credit so adding a name
@@ -977,22 +977,30 @@ export class MenuSystem extends createSystem({}) {
       { role: 'CREATED BY', names: ['yellkell'] },
       { role: 'OST BY', names: ['IBWildcat1998', 'poopoodoodoo698', 'JakeThePro'] },
     ];
-    let y = 380;
+    let y = 340;
     for (const block of credits) {
       g.font = font(600, 26);
       g.fillStyle = 'rgba(255,255,255,0.5)';
       g.letterSpacing = '8px';
       g.fillText(block.role, W / 2, y);
       g.letterSpacing = '0px';
-      y += 64;
+      y += 60;
       for (const name of block.names) {
         g.font = font(700, 48);
         g.fillStyle = '#ffffff';
         g.fillText(name, W / 2, y);
-        y += 68;
+        y += 64;
       }
-      y += 40;
+      y += 36;
     }
+
+    // The sign-off, last and on its own: the names are the record of who
+    // made it, this is the one line addressed to the person who finished it.
+    g.font = font(700, 40);
+    g.fillStyle = '#ffffff';
+    g.letterSpacing = '6px';
+    g.fillText('THANK YOU FOR PLAYING!', W / 2, 832);
+    g.letterSpacing = '0px';
   }
 
   /* ── the colour wheel (modal) ── */
