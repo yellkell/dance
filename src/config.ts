@@ -150,6 +150,9 @@ export const GOOP = {
  *           shoulder to shoulder covering one side and the middle (get
  *           across), or a SPLIT evenly either side of centre (stand in the
  *           corridor between them). Deliberate shapes, read at a glance.
+ *           A twin usually comes with THE RETURN: a bar after it lands,
+ *           the same pair arrives mirrored on the side you just ran to, so
+ *           the move walks you across the deck and straight back.
  *  sweep  : the AIR burns, never the floor — a danger roof overhead with a
  *           blazing limbo line as its underside, a short chevron fringe
  *           dripping off it — get UNDER the line (duck). The deck stays
@@ -182,6 +185,11 @@ export const GOOP = {
  *           an emitter at one rail — step FORWARD or BACK off it (the beam's
  *           quarter-turn cousin: same read, the other axis). Late on it
  *           lays a stage lane across itself and the safe ground is a cell.
+ *           It carries the beam's doubles too, quarter-turned: the TRAP
+ *           (two rails closing like jaws, stand in the corridor) and the
+ *           VERTICAL TWIN — two shoulder to shoulder taking a whole half,
+ *           with the same RETURN a bar later on the other half. Two at the
+ *           back then two at the front, and the deck travels that way.
  *  wire   : the trip web — a shin-high lattice of laser wire cutting the
  *           deck into a 4×4 grid. Base form: no safe ground drawn, because
  *           there isn't any — HOLD STILL until it clears (the one dodge
@@ -270,6 +278,18 @@ export const CHOREO = {
   beamSplitX: 0.5,
   beamTwinInner: 0.12,
   beamSplitChance: [0.4, 0.4, 0.55, 0.55, 0.55],
+  /** THE RETURN — the twin's second half, and the set's plainest travel
+   *  order: the twin takes one side, and a bar later the SAME pair lands
+   *  mirrored on the side you just ran to. Across, and straight back.
+   *
+   *  Only the TWIN earns it. A split is symmetrical — it has no "other
+   *  side" to answer with — and the X already sends you radial. And it's a
+   *  full BAR apart, like the donut's one-two: the return's telegraph opens
+   *  exactly as the first pair fires, so there is never more than one pair
+   *  of strips on the deck to read, and the beat you spend crossing is the
+   *  beat you get to read the answer in. */
+  twinReturnBeats: 4,
+  twinReturnChance: [0, 0, 0.55, 0.6, 0.65],
   /** THE X: two beams thrown diagonally through the deck centre at once,
    *  crossing in an X — the safe ground is the four pockets between the
    *  arms, so the dodge reads radial (out of the cross, not off a line).
@@ -368,6 +388,24 @@ export const CHOREO = {
    *  is the corridor pinned between them. */
   railTrapChance: [0, 0, 0.35, 0.5, 0.5],
   railTrapZ: 0.44,
+  /** THE VERTICAL TWIN: the beam's twin, quarter-turned. Two rails shoulder
+   *  to shoulder covering one whole HALF of the deck — both fired from the
+   *  same emitter, so they read as one battery rather than two decisions —
+   *  and then, on the return, the mirrored pair covering the other half.
+   *  Two at the back and then two at the front, or the other way about.
+   *
+   *  This is the one shape allowed to flood the ground BEHIND you, and it
+   *  earns that the way the trap and the wave do: it isn't a strip you
+   *  could miss, it's half the floor going up at once. The rule the single
+   *  rail obeys — always land on the front half, where your eyes already
+   *  are — is about thin lasers sneaking in behind your back, and a whole
+   *  half of the deck is not sneaking anywhere.
+   *
+   *  Inner rail centred just past the middle so the pair covers its half
+   *  plus a shade over, exactly as the lateral twin does: no corridor, no
+   *  choice, step off it. */
+  railTwinInner: 0.11,
+  railTwinChance: [0, 0, 0.4, 0.5, 0.5],
   /** From this act on, the crossfire lays a stage lane ACROSS the rail: the
    *  safe ground becomes a quarter of the deck and the dodge is diagonal. */
   latticeFromAct: 2,

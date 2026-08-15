@@ -145,7 +145,8 @@ function buildLandings(
   const landings: Landing[] = [];
   if (kind === 'beam') {
     const halfW = CHOREO.beamHalfWidth;
-    const lane = (x: number) => landings.push({ beat: landBeat, zone: { kind: 'lane', x, halfW } });
+    const laneAt = (beat: number, x: number) => landings.push({ beat, zone: { kind: 'lane', x, halfW } });
+    const lane = (x: number) => laneAt(landBeat, x);
     if (act < 2) {
       // One laser, and it lands on a SLOT: the middle, or a third out.
       lane(CHOREO.beamSlots[Math.floor(rng() * CHOREO.beamSlots.length)]);
@@ -166,8 +167,19 @@ function buildLandings(
       // TWIN: two strips shoulder to shoulder, taking one whole side and
       // the middle with them. No corridor, no choice — get across.
       const s = rng() < 0.5 ? 1 : -1;
-      lane(s * CHOREO.beamTwinInner);
-      lane(s * (CHOREO.beamTwinInner + halfW * 2 + 0.02));
+      const inner = CHOREO.beamTwinInner;
+      const outer = CHOREO.beamTwinInner + halfW * 2 + 0.02;
+      lane(s * inner);
+      lane(s * outer);
+      // THE RETURN: a bar later the same pair lands MIRRORED, on the ground
+      // the first pair just chased you onto. Across, and straight back —
+      // one move that uses the whole width of the deck instead of parking
+      // you on the far side with nothing left to ask.
+      if (rng() < CHOREO.twinReturnChance[Math.min(act, CHOREO.twinReturnChance.length - 1)]) {
+        const back = landBeat + CHOREO.twinReturnBeats;
+        laneAt(back, -s * inner);
+        laneAt(back, -s * outer);
+      }
     }
   } else if (kind === 'donut') {
     // THE ONE-TWO: a laser straight down the middle drives everyone off
@@ -207,6 +219,31 @@ function buildLandings(
         beat: landBeat,
         zone: { kind: 'rail', z: CHOREO.railTrapZ, halfD: CHOREO.railHalfDepth, from: 1 },
       });
+      return landings;
+    }
+    // THE VERTICAL TWIN: the beam's twin, quarter-turned. Two rails
+    // shoulder to shoulder take one whole HALF — both from the same
+    // emitter, one battery firing a pair — and the RETURN mirrors them onto
+    // the other half a bar later. Two at the back, then two at the front:
+    // the deck's front/back answer to the lateral twin's walk across, and
+    // the surest way to make a floor that only ever sidesteps travel.
+    const twinChance = CHOREO.railTwinChance[Math.min(act, CHOREO.railTwinChance.length - 1)];
+    if (rng() < twinChance) {
+      const halfD = CHOREO.railHalfDepth;
+      const inner = CHOREO.railTwinInner;
+      const outer = CHOREO.railTwinInner + halfD * 2 + 0.02;
+      const s: 1 | -1 = rng() < 0.5 ? 1 : -1; // +1 floods the back, −1 the front
+      const from: 1 | -1 = rng() < 0.5 ? 1 : -1;
+      const pair = (beat: number, side: number, emitter: 1 | -1) => {
+        landings.push({ beat, zone: { kind: 'rail', z: side * inner, halfD, from: emitter } });
+        landings.push({ beat, zone: { kind: 'rail', z: side * outer, halfD, from: emitter } });
+      };
+      pair(landBeat, s, from);
+      if (rng() < CHOREO.twinReturnChance[Math.min(act, CHOREO.twinReturnChance.length - 1)]) {
+        // The answering battery fires from the OTHER rail, so the return
+        // announces itself as a new machine rather than a repeat.
+        pair(landBeat + CHOREO.twinReturnBeats, -s, from === 1 ? -1 : 1);
+      }
       return landings;
     }
     // A single rail always lands on the FRONT half (toward the stage,
@@ -415,17 +452,33 @@ export function parkOf(kind: MoveKind, landings: readonly Landing[], prev: Park)
       return prev;
     }
     case 'cross': {
-      const rails = landings.filter((l) => l.zone.kind === 'rail');
-      if (rails.length >= 2) return { x: p.x, z: 0 }; // the trap's middle band
-      const r = rails[0]?.zone;
+      // Only the LAST volley decides where you end up: a vertical twin that
+      // returns chases you off one half and then off the other.
+      const all: { beat: number; z: number; halfD: number }[] = [];
+      for (const l of landings) if (l.zone.kind === 'rail') all.push({ beat: l.beat, ...l.zone });
       const lane = landings.find((l) => l.zone.kind === 'lane')?.zone;
-      const z = r?.kind === 'rail' ? cz(r.z + r.halfD + 0.3) : p.z; // step off, away from the stage
       const x = lane?.kind === 'lane' ? cx(lane.x + (p.x >= lane.x ? 1 : -1) * (lane.halfW + 0.2)) : p.x;
-      return { x, z };
+      if (!all.length) return { x, z: p.z };
+      const lastBeat = Math.max(...all.map((r) => r.beat));
+      const rails = all.filter((r) => r.beat === lastBeat);
+      if (rails.length >= 2) {
+        // Opposite sides of centre is THE TRAP — the jaws leave a corridor
+        // down the middle. Same side is the TWIN, which leaves you a whole
+        // half and no corridor at all.
+        return rails[0].z * rails[1].z < 0
+          ? { x, z: 0 }
+          : { x, z: -Math.sign(rails[0].z || rails[1].z) * 0.42 };
+      }
+      return { x, z: cz(rails[0].z + rails[0].halfD + 0.3) }; // step off, away from the stage
     }
     case 'beam': {
-      const lanes: { x: number; halfW: number; yaw?: number }[] = [];
-      for (const l of landings) if (l.zone.kind === 'lane') lanes.push(l.zone);
+      const all: { beat: number; x: number; halfW: number; yaw?: number }[] = [];
+      for (const l of landings) if (l.zone.kind === 'lane') all.push({ beat: l.beat, ...l.zone });
+      if (!all.length) return prev;
+      // A twin that RETURNS lands twice: only the second pair decides where
+      // the dodge finally leaves you standing.
+      const lastBeat = Math.max(...all.map((l) => l.beat));
+      const lanes = all.filter((l) => l.beat === lastBeat);
       if (lanes.some((l) => l.yaw)) {
         // THE X: the nearest pocket between the arms.
         const pockets = [

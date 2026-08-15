@@ -81,6 +81,11 @@ export const choreoView: {
   dropRoutine?: () => void;
   /** Dev: throw THE TRAP now — both side rails on one beat. */
   dropTrap?: () => void;
+  /** Dev: throw THE TWIN AND ITS RETURN now — a shoulder-to-shoulder pair
+   *  taking one half, then the mirrored pair a bar later. axis 0 = lateral
+   *  beams (across and back), axis 1 = rails (front/back); `side` picks
+   *  which half goes up first. */
+  dropTwin?: (axis?: 0 | 1, side?: 1 | -1) => void;
   /** Dev: throw DUCK DONUT now — the blade and the closing rim together. */
   dropDuckDonut?: () => void;
   /** Dev: throw THE X now — two diagonal beams crossing dead centre. */
@@ -147,6 +152,8 @@ export class ChoreoSystem extends createSystem({}) {
   private generation = -1;
   private setlist: SetMove[] = [];
   private nextMove = 0;
+  /** Dev drops only: a unique move index per injected move. */
+  private devDrops = 0;
   private zones: LiveZone[] = [];
   /** Blockfalls playing out their landing crush after their zone resolved. */
   private crushing: RoutineBlockfall[] = [];
@@ -267,6 +274,33 @@ export class ChoreoSystem extends createSystem({}) {
           { beat: land, zone: { kind: 'rail', z: -CHOREO.railTrapZ, halfD: CHOREO.railHalfDepth, from: -1 } },
           { beat: land, zone: { kind: 'rail', z: CHOREO.railTrapZ, halfD: CHOREO.railHalfDepth, from: 1 } },
         ],
+      });
+    };
+    choreoView.dropTwin = (axis = 0, side = 1) => {
+      if (!match.playing || !Number.isFinite(match.beat)) return;
+      const tele = match.beat + 0.25;
+      const kind = axis ? 'cross' : 'beam';
+      const land = tele + MOVES[kind].chargeBeats;
+      const back = land + CHOREO.twinReturnBeats;
+      const inner = axis ? CHOREO.railTwinInner : CHOREO.beamTwinInner;
+      const span = axis ? CHOREO.railHalfDepth : CHOREO.beamHalfWidth;
+      const outer = inner + span * 2 + 0.02;
+      const pair = (beat: number, s: number, from: 1 | -1) =>
+        [inner, outer].map((at) => ({
+          beat,
+          zone: axis
+            ? ({ kind: 'rail', z: s * at, halfD: span, from } as const)
+            : ({ kind: 'lane', x: s * at, halfW: span } as const),
+        }));
+      this.begin({
+        // A counter, not `nextMove`: two drops between set-list moves would
+        // otherwise share an index, and the zone bookkeeping is keyed on it.
+        index: 9500 + (this.devDrops++ % 100),
+        kind,
+        telegraphBeat: tele,
+        landBeat: land,
+        act: 3,
+        landings: [...pair(land, side, 1), ...pair(back, -side, -1)],
       });
     };
     choreoView.dropDuckDonut = () => {
@@ -476,7 +510,13 @@ export class ChoreoSystem extends createSystem({}) {
                 ? landing.beat - CHOREO.novaChainBeats
                 : landing.zone.kind === 'donut' && landingIdx > 0
                   ? landing.beat - CHOREO.donutFollowBeats
-                  : move.telegraphBeat;
+                  : // THE TWIN'S RETURN (beam or crossfire): the answering pair
+                    // holds off the floor until the first pair actually fires,
+                    // so you never read four strips at once — one shape, the
+                    // crossing, then the next shape.
+                    (move.kind === 'beam' || move.kind === 'cross') && landing.beat > move.landBeat
+                    ? landing.beat - CHOREO.twinReturnBeats
+                    : move.telegraphBeat;
         // THE ROUTINE's danger is DOWN blocks descending from above — one
         // per doomed quarter, beat-locked so the landing is the downbeat.
         const blocks =
