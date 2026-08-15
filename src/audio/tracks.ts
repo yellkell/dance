@@ -20,8 +20,16 @@
  *                 gain-matched to TARGET_LUFS at playback. Nothing is ever
  *                 re-encoded; it's a gain node.
  *
- * Adding a track: drop the file in src/assets/music/, add a row here, done.
- * Roles decide where it plays; move a track between roles freely.
+ * Adding a track: drop the file in src/assets/music/, run
+ * `npm run analyze -- <file>`, paste the row it prints, done. Roles decide
+ * where it plays; move a track between roles freely.
+ *
+ * CHECK THE TEMPO IT GIVES YOU. The analyser's octave fold only looks
+ * between 100 and 180 BPM, so a record whose true beat falls outside that
+ * comes back as whatever fraction of the grid autocorrelated best — V ONE
+ * arrived as 63.333, a third of its real 190 lattice. `tools/octave-check`
+ * scores the candidates against the onsets, and `tools/track-check` audits
+ * the whole box against the files it claims to describe.
  */
 
 import sakupenedUrl from '../assets/music/sakupened.mp3';
@@ -42,6 +50,10 @@ import chillUrl from '../assets/music/chill.m4a';
 import discoballUrl from '../assets/music/discoball.mp3';
 import eclipseUrl from '../assets/music/eclipse.mp3';
 import vfallUrl from '../assets/music/vfall.mp3';
+import giveitUrl from '../assets/music/giveit.m4a';
+import voneUrl from '../assets/music/vone.m4a';
+import fusionUrl from '../assets/music/fusion.mp3';
+import futurevibeUrl from '../assets/music/futurevibe.mp3';
 import type { MoveKind } from '../config.js';
 
 export type TrackRole = 'raid' | 'lobby' | 'club';
@@ -258,6 +270,59 @@ export const TRACKS: Track[] = [
     downbeat: 0.7308,
     seconds: 222.61,
     lufs: -10.9,
+    roles: ['raid'],
+  },
+  {
+    id: 'giveit',
+    title: 'GIVE IT TO ME',
+    url: giveitUrl,
+    bpm: 112.0,
+    downbeat: 1.3849,
+    seconds: 240.01,
+    lufs: -14.2,
+    // AFTER HOURS opens on this now, in INFECTION's old seat. The night
+    // starts a good deal lower than it used to (112 against 138) and the
+    // step up to SPREAD is the biggest on the tour — which is the point of
+    // a last set: the room walks in, then the floor runs away with it.
+    roles: ['raid'],
+  },
+  {
+    id: 'vone',
+    title: 'V ONE',
+    url: voneUrl,
+    bpm: 95.0,
+    downbeat: 1.5708,
+    seconds: 179.37,
+    lufs: -10.8,
+    // The analyser called this one 63.333 and it is nothing of the sort.
+    // The onsets sit on a 190 lattice — 63.333 is a third of it, and the
+    // octave fold only ever looks between 100 and 180, so nothing rescued
+    // it. 95 is the half of 190 you can actually dance: every beat lands on
+    // a real onset (88% of them carry one), while 190 itself would ask for
+    // three hand-swaps a second and the groove would never pay out.
+    roles: ['raid'],
+  },
+  {
+    id: 'fusion',
+    title: 'FUSION',
+    url: fusionUrl,
+    bpm: 122.0,
+    downbeat: 1.963,
+    seconds: 90.67,
+    lufs: -8.1,
+    // The shortest record in the box at 1:30 — a five-phrase sprint, and
+    // the tightest grid of the four (confidence 7.4, the best reading of
+    // any record here).
+    roles: ['raid'],
+  },
+  {
+    id: 'futurevibe',
+    title: 'FUTURE VIBE',
+    url: futurevibeUrl,
+    bpm: 93.984,
+    downbeat: 0.9577,
+    seconds: 147.54,
+    lufs: -14.2,
     roles: ['raid'],
   },
   {

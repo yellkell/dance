@@ -648,7 +648,11 @@ export const TOUR: { sets: TourSet[]; freeSets: number; maxPhrases: number } = {
       // No repeats anywhere on the tour. SPREAD replaced UNITY (a fight
       // record where a five-minute journey used to sit) and, being the
       // faster of the two openers, it plays second so the set still climbs.
-      songs: ['infection', 'spread', 'breakcore'], // 138 → 150 → 174 BPM
+      // GIVE IT TO ME has INFECTION's old seat, which opens the last night
+      // 26 BPM lower and makes the step into SPREAD the steepest on the
+      // tour — the climb is the whole shape of this set, so a longer run-up
+      // suits it. (INFECTION keeps its place on the SOLO shelf.)
+      songs: ['giveit', 'spread', 'breakcore'], // 112 → 150 → 174 BPM
       tint: { shallow: 0xffd24a, deep: 0x6e3c06, nucleus: 0xffefad }, // molten gold
     },
   ],
