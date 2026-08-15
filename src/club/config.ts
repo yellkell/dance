@@ -54,7 +54,9 @@ export const CLUB = {
   stage: { z: -9.3, r: 3.0, h: 0.45 },
 
   /** Bar along the east wall. Counter FRONT face at `x`; the keeper's aisle
-   *  runs between the counter back and the back-bar shelf wall. */
+   *  runs between the counter back and the back-bar shelf wall. The `top` is
+   *  a standable surface (TELEPORT_AREAS) — getting up on the bar is the
+   *  oldest move in the book, and it's the one perch the whole hall can see. */
   bar: {
     x: 6.7,
     z0: -6.8,
@@ -153,6 +155,16 @@ export const TELEPORT_AREAS: FloorArea[] = [
   // ── STANDABLE FURNITURE — small islands, listed FIRST so they win the
   // area lookup over the floor beneath them. Dancing on the tables is not
   // an accident in this venue; it is the venue.
+  // THE BAR ITSELF. Getting up on the counter is the oldest move in the
+  // book, and the counter is the one surface in here everybody can see
+  // from everywhere. Inset from the lip so you land on oak, not air.
+  {
+    minX: CLUB.bar.x + 0.15,
+    maxX: CLUB.bar.x + CLUB.bar.depth - 0.12,
+    minZ: CLUB.bar.z0 + 0.3,
+    maxZ: CLUB.bar.z1 - 0.2,
+    y: CLUB.bar.top,
+  },
   // The booth tables (inside each velvet horseshoe).
   ...CLUB.boothZs.map((bz) => ({
     minX: CLUB.boothX - 0.42,
@@ -201,13 +213,24 @@ export function floorYAt(x: number, z: number): number {
 }
 
 /**
+ * A wall a teleport may not arc THROUGH: the XZ segment [ax, az, bx, bz],
+ * plus an optional SILL — the height at which it stops being a wall and
+ * becomes something you're standing on top of.
+ *
+ * The bar counter is the case that needs it. It has to block hops straight
+ * over it at floor level (walk round the south end to get behind), while
+ * still letting you up ONTO it — and, once you're up there, back down
+ * either side. A sill-less segment is solid at every height.
+ */
+export type WallSegment = [number, number, number, number, number?];
+
+/**
  * Solid walls a teleport may not arc THROUGH — the landing can be valid
  * floor, but if the straight path from where you stand crosses one of these
- * you can't go (no phasing through walls). Each is an XZ segment
- * [ax, az, bx, bz]. The still room keeps its doorway gap; the bar counter
- * blocks hops straight over it (walk round the south end instead).
+ * you can't go (no phasing through walls). The still room keeps its doorway
+ * gap; the bar counter is silled at its own worktop.
  */
-export const WALL_SEGMENTS: Array<[number, number, number, number]> = [
+export const WALL_SEGMENTS: WallSegment[] = [
   // Hall perimeter.
   [-CLUB.halfW, CLUB.minZ, CLUB.halfW, CLUB.minZ], // north (stage/drape) wall
   [-CLUB.halfW, CLUB.maxZ, CLUB.halfW, CLUB.maxZ], // south (vestibule) wall
@@ -225,8 +248,41 @@ export const WALL_SEGMENTS: Array<[number, number, number, number]> = [
   // The stage face — the performer's ground, not the crowd's.
   [-CLUB.stage.r - 0.4, CLUB.stage.z + CLUB.stage.r + 0.35, CLUB.stage.r + 0.4, CLUB.stage.z + CLUB.stage.r + 0.35],
   // The bar counter line (its south end at z1 stays open into the aisle).
-  [CLUB.bar.x, CLUB.bar.z0 - 0.4, CLUB.bar.x, CLUB.bar.z1],
+  // Silled at the worktop: solid to anyone on the floor, a step to anyone
+  // standing on it.
+  [CLUB.bar.x, CLUB.bar.z0 - 0.4, CLUB.bar.x, CLUB.bar.z1, CLUB.bar.top],
 ];
+
+/** Do segments AB and CD properly cross? (Collinear/endpoint touches don't
+ *  count — grazing a doorway edge shouldn't block the hop.) */
+function segmentsCross(
+  ax: number, az: number, bx: number, bz: number,
+  cx: number, cz: number, dx: number, dz: number,
+): boolean {
+  const o = (px: number, pz: number, qx: number, qz: number, rx: number, rz: number): number =>
+    (qx - px) * (rz - pz) - (qz - pz) * (rx - px);
+  const d1 = o(cx, cz, dx, dz, ax, az);
+  const d2 = o(cx, cz, dx, dz, bx, bz);
+  const d3 = o(ax, az, bx, bz, cx, cz);
+  const d4 = o(ax, az, bx, bz, dx, dz);
+  return ((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) && ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0));
+}
+
+/**
+ * Does the straight path (x0,z0)→(x1,z1) cross any solid wall?
+ *
+ * `atY` is the HIGHER of the two ends' floor heights — the height the hop
+ * is really travelling at. A silled wall (the bar counter) stops being an
+ * obstacle once you're at or above its top, which is what makes climbing
+ * onto the counter legal without also opening the keeper's aisle to
+ * anyone standing on the floor in front of it.
+ */
+export function crossesWall(x0: number, z0: number, x1: number, z1: number, atY = 0): boolean {
+  return WALL_SEGMENTS.some(
+    ([ax, az, bx, bz, sill]) =>
+      (sill === undefined || atY < sill - 1e-6) && segmentsCross(x0, z0, x1, z1, ax, az, bx, bz),
+  );
+}
 
 /* ── the social wire ────────────────────────────────────────────────────── */
 export const CLUB_NET = {

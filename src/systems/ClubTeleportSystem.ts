@@ -11,10 +11,13 @@
  *  - An isolated sideways flick (when not aiming) is a snap turn.
  *
  * Landing spots are restricted to the club's floor rectangles
- * (TELEPORT_AREAS — hall, bar aisle, terrace wings, still room); anywhere
- * else the marker burns hazard-red and release does nothing. The terrace
- * rides at +0.45 m: areas carry their own floor height and the rig lands at
- * it. Arcs can't cut through walls, the bar counter, or the stage face.
+ * (TELEPORT_AREAS — hall, bar aisle, terrace wings, still room, and the
+ * standable furniture: the booth tables and THE BAR ITSELF); anywhere else
+ * the marker burns hazard-red and release does nothing. The terrace rides
+ * at +0.45 m and the counter at +1.09: areas carry their own floor height
+ * and the rig lands at it. Arcs can't cut through walls or the stage face —
+ * or over the bar counter, until you're standing at counter height, which
+ * is how you get up on it and back down again.
  *
  * Active only while the club is the room (menu screens). The moment a set
  * books the floor, every club offset is DROPPED and the rig returns to
@@ -47,7 +50,7 @@ import type { XROrigin } from '@iwsdk/xr-input';
 import { OCTAGON_VERTICES, PALETTE } from '../config.js';
 import { octagonSlab } from '../arena/octagon.js';
 import * as sfx from '../audio/sfx.js';
-import { DECOR, TELEPORT, TELEPORT_AREAS, WALL_SEGMENTS, type FloorArea } from '../club/config.js';
+import { DECOR, TELEPORT, TELEPORT_AREAS, crossesWall, floorYAt, type FloorArea } from '../club/config.js';
 import { match } from '../game/state.js';
 import { net } from '../net/session.js';
 
@@ -105,26 +108,6 @@ function areaAt(x: number, z: number): FloorArea | null {
     if (x >= a.minX && x <= a.maxX && z >= a.minZ && z <= a.maxZ) return a;
   }
   return null;
-}
-
-/** Do segments AB and CD properly cross? (Collinear/endpoint touches don't
- *  count — grazing a doorway edge shouldn't block the hop.) */
-function segmentsCross(
-  ax: number, az: number, bx: number, bz: number,
-  cx: number, cz: number, dx: number, dz: number,
-): boolean {
-  const o = (px: number, pz: number, qx: number, qz: number, rx: number, rz: number): number =>
-    (qx - px) * (rz - pz) - (qz - pz) * (rx - px);
-  const d1 = o(cx, cz, dx, dz, ax, az);
-  const d2 = o(cx, cz, dx, dz, bx, bz);
-  const d3 = o(ax, az, bx, bz, cx, cz);
-  const d4 = o(ax, az, bx, bz, dx, dz);
-  return ((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) && ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0));
-}
-
-/** Does the straight path (x0,z0)→(x1,z1) cross any solid wall? */
-function crossesWall(x0: number, z0: number, x1: number, z1: number): boolean {
-  return WALL_SEGMENTS.some(([ax, az, bx, bz]) => segmentsCross(x0, z0, x1, z1, ax, az, bx, bz));
 }
 
 export class ClubTeleportSystem extends createSystem({}) {
@@ -341,12 +324,15 @@ export class ClubTeleportSystem extends createSystem({}) {
     if (!landed) this.landing.copy(_p);
     this.arcGeo.setPositions(buf);
 
-    // Valid only on real floor, with no wall between you and it.
+    // Valid only on real floor, with no wall between you and it. The hop is
+    // judged at the higher of the two ends: stepping UP onto the counter and
+    // stepping back DOWN off it are both hops made at counter height.
     this.player.head.getWorldPosition(_head);
+    const hopY = Math.max(floorYAt(_head.x, _head.z), this.landingArea?.y ?? 0);
     this.valid =
       landed &&
       this.landingArea !== null &&
-      !crossesWall(_head.x, _head.z, this.landing.x, this.landing.z);
+      !crossesWall(_head.x, _head.z, this.landing.x, this.landing.z, hopY);
 
     // Facing: thumbstick angle relative to where the controller points.
     const ctrlYaw = Math.atan2(-_dir.x, -_dir.z);

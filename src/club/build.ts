@@ -322,15 +322,22 @@ function buildWalls(root: Group, W: number, NZ: number, SZ: number, H: number): 
   // three horizontal registers that make plaster read as a dressed room.
   const skirt = blackSteelMat();
   const railMat = brassMat(0.34);
-  for (const [len, x, z, ry] of [
-    [W * 2, 0, NZ + 0.02, 0],
-    [W * 2, 0, SZ - 0.02, Math.PI],
-    [SZ - NZ, -W + 0.02, (NZ + SZ) / 2, Math.PI / 2],
-    [SZ - NZ, W - 0.02, (NZ + SZ) / 2, -Math.PI / 2],
-  ] as const) {
+  const trimRun = (len: number, x: number, z: number, ry: number): void => {
     box(root, skirt, len, 0.16, 0.03, x, 0.08, z, ry);
     box(root, railMat, len, 0.035, 0.02, x, 1.0, z, ry);
     box(root, railMat, len, 0.05, 0.025, x, 2.62, z, ry);
+  };
+  trimRun(W * 2, 0, NZ + 0.02, 0);
+  trimRun(SZ - NZ, -W + 0.02, (NZ + SZ) / 2, Math.PI / 2);
+  trimRun(SZ - NZ, W - 0.02, (NZ + SZ) / 2, -Math.PI / 2);
+  // The SOUTH wall's runs die into the entrance portal instead of ploughing
+  // through it: a door surround interrupts the mouldings, and the picture
+  // rail in particular used to draw a brass line clean across the fanlight
+  // sitting in front of it. The gap clears the widest frame (±1.635).
+  const doorGap = 1.75;
+  const southRun = W - doorGap;
+  for (const side of [-1, 1] as const) {
+    trimRun(southRun, side * (doorGap + southRun / 2), SZ - 0.02, Math.PI);
   }
 
   // Fluted brass pilasters pace the long walls — each a slim core wrapped
@@ -1025,9 +1032,16 @@ function buildVestibule(root: Group): void {
   const doorH = 2.5;
 
   // Three nested portal frames stepping outward — the deco doorway.
+  //
+  // The heads sit HIGH above the doors on purpose: the frames used to clear
+  // the leaf by 0.22 m and step 0.28 apart, which put the second crossbar
+  // at y ≈ 3.0 — straight across the middle of the fanlight, and standing
+  // 5 mm proud of it, so the sunburst was cut in half by a bronze bar. A
+  // 0.5 m tympanum over the doors gives the fanlight the field it needs,
+  // and the tighter 0.14 step keeps the outermost head under the cornice.
   for (let i = 0; i < 3; i++) {
     const w = doorW + 0.3 + i * 0.36;
-    const h = doorH + 0.22 + i * 0.28;
+    const h = doorH + 0.5 + i * 0.14;
     const t = 0.09 - i * 0.02;
     const mat = i === 0 ? brassMat(0.25) : i === 1 ? bronzeMat() : blackSteelMat();
     const z = SZ - 0.16 + i * 0.05;
@@ -1044,15 +1058,34 @@ function buildVestibule(root: Group): void {
     box(root, brassMat(0.3), 0.05, 0.34, 0.02, side * 0.16, 1.12, SZ - 0.14);
     box(root, brassMat(0.4), doorW / 2 - 0.1, 0.16, 0.02, (side * doorW) / 4, 0.12, SZ - 0.14);
   }
-  // The fanlight: a half-sunburst window over the doors, softly lit.
+  // THE FANLIGHT: a half-sunburst window over the doors, softly lit — a fan
+  // springing from the door head, ringed by its own arch bar so it reads as
+  // a window rather than a handful of loose spokes.
+  //
+  // It sits INSIDE the tympanum now: springing line just over the leaves,
+  // outer radius stopping short of the innermost frame's head. Nothing
+  // crosses it any more — the crossbar that used to bisect it has been
+  // lifted clear above, and the south wall's picture rail (which ran the
+  // full width of the hall, straight through the fan behind it) now dies
+  // into the portal on both sides like a moulding should.
   const fanMat = brassGlowMat(0.7);
+  const fanY = doorH + 0.06;
+  const rIn = 0.08;
+  const rOut = 0.33;
+  const fanZ = SZ - 0.13;
   for (let i = 0; i < 7; i++) {
     const a = (i / 6) * Math.PI - Math.PI / 2;
-    const spoke = new Mesh(new BoxGeometry(0.03, 0.62, 0.02), fanMat);
-    spoke.position.set(Math.sin(a) * 0.36, doorH + 0.36 + Math.cos(a) * 0.28, SZ - 0.13);
+    const mid = (rIn + rOut) / 2;
+    const spoke = new Mesh(new BoxGeometry(0.028, rOut - rIn, 0.02), fanMat);
+    spoke.position.set(Math.sin(a) * mid, fanY + Math.cos(a) * mid, fanZ);
     spoke.rotation.z = -a;
     root.add(spoke);
   }
+  // The arch over the fan, and the sill it springs from.
+  const arch = new Mesh(new TorusGeometry(rOut, 0.022, 8, 28, Math.PI), fanMat);
+  arch.position.set(0, fanY, fanZ);
+  root.add(arch);
+  box(root, brassMat(0.3), rOut * 2 + 0.06, 0.035, 0.025, 0, fanY, fanZ);
 
   // The velvet rope and the members-&-dancers plaque used to stand here.
   // The way in is a doorway, not a queue: nothing to sidestep, nothing to
@@ -1122,7 +1155,11 @@ function buildStillRoom(root: Group, candleMat: SpriteMaterial): MeshStandardMat
   // Inside: a wide curved bench with deep cushions, a low table, a slow
   // lamp. Nothing performs in here — that's the point.
   const cx = (Q.minX + Q.maxX) / 2;
-  const cz = (Q.minZ + Q.maxZ) / 2 - 0.25;
+  // The bench hugs the deep side, but it used to hug it THROUGH the wall:
+  // its back reached z = −11.455 while the north shell's middle panel stands
+  // proud at −11.4, so the velvet was buried 55 mm into the plaster. Sit it
+  // far enough forward that the plinth (the widest ring at r = 1.4) clears.
+  const cz = (Q.minZ + Q.maxZ) / 2 - 0.1;
   const bench = new Group();
   bench.position.set(cx, 0, cz);
   bench.rotation.y = Math.PI / 2 + Math.PI; // horseshoe opens toward the door
@@ -1153,6 +1190,15 @@ function buildStillRoom(root: Group, candleMat: SpriteMaterial): MeshStandardMat
   }));
   backW.position.y = 0.75;
   bench.add(backW);
+  // The brass cap along the top of the back — every velvet horseshoe in the
+  // booths is finished with one, and the still room's was the only bench
+  // left showing a raw shell edge. Same half as the wall it caps (the seat
+  // torus above uses this identical pair of rotations).
+  const backCap = new Mesh(new TorusGeometry(1.38, 0.03, 8, 24, Math.PI), brassMat(0.3));
+  backCap.rotation.x = -Math.PI / 2;
+  backCap.rotation.z = Math.PI / 2;
+  backCap.position.y = 1.15;
+  bench.add(backCap);
   root.add(bench);
 
   const table = new Mesh(new CylinderGeometry(0.34, 0.3, 0.36, 14), new MeshStandardMaterial({
@@ -1398,7 +1444,13 @@ function buildArcade(root: Group): void {
   boardTex.minFilter = LinearFilter;
   const board = new Mesh(new PlaneGeometry(0.82, 1.18), new MeshBasicMaterial({ map: boardTex, transparent: true }));
   board.name = 'live-octagon-board';
-  board.position.set(A.maxX - 0.03, 1.55, (A.minZ + A.maxZ) / 2 + 0.5);
+  // Hung PROUD of the wall trim. At the old 0.03 standoff the board's plane
+  // landed on exactly x = 8.97 — which is also the front face of the east
+  // wall's dado rail, running the length of the hall at y = 1.0 and straight
+  // through the board's bottom edge. Two coplanar surfaces, so the rail
+  // shimmered through the last row of scores. A board on a wall stands off
+  // the mouldings and covers them; now it does.
+  board.position.set(A.maxX - 0.1, 1.55, (A.minZ + A.maxZ) / 2 + 0.5);
   board.rotation.y = -Math.PI / 2;
   root.add(board);
 

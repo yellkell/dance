@@ -610,6 +610,10 @@ export class MenuSystem extends createSystem({}) {
       this.keyboardOpen,
       this.nameDraft,
       profileName(),
+      // Your colour paints the profile diamond, so a fresh pick (or a new
+      // seat online, which moves the default) has to repaint the header.
+      profileHue() ?? 'seat',
+      match.mySeat,
       this.boardSource,
       this.boardScroll,
     ].join('|');
@@ -842,14 +846,18 @@ export class MenuSystem extends createSystem({}) {
     g.lineWidth = 2;
     g.strokeStyle = open ? 'rgba(255,42,213,0.9)' : `rgba(255,255,255,${(0.1 + 0.2 * hov).toFixed(3)})`;
     g.stroke();
-    // The identity mark: the brand diamond, glowing faintly.
+    // The identity mark: a diamond in YOUR colour, glowing faintly. It used
+    // to be the brand pink no matter what you picked, which made the one
+    // mark with your name on it the only thing in the venue that didn't
+    // answer to the colour wheel.
     const dx = PROF.x + 32;
     const dy = PROF.y + PROF.h / 2;
+    const mark = `hsl(${Math.round(danceHue(match.mySeat, true) * 360)}, 100%, 62%)`;
     g.save();
     g.translate(dx, dy);
     g.rotate(Math.PI / 4);
-    g.fillStyle = UI.accent;
-    g.shadowColor = UI.accentDim;
+    g.fillStyle = mark;
+    g.shadowColor = mark;
     g.shadowBlur = 8;
     g.fillRect(-8, -8, 16, 16);
     g.restore();

@@ -84,6 +84,9 @@ let ambZero = 0;
 let ambToken = 0;
 let ambBase = 0;
 let ambDuck = 1;
+/** The still room's door, as a filter: the muffle stage the loop runs
+ *  through so a duck sounds like a wall and not like a volume knob. */
+let ambMuffle: BiquadFilterNode | null = null;
 /** The rotation: the records the room trades between, and where it is. */
 let ambSet: Track[] = [];
 let ambIdx = 0;
@@ -349,7 +352,15 @@ function spinAmbient(level: number, hops = 0): void {
     const gain = c.createGain();
     ambBase = trackGain(track) * level;
     gain.gain.value = ambBase * ambDuck;
-    gain.connect(chain(c));
+    // src → gain → muffle → the bus. Wide open out on the floor; closing
+    // down to a thud when you step into the still room.
+    const muffle = c.createBiquadFilter();
+    muffle.type = 'lowpass';
+    muffle.frequency.value = duckCutoff(ambDuck);
+    muffle.Q.value = 0.4;
+    gain.connect(muffle);
+    muffle.connect(chain(c));
+    ambMuffle = muffle;
     const src = c.createBufferSource();
     src.buffer = buf;
     if (ambSet.length === 1) {
@@ -386,6 +397,7 @@ export function stopAmbient(fade = 0.4): void {
   const gain = ambGain;
   ambSrc = null;
   ambGain = null;
+  ambMuffle = null;
   ambTrack = null;
   if (!c || !src || !gain) return;
   const now = c.currentTime;
@@ -403,17 +415,34 @@ export function ambientRunning(): boolean {
   return ambSrc !== null;
 }
 
+/** The lowpass corner that goes with a duck level: open at full, down to a
+ *  through-the-wall thud when the room is hushed. */
+function duckCutoff(mult: number): number {
+  return 320 + Math.pow(Math.min(1, Math.max(0, mult)), 0.5) * 19680;
+}
+
 /**
  * Duck the room loop without stopping it — THE STILL ROOM's whole trick:
  * step through its door and the club's music falls away to a murmur (the
  * ClubSystem drives this from your head position). 1 = full level.
+ *
+ * Level ALONE never sounded like a quiet room, only like a quieter club —
+ * what a wall actually does is eat the top end and leave you the kick. So
+ * the duck drives a lowpass with it, and the still room finally sounds like
+ * somewhere you stepped out to rather than somewhere with the volume down.
  */
 export function setAmbientDuck(mult: number): void {
   ambDuck = Math.min(1, Math.max(0, mult));
   const c = audioContext();
-  if (!c || !ambGain) return;
-  ambGain.gain.cancelScheduledValues(c.currentTime);
-  ambGain.gain.setTargetAtTime(ambBase * ambDuck, c.currentTime, 0.35);
+  if (!c) return;
+  if (ambGain) {
+    ambGain.gain.cancelScheduledValues(c.currentTime);
+    ambGain.gain.setTargetAtTime(ambBase * ambDuck, c.currentTime, 0.35);
+  }
+  if (ambMuffle) {
+    ambMuffle.frequency.cancelScheduledValues(c.currentTime);
+    ambMuffle.frequency.setTargetAtTime(duckCutoff(ambDuck), c.currentTime, 0.35);
+  }
 }
 
 /** The lobby loop's beat position — the club's idle pulse. */

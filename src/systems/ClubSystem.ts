@@ -29,7 +29,8 @@
  * and club and never clobbers the set's (DiscoSystem's) fog.
  *
  * THE STILL ROOM's law is enforced here: step through its door and the
- * club's music falls away to a murmur (setAmbientDuck), voices untouched.
+ * club's music drops to a muffled thud through the wall (setAmbientDuck
+ * takes the level down AND the top end off), voices untouched.
  */
 
 import { createSystem } from '@iwsdk/core';
@@ -134,7 +135,10 @@ export class ClubSystem extends createSystem({}) {
       const Q = CLUB.quiet;
       const inside =
         match.headX >= Q.minX && match.headX <= Q.maxX && match.headZ >= Q.minZ && match.headZ <= Q.maxZ;
-      const target = inside ? 0.1 : 1;
+      // Properly quiet, not just turned down: at 0.1 the club was still in
+      // the room with you. The muffle rides this same number, so the low
+      // setting is a wall's worth of both.
+      const target = inside ? 0.03 : 1;
       if (target !== this.duckTarget) {
         this.duckTarget = target;
         setAmbientDuck(target);

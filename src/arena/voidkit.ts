@@ -819,10 +819,21 @@ export interface ShardField {
   commit(): void;
 }
 
-/** OCTAGONS adrift in the middle distance — the game's own sigil floating
- *  through its abstract spaces (they used to be octahedra, which read as
- *  squares in silhouette). Dark plates with a bright ghost — instanced,
- *  so a cloud costs what one used to. */
+/**
+ * OCTAGONS adrift in the middle distance — the game's own sigil floating
+ * through its abstract spaces (they used to be octahedra, which read as
+ * squares in silhouette). Dark slabs inside a bright ghost — instanced, so
+ * a cloud costs what one used to.
+ *
+ * SLABS, not plates, and that is the whole fix for a shard cloud that used
+ * to FLICKER. Zero-thickness plates failed twice over: a flat plate
+ * tumbling through world-up goes edge-on twice a turn and vanishes into
+ * nothing, and the halo — the same plate at 1.18× in the SAME plane — was
+ * exactly coplanar with the body, so the two z-fought across every pixel
+ * they shared. Give the octagon a little depth and the halo becomes a
+ * shell standing off it on all six sides: nothing coplanar left to fight
+ * over, and no viewing angle that makes a shard disappear.
+ */
 export function buildShardField(
   count: number,
   rMin: number,
@@ -833,22 +844,25 @@ export function buildShardField(
 ): ShardField {
   const group = new Group();
   const rnd = rng(seed);
-  const bodies = darkBank(new CircleGeometry(0.5, 8), count, 0x0c0b14);
-  const halos = new GlowBank(new CircleGeometry(0.5, 8), count, { additive: true, opacity: 0.3 });
+  // An 8-sided cylinder IS an octagonal prism: octagon faces, a rim of
+  // eight narrow flanks. Unit-sized, scaled per instance (x/z span the
+  // octagon, y is the slab's thickness).
+  const bodies = darkBank(new CylinderGeometry(0.5, 0.5, 1, 8), count, 0x0c0b14);
+  const halos = new GlowBank(new CylinderGeometry(0.5, 0.5, 1, 8), count, { additive: true, opacity: 0.3 });
   const base: { x: number; y: number; z: number; s: Vector3; spin: number; bob: number; phase: number; rot: Euler }[] =
     [];
   for (let i = 0; i < count; i++) {
     const a = rnd() * Math.PI * 2;
     const r = rMin + rnd() * (rMax - rMin);
     const y = yMin + rnd() * (yMax - yMin);
-    // Octagon plates: near-regular, sized with real spread, tilted so the
-    // cloud never lines up.
+    // Octagon slabs: near-regular, sized with real spread, tilted so the
+    // cloud never lines up. Thin enough to still read as a plate edge-on.
     const plate = 0.9 + rnd() * 1.8;
     base.push({
       x: Math.sin(a) * r,
       y,
       z: Math.cos(a) * r,
-      s: new Vector3(plate * (0.9 + rnd() * 0.2), plate, 1),
+      s: new Vector3(plate * (0.9 + rnd() * 0.2), plate * 0.06, plate),
       spin: (rnd() - 0.5) * 0.5,
       bob: 0.25 + rnd() * 0.7,
       phase: rnd() * Math.PI * 2,
@@ -869,7 +883,10 @@ export function buildShardField(
         _e.set(b.rot.x, b.rot.y + clock * b.spin, b.rot.z);
         _q.setFromEuler(_e);
         bodies.setMatrixAt(i, _m.compose(_p, _q, b.s));
-        _s.set(b.s.x * 1.18, b.s.y * 1.1, b.s.z * 1.18);
+        // The ghost stands clear of the slab on every axis — including the
+        // thin one, where a 1.1× of near-nothing would still have left the
+        // two faces sharing a plane.
+        _s.set(b.s.x * 1.18, b.s.y + 0.05, b.s.z * 1.18);
         halos.mesh.setMatrixAt(i, _m.compose(_p, _q, _s));
       }
       bodies.instanceMatrix.needsUpdate = true;
