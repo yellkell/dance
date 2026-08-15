@@ -112,7 +112,16 @@ export function finishRaid(): void {
       // No pop for the clear: that strip says HIT and PERFECT and nothing
       // else. The grade card, the podium board and the map's fresh ✓ all
       // carry the news anyway.
-      if (me.alive) markTourNightCleared(match.tour.set, match.tour.song);
+      if (me.alive) {
+        markTourNightCleared(match.tour.set, match.tour.song);
+        // THE LAST NIGHT. Survive the final record of the final set and the
+        // credits are due: the podium plays out as usual, and the map you
+        // walk back to is wearing them.
+        const last = TOUR.sets.length - 1;
+        if (match.tour.set === last && match.tour.song === TOUR.sets[last].songs.length - 1) {
+          match.credits = true;
+        }
+      }
     } else if (!match.online) {
       // A finished solo set posts to the song's leaderboards — this
       // headset's book, and the world board. The campaign and the club's
@@ -152,6 +161,7 @@ export function toLobby(): void {
   match.playing = false;
   match.beat = -Infinity;
   match.tour = null;
+  match.credits = false; // walking out to the foyer ends the roll
   restorePickedDifficulty();
   match.generation++;
 }

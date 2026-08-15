@@ -54,9 +54,14 @@ import giveitUrl from '../assets/music/giveit.m4a';
 import voneUrl from '../assets/music/vone.m4a';
 import fusionUrl from '../assets/music/fusion.mp3';
 import futurevibeUrl from '../assets/music/futurevibe.mp3';
+import braineaterUrl from '../assets/music/braineater.mp3';
+import creditsUrl from '../assets/music/credits.mp3';
 import type { MoveKind } from '../config.js';
 
-export type TrackRole = 'raid' | 'lobby' | 'club';
+/** Where a record is allowed to play. 'credits' is a role of one: the
+ *  campaign's closing theme, kept out of the shuffle and out of the foyer
+ *  rotation so the first time anyone hears it is the night they finish. */
+export type TrackRole = 'raid' | 'lobby' | 'club' | 'credits';
 
 export interface Track {
   id: string;
@@ -324,6 +329,29 @@ export const TRACKS: Track[] = [
     seconds: 147.54,
     lufs: -14.2,
     roles: ['raid'],
+  },
+  {
+    id: 'braineater',
+    title: 'BRAIN EATER',
+    url: braineaterUrl,
+    bpm: 149.959,
+    downbeat: 0.7716,
+    seconds: 95.74,
+    lufs: -9.1,
+    roles: ['raid'],
+  },
+  {
+    id: 'credits',
+    title: 'CREDITS',
+    url: creditsUrl,
+    bpm: 70.0,
+    downbeat: 3.4248,
+    seconds: 154.03,
+    lufs: -10.4,
+    // THE CLOSING THEME. Its own role, so the shuffle can't reach it and
+    // the foyer never spins it: it plays once, over the credits, on the
+    // night the tour is finished.
+    roles: ['credits'],
   },
   {
     id: 'chill',

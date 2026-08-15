@@ -527,6 +527,8 @@ export class MenuSystem extends createSystem({}) {
       } catch {
         /* fine */
       }
+    } else if (id === 'credits-done') {
+      match.credits = false;
     } else if (id === 'vol-' || id === 'vol+') {
       setMusicVolume(musicVolume() + (id === 'vol+' ? 0.1 : -0.1));
     } else if (id === 'sfx-' || id === 'sfx+') {
@@ -614,6 +616,7 @@ export class MenuSystem extends createSystem({}) {
       // seat online, which moves the default) has to repaint the header.
       profileHue() ?? 'seat',
       match.mySeat,
+      match.credits,
       this.boardSource,
       this.boardScroll,
     ].join('|');
@@ -664,6 +667,28 @@ export class MenuSystem extends createSystem({}) {
       const buttons: PanelButton[] = [];
       this.keyboardButtons(buttons);
       this.board.paint('', (g) => this.drawKeyboard(g), buttons, this.hover);
+      return;
+    }
+    // THE CREDITS are modal above everything: you finished the tour, so the
+    // map can wait. Black card, white type — the one place in the venue
+    // that isn't neon, because a name list shouldn't be a light show.
+    if (match.credits && match.screen === 'tour') {
+      this.board.paint(
+        '',
+        (g) => this.drawCredits(g),
+        [
+          {
+            id: 'credits-done',
+            label: 'BACK TO THE MAP',
+            primary: true,
+            x: W / 2 - 210,
+            y: H - 132,
+            w: 420,
+            h: 72,
+          },
+        ],
+        this.hover,
+      );
       return;
     }
     // THE COLOUR WHEEL is modal on the same terms.
@@ -915,6 +940,59 @@ export class MenuSystem extends createSystem({}) {
     g.shadowBlur = 16;
     g.fill();
     g.shadowBlur = 0;
+  }
+
+  /* ── the credits (modal) ── */
+
+  /**
+   * THE CREDITS. Black card, white type, centred — deliberately the plainest
+   * thing the game draws. Everything else on this board is neon on charcoal
+   * and fighting for your eye; the people who made it get quiet.
+   */
+  private drawCredits(g: CanvasRenderingContext2D): void {
+    g.fillStyle = '#000000';
+    g.fillRect(0, 0, W, H);
+    g.strokeStyle = 'rgba(255,255,255,0.22)';
+    g.lineWidth = 2;
+    g.strokeRect(24, 24, W - 48, H - 48);
+
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.fillStyle = '#ffffff';
+
+    g.font = font(700, 76);
+    g.letterSpacing = '18px';
+    g.fillText('RAVE RAID', W / 2, 176);
+    g.letterSpacing = '0px';
+
+    g.font = font(500, 24);
+    g.fillStyle = 'rgba(255,255,255,0.55)';
+    g.letterSpacing = '10px';
+    g.fillText('THE TOUR IS FINISHED', W / 2, 246);
+    g.letterSpacing = '0px';
+
+    // Role, then the names under it. One block per credit so adding a name
+    // is adding a string.
+    const credits: Array<{ role: string; names: string[] }> = [
+      { role: 'CREATED BY', names: ['yellkell'] },
+      { role: 'OST BY', names: ['IBWildcat1998', 'poopoodoodoo698', 'JakeThePro'] },
+    ];
+    let y = 380;
+    for (const block of credits) {
+      g.font = font(600, 26);
+      g.fillStyle = 'rgba(255,255,255,0.5)';
+      g.letterSpacing = '8px';
+      g.fillText(block.role, W / 2, y);
+      g.letterSpacing = '0px';
+      y += 64;
+      for (const name of block.names) {
+        g.font = font(700, 48);
+        g.fillStyle = '#ffffff';
+        g.fillText(name, W / 2, y);
+        y += 68;
+      }
+      y += 40;
+    }
   }
 
   /* ── the colour wheel (modal) ── */

@@ -146,6 +146,11 @@ export interface MatchState {
   /* ── the tour (campaign) ── */
   /** Which night this raid is, or null for a free-play set. */
   tour: { set: number; song: number } | null;
+  /** THE CREDITS ARE ROLLING. Set when the tour's last night is cleared and
+   *  carried back to the map, where the board wears the credits card and the
+   *  closing theme takes the decks. Cleared by dismissing it (or by walking
+   *  out to the foyer). */
+  credits: boolean;
 
   /* ── online ── */
   online: boolean;
@@ -183,6 +188,7 @@ export const match: MatchState = {
   goopTint: null,
   eatIntro: false,
   tour: null,
+  credits: false,
   online: false,
   roomCode: '',
 };

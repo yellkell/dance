@@ -80,9 +80,17 @@ export class MusicSystem extends createSystem({}) {
         // floor (hosting or joined — the SOCIAL night), CHILL takes the
         // decks and loops. startAmbient switches cleanly when the set
         // changes and no-ops while a rotation is mid-spin.
+        // …unless THE CREDITS ARE ROLLING, in which case the closing theme
+        // takes the decks over both of them. It's a rotation of one, so it
+        // loops for as long as the card is up; dismissing it hands the
+        // foyer back to its own records.
         const social = net.phase === 'hosting' || net.phase === 'joined';
-        const room = social ? tracksFor('club') : tracksFor('lobby');
-        if (room.length) startAmbient(room, social ? 0.7 : 0.55);
+        const room = match.credits
+          ? tracksFor('credits')
+          : social
+            ? tracksFor('club')
+            : tracksFor('lobby');
+        if (room.length) startAmbient(room, match.credits ? 0.75 : social ? 0.7 : 0.55);
         // Warm the raid record while the room track holds the floor, so the
         // drop is instant when someone hits START.
         if (!this.warmed) {
