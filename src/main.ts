@@ -144,6 +144,7 @@ import { arena } from './arena/arena.js';
 import { choreoView } from './systems/ChoreoSystem.js';
 import { menuView } from './systems/MenuSystem.js';
 import { socialView } from './systems/ClubSocialSystem.js';
+import { propsView } from './systems/ClubPropsSystem.js';
 import { grooveView } from './systems/PlayerSystem.js';
 import { callBall, cancelBall, hostRoom, joinBall, joinRoom, leaveRoom, net, setDancerName } from './net/session.js';
 import { clubPoses } from './net/poses.js';
@@ -173,6 +174,8 @@ declare global {
       };
       /** THE BALL, drivable headlessly: call one, touch in, call it off. */
       club: { call: typeof callBall; touch: typeof joinBall; cancel: typeof cancelBall };
+      /** THE DRINKS: read the pool, or launch a glass on a known arc. */
+      props: typeof propsView;
       /** The menus, drivable headlessly: board mode/hover, the pause card,
        *  the SOCIAL panel — the style-iteration hooks. */
       menu: typeof menuView & typeof socialView;
@@ -206,6 +209,7 @@ window.__gdr = {
     poses: clubPoses,
   },
   club: { call: callBall, touch: joinBall, cancel: cancelBall },
+  props: propsView,
   menu: new Proxy({} as typeof menuView & typeof socialView, {
     // The views are populated in each system's init — resolve lazily.
     get: (_t, key) =>

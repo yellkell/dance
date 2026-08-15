@@ -17,8 +17,15 @@
  *  - FLIGHT: gravity, wall reflections with per-wall heights (a lob
  *    clears the bar counter; a line drive rings off it), landings on any
  *    surface the venue knows — bar top, booth tables, terrace, stage,
- *    the floor — with bounce-or-settle split by speed and a glass that
- *    eases upright rather than snapping.
+ *    the floor — with bounce, SKID or settle split by speed, and a glass
+ *    that eases upright rather than snapping. Substepped, so a hard throw
+ *    meets the table edge it's aimed at instead of passing through it.
+ *  - SEATED, NOT SUNK: contact is the glass's own lowest point, worked out
+ *    from its profile and its tilt, so a coupe on its side lies on its rim
+ *    and never puts its stem and bowl through the floor.
+ *  - GLASS ON GLASS: they clack off each other and off the ones already
+ *    standing about, and a struck glass is claimed off the relay so one
+ *    client owns the motion it just picked up.
  *  - DRINK: bring it to your face and the cocktail's gone (the fill
  *    empties with a slurp). New glasses come full.
  *
@@ -42,7 +49,14 @@ import { createSystem, InputComponent } from '@iwsdk/core';
 import { BoxGeometry, Group, Mesh, MeshStandardMaterial, Quaternion, Vector3 } from 'three';
 import * as sfx from '../audio/sfx.js';
 import { CLUB, DECOR, floorYAt } from '../club/config.js';
-import { buildCoupe, PROP_PHYS, PROP_SURFACES, PROP_WALLS, type CoupeRefs } from '../club/props.js';
+import {
+  buildCoupe,
+  coupeBottomOffset,
+  PROP_PHYS,
+  PROP_SURFACES,
+  PROP_WALLS,
+  type CoupeRefs,
+} from '../club/props.js';
 import { match } from '../game/state.js';
 import {
   net,
@@ -85,6 +99,10 @@ interface Glass {
   /** Who simulates it while it moves: my idx, a room-mate's, or nobody. */
   owner: number | null;
   vel: Vector3;
+  /** Skidding along a surface rather than falling through the air — still
+   *  'flight' to the room (owner-simulated, streamed), just with its feet
+   *  down and `slideFriction` grinding it to a stop. */
+  grounded: boolean;
   /** Tumble axis+rate while flying. */
   spinAxis: Vector3;
   spin: number;
@@ -101,6 +119,23 @@ interface Glass {
 }
 
 type WaiterPhase = 'down' | 'sinking' | 'rising' | 'up';
+
+/** Dev window on the drinks: read the pool's state, and launch a glass on
+ *  a known trajectory, so the physics can be exercised without a room-mate
+ *  and a good arm. (`__gdr.props`.) */
+export const propsView: {
+  glasses?: () => Array<{
+    id: number;
+    mode: Mode;
+    grounded: boolean;
+    pos: [number, number, number];
+    vel: [number, number, number];
+    /** How far the glass's lowest point sits above the surface under it —
+     *  0 is seated, negative means it is INSIDE the floor. */
+    clearance: number;
+  }>;
+  launch?: (id: number, at: [number, number, number], vel: [number, number, number]) => void;
+} = {};
 
 export class ClubPropsSystem extends createSystem({}) {
   private group = new Group();
@@ -144,6 +179,7 @@ export class ClubPropsSystem extends createSystem({}) {
         mode: 'idle',
         owner: null,
         vel: new Vector3(),
+        grounded: false,
         spinAxis: new Vector3(0, 1, 0),
         spin: 0,
         hand: null,
@@ -159,6 +195,33 @@ export class ClubPropsSystem extends createSystem({}) {
     // The wire mutates the glasses directly — even while we're away on the
     // ring (the group hides, but the state stays true to the room).
     onProp((msg) => this.onWire(msg));
+
+    propsView.glasses = () =>
+      this.glasses.map((g) => {
+        const p = g.refs.root.position;
+        return {
+          id: g.id,
+          mode: g.mode,
+          grounded: g.grounded,
+          pos: [p.x, p.y, p.z] as [number, number, number],
+          vel: [g.vel.x, g.vel.y, g.vel.z] as [number, number, number],
+          clearance: p.y + this.bottomOffset(g) - this.restingYAt(p.x, p.z),
+        };
+      });
+    propsView.launch = (id, at, vel) => {
+      const glass = this.glasses[id];
+      if (!glass) return;
+      this.disown(glass);
+      glass.refs.root.visible = true;
+      glass.refs.root.position.set(at[0], at[1], at[2]);
+      glass.refs.root.quaternion.identity();
+      glass.vel.set(vel[0], vel[1], vel[2]);
+      glass.spin = 0;
+      glass.grounded = false;
+      glass.mode = 'flight';
+      glass.owner = net.myIdx;
+      this.toGroup(glass);
+    };
   }
 
   update(delta: number): void {
@@ -201,6 +264,7 @@ export class ClubPropsSystem extends createSystem({}) {
     for (const g of this.glasses) {
       g.mode = 'idle';
       g.owner = null;
+      g.grounded = false;
       g.hand = null;
       g.netAt = 0;
       g.refs.root.visible = false;
@@ -222,6 +286,7 @@ export class ClubPropsSystem extends createSystem({}) {
       glass.mode = 'rest';
       glass.owner = null;
       glass.hand = null;
+      glass.grounded = false;
       glass.restedAt = this.clock;
       this.toGroup(glass);
     }
@@ -336,6 +401,7 @@ export class ClubPropsSystem extends createSystem({}) {
   private grab(glass: Glass, hand: Hand, rayObj: import('three').Object3D): void {
     glass.mode = 'held';
     glass.owner = net.myIdx;
+    glass.grounded = false;
     glass.hand = hand;
     glass.ring.length = 0;
     this.setGlow(glass, false);
@@ -370,6 +436,7 @@ export class ClubPropsSystem extends createSystem({}) {
     if (glass.spinAxis.lengthSq() < 1e-6) glass.spinAxis.set(1, 0, 0);
     glass.spinAxis.normalize();
     glass.spin = Math.min(PROP_PHYS.spinMax, speed * PROP_PHYS.spinFromThrow);
+    glass.grounded = false; // thrown, not skidding
     glass.mode = 'flight'; // still mine to simulate — and now catchable
     sendPropRelease(glass.id);
   }
@@ -384,16 +451,46 @@ export class ClubPropsSystem extends createSystem({}) {
     return y;
   }
 
+  /** How far this glass's lowest point sits below its origin right now. */
+  private bottomOffset(glass: Glass): number {
+    _up.set(0, 1, 0).applyQuaternion(glass.refs.root.quaternion);
+    return coupeBottomOffset(_up.y);
+  }
+
+  /**
+   * Flight, SUBSTEPPED. A capped throw crosses 15 cm in a 90 Hz frame while
+   * the landing test only samples where the step ends, so one step per frame
+   * let hard throws pass clean through the edge of the bar. Cap how far any
+   * one step may travel and the glass meets the things it flies into.
+   */
   private stepFlight(glass: Glass, delta: number): void {
+    const frame = Math.min(delta, PROP_PHYS.maxFrame);
+    const reach = glass.vel.length() * frame;
+    const steps = Math.max(1, Math.min(PROP_PHYS.maxSubsteps, Math.ceil(reach / PROP_PHYS.maxStep)));
+    const dt = frame / steps;
+    for (let i = 0; i < steps && glass.mode === 'flight'; i++) this.integrate(glass, dt);
+  }
+
+  private integrate(glass: Glass, delta: number): void {
     const root = glass.refs.root;
     _prev.copy(root.position);
-    glass.vel.y -= PROP_PHYS.gravity * delta;
+    // A grounded glass is SLIDING, not falling: it keeps its footing and
+    // loses speed to the surface instead of to gravity.
+    if (glass.grounded) {
+      const grind = Math.exp(-PROP_PHYS.slideFriction * delta);
+      glass.vel.x *= grind;
+      glass.vel.z *= grind;
+      glass.vel.y = 0;
+    } else {
+      glass.vel.y -= PROP_PHYS.gravity * delta;
+    }
     root.position.addScaledVector(glass.vel, delta);
 
-    // Tumble.
+    // Tumble, bleeding off in the air.
     if (glass.spin > 0.01) {
       _q.setFromAxisAngle(glass.spinAxis, glass.spin * delta);
       root.quaternion.premultiply(_q);
+      glass.spin *= Math.exp(-PROP_PHYS.spinDamp * delta);
     }
 
     // Walls: axis-aligned segments with heights — reflect the crossing
@@ -430,32 +527,42 @@ export class ClubPropsSystem extends createSystem({}) {
       }
     }
 
-    // The ground (or whatever surface is under it). Fall-through gating:
-    // only land when the base was above the surface last frame.
-    const restY = this.restingYAt(root.position.x, root.position.z);
-    if (root.position.y <= restY && _prev.y >= restY - 0.01) {
+    // Glass on glass, before the ground has its say.
+    this.collideGlasses(glass);
+
+    // The ground (or whatever surface is under it). The contact height is
+    // the glass's OWN lowest point, not its origin: the origin sits at the
+    // base, so a tilted coupe would bury its stem and bowl in the floor.
+    const surfaceY = this.restingYAt(root.position.x, root.position.z);
+    const restY = surfaceY - this.bottomOffset(glass);
+    if (root.position.y <= restY && (glass.grounded || _prev.y >= restY - 0.02)) {
       root.position.y = restY;
       const vy = Math.abs(glass.vel.y);
-      if (glass.vel.length() < PROP_PHYS.settleSpeed || vy < 0.5) {
-        glass.mode = 'rest';
-        glass.owner = null;
-        glass.restedAt = this.clock;
-        glass.vel.set(0, 0, 0);
-        glass.spin = 0;
-        sfx.glassTap(false);
-        // The pose sticks room-wide — and frees the glass for anyone.
-        sendPropRest(
-          glass.id,
-          [root.position.x, root.position.y, root.position.z],
-          [root.quaternion.x, root.quaternion.y, root.quaternion.z, root.quaternion.w],
-        );
-      } else {
+      const horiz = Math.hypot(glass.vel.x, glass.vel.z);
+      if (!glass.grounded && (glass.vel.length() >= PROP_PHYS.settleSpeed && vy >= 0.5)) {
+        // Fast enough to come back up: bounce.
         glass.vel.y = vy * PROP_PHYS.restitution;
         glass.vel.x *= 0.7;
         glass.vel.z *= 0.7;
         glass.spin *= 0.6;
         sfx.glassTap(vy > 1.2);
+      } else if (horiz > PROP_PHYS.slideStop) {
+        // Too slow to bounce but still travelling: SKID. This is what
+        // `slideFriction` was always for — a glass that lands on a bar top
+        // carries across it and slows, rather than stopping where it hit.
+        if (!glass.grounded) {
+          glass.grounded = true;
+          glass.vel.y = 0;
+          glass.spin *= 0.4;
+          sfx.glassTap(vy > 1.2);
+        }
+      } else {
+        this.settle(glass);
       }
+    } else if (glass.grounded) {
+      // The floor went out from under a skidding glass — off a table edge,
+      // or over the lip of the terrace. Let it fall.
+      glass.grounded = false;
     } else if (root.position.y < -2) {
       // Fell out of the world somehow — back to the pool.
       glass.mode = 'idle';
@@ -465,13 +572,103 @@ export class ClubPropsSystem extends createSystem({}) {
     }
   }
 
+  /** Done moving: park it, free it, and tell the room where it ended up. */
+  private settle(glass: Glass): void {
+    const root = glass.refs.root;
+    glass.mode = 'rest';
+    glass.owner = null;
+    glass.grounded = false;
+    glass.restedAt = this.clock;
+    glass.vel.set(0, 0, 0);
+    glass.spin = 0;
+    sfx.glassTap(false);
+    // The pose sticks room-wide — and frees the glass for anyone.
+    sendPropRest(
+      glass.id,
+      [root.position.x, root.position.y, root.position.z],
+      [root.quaternion.x, root.quaternion.y, root.quaternion.z, root.quaternion.w],
+    );
+  }
+
+  /**
+   * GLASS ON GLASS. Each glass I simulate is bounced off every other one —
+   * a sphere round each bowl, an equal-mass exchange along the line between
+   * them, and a shove apart so they never share space.
+   *
+   * The struck glass answers too, but only if it's free to: hit something
+   * resting on a table and I CLAIM it (grab, then release, which is the
+   * relay's word for "flying and catchable") so one client owns the new
+   * motion and streams it. A glass in somebody's hand doesn't budge — their
+   * hand outranks my throw — and a glass someone else is already flying is
+   * left to its own owner, who is bouncing it off mine from their side.
+   */
+  private collideGlasses(glass: Glass): void {
+    const root = glass.refs.root;
+    _c1.set(0, PROP_PHYS.bodyY, 0).applyQuaternion(root.quaternion).add(root.position);
+    const minGap = PROP_PHYS.bodyR * 2;
+    for (const other of this.glasses) {
+      if (other === glass || other.mode === 'idle' || other.mode === 'pedestal') continue;
+      const oRoot = other.refs.root;
+      _c2.set(0, PROP_PHYS.bodyY, 0).applyQuaternion(oRoot.quaternion).add(oRoot.position);
+      _v.copy(_c1).sub(_c2);
+      const d = _v.length();
+      if (d >= minGap || d < 1e-5) continue;
+      _v.divideScalar(d); // contact normal, pointing at me
+
+      // Closing speed along the normal (the other's velocity counts only
+      // when it actually has one — a resting glass contributes nothing).
+      const moving = other.mode === 'flight';
+      const rel = glass.vel.dot(_v) - (moving ? other.vel.dot(_v) : 0);
+      const claimable = other.mode === 'rest';
+      const shares = moving || claimable; // can the other take an impulse?
+
+      // Separate first: no two glasses ever occupy the same space.
+      const push = (minGap - d) * (shares ? 0.5 : 1);
+      root.position.addScaledVector(_v, push);
+      if (rel < 0) {
+        // Equal masses: swap the normal component, keeping `restitution`.
+        const j = (shares ? 0.5 : 1) * (1 + PROP_PHYS.glassRestitution) * -rel;
+        glass.vel.addScaledVector(_v, j);
+        if (shares) {
+          if (claimable) this.claimStruck(other);
+          if (other.owner === net.myIdx) {
+            other.refs.root.position.addScaledVector(_v, -push);
+            other.vel.addScaledVector(_v, -j);
+            other.spin = Math.min(PROP_PHYS.spinMax, other.spin + Math.abs(j) * PROP_PHYS.spinFromThrow);
+          }
+        }
+        glass.grounded = false; // a knock lifts it back into the air
+        sfx.glassTap(Math.abs(rel) > 0.8);
+      }
+    }
+  }
+
+  /** A resting glass just got hit: take it over so somebody simulates the
+   *  motion, and let the room know it's live again. */
+  private claimStruck(other: Glass): void {
+    sendPropGrab(other.id);
+    sendPropRelease(other.id);
+    other.mode = 'flight';
+    other.owner = net.myIdx;
+    other.grounded = true; // it was sitting on something; let it skid
+    other.hand = null;
+    other.vel.set(0, 0, 0);
+    other.spinAxis.set(0, 1, 0);
+    this.toGroup(other);
+  }
+
   private stepRest(glass: Glass, delta: number): void {
     const root = glass.refs.root;
     // Ease upright — never snap.
     const k = Math.min(1, PROP_PHYS.uprightEase * delta);
     _q.identity();
     root.quaternion.slerp(_q, k);
-    // Keep glasses from sharing a coaster: gently push apart resting pairs.
+    // Keep glasses from sharing a coaster: gently push apart resting pairs —
+    // but never push one off the shelf it's standing on. Every client runs
+    // this for every resting glass, so it has to stay a pure, identical
+    // nudge; shoving a glass into thin air here would have each client
+    // separately decide it was falling.
+    const surfaceY = this.restingYAt(root.position.x, root.position.z);
     for (const other of this.glasses) {
       if (other === glass || other.mode !== 'rest') continue;
       _v.copy(root.position).sub(other.refs.root.position);
@@ -479,9 +676,20 @@ export class ClubPropsSystem extends createSystem({}) {
       const d = _v.length();
       if (d > 0.001 && d < 0.09) {
         _v.setLength((0.09 - d) * 0.5);
-        root.position.add(_v);
+        const toX = root.position.x + _v.x;
+        const toZ = root.position.z + _v.z;
+        if (this.restingYAt(toX, toZ) >= surfaceY - 0.001) {
+          root.position.x = toX;
+          root.position.z = toZ;
+        }
       }
     }
+    // Stay SEATED through all of that. Righting itself changes which part
+    // of the glass is lowest — a coupe on its side rests on its rim, a
+    // whole bowl-radius higher than one standing on its foot — so the
+    // height has to follow the tilt as it comes up, or the glass rights
+    // itself straight down through the table.
+    root.position.y = this.restingYAt(root.position.x, root.position.z) - this.bottomOffset(glass);
   }
 
   /* ── the wire: the room's glasses, kept true ──────────────────────────── */
@@ -696,6 +904,7 @@ export class ClubPropsSystem extends createSystem({}) {
   /** Out of any hand of mine, glow off, back under the props group. */
   private disown(glass: Glass): void {
     glass.hand = null;
+    glass.grounded = false;
     this.setGlow(glass, false);
     for (const hand of HANDS) {
       if (this.highlight[hand] === glass) this.highlight[hand] = null;
@@ -715,5 +924,8 @@ const _p = new Vector3();
 const _v = new Vector3();
 const _prev = new Vector3();
 const _head = new Vector3();
+const _up = new Vector3();
+const _c1 = new Vector3();
+const _c2 = new Vector3();
 const _q = new Quaternion();
 const _wq = new Quaternion();

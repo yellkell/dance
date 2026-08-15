@@ -56,8 +56,9 @@ const _hand = new Vector3();
 const _c = new Color();
 const _white = new Color(0xffffff);
 
-/** Dev window into the groove: `__gdr.sparkle(heat)` fires a burst off the
- *  right stick so the sparkles can be tuned without dancing for them. */
+/** Dev window into the groove: `__gdr.sparkle(heat)` plays a whole rewarded
+ *  swap off the right stick — flash, shake and sparks — so the answer can be
+ *  tuned without dancing for it. */
 export const grooveView: {
   burst?: (heat?: number) => void;
   /** Getting HIT breaks the hand rhythm — the judge calls this to cut the
@@ -77,6 +78,10 @@ interface Stick {
 const STICK_R = 0.013;
 const STICK_LEN = 0.3;
 const STICK_CASE = 0.007;
+/** Held like a stick: up and slightly forward off the grip. The shake
+ *  wobbles around this, so it has to be a named rest pose rather than a
+ *  number set once at build time. */
+const STICK_TILT = -0.55;
 
 /** One near-black casing material for both hands — never lit, never tinted. */
 let _casingMat: MeshBasicMaterial | null = null;
@@ -219,12 +224,17 @@ export class PlayerSystem extends createSystem({}) {
   private sticks!: Record<'left' | 'right', Stick>;
   private sparks = new SparkPool();
   private stickHue = -1;
+  /** Your seat colour, held so the flash has something to fall back to. */
+  private stickColor = new Color(0xffffff);
+  /** Free-running seconds — the shake's oscillator. */
+  private clock = 0;
 
   init(): void {
     this.sticks = { left: this.buildStick(), right: this.buildStick() };
     this.scene.add(this.sparks.points);
     grooveView.burst = (heat = 1) => {
       const s = this.sticks.right;
+      s.pulse = 1; // the whole reward answer, not just the sparks
       if (s.attachedTo) s.halo.getWorldPosition(_hand);
       else _hand.set(0.25, 1.35, -0.4);
       this.sparks.burst(_hand, Math.min(1, Math.max(0, heat)), hueToColor(danceHue(match.mySeat, true), 0.6));
@@ -271,11 +281,11 @@ export class PlayerSystem extends createSystem({}) {
     core.position.y = 0.02;
     group.add(core);
 
+    group.name = 'live-glowstick';
     const halo = glowSprite(0xffffff, 0.34, 0.55);
     halo.position.y = 0.08;
     group.add(halo);
-    // Held like a stick: up and slightly forward off the grip.
-    group.rotation.x = -0.55;
+    group.rotation.x = STICK_TILT;
     group.position.set(0, 0.01, -0.02);
     return { group, mat, halo, pulse: 0, attachedTo: null };
   }
@@ -307,14 +317,11 @@ export class PlayerSystem extends createSystem({}) {
   private updateSticks(delta: number): void {
     // Your colour: the one you picked, else your seat's (it can change per
     // match online).
+    this.clock += delta;
     const hue = danceHue(match.mySeat, true);
     if (hue !== this.stickHue) {
       this.stickHue = hue;
-      const color = hueToColor(hue, 0.6);
-      for (const hand of ['left', 'right'] as const) {
-        this.sticks[hand].mat.color.setHex(color);
-        (this.sticks[hand].halo.material as SpriteMaterial).color.setHex(color);
-      }
+      this.stickColor.setHex(hueToColor(hue, 0.6));
     }
 
     // The sticks are RING kit. On the club floor your hands are hands —
@@ -323,6 +330,14 @@ export class PlayerSystem extends createSystem({}) {
     const clubFloor =
       (match.screen === 'lobby' || match.screen === 'tour') &&
       (net.phase === 'hosting' || net.phase === 'joined');
+
+    // ONCE THE RECORD DROPS, THE PLASTIC GOES. Through a set you are a
+    // dancer holding two glowsticks, not somebody wearing two controllers:
+    // the moulded grips are hidden for the whole song and handed back at
+    // the podium. Only the controller MODEL goes — tracked hands are your
+    // actual hands and stay, and the pointer's own ray and cursor still
+    // draw, so the pause card is as pokeable as ever.
+    this.showControllers(!(match.screen === 'countdown' || match.screen === 'raid'));
 
     for (const hand of ['left', 'right'] as const) {
       const s = this.sticks[hand];
@@ -334,12 +349,56 @@ export class PlayerSystem extends createSystem({}) {
       }
       s.group.visible = !clubFloor;
       // Brighter the deeper the groove; the pulse pops it on a rewarded swap.
-      s.pulse = Math.max(0, s.pulse - delta * 4);
       const grooveGlow = Math.min(this.streak, 50) / 50;
       s.mat.opacity = 0.7 + grooveGlow * 0.3;
       (s.halo.material as SpriteMaterial).opacity = 0.4 + grooveGlow * 0.3 + s.pulse * 0.5;
       const scale = 1 + s.pulse * 0.5;
       s.group.scale.set(scale, 1 + s.pulse * 0.25, scale);
+
+      // THE KICK. A rewarded swap already threw sparks and ticked the palm;
+      // now the STICK answers too, so the reward reads in the thing you're
+      // actually looking at. Two parts, both riding the same pulse:
+      //
+      //  FLASH — the neon runs hot toward white and falls back to your
+      //    seat colour, the way a tube does when it's struck.
+      //  SHAKE — a short rattle about the grip, squared off the pulse so it
+      //    bites on the beat and is gone before the next one. This is the
+      //    seen half of the haptic tick: the buzz you feel, on the object.
+      //
+      // Deliberately small: the sticks are read in peripheral vision all
+      // set long, and a stick that whips about is a stick you stop trusting
+      // to tell you where your hands are.
+      const flash = s.pulse * s.pulse;
+      s.mat.color.copy(this.stickColor).lerp(_white, flash * 0.55);
+      (s.halo.material as SpriteMaterial).color.copy(this.stickColor).lerp(_white, flash * 0.4);
+      s.group.rotation.x = STICK_TILT + Math.sin(this.clock * 47) * 0.075 * flash;
+      s.group.rotation.z = Math.sin(this.clock * 61 + 1.7) * 0.095 * flash;
+
+      // Decay LAST, and never by more than a frame's worth. Draining the
+      // pulse before drawing with it meant the frame a swap landed on
+      // rendered the stick already half-way home — and a single long frame
+      // (a hitch, a headset waking up) drank the whole kick before it was
+      // ever seen. Set on one frame, shown on that frame.
+      s.pulse = Math.max(0, s.pulse - Math.min(delta, 0.05) * 4);
+    }
+  }
+
+  /**
+   * Show or hide the moulded controller models.
+   *
+   * Written every frame rather than on the edge: the visual is rebuilt
+   * whenever a controller reconnects (or wakes from sleep), and it comes
+   * back visible, so a one-shot hide would quietly undo itself mid-song.
+   * Writing `visible` straight onto the model — instead of the adapter's
+   * own `toggle`, which latches on an internal flag — means a reconnect
+   * can't leave the two disagreeing.
+   */
+  private showControllers(show: boolean): void {
+    const pads = this.input?.xr?.visualAdapters?.controller;
+    if (!pads) return;
+    for (const hand of ['left', 'right'] as const) {
+      const model = pads[hand]?.visual?.model;
+      if (model && model.visible !== show) model.visible = show;
     }
   }
 
