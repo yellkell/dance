@@ -166,19 +166,24 @@ function buildLandings(
     } else {
       // TWIN: two strips shoulder to shoulder, taking one whole side and
       // the middle with them. No corridor, no choice — get across.
-      const s = rng() < 0.5 ? 1 : -1;
+      //
+      // THE BOUNCE: and then it does it again, mirrored, a bar later — and
+      // again after that, back on the side it opened with. Each volley
+      // lands on the ground the one before it chased you onto, so the pair
+      // stops being a shove across the deck and becomes a rally: left,
+      // right, left. The chain always ALTERNATES, so however long it runs
+      // the answer never changes — the strips are coming, go the other way.
       const inner = CHOREO.beamTwinInner;
       const outer = CHOREO.beamTwinInner + halfW * 2 + 0.02;
-      lane(s * inner);
-      lane(s * outer);
-      // THE RETURN: a bar later the same pair lands MIRRORED, on the ground
-      // the first pair just chased you onto. Across, and straight back —
-      // one move that uses the whole width of the deck instead of parking
-      // you on the far side with nothing left to ask.
-      if (rng() < CHOREO.twinReturnChance[Math.min(act, CHOREO.twinReturnChance.length - 1)]) {
-        const back = landBeat + CHOREO.twinReturnBeats;
-        laneAt(back, -s * inner);
-        laneAt(back, -s * outer);
+      const keep = CHOREO.twinReturnChance[Math.min(act, CHOREO.twinReturnChance.length - 1)];
+      let side = rng() < 0.5 ? 1 : -1;
+      lane(side * inner);
+      lane(side * outer);
+      for (let v = 1; v < CHOREO.twinChainMax && rng() < keep; v++) {
+        side = -side as 1 | -1;
+        const at = landBeat + v * CHOREO.twinReturnBeats;
+        laneAt(at, side * inner);
+        laneAt(at, side * outer);
       }
     }
   } else if (kind === 'donut') {
@@ -232,17 +237,21 @@ function buildLandings(
       const halfD = CHOREO.railHalfDepth;
       const inner = CHOREO.railTwinInner;
       const outer = CHOREO.railTwinInner + halfD * 2 + 0.02;
-      const s: 1 | -1 = rng() < 0.5 ? 1 : -1; // +1 floods the back, −1 the front
-      const from: 1 | -1 = rng() < 0.5 ? 1 : -1;
-      const pair = (beat: number, side: number, emitter: 1 | -1) => {
-        landings.push({ beat, zone: { kind: 'rail', z: side * inner, halfD, from: emitter } });
-        landings.push({ beat, zone: { kind: 'rail', z: side * outer, halfD, from: emitter } });
+      let side: 1 | -1 = rng() < 0.5 ? 1 : -1; // +1 floods the back, −1 the front
+      let from: 1 | -1 = rng() < 0.5 ? 1 : -1;
+      const pair = (beat: number, at: number, emitter: 1 | -1) => {
+        landings.push({ beat, zone: { kind: 'rail', z: at * inner, halfD, from: emitter } });
+        landings.push({ beat, zone: { kind: 'rail', z: at * outer, halfD, from: emitter } });
       };
-      pair(landBeat, s, from);
-      if (rng() < CHOREO.twinReturnChance[Math.min(act, CHOREO.twinReturnChance.length - 1)]) {
-        // The answering battery fires from the OTHER rail, so the return
-        // announces itself as a new machine rather than a repeat.
-        pair(landBeat + CHOREO.twinReturnBeats, -s, from === 1 ? -1 : 1);
+      pair(landBeat, side, from);
+      // The same BOUNCE, quarter-turned: back, front, back. Each answering
+      // battery fires from the OTHER rail, so every volley announces itself
+      // as a new machine rather than a repeat of the last one.
+      const keep = CHOREO.twinReturnChance[Math.min(act, CHOREO.twinReturnChance.length - 1)];
+      for (let v = 1; v < CHOREO.twinChainMax && rng() < keep; v++) {
+        side = -side as 1 | -1;
+        from = from === 1 ? -1 : 1;
+        pair(landBeat + v * CHOREO.twinReturnBeats, side, from);
       }
       return landings;
     }

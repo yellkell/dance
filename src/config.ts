@@ -289,7 +289,14 @@ export const CHOREO = {
    *  of strips on the deck to read, and the beat you spend crossing is the
    *  beat you get to read the answer in. */
   twinReturnBeats: 4,
-  twinReturnChance: [0, 0, 0.55, 0.6, 0.65],
+  twinReturnChance: [0, 0, 0.72, 0.78, 0.82],
+  /** How many volleys THE BOUNCE may run to, the opener included. At 3 the
+   *  pattern is across, back, and across again — the third pair lands on
+   *  the side the first one did, so the deck throws you left, right and
+   *  left rather than shunting you over once and letting go. Each extra
+   *  volley costs another bar, and three bars of one idea is the most a
+   *  phrase can carry without becoming the whole phrase. */
+  twinChainMax: 3,
   /** THE X: two beams thrown diagonally through the deck centre at once,
    *  crossing in an X — the safe ground is the four pockets between the
    *  arms, so the dodge reads radial (out of the cross, not off a line).
