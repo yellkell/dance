@@ -132,6 +132,15 @@ function pickKind(
   return pool[0]?.[0] ?? 'beam';
 }
 
+/** THE BOUNCE's two odds, indexed by volley: [_, does it answer, does it
+ *  come back across]. Volley 2 is a shove; volley 3 is the rally, and on
+ *  the expert acts the rally is close to a promise once it has begun. Both
+ *  twins — lateral and vertical — read the same pair. */
+function twinKeep(act: number): number[] {
+  const at = (a: readonly number[]): number => a[Math.min(act, a.length - 1)]!;
+  return [0, at(CHOREO.twinReturnChance), at(CHOREO.twinBounceChance)];
+}
+
 /** Build one move's landings from the seeded rng (seat-local pattern).
  *  `sweptRoutines` is the chart-wide coin for THE SWEPT ROUTINE — rolled
  *  once per song, so some expert nights carry it and some never do. */
@@ -175,11 +184,11 @@ function buildLandings(
       // the answer never changes — the strips are coming, go the other way.
       const inner = CHOREO.beamTwinInner;
       const outer = CHOREO.beamTwinInner + halfW * 2 + 0.02;
-      const keep = CHOREO.twinReturnChance[Math.min(act, CHOREO.twinReturnChance.length - 1)];
+      const keep = twinKeep(act);
       let side = rng() < 0.5 ? 1 : -1;
       lane(side * inner);
       lane(side * outer);
-      for (let v = 1; v < CHOREO.twinChainMax && rng() < keep; v++) {
+      for (let v = 1; v < CHOREO.twinChainMax && rng() < keep[v]; v++) {
         side = -side as 1 | -1;
         const at = landBeat + v * CHOREO.twinReturnBeats;
         laneAt(at, side * inner);
@@ -247,8 +256,8 @@ function buildLandings(
       // The same BOUNCE, quarter-turned: back, front, back. Each answering
       // battery fires from the OTHER rail, so every volley announces itself
       // as a new machine rather than a repeat of the last one.
-      const keep = CHOREO.twinReturnChance[Math.min(act, CHOREO.twinReturnChance.length - 1)];
-      for (let v = 1; v < CHOREO.twinChainMax && rng() < keep; v++) {
+      const keep = twinKeep(act);
+      for (let v = 1; v < CHOREO.twinChainMax && rng() < keep[v]; v++) {
         side = -side as 1 | -1;
         from = from === 1 ? -1 : 1;
         pair(landBeat + v * CHOREO.twinReturnBeats, side, from);

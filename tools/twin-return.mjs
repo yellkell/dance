@@ -32,8 +32,23 @@ const out = await page.evaluate(async () => {
     railTwins: 0, railReturns: 0, railTraps: 0,
     backFirst: 0, frontFirst: 0,
     bouncedBack: 0, chain: {},
+    // DENSITY: what an EXPERT night actually serves up. The correctness
+    // checks above say the bounce is well formed; these say how often a
+    // dancer meets one, which is the only question tuning can answer.
+    byAct: {},
+    byDiff: {},
+    perSong: [],
+    songs: 0, movesTotal: 0, sourceMoves: 0,
     problems: [],
   };
+  const actRow = (a) =>
+    (stats.byAct[a] ??= {
+      twins: 0, one: 0, two: 0, three: 0, source: 0,
+      // The SHAPE CENSUS: raising the twin's share spends someone else's,
+      // so the mix is part of the reading. A deck that only ever throws
+      // twins is as dull as one that never does.
+      single: 0, x: 0, split: 0, trap: 0,
+    });
   const note = (m) => { if (stats.problems.length < 12) stats.problems.push(m); };
 
   // Group a move's landings into volleys by beat.
@@ -55,11 +70,28 @@ const out = await page.evaluate(async () => {
     return false;
   };
 
+  for (let pass = 0; pass <= 3; pass++)
   for (let seed = 1; seed <= 400; seed++) {
-    // difficulty 3 so the late acts (where twins live) are well sampled
-    const set = generateSetlist(seed, 12, [], 3);
+    const set = generateSetlist(seed, 12, [], pass);
+    stats.byDiff[pass] ??= { bounces: 0, none: 0, nights: 0 };
     let park = { x: 0, z: 0 };
+    if (pass === 3) { stats.songs++; stats.movesTotal += set.length; }
+    let songBounces = 0;
     for (const mv of set) {
+      if ((mv.kind === 'beam' || mv.kind === 'cross') && pass === 3) {
+        stats.sourceMoves++;
+        const r = actRow(mv.act);
+        r.source++;
+        const isRail = mv.kind === 'cross';
+        const opening = volleys(mv)[0][1].filter((z) => z.kind === (isRail ? 'rail' : 'lane'));
+        if (opening.length === 1) r.single++;
+        else if (opening.length === 2) {
+          if (opening.some((z) => z.yaw)) r.x++;
+          else if ((isRail ? opening[0].z * opening[1].z : opening[0].x * opening[1].x) < 0) {
+            if (isRail) r.trap++; else r.split++;
+          }
+        }
+      }
       const vs = volleys(mv);
       const parkBefore = park;
       if (mv.kind === 'beam' || mv.kind === 'cross') {
@@ -80,6 +112,11 @@ const out = await page.evaluate(async () => {
           // predecessor parked you on.
           const len = vs.length;
           stats.chain[len] = (stats.chain[len] ?? 0) + 1;
+          const row = pass === 3 ? actRow(mv.act) : { twins: 0, one: 0, two: 0, three: 0 };
+          row.twins++;
+          if (len >= 3) { row.three++; songBounces++; }
+          else if (len === 2) row.two++;
+          else row.one++;
           if (len > CHOREO.twinChainMax) note(`seed ${seed}: chain ran to ${len} volleys`);
           let park = parkBefore;
           for (let v = 0; v < len; v++) {
@@ -114,6 +151,11 @@ const out = await page.evaluate(async () => {
         note(`seed ${seed}: ${mv.kind} parks off-deck ${JSON.stringify(park)}`);
       }
     }
+    const d = stats.byDiff[pass];
+    d.nights++;
+    d.bounces += songBounces;
+    if (!songBounces) d.none++;
+    if (pass === 3) stats.perSong.push(songBounces);
   }
   return stats;
 });
@@ -125,6 +167,40 @@ console.log(`   opened at back  ${out.backFirst}   opened at front ${out.frontFi
 console.log(`crossfire traps    ${out.railTraps}`);
 console.log(`chain lengths      ${Object.entries(out.chain).map(([k, v]) => `${k}-volley: ${v}`).join('   ')}`);
 console.log(`full bounces       ${out.bouncedBack} ran across, back and across again`);
+
+console.log(`\nEXPERT density — ${out.songs} nights, ${out.movesTotal} moves (${out.sourceMoves} beam/cross)`);
+console.log('  act   beam+cross   twins            full 3-volley bounces');
+for (const [a, r] of Object.entries(out.byAct).sort()) {
+  const ofTwins = r.twins ? `${Math.round((r.three / r.twins) * 100)}% of twins` : '—';
+  const ofSource = r.source ? `${Math.round((r.three / r.source) * 100)}% of moves` : '—';
+  console.log(
+    `  ${a}     ${String(r.source).padStart(6)}   ${String(r.twins).padStart(5)} (${pct(r.twins, r.source).padStart(4)})` +
+    `   ${String(r.three).padStart(5)}  ${ofTwins.padEnd(14)} ${ofSource}`,
+  );
+}
+const per = out.perSong;
+const mean = per.reduce((a, b) => a + b, 0) / per.length;
+const hist = {};
+for (const n of per) hist[n] = (hist[n] ?? 0) + 1;
+console.log(`  full bounces per night: mean ${mean.toFixed(2)}`);
+console.log(`  spread: ${Object.entries(hist).sort((a, b) => a[0] - b[0]).map(([k, v]) => `${k}x:${v}`).join('  ')}`);
+console.log(`  nights with none: ${(hist[0] ?? 0)} of ${per.length}`);
+
+console.log('\n  every difficulty — full bounces per night');
+for (const [d, r] of Object.entries(out.byDiff).sort()) {
+  const label = ['EASY', 'NORMAL', 'HARD', 'EXPERT'][d];
+  console.log(
+    `  ${label.padEnd(7)} mean ${(r.bounces / r.nights).toFixed(2)}   ` +
+    `nights with none ${r.none}/${r.nights} (${Math.round((r.none / r.nights) * 100)}%)`,
+  );
+}
+
+console.log('\n  shape census (share of beam+cross moves)');
+console.log('  act    single      X    split     trap     twin');
+for (const [a, r] of Object.entries(out.byAct).sort()) {
+  const f = (n) => pct(n, r.source).padStart(6);
+  console.log(`  ${a}    ${f(r.single)}  ${f(r.x)}  ${f(r.split)}  ${f(r.trap)}  ${f(r.twins)}`);
+}
 if (out.problems.length) {
   console.log('\nPROBLEMS:');
   for (const p of out.problems) console.log('  ' + p);

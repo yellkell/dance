@@ -152,7 +152,10 @@ export const GOOP = {
  *           corridor between them). Deliberate shapes, read at a glance.
  *           A twin usually comes with THE RETURN: a bar after it lands,
  *           the same pair arrives mirrored on the side you just ran to, so
- *           the move walks you across the deck and straight back.
+ *           the move walks you across the deck and straight back. On the
+ *           EXPERT acts the return almost always comes back a third time,
+ *           onto the side it opened on — left, right, left, a rally rather
+ *           than a shove, and the shape those acts are built around.
  *  sweep  : the AIR burns, never the floor — a danger roof overhead with a
  *           blazing limbo line as its underside, a short chevron fringe
  *           dripping off it — get UNDER the line (duck). The deck stays
@@ -274,10 +277,15 @@ export const CHOREO = {
    *     is to stand BETWEEN the lasers.
    *   TWIN — two shoulder to shoulder from beamTwinInner outward, covering
    *     one whole side AND the middle: the answer is to get across.
-   *  The split gets likelier at the peak, where precision is the point. */
+   *  The split owns the middle acts, where precision is the point. It gives
+   *  ground back on the EXPERT acts — not because it stops being good, but
+   *  because the twin is the only double that TRAVELS, and an expert night
+   *  is supposed to move you. It keeps about a tenth of the laser moves
+   *  there, which is often enough that the corridor read stays in the
+   *  vocabulary rather than becoming a surprise. */
   beamSplitX: 0.5,
   beamTwinInner: 0.12,
-  beamSplitChance: [0.4, 0.4, 0.55, 0.55, 0.55],
+  beamSplitChance: [0.4, 0.4, 0.55, 0.47, 0.45],
   /** THE RETURN — the twin's second half, and the set's plainest travel
    *  order: the twin takes one side, and a bar later the SAME pair lands
    *  mirrored on the side you just ran to. Across, and straight back.
@@ -297,6 +305,17 @@ export const CHOREO = {
    *  volley costs another bar, and three bars of one idea is the most a
    *  phrase can carry without becoming the whole phrase. */
   twinChainMax: 3,
+  /** ...and whether it actually gets there. The first roll (twinReturnChance)
+   *  asks "does this twin answer at all"; THIS one asks the different and
+   *  more important question: having answered, does it come back across?
+   *
+   *  They were one number, and that made the two-volley chain — shove you
+   *  over, let go — as likely as the full rally, which is the exact thing
+   *  the bounce was built to stop being. A rally that has started should
+   *  finish, so on the expert acts the third pair is close to a promise.
+   *  Below them it stays a coin, because a floor still learning to read one
+   *  pair does not need three bars of them. */
+  twinBounceChance: [0, 0, 0.72, 0.92, 0.96],
   /** THE X: two beams thrown diagonally through the deck centre at once,
    *  crossing in an X — the safe ground is the four pockets between the
    *  arms, so the dodge reads radial (out of the cross, not off a line).
@@ -410,9 +429,15 @@ export const CHOREO = {
    *
    *  Inner rail centred just past the middle so the pair covers its half
    *  plus a shade over, exactly as the lateral twin does: no corridor, no
-   *  choice, step off it. */
+   *  choice, step off it.
+   *
+   *  On the expert acts it takes most of what the SINGLE rail used to have.
+   *  That's the cheapest trade on the deck: one thin strip across the front
+   *  is the plainest shape in the crossfire's vocabulary, and a floor at
+   *  this act has read it a hundred times. (The trap rolls first and keeps
+   *  its half regardless, so the jaws are untouched.) */
   railTwinInner: 0.11,
-  railTwinChance: [0, 0, 0.4, 0.5, 0.5],
+  railTwinChance: [0, 0, 0.4, 0.72, 0.8],
   /** From this act on, the crossfire lays a stage lane ACROSS the rail: the
    *  safe ground becomes a quarter of the deck and the dodge is diagonal. */
   latticeFromAct: 2,
