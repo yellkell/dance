@@ -74,6 +74,11 @@ const results = await page.evaluate(async () => {
     ['hall → the pocket under the stage', [0, -5.0], [0, -7.0], false],
     ['beside the stage → up onto it', [-3.3, -7.0], onStage, true],
     ['hall → inside the DJ desk', inFrontOfStage, [0, -8.4], false],
+    // The arcade's old plot, north-east, beside the stage.
+    ['hall → the north-east corner', [5.5, -7.5], [7.0, -9.5], true],
+    ['NE corner → back out to the hall', [7.0, -9.5], [5.5, -7.5], true],
+    ['NE corner → the corridor by the stage', [7.0, -9.5], [4.2, -9.5], true],
+    ['NE corner → through the back-bar wall', [7.0, -9.5], [8.9, -9.5], false],
   ];
 
   return cases.map(([name, from, to, want]) => {

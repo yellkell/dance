@@ -40,10 +40,7 @@ await page.waitForTimeout(1500);
 
 /** Query boxes: [label, minX, maxX, minY, maxY, minZ, maxZ] */
 const QUERIES = [
-  ['FANLIGHT field (must hold ONLY the sunburst)', -0.75, 0.75, 2.5, 3.0, 4.6, 5.0],
-  ['ARCADE BOARD (lower edge band)', 8.9, 9.01, 0.9, 1.15, 3.5, 4.6],
-  ['STILL-ROOM BENCH back vs shell (must be empty)', -8.3, -5.3, 0.1, 1.3, -11.5, -11.36],
-  ['STILL-ROOM brass cap', -8.3, -5.3, 1.1, 1.2, -11.4, -9.5],
+  ['NE CORNER — the arcade\'s old plot, beside the DJ booth', 4.7, 9.01, 0, 2.6, -11.5, -8.0],
 ];
 
 // Triangle-level, because the club merges its scenery into a handful of

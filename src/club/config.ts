@@ -224,6 +224,12 @@ export const TELEPORT_AREAS: FloorArea[] = [
   // the strip runs back toward the floor rather than up toward the stage.
   { minX: A.minX + 0.25, maxX: A.maxX - 0.25, minZ: A.minZ + 0.2, maxZ: A.maxZ - 0.25, y: 0 },
   { minX: A.doorX0 + 0.05, maxX: A.doorX1 - 0.05, minZ: A.minZ - 0.75, maxZ: A.minZ + 0.05, y: 0 },
+  // THE NORTH-EAST CORNER — the arcade's old plot. When the arcade moved
+  // to the back-right by the door it left this whole corner behind the
+  // stage's east side standing empty, and nobody had given the floor back:
+  // you could see it, walk the corridor past it, and not stand in it. It
+  // stops short of the back-bar's shelf wall (x 8.72) and the north shell.
+  { minX: 4.85, maxX: 8.45, minZ: -11.2, maxZ: -8.15, y: 0 },
   // The north corridors flanking the stage, and the backstage walk behind
   // it — the whole perimeter is a loop now, not a set of dead ends.
   { minX: -4.85, maxX: -3.45, minZ: -11.3, maxZ: -8.1, y: 0 },

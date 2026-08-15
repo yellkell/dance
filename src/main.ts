@@ -164,6 +164,11 @@ declare global {
       choreo: typeof choreoView;
       /** Fire a glowstick sparkle burst (heat 0..1) for tuning. */
       sparkle: (heat?: number) => void;
+      /** What the controller models are doing (see grooveView.controllers). */
+      pads: () => ReturnType<NonNullable<typeof grooveView.controllers>>;
+      /** The live controller visual adapters — the only handle on the
+       *  hide-for-a-song path off-device. */
+      padAdapters: () => ReturnType<NonNullable<typeof grooveView.padAdapters>>;
       net: {
         host: typeof hostRoom;
         join: typeof joinRoom;
@@ -200,6 +205,8 @@ window.__gdr = {
   arena,
   choreo: choreoView,
   sparkle: (heat = 1) => grooveView.burst?.(heat),
+  pads: () => grooveView.controllers?.() ?? [],
+  padAdapters: () => grooveView.padAdapters?.() ?? null,
   net: {
     host: hostRoom,
     join: joinRoom,

@@ -93,56 +93,26 @@ if (Math.abs(last.rz) > 0.005 || Math.abs(last.rx - out.rest.rx) > 0.005) {
   problems.push(`the shake did not return to rest (rz ${last.rz.toFixed(4)})`);
 }
 
-/* ── the controllers: gone for the song, back afterwards ───────────────── */
+/* ── the controllers ───────────────────────────────────────────────────── */
 
-// Black box on purpose: snapshot which objects under the XR rig are visible
-// in the lobby, then during a song, and diff. Naming the controller models
-// isn't possible — they arrive as anonymous glTF scenes — but a thing that
-// hides exactly when the record drops and returns at the podium is the thing
-// we asked to hide.
-const ctrl = await page.evaluate(async () => {
-  let stick = null;
-  window.__gdr.scene().traverse((o) => { if (!stick && o.name === 'live-glowstick') stick = o; });
-  let rig = stick;
-  for (let i = 0; i < 4 && rig.parent; i++) rig = rig.parent;
-
-  const snap = () => {
-    const m = new Map();
-    rig.traverse((o) => { if (o.isMesh || o.isSkinnedMesh || o.isGroup) m.set(o.uuid, o.visible); });
-    return m;
-  };
-  const frame = () => new Promise((r) => requestAnimationFrame(r));
-
-  window.__gdr.toLobby();
-  for (let i = 0; i < 8; i++) await frame();
-  const before = snap();
-
-  window.__gdr.startRaid({ seats: 1 });
-  for (let i = 0; i < 8; i++) await frame();
-  const during = snap();
-
-  // Back to the foyer for the "after" reading. (endSet() only bites once
-  // the countdown has actually handed over to the live set, so it is the
-  // wrong lever for a test that has only run a handful of frames.)
-  window.__gdr.toLobby();
-  for (let i = 0; i < 8; i++) await frame();
-  const after = snap();
-
-  let hidden = 0;
-  let restored = 0;
-  for (const [id, wasVisible] of before) {
-    if (wasVisible && during.get(id) === false) {
-      hidden++;
-      if (after.get(id) === true) restored++;
-    }
-  }
-  return { hidden, restored, duringScreen: 'countdown', screen: window.__gdr.match.screen };
-});
-
-if (ctrl.hidden === 0) problems.push('nothing under the rig hid when the song started');
-else console.log(`\ncontrollers: ${ctrl.hidden} rig object(s) hidden for the song, ${ctrl.restored} handed back after`);
-if (ctrl.hidden > 0 && ctrl.restored !== ctrl.hidden) {
-  problems.push(`${ctrl.hidden - ctrl.restored} rig object(s) never came back after the set`);
+// NOT VERIFIABLE HERE, and this says so rather than inventing a pass. Plain
+// Chromium ships no controller glTF, so `visual.model` never exists off a
+// headset and there is nothing for the hide to act on. (An earlier version
+// of this check diffed the visibility of everything under the rig, found
+// four unrelated objects that happened to hide, and reported success while
+// the headset still showed controllers all the way through a song.)
+//
+// On-device the one-liner is `__gdr.pads()` — `inRig` is the field that
+// decides what draws.
+const ctrl = await page.evaluate(() => window.__gdr.pads());
+const withModel = ctrl.filter((c) => c.hasVisual);
+if (!withModel.length) {
+  console.log(`\ncontrollers: no glTF in this browser — nothing to hide, check skipped`);
+  console.log(`  (on a headset: __gdr.pads() during a song, expect inRig false)`);
+} else {
+  const stillUp = withModel.filter((c) => c.inRig).map((c) => c.hand);
+  if (stillUp.length) problems.push(`controller model still in the rig during the song: ${stillUp.join(', ')}`);
+  else console.log(`\ncontrollers: ${withModel.length} model(s) lifted out of the rig for the song`);
 }
 
 if (problems.length) {

@@ -64,6 +64,15 @@ export const grooveView: {
   /** Getting HIT breaks the hand rhythm — the judge calls this to cut the
    *  groove streak (and its tally) dead. */
   disrupt?: () => void;
+  /** Dev (`__gdr.pads()`): what the controller models are doing — whether a
+   *  visual exists at all, and whether it's hanging in the rig. `inRig` is
+   *  the one that decides what draws; `visible` is IWSDK's to write and it
+   *  rewrites it every frame. */
+  controllers?: () => Array<{ hand: string; hasVisual: boolean; inRig: boolean; visible: boolean }>;
+  /** Dev: the live controller visual adapters. The headset browsers ship a
+   *  controller glTF and the emulator does not, so this is the only way to
+   *  exercise the hide-during-a-song path anywhere but on-device. */
+  padAdapters?: () => Record<'left' | 'right', { visual?: { model: Object3D } }> | null;
 } = {};
 
 interface Stick {
@@ -228,6 +237,9 @@ export class PlayerSystem extends createSystem({}) {
   private stickColor = new Color(0xffffff);
   /** Free-running seconds — the shake's oscillator. */
   private clock = 0;
+  /** Where each controller model hangs when it's on show, so a song can
+   *  lift it out of the rig and put it back afterwards. */
+  private padHome = new WeakMap<Object3D, Object3D>();
 
   init(): void {
     this.sticks = { left: this.buildStick(), right: this.buildStick() };
@@ -239,6 +251,20 @@ export class PlayerSystem extends createSystem({}) {
       else _hand.set(0.25, 1.35, -0.4);
       this.sparks.burst(_hand, Math.min(1, Math.max(0, heat)), hueToColor(danceHue(match.mySeat, true), 0.6));
     };
+    grooveView.controllers = () =>
+      (['left', 'right'] as const).map((hand) => {
+        const model = this.input?.xr?.visualAdapters?.controller?.[hand]?.visual?.model;
+        return {
+          hand,
+          hasVisual: !!model,
+          inRig: !!model?.parent,
+          visible: model?.visible ?? false,
+        };
+      });
+    grooveView.padAdapters = () =>
+      (this.input?.xr?.visualAdapters?.controller as
+        | Record<'left' | 'right', { visual?: { model: Object3D } }>
+        | undefined) ?? null;
     grooveView.disrupt = () => {
       // A hit knocks the rhythm out of your hands: streak, tally and the
       // metronome pose all reset — the groove restarts from the first swap.
@@ -384,21 +410,32 @@ export class PlayerSystem extends createSystem({}) {
   }
 
   /**
-   * Show or hide the moulded controller models.
+   * Show or hide the moulded controller models — by UNPARENTING them, not
+   * by their `visible` flag.
    *
-   * Written every frame rather than on the edge: the visual is rebuilt
-   * whenever a controller reconnects (or wakes from sleep), and it comes
-   * back visible, so a one-shot hide would quietly undo itself mid-song.
-   * Writing `visible` straight onto the model — instead of the adapter's
-   * own `toggle`, which latches on an internal flag — means a reconnect
-   * can't leave the two disagreeing.
+   * The flag is not ours to hold. IWSDK's input manager assigns
+   * `visual.model.visible = isPrimary` every single frame, so setting it
+   * false here only wins on frames we happen to run last — which is to say
+   * it doesn't win, and the controllers stayed on screen through the song.
+   * Lifting the model out of the scene graph settles it: the input manager
+   * can go on setting `visible` on a detached object all it likes, and
+   * nothing draws.
+   *
+   * Re-checked every frame because a controller that reconnects (or a
+   * headset waking) rebuilds its visual and re-adds it to the rig.
    */
   private showControllers(show: boolean): void {
     const pads = this.input?.xr?.visualAdapters?.controller;
     if (!pads) return;
     for (const hand of ['left', 'right'] as const) {
       const model = pads[hand]?.visual?.model;
-      if (model && model.visible !== show) model.visible = show;
+      if (!model) continue;
+      if (show) {
+        if (!model.parent) (this.padHome.get(model) ?? this.player).add(model);
+      } else if (model.parent) {
+        this.padHome.set(model, model.parent);
+        model.removeFromParent();
+      }
     }
   }
 
