@@ -172,8 +172,11 @@ The law of the land is **three places — where you are is what you're doing**:
    you summon, not furniture blocking the stage.
 3. **THE SET** (game place): the raid, wrapped in THE VOID — an actual
    environment sharing the foyer's language at arena scale. Both interiors
-   pack away; the rig re-plants at the spawn so "my platform IS the world
-   origin" stays true no matter where you teleported. The void ducks with
+   pack away; the rig drops every club offset back to identity, so "my
+   platform IS the world origin" stays true no matter where you teleported
+   — and the platform sits on the same physical spot of your room it held
+   before you went social (a headset recentre, honoured via the reference
+   space's `reset` event, is how you choose a new one). The void ducks with
    the light rig while a telegraph owns your deck — danger never competes
    with scenery.
 

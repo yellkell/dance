@@ -17,8 +17,17 @@
  * it. Arcs can't cut through walls, the bar counter, or the stage face.
  *
  * Active only while the club is the room (menu screens). The moment a set
- * books the floor, the rig is re-planted at the spawn facing the stage —
- * the raid's law is "my platform IS the world origin", and it still is.
+ * books the floor, every club offset is DROPPED and the rig returns to
+ * identity — the raid's law is "my platform IS the world origin", and the
+ * origin is the same physical spot of your room it was before you went
+ * social. Wandering the club never moves your platform: you walk back to
+ * the same real-world centre you set up on, facing the same way.
+ *
+ * A headset RECENTRE (the reference space's `reset` event) is honoured
+ * everywhere: in the club the rig folds the new origin in so you stay
+ * exactly where you stood, and everywhere else the rig snaps to identity —
+ * recentring always means "put me at my platform's centre, facing the
+ * board", never a weird spot at a weird angle.
  */
 
 import { createSystem, InputComponent } from '@iwsdk/core';
@@ -38,7 +47,7 @@ import type { XROrigin } from '@iwsdk/xr-input';
 import { OCTAGON_VERTICES, PALETTE } from '../config.js';
 import { octagonSlab } from '../arena/octagon.js';
 import * as sfx from '../audio/sfx.js';
-import { CLUB, DECOR, TELEPORT, TELEPORT_AREAS, WALL_SEGMENTS, type FloorArea } from '../club/config.js';
+import { DECOR, TELEPORT, TELEPORT_AREAS, WALL_SEGMENTS, type FloorArea } from '../club/config.js';
 import { match } from '../game/state.js';
 import { net } from '../net/session.js';
 
@@ -134,6 +143,27 @@ export class ClubTeleportSystem extends createSystem({}) {
   /** Snap turn fires once per flick: armed again after the stick recentres. */
   private snapArmed = true;
   private wasClub = false;
+  /** The reference space we're watching for `reset` (headset recentre). */
+  private refSpace: XRReferenceSpace | null = null;
+  /** A recentre happened; fold it in on the next tick (see onRecenter). */
+  private recentered = false;
+  private recenterPose = { x: 0, z: 0, yaw: 0, y: 0 };
+
+  /**
+   * A headset recentre fires `reset` BETWEEN frames, before any pose uses
+   * the moved origin — so the head still holds where the player stands in
+   * the world RIGHT NOW. Bank that pose; the next update re-plants on it.
+   */
+  private onRecenter = (): void => {
+    this.player.head.getWorldPosition(_head);
+    this.player.head.getWorldQuaternion(_quat);
+    _dir.set(0, 0, -1).applyQuaternion(_quat);
+    this.recenterPose.x = _head.x;
+    this.recenterPose.z = _head.z;
+    this.recenterPose.yaw = Math.atan2(-_dir.x, -_dir.z);
+    this.recenterPose.y = this.player.position.y;
+    this.recentered = true;
+  };
 
   init(): void {
     // Arc line — a fat world-unit ribbon in club brass (hazard-red when the
@@ -190,20 +220,41 @@ export class ClubTeleportSystem extends createSystem({}) {
   }
 
   update(): void {
+    this.watchRecenter();
+
     // Movement belongs to the SOCIAL place only: the club floor, which is
     // open while a room is (hosting/joined) on a menu screen. The foyer is
     // a front desk, and the raid is your real feet.
     const menuRoom = match.screen === 'lobby' || match.screen === 'tour';
     const inClub = menuRoom && (net.phase === 'hosting' || net.phase === 'joined');
 
-    // Leaving the floor — a set booked it, or you left the room: re-plant
-    // the rig at the spawn, facing the stage. The raid's law is "my
-    // platform IS the world origin", and the foyer stands at the origin.
+    // A recentre moved the reference-space origin under our feet. In the
+    // club, re-plant the rig on the banked pose so you stay exactly where
+    // you stood (the recentre redefines your NEUTRAL, not your spot).
+    // Anywhere else the rig belongs at identity anyway — snap it there, so
+    // recentring lands you dead-centre on your platform facing the board.
+    if (this.recentered) {
+      this.recentered = false;
+      if (inClub) {
+        const p = this.recenterPose;
+        teleportPlayer(this.player, p.x, p.z, p.yaw, p.y);
+      } else {
+        this.player.position.set(0, 0, 0);
+        this.player.rotation.set(0, 0, 0);
+      }
+    }
+
+    // Leaving the floor — a set booked it, or you left the room: drop every
+    // club offset and return the rig to identity. The raid's law is "my
+    // platform IS the world origin", and identity puts that origin back on
+    // the SAME physical spot (and facing) it held before the social hang —
+    // your platform never moves house because you visited the bar.
     if (!inClub) {
       if (this.wasClub) {
         this.wasClub = false;
         this.hide();
-        teleportPlayer(this.player, CLUB.spawn.x, CLUB.spawn.z, 0, 0);
+        this.player.position.set(0, 0, 0);
+        this.player.rotation.set(0, 0, 0);
       }
       return;
     }
@@ -344,6 +395,18 @@ export class ClubTeleportSystem extends createSystem({}) {
       return true;
     }
     return false;
+  }
+
+  /**
+   * Keep a `reset` listener on the session's live reference space (it only
+   * exists once a session is up, and each new session mints a new one).
+   */
+  private watchRecenter(): void {
+    const space = this.renderer.xr.getReferenceSpace();
+    if (space === this.refSpace) return;
+    this.refSpace?.removeEventListener('reset', this.onRecenter);
+    this.refSpace = space;
+    space?.addEventListener('reset', this.onRecenter);
   }
 
   private hide(): void {

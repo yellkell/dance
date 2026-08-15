@@ -44,7 +44,9 @@ export const CLUB = {
    *  the club and the game share a centre of gravity. */
   floor: { x: 0, z: -4.2, r: 4.3 },
 
-  /** Where you arrive (and are re-planted when a set books the room). */
+  /** Where you arrive — the world origin, the same spot the raid puts your
+   *  platform. (When a set books the room the rig simply drops back to
+   *  identity, so no re-plant is needed: the origin IS the spawn.) */
   spawn: { x: 0, z: 0 },
 
   /** The stage: a raised crescent hugging the north wall, DJ console at its
