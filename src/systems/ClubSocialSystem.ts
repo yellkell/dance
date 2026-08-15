@@ -124,6 +124,9 @@ function nameTagTexture(text: string, colorCss: string): CanvasTexture {
  *  without a controller. */
 export const socialView: {
   show?: (on: boolean) => void;
+  /** Is it actually up? `show(true)` off the club floor is refused, so the
+   *  ask and the answer are not the same question. */
+  shown?: () => boolean;
   snapSocial?: () => string;
   snapSongs?: () => string;
   openSongs?: (on: boolean) => void;
@@ -179,6 +182,7 @@ export class ClubSocialSystem extends createSystem({}) {
       if (on) this.place();
       this.paintKey = '';
     };
+    socialView.shown = () => this.panel.isShown;
     socialView.snapSongs = () => (this.songs.ctx().canvas as HTMLCanvasElement).toDataURL('image/png');
     socialView.openSongs = (on) => this.openSongs(on);
     socialView.snapSocial = () => (this.panel.ctx().canvas as HTMLCanvasElement).toDataURL('image/png');
@@ -296,7 +300,12 @@ export class ClubSocialSystem extends createSystem({}) {
 
     // ── the SOCIAL panel ────────────────────────────────────────────────
     this.clock += delta;
-    this.updatePanel(delta, inClub && (inRoom || net.phase === 'off' || net.phase === 'error'));
+    // The panel belongs to the SOCIAL FLOOR and nowhere else. It used to
+    // open with no room too, on the theory that its empty state ("host or
+    // join a room") was a signpost — but the foyer already has the board
+    // for that, so all it did was put a second menu on a button in the
+    // middle of the first one. Off the floor, right Ⓐ does nothing.
+    this.updatePanel(delta, inClub && inRoom);
     const pulse = this.beatPulse();
     this.panel.tick(delta, pulse);
     this.songs.tick(delta, pulse);
