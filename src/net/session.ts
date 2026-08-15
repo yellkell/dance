@@ -24,7 +24,7 @@
  * picker only needs 8 letters per slot) or by URL: ?room=CADA&name=YELL.
  */
 
-import { NET, serverUrl } from '../config.js';
+import { NET, seatHue, serverUrl } from '../config.js';
 import { audioContext, ensureAudio } from '../audio/sfx.js';
 import { clearVoiceSpeakers, removeVoiceSpeaker, stopVoiceCapture } from '../club/voice.js';
 import { startRaid } from '../game/flow.js';
@@ -39,6 +39,10 @@ export interface LobbyMember {
   name: string;
   /** Stable relay member index — club poses and voice are keyed by it. */
   idx: number;
+  /** The colour they picked (hue 0..1), or null for "whatever my slot says".
+   *  It rides the wire so a choice made in the foyer follows its dancer onto
+   *  the club floor; an older relay simply never sends it. */
+  hue?: number | null;
 }
 
 /** THE BALL, while it hangs: who sent it up, on what song, where it floats,
@@ -77,6 +81,7 @@ export const seatByIdx = new Map<number, number>();
 
 let ws: WebSocket | null = null;
 let pingTimer: number | null = null;
+let myHue: number | null = null;
 let myName = 'DANCER';
 
 function send(obj: unknown): void {
@@ -395,16 +400,44 @@ export function setDancerName(name: string): void {
   myName = name.trim().slice(0, 12).toUpperCase() || 'DANCER';
 }
 
+/**
+ * Hand the session the colour this headset dances in (null = the slot's).
+ *
+ * It travels with the greeting that opens or joins a room — and, if a room
+ * is already standing, straight down the wire, since the board is reachable
+ * from the foyer with a room open and the club floor should never show a
+ * dancer a colour they've stopped wearing.
+ *
+ * Only the COLOUR updates this way, not the name: the club's mute and block
+ * lists are keyed by name, so a rename that propagated would shrug off a
+ * block. Renaming stays a between-rooms act.
+ */
+export function setDancerHue(hue: number | null): void {
+  const next = hue === null || !Number.isFinite(hue) ? null : ((hue % 1) + 1) % 1;
+  if (next === myHue) return;
+  myHue = next;
+  if (net.phase === 'hosting' || net.phase === 'joined' || net.phase === 'live') {
+    send({ t: 'hue', hue: myHue });
+  }
+}
+
 export function dancerName(): string {
   return myName;
 }
 
+/** The hue a room-mate wears on the club floor: the colour they chose, or
+ *  their slot's if they never picked one (or the relay is too old to say). */
+export function memberHue(m: LobbyMember): number {
+  const h = m.hue;
+  return h === null || h === undefined || !Number.isFinite(h) ? seatHue(m.idx) : ((h % 1) + 1) % 1;
+}
+
 export function hostRoom(): void {
-  connect(() => send({ t: 'host', name: myName }));
+  connect(() => send({ t: 'host', name: myName, hue: myHue }));
 }
 
 export function joinRoom(code: string): void {
-  connect(() => send({ t: 'join', code: code.toUpperCase(), name: myName }));
+  connect(() => send({ t: 'join', code: code.toUpperCase(), name: myName, hue: myHue }));
 }
 
 export function leaveRoom(): void {

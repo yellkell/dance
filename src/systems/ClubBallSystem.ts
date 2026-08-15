@@ -17,8 +17,9 @@ import { createSystem, InputComponent } from '@iwsdk/core';
 import { Group, Vector3 } from 'three';
 import * as sfx from '../audio/sfx.js';
 import { BALL_TOUCH_RADIUS, buildBallVisual, type BallVisual } from '../club/ball.js';
+import { seatHue } from '../config.js';
 import { match } from '../game/state.js';
-import { cancelBall, joinBall, net } from '../net/session.js';
+import { cancelBall, joinBall, memberHue, net } from '../net/session.js';
 
 const _hand = new Vector3();
 const _cam = new Vector3();
@@ -104,7 +105,12 @@ export class ClubBallSystem extends createSystem({}) {
         joined,
         inReach,
       });
-      v.setPips(joinIdxs);
+      // Pips wear each dancer's own colour, same as their figure across the
+      // floor — a slot's neon only stands in for someone who never picked.
+      v.setPips(joinIdxs.map((idx) => {
+        const m = net.members.find((mm) => mm.idx === idx);
+        return m ? memberHue(m) : seatHue(idx);
+      }));
     }
   }
 

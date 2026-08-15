@@ -146,7 +146,17 @@ import { menuView } from './systems/MenuSystem.js';
 import { socialView } from './systems/ClubSocialSystem.js';
 import { propsView } from './systems/ClubPropsSystem.js';
 import { grooveView } from './systems/PlayerSystem.js';
-import { callBall, cancelBall, hostRoom, joinBall, joinRoom, leaveRoom, net, setDancerName } from './net/session.js';
+import {
+  callBall,
+  cancelBall,
+  hostRoom,
+  joinBall,
+  joinRoom,
+  leaveRoom,
+  net,
+  setDancerHue,
+  setDancerName,
+} from './net/session.js';
 import { clubPoses } from './net/poses.js';
 
 declare global {
@@ -174,6 +184,8 @@ declare global {
         join: typeof joinRoom;
         leave: typeof leaveRoom;
         setName: typeof setDancerName;
+        /** Repaint this headset — pushes to a room already standing. */
+        setHue: typeof setDancerHue;
         state: typeof net;
         poses: typeof clubPoses;
       };
@@ -212,6 +224,7 @@ window.__gdr = {
     join: joinRoom,
     leave: leaveRoom,
     setName: setDancerName,
+    setHue: setDancerHue,
     state: net,
     poses: clubPoses,
   },

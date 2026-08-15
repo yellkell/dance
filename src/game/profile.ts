@@ -78,9 +78,14 @@ export function profileName(): string {
  * should get to be the green one on every stage. Stored as a hue (0..1),
  * null = whatever the seat says.
  *
- * It is a LOCAL preference and does not ride the wire: over in a room, the
- * others still see you in your seat's colour, so nobody can paint
- * themselves the same as the dancer beside them.
+ * It RIDES THE WIRE into the club: the session carries it with the greeting
+ * that opens or joins a room, so your figure and your name tag on the club
+ * floor wear your colour rather than your slot's. Two dancers CAN end up
+ * looking alike that way — the club is a room, not a fight, and being
+ * recognisably yourself matters more there than telling seats apart.
+ *
+ * On the RING, seats still rule for everyone but you: a raid reads at speed
+ * off colour alone, so opponents keep their distinct neons.
  */
 let cachedHue: number | null | undefined;
 

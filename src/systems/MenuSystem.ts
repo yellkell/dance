@@ -64,6 +64,7 @@ import {
   hostRoom,
   joinRoom,
   net,
+  setDancerHue,
   setDancerName,
 } from '../net/session.js';
 import { refreshWorldBoard, scores, worldBoard, type WorldRow } from '../net/scores.js';
@@ -245,9 +246,11 @@ export class MenuSystem extends createSystem({}) {
 
     this.pointers = { left: new PointerRay(this.scene), right: new PointerRay(this.scene) };
 
-    // The stored profile signs the club tag from the first frame; a
-    // ?name= share link may still override the session below.
+    // The stored profile signs the club tag from the first frame — name and
+    // colour both — so a room opened before the board is ever touched still
+    // carries them. A ?name= share link may still override the session below.
     setDancerName(profileName());
+    setDancerHue(profileHue());
 
     menuView.setMode = (m) => {
       this.mode = m === 'join' ? 'multi' : m;
@@ -472,6 +475,9 @@ export class MenuSystem extends createSystem({}) {
       this.colourOpen = false;
     } else if (id === 'cw:done') {
       setProfileHue(this.hueDraft);
+      // The choice travels: the session hands it to the relay with the next
+      // greeting, so the club floor sees you in it too.
+      setDancerHue(profileHue());
       // A live platform is already built in the old colour — rebuild it so
       // the choice shows without leaving the room.
       match.generation++;

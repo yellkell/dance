@@ -33,6 +33,12 @@
  *    'prop-release' marks a throw catchable, and 'prop-rest' parks the
  *    final pose — which is what late joiners get in their 'props' snapshot.
  *    Leavers and dancers dealt onto the ring drop whatever they held.
+ *  - COLOUR: a dancer's chosen hue rides the 'host'/'join' greeting and is
+ *    carried in the roster, so the figure and name tag on the club floor
+ *    wear the colour they picked rather than the one their slot handed out.
+ *    'hue' updates it on a room already standing (the board is reachable
+ *    from the foyer mid-room). Names deliberately do NOT work this way —
+ *    the club's mute/block lists key on them.
  *  - A departing host is replaced by the longest-standing member instead of
  *    folding the party.
  *
@@ -89,7 +95,7 @@ function mintCode() {
 function roster(room) {
   return [...room.members.values()]
     .sort((a, b) => a.idx - b.idx)
-    .map((m) => ({ name: m.name, idx: m.idx }));
+    .map((m) => ({ name: m.name, idx: m.idx, hue: m.hue ?? null }));
 }
 
 function broadcast(room, obj, except = null) {
@@ -327,7 +333,7 @@ wss.on('connection', (ws) => {
           props: freshProps(),
           serveTimer: null,
         };
-        room.members.set(ws, { name: sanitizeName(msg.name), idx: 0, seat: 0 });
+        room.members.set(ws, { name: sanitizeName(msg.name), hue: sanitizeHue(msg.hue), idx: 0, seat: 0 });
         rooms.set(code, room);
         ws.room = code;
         send(ws, { t: 'room', code, host: true, idx: 0 });
@@ -355,7 +361,7 @@ wss.on('connection', (ws) => {
         // The floor is ALWAYS open — a set being away on the ring doesn't
         // bar the door anymore. Latecomers land in the club.
         const idx = Math.max(-1, ...[...room.members.values()].map((m) => m.idx)) + 1;
-        room.members.set(ws, { name: sanitizeName(msg.name), idx, seat: idx });
+        room.members.set(ws, { name: sanitizeName(msg.name), hue: sanitizeHue(msg.hue), idx, seat: idx });
         ws.room = code;
         send(ws, { t: 'room', code, host: false, idx });
         broadcast(room, { t: 'roster', players: roster(room) });
@@ -375,6 +381,20 @@ wss.on('connection', (ws) => {
         if (room.playing.size) send(ws, { t: 'game', players: [...room.playing].sort((a, b) => a - b) });
         // ... and the drinks as they stand: the pedestal, the floor, the air.
         send(ws, { t: 'props', props: snapshotProps(room) });
+        break;
+      }
+
+      // A dancer repainted themselves at the board with the room still
+      // open. Names are fixed at the door (the safety lists key on them);
+      // the colour is free to change and the floor repaints to match.
+      case 'hue': {
+        const room = rooms.get(ws.room);
+        const info = room?.members.get(ws);
+        if (!room || !info) break;
+        const hue = sanitizeHue(msg.hue);
+        if (hue === info.hue) break;
+        info.hue = hue;
+        broadcast(room, { t: 'roster', players: roster(room) });
         break;
       }
 
@@ -565,6 +585,17 @@ wss.on('connection', (ws) => {
 
 function sanitizeName(name) {
   return String(name ?? 'DANCER').replace(/[^\w !?'-]/g, '').slice(0, 12).toUpperCase() || 'DANCER';
+}
+
+// A dancer's chosen colour, as a hue in [0,1). null means "no choice" — the
+// room falls back to the colour of the slot they landed in.
+function sanitizeHue(hue) {
+  // Explicit, because Number(null) is 0 — a dancer handing their colour
+  // back to their slot must not come out painted red.
+  if (hue === null || hue === undefined || hue === '') return null;
+  const h = Number(hue);
+  if (!Number.isFinite(h)) return null;
+  return ((h % 1) + 1) % 1;
 }
 
 // Heartbeat: cull dead sockets so lobbies never wedge on a ghost.

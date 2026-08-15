@@ -28,7 +28,7 @@ import {
   SRGBColorSpace,
   Vector3,
 } from 'three';
-import { PALETTE, hueToColor, seatHue } from '../config.js';
+import { PALETTE, hueToColor } from '../config.js';
 import { glowSprite } from '../materials/glow.js';
 import { trackById } from '../audio/tracks.js';
 import { CLUB } from './config.js';
@@ -73,7 +73,8 @@ export interface BallVisual {
     inReach: boolean;
   }): void;
   /** One orbiting pip per joined dancer, tinted their hue. */
-  setPips(idxs: number[]): void;
+  /** One pip per dancer touched in, each in the hue that dancer wears. */
+  setPips(hues: number[]): void;
   dispose(): void;
 }
 
@@ -186,19 +187,19 @@ export function buildBallVisual(): BallVisual {
     tex.needsUpdate = true;
   };
 
-  const setPips: BallVisual['setPips'] = (idxs) => {
+  const setPips: BallVisual['setPips'] = (hues) => {
     pips.forEach((pip, i) => {
-      const idx = idxs[i];
-      if (idx === undefined) {
+      const hue = hues[i];
+      if (hue === undefined) {
         pip.visible = false;
         return;
       }
-      const a = (i / Math.max(1, idxs.length)) * Math.PI * 2;
+      const a = (i / Math.max(1, hues.length)) * Math.PI * 2;
       pip.position.set(Math.sin(a) * 0.34, 0.02, Math.cos(a) * 0.34);
-      (pip.material as MeshBasicMaterial).color.setHex(hueToColor(seatHue(idx), 0.62));
+      (pip.material as MeshBasicMaterial).color.setHex(hueToColor(hue, 0.62));
       pip.visible = true;
     });
-    pipHolder.visible = idxs.length > 0;
+    pipHolder.visible = hues.length > 0;
   };
 
   return {

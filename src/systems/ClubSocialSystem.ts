@@ -34,7 +34,7 @@ import {
   SRGBColorSpace,
   Vector3,
 } from 'three';
-import { DIFFICULTY, hueToColor, seatHue } from '../config.js';
+import { DIFFICULTY, hueToColor } from '../config.js';
 import * as sfx from '../audio/sfx.js';
 import { preload } from '../audio/music.js';
 import { pickRaidTrack, trackById, tracksFor } from '../audio/tracks.js';
@@ -60,7 +60,17 @@ import {
 import { buildDancer, type DancerPose, type DancerRig } from '../game/avatars.js';
 import { match } from '../game/state.js';
 import { clubPoses, remotePoses } from '../net/poses.js';
-import { callBall, cancelBall, leaveRoom, net, onVoice, seatByIdx, sendClubPose, sendVoice } from '../net/session.js';
+import {
+  callBall,
+  cancelBall,
+  leaveRoom,
+  memberHue,
+  net,
+  onVoice,
+  seatByIdx,
+  sendClubPose,
+  sendVoice,
+} from '../net/session.js';
 import { font } from '../ui/fonts.js';
 import { Panel, UI, type PanelButton } from '../ui/panel.js';
 import { PointerRay } from '../ui/pointer.js';
@@ -79,6 +89,8 @@ const _d = new Vector3();
 interface ClubPuppet {
   idx: number;
   name: string;
+  /** The hue this figure was built in — respawned if their pick changes. */
+  hue: number;
   rig: DancerRig;
   tag: Mesh;
   tagMat: MeshBasicMaterial;
@@ -303,19 +315,25 @@ export class ClubSocialSystem extends createSystem({}) {
   /* ── roster → puppets ─────────────────────────────────────────────────── */
 
   private syncRoster(connected: boolean): void {
-    const key = connected ? net.members.map((m) => `${m.idx}:${m.name}`).join('|') + `#${net.myIdx}` : '';
+    const key = connected
+      ? net.members.map((m) => `${m.idx}:${m.name}:${memberHue(m).toFixed(4)}`).join('|') + `#${net.myIdx}`
+      : '';
     if (key === this.lastRosterKey) return;
     this.lastRosterKey = key;
 
-    const want = new Map<number, string>();
+    // Everyone but me, in the colour they dance in — their own pick if they
+    // made one back in the foyer, otherwise the neon their slot handed out.
+    const want = new Map<number, { name: string; hue: number }>();
     if (connected) {
       for (const m of net.members) {
-        if (m.idx !== net.myIdx) want.set(m.idx, m.name);
+        if (m.idx !== net.myIdx) want.set(m.idx, { name: m.name, hue: memberHue(m) });
       }
     }
-    // Despawn the departed.
+    // Despawn the departed — and anyone whose name or colour changed under
+    // them, since both are baked into the rig and the tag's texture.
     for (const [idx, p] of [...this.puppets]) {
-      if (!want.has(idx)) {
+      const w = want.get(idx);
+      if (!w || w.name !== p.name || Math.abs(w.hue - p.hue) > 1e-4) {
         p.rig.dispose();
         p.tag.removeFromParent();
         p.tagMat.map?.dispose();
@@ -324,10 +342,9 @@ export class ClubSocialSystem extends createSystem({}) {
       }
     }
     // Spawn the new (parked invisible until their first pose arrives).
-    for (const [idx, name] of want) {
+    for (const [idx, { name, hue }] of want) {
       const existing = this.puppets.get(idx);
       if (existing) continue;
-      const hue = seatHue(idx);
       const rig = buildDancer(hue);
       rig.root.visible = false;
       this.crowd.add(rig.root);
@@ -344,6 +361,7 @@ export class ClubSocialSystem extends createSystem({}) {
       this.puppets.set(idx, {
         idx,
         name,
+        hue,
         rig,
         tag,
         tagMat,
@@ -814,7 +832,7 @@ export class ClubSocialSystem extends createSystem({}) {
           g.letterSpacing = '1px';
           g.fillStyle = hidden
             ? UI.faint
-            : `#${hueToColor(seatHue(m.idx), 0.62).toString(16).padStart(6, '0')}`;
+            : `#${hueToColor(memberHue(m), 0.62).toString(16).padStart(6, '0')}`;
           const label = m.name.slice(0, 12);
           g.fillText(label, 28, y);
           g.letterSpacing = '0px';
