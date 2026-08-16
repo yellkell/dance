@@ -530,13 +530,16 @@ export class McSystem extends createSystem({}) {
     const rig = this.rig;
     if (!rig) return;
     const color = warn > 0.5 ? MC.warnColor : this.baseColor;
-    for (const m of rig.accents) {
-      const std = m as MeshStandardMaterial;
+    const drive = 1.1 + warn * 1.5;
+    for (const { mat, gain } of rig.accents) {
+      const std = mat as MeshStandardMaterial;
       if (std.emissive) {
         std.emissive.setHex(color);
-        std.emissiveIntensity = 1.1 + warn * 1.5;
+        // Scaled by the material's authored gain — the suit never outshines
+        // the sticks, warn amber included.
+        std.emissiveIntensity = drive * gain;
       } else {
-        (m as MeshBasicMaterial).color.setHex(color);
+        (mat as MeshBasicMaterial).color.setHex(color);
       }
     }
   }
