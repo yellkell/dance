@@ -197,10 +197,12 @@ There are **three places**, and where you are is what you're doing:
    board and the MC posing. The club's door is the board's MULTIPLAYER
    seat, nothing in the room.
 2. **THE CLUB** — the social place, the warm room between the voids.
-   **HOST / JOIN** (the multiplayer tab's one door) → **HOST** opens a room
-   and hands you a 4-digit code to give your friends (or the
-   `?room=CODE&name=YOU` link) → they pick **JOIN** and type it on the
-   keypad — and your whole room stands in the club together. Every member is a raver figure in
+   Two doors. **ENTER THE CLUB** walks you straight onto the PUBLIC floor —
+   no code, no arranging; the relay puts you wherever the crowd already is.
+   **HOST / JOIN** is the private one: **HOST** opens a room and hands you a
+   4-digit code to give your friends (or the `?room=CODE&name=YOU` link) →
+   they pick **JOIN** and type it on the keypad. Either way your whole room
+   stands in the club together. Every member is a raver figure in
    their join colour with a name tag that swells while they talk. Voice is
    **spatial** (each voice comes from its figure, HRTF + distance falloff)
    and rides the same room socket as Int16 PCM — no SFU, no peer soup, the

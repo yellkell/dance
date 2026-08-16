@@ -124,6 +124,66 @@ function memberByIdx(room, idx) {
   return null;
 }
 
+/** Open a fresh room around `ws`. `isPublic` marks it as somewhere the
+ *  PUBLIC FLOOR door may drop a stranger; private rooms are reachable only
+ *  by their four digits. Returns false if the code space is exhausted. */
+function openRoom(ws, msg, isPublic) {
+  leaveRoom(ws);
+  const code = mintCode();
+  if (!code) return false;
+  const room = {
+    members: new Map(),
+    host: ws,
+    isPublic,
+    ball: null,
+    playing: new Set(),
+    props: freshProps(),
+    serveTimer: null,
+  };
+  room.members.set(ws, { name: sanitizeName(msg.name), hue: sanitizeHue(msg.hue), idx: 0, seat: 0 });
+  rooms.set(code, room);
+  ws.room = code;
+  send(ws, { t: 'room', code, host: true, idx: 0, open: isPublic });
+  send(ws, { t: 'roster', players: roster(room) });
+  // The snapshot doubles as "this relay speaks drinks"; the first coupe
+  // rises on the dumbwaiter's own clock.
+  send(ws, { t: 'props', props: snapshotProps(room) });
+  armServe(code, room);
+  console.log(`[dance-raid] room ${code} opened (${isPublic ? 'public floor' : 'private'})`);
+  return true;
+}
+
+/** Put `ws` into an existing room and catch them up on everything already
+ *  in the air. The caller has checked the room exists and has space. */
+function joinRoomByCode(ws, msg, code) {
+  leaveRoom(ws);
+  const room = rooms.get(code);
+  if (!room) return;
+  // The floor is ALWAYS open — a set being away on the ring doesn't bar
+  // the door. Latecomers land in the club.
+  const idx = Math.max(-1, ...[...room.members.values()].map((m) => m.idx)) + 1;
+  room.members.set(ws, { name: sanitizeName(msg.name), hue: sanitizeHue(msg.hue), idx, seat: idx });
+  ws.room = code;
+  send(ws, { t: 'room', code, host: false, idx, open: Boolean(room.isPublic) });
+  broadcast(room, { t: 'roster', players: roster(room) });
+  // Walk them into whatever is mid-air: a hanging ball, a live game.
+  if (room.ball) {
+    send(ws, {
+      t: 'ball-up',
+      idx: room.ball.caller,
+      name: memberByIdx(room, room.ball.caller)?.[1].name ?? '',
+      track: room.ball.track,
+      diff: room.ball.diff,
+      pos: room.ball.pos,
+      ms: Math.max(500, room.ball.deadline - Date.now()),
+      joins: [...room.ball.joins],
+    });
+  }
+  if (room.playing.size) send(ws, { t: 'game', players: [...room.playing].sort((a, b) => a - b) });
+  // ... and the drinks as they stand: the pedestal, the floor, the air.
+  send(ws, { t: 'props', props: snapshotProps(room) });
+}
+
 function clearBall(room) {
   if (!room.ball) return;
   clearTimeout(room.ball.timer);
@@ -332,68 +392,41 @@ wss.on('connection', (ws) => {
         break;
 
       case 'host': {
-        leaveRoom(ws);
-        const code = mintCode();
-        if (!code) {
-          send(ws, { t: 'err', m: 'no room codes free' });
-          break;
+        if (!openRoom(ws, msg, false)) send(ws, { t: 'err', m: 'no room codes free' });
+        break;
+      }
+
+      // THE PUBLIC FLOOR. No code, no arranging: put me wherever the
+      // strangers are. The relay walks you into the FULLEST public room
+      // with space — clustering, not scattering, because one club with
+      // nine people in it is a night out and three clubs with three each
+      // is three lonely rooms. If none has room, it opens a fresh one.
+      case 'public': {
+        let best = null;
+        let bestSize = -1;
+        for (const [code, room] of rooms) {
+          if (!room.isPublic || room.members.size >= MAX_ROOM) continue;
+          if (room.members.size > bestSize) {
+            bestSize = room.members.size;
+            best = code;
+          }
         }
-        const room = {
-          members: new Map(),
-          host: ws,
-          ball: null,
-          playing: new Set(),
-          props: freshProps(),
-          serveTimer: null,
-        };
-        room.members.set(ws, { name: sanitizeName(msg.name), hue: sanitizeHue(msg.hue), idx: 0, seat: 0 });
-        rooms.set(code, room);
-        ws.room = code;
-        send(ws, { t: 'room', code, host: true, idx: 0 });
-        send(ws, { t: 'roster', players: roster(room) });
-        // The snapshot doubles as "this relay speaks drinks"; the first
-        // coupe rises on the dumbwaiter's own clock.
-        send(ws, { t: 'props', props: snapshotProps(room) });
-        armServe(code, room);
-        console.log(`[dance-raid] room ${code} opened`);
+        if (best) joinRoomByCode(ws, msg, best);
+        else if (!openRoom(ws, msg, true)) send(ws, { t: 'err', m: 'no room codes free' });
         break;
       }
 
       case 'join': {
-        leaveRoom(ws);
         const code = String(msg.code ?? '').toUpperCase();
-        const room = rooms.get(code);
-        if (!room) {
+        if (!rooms.has(code)) {
           send(ws, { t: 'err', m: 'no such room' });
           break;
         }
-        if (room.members.size >= MAX_ROOM) {
+        if (rooms.get(code).members.size >= MAX_ROOM) {
           send(ws, { t: 'err', m: 'room is full' });
           break;
         }
-        // The floor is ALWAYS open — a set being away on the ring doesn't
-        // bar the door anymore. Latecomers land in the club.
-        const idx = Math.max(-1, ...[...room.members.values()].map((m) => m.idx)) + 1;
-        room.members.set(ws, { name: sanitizeName(msg.name), hue: sanitizeHue(msg.hue), idx, seat: idx });
-        ws.room = code;
-        send(ws, { t: 'room', code, host: false, idx });
-        broadcast(room, { t: 'roster', players: roster(room) });
-        // Walk them into whatever is mid-air: a hanging ball, a live game.
-        if (room.ball) {
-          send(ws, {
-            t: 'ball-up',
-            idx: room.ball.caller,
-            name: memberByIdx(room, room.ball.caller)?.[1].name ?? '',
-            track: room.ball.track,
-            diff: room.ball.diff,
-            pos: room.ball.pos,
-            ms: Math.max(500, room.ball.deadline - Date.now()),
-            joins: [...room.ball.joins],
-          });
-        }
-        if (room.playing.size) send(ws, { t: 'game', players: [...room.playing].sort((a, b) => a - b) });
-        // ... and the drinks as they stand: the pedestal, the floor, the air.
-        send(ws, { t: 'props', props: snapshotProps(room) });
+        joinRoomByCode(ws, msg, code);
         break;
       }
 

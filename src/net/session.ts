@@ -67,6 +67,10 @@ export const net = {
   code: '',
   members: [] as LobbyMember[],
   isHost: false,
+  /** Is this a PUBLIC room (strangers may walk in) or a private one behind
+   *  its four digits? The floor reads the same either way; the difference
+   *  is only whether the code is a door or just an address. */
+  isPublic: false,
   /** My own relay member index (−1 until the room hands it over). */
   myIdx: -1,
   /** The raid-summoning ball currently in the air, or null. */
@@ -164,6 +168,7 @@ function teardown(reason: string): void {
   net.code = '';
   net.members = [];
   net.isHost = false;
+  net.isPublic = false;
   net.myIdx = -1;
   net.ball = null;
   net.gamePlayers = new Set();
@@ -224,6 +229,7 @@ function handle(msg: Record<string, unknown>): void {
       const wasLive = net.phase === 'live';
       net.phase = wasLive ? 'live' : msg.host ? 'hosting' : 'joined';
       net.isHost = Boolean(msg.host);
+      net.isPublic = Boolean(msg.open);
       net.code = String(msg.code ?? net.code);
       if (Number.isFinite(Number(msg.idx))) net.myIdx = Number(msg.idx);
       net.dirty++;
@@ -438,6 +444,14 @@ export function memberHue(m: LobbyMember): number {
 
 export function hostRoom(): void {
   connect(() => send({ t: 'host', name: myName, hue: myHue }));
+}
+
+/** THE PUBLIC FLOOR: no code, no arranging — the relay drops you into
+ *  whichever public room has the most people and still has space, or opens
+ *  a fresh one if none does. The other door (host/join with a 4-digit
+ *  code) is for a room you want to keep to your friends. */
+export function enterPublicRoom(): void {
+  connect(() => send({ t: 'public', name: myName, hue: myHue }));
 }
 
 export function joinRoom(code: string): void {

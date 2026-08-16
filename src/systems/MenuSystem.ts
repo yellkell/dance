@@ -60,6 +60,7 @@ import {
 } from '../game/state.js';
 import {
   autoJoinFromUrl,
+  enterPublicRoom,
   hostRoom,
   joinRoom,
   leaveRoom,
@@ -568,6 +569,10 @@ export class MenuSystem extends createSystem({}) {
         /* fine */
       }
       preload(trackById(picked) ?? pickRaidTrack(match.seed));
+    } else if (id === 'club') {
+      // Straight through — no code to read, so nothing to hold the foyer
+      // for. The relay puts you wherever the crowd already is.
+      enterPublicRoom();
     } else if (id === 'rooms') {
       this.multiPage = 'pick';
     } else if (id === 'host') {
@@ -1811,19 +1816,30 @@ export class MenuSystem extends createSystem({}) {
 
   private multiContent(buttons: PanelButton[]): void {
     const connecting = net.phase === 'connecting';
-    // THE DOOR. One way in, and it says both things it does — a board that
-    // offered ENTER THE CLUB beside JOIN A ROOM was offering the same verb
-    // twice, since entering the club IS opening a room with a code.
+    // TWO DOORS, and they are genuinely different rooms — which is what
+    // the old pair got wrong (both of them hosted). The top one is the
+    // PUBLIC floor: press it and you are in, wherever the strangers are.
+    // The second is for a room you keep to yourselves.
     buttons.push({
-      id: 'rooms',
-      label: 'HOST / JOIN',
-      sub: 'the social floor · open a room, or type a friend\'s code',
+      id: 'club',
+      label: 'ENTER THE CLUB',
+      sub: 'the public floor · walk in, anyone can join you',
       primary: true,
       disabled: connecting,
       x: CONTENT_X,
-      y: 300,
+      y: 210,
       w: CONTENT_W,
-      h: 240,
+      h: 230,
+    });
+    buttons.push({
+      id: 'rooms',
+      label: 'HOST / JOIN',
+      sub: 'a private room · a 4-digit code only your friends have',
+      disabled: connecting,
+      x: CONTENT_X,
+      y: 478,
+      w: CONTENT_W,
+      h: 230,
     });
   }
 

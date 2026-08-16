@@ -29,6 +29,7 @@ import { ClubTeleportSystem } from './systems/ClubTeleportSystem.js';
 import { DiscoSystem } from './systems/DiscoSystem.js';
 import { GoopliathSystem } from './systems/GoopliathSystem.js';
 import { HudSystem } from './systems/HudSystem.js';
+import { IntroSystem, introView } from './systems/IntroSystem.js';
 import { McSystem } from './systems/McSystem.js';
 import { MenuSystem } from './systems/MenuSystem.js';
 import { MusicSystem } from './systems/MusicSystem.js';
@@ -46,6 +47,9 @@ enterButton?.setAttribute('disabled', '');
 
 function hideLanding(): void {
   document.body.classList.add('app-entered');
+  // House lights down: the title card plays on the inside of the headset,
+  // cued by the same moment the web page gets out of the way.
+  introView.begin?.();
 }
 
 function showLanding(): void {
@@ -103,6 +107,8 @@ World.create(container, {
   world.registerSystem(HudSystem);
   world.registerSystem(MenuSystem);
   world.registerSystem(NetworkSystem);
+  // Last, so its blackout is built after everything it covers.
+  world.registerSystem(IntroSystem);
 
   const xrSupported =
     (await navigator.xr?.isSessionSupported(SessionMode.ImmersiveVR).catch(() => false)) === true;
@@ -202,6 +208,8 @@ declare global {
       rig: (x: number, z: number, yaw?: number, y?: number) => void;
       /** The live scene graph — headless probes walk it by name. */
       scene: () => import('three').Scene | null;
+      /** The title card, for captures that need to know where the show is. */
+      intro: typeof introView;
     };
   }
 }
@@ -231,6 +239,7 @@ window.__gdr = {
     poses: clubPoses,
   },
   club: { call: callBall, touch: joinBall, cancel: cancelBall },
+  intro: introView,
   props: propsView,
   menu: new Proxy({} as typeof menuView & typeof socialView, {
     // The views are populated in each system's init — resolve lazily.
