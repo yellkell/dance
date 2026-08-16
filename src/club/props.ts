@@ -4,14 +4,9 @@
  * The interaction feel is FIRE FIGHT's pub, carried over: a fat invisible
  * grab proxy so a slim coupe is never fiddly to catch, a forgiving
  * aim-cone range grab, a five-frame ring buffer turning real hand motion
- * into throw velocity, and per-surface landing. No physics engine — a few
+ * into throw velocity, per-surface landing, and a settle that eases a
+ * tilted glass upright instead of snapping it. No physics engine — five
  * cheap tricks that read as one expensive one.
- *
- * A glass lands how it lands. It used to right itself where it fell, which
- * kept the club tidy and made the props feel like set dressing rather than
- * objects; now a thrown coupe lies on its rim exactly as it came down. The
- * surfaces it can land on include OTHER GLASSES' rims, so a steady hand can
- * stack them.
  *
  * Geometry: the coupe is the booths' decorative glass, sized for a hand,
  * with a cocktail in it (a magenta fill that empties when you drink).
@@ -70,20 +65,16 @@ export const PROP_PHYS = {
   bodyR: 0.072,
   /** Energy kept when two glasses meet (they ring more than they stick). */
   glassRestitution: 0.45,
-  /* ── STACKING ──
-   * A coupe's rim is a landing pad: set one down square on another and the
-   * foot sits in the bowl, which is how a bartender stacks them and how
-   * anyone who wants a tower is going to try. Three numbers make it a
-   * skill rather than a magnet. */
-  /** Rim height and radius above the glass's own base. */
-  rimY: 0.187,
-  rimR: 0.066,
-  /** How near the lower glass's axis your foot has to land. Under the rim
-   *  radius on purpose: catch it dead centre or it goes to the table. */
-  stackR: 0.045,
-  /** How square the glass underneath has to be standing (world-Y of its own
-   *  up axis). Nothing balances on one lying on its side. */
-  stackCos: 0.96,
+  /** How fast a settled glass eases upright (per second).
+   *
+   *  This came out once, to see whether a coupe could be left lying where it
+   *  fell and whether two of them could be stacked. Both worked exactly as
+   *  built and both were wrong in the hand: without a physics engine there
+   *  is no friction to hold a rim on a rim, so every attempt at a tower was
+   *  a pile sliding apart, and every slide rang the glass-on-glass tap —
+   *  a dozen at once. A stack you cannot build is worse than no stack, and
+   *  the noise made it unmistakable. */
+  uprightEase: 6,
 } as const;
 
 /**

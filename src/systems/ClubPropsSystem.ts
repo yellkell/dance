@@ -91,24 +91,29 @@ const STREAM_S = 0.05;
 const NET_EASE = 18;
 
 /**
- * A drink in somebody's hand, in WORLD space, keyed by the holder's member
- * idx — republished every frame the floor is live.
+ * Every glass that's out, in WORLD space — republished each frame the floor
+ * is live.
  *
- * This exists for THE MIRROR. The glass is the one thing you carry, and the
- * pier glass casts bodies only, so walking up to it with a drink used to
- * show you a reflection miming an empty grip. The mirror can't reach into
- * this system's private pool (a held glass is parented to a controller, a
- * room-mate's is easing toward a streamed pose), so the pose it needs is
- * resolved to world here, once, where it's already known.
+ * This exists for THE MIRROR, which casts bodies only and so used to show
+ * you a reflection miming an empty grip. It can't reach into this system's
+ * private pool for the pose: a glass in your own hand is parented to a
+ * controller, and a room-mate's is easing toward a streamed one. Both are
+ * resolved to world here, once, where they're already known.
+ *
+ * A LIST, not a map by holder. Keying it by who was carrying it meant one
+ * drink each — so a second glass, or one set down on the ledge while three
+ * of you posed, simply wasn't in the reflection.
  */
-export interface HeldDrink {
+export interface GlassView {
+  id: number;
   pos: Vector3;
   quat: Quaternion;
-  hand: Hand;
   /** Still has a cocktail in it — drink it and the fill goes. */
   full: boolean;
+  /** Member idx of whoever is carrying it, or null if it's standing free. */
+  heldBy: number | null;
 }
-export const heldDrinks = new Map<number, HeldDrink>();
+export const liveGlasses: GlassView[] = [];
 
 type Mode = 'idle' | 'pedestal' | 'held' | 'flight' | 'rest';
 
@@ -132,9 +137,6 @@ interface Glass {
   ring: { pos: Vector3; t: number }[];
   /** Age counter for recycling the oldest resting glass. */
   restedAt: number;
-  /** Downward speed while a resting glass sinks after whatever it was
-   *  balanced on got picked up. Zero whenever it is properly seated. */
-  sink: number;
   /** The owner's streamed pose (world), and when it last arrived. */
   netPos: Vector3;
   netQuat: Quaternion;
@@ -178,12 +180,13 @@ export class ClubPropsSystem extends createSystem({}) {
    *  so a headless grab would last exactly one frame without this. Empty in
    *  real play. */
   private devGrip = new Set<Hand>();
-  /** One reusable HeldDrink per pool slot — see publishHeld(). */
-  private heldRecs: HeldDrink[] = Array.from({ length: POOL }, () => ({
+  /** One reusable GlassView per pool slot — see publishLive(). */
+  private views: GlassView[] = Array.from({ length: POOL }, (_, id) => ({
+    id,
     pos: new Vector3(),
     quat: new Quaternion(),
-    hand: 'right' as Hand,
     full: true,
+    heldBy: null as number | null,
   }));
   private plate!: Mesh;
   private waiterPhase: WaiterPhase = 'down';
@@ -231,7 +234,6 @@ export class ClubPropsSystem extends createSystem({}) {
         full: true,
         ring: [],
         restedAt: 0,
-        sink: 0,
         netPos: new Vector3(),
         netQuat: new Quaternion(),
         netAt: 0,
@@ -255,9 +257,7 @@ export class ClubPropsSystem extends createSystem({}) {
           grounded: g.grounded,
           pos: [p.x, p.y, p.z] as [number, number, number],
           vel: [g.vel.x, g.vel.y, g.vel.z] as [number, number, number],
-          // Against whatever is really under it, another glass's rim
-          // included — a stacked glass reads seated, not floating.
-          clearance: p.y + drop - this.supportYAt(g, p.x, p.z, p.y + drop),
+          clearance: p.y + drop - this.restingYAt(p.x, p.z),
           /** World-Y of the glass's own up axis: 1 standing, 0 on its side. */
           upright: _up.y,
         };
@@ -334,24 +334,24 @@ export class ClubPropsSystem extends createSystem({}) {
       }
     }
 
-    this.publishHeld();
+    this.publishLive();
   }
 
   /**
-   * Who is holding what, resolved to world space for the mirror. Rebuilt in
-   * place — the records are allocated once per pool slot and re-filled, so a
-   * per-frame publish costs no garbage.
+   * Every glass that's out, resolved to world space for the mirror. Rebuilt
+   * in place — the records are allocated once per pool slot and re-filled,
+   * so a per-frame publish costs no garbage.
    */
-  private publishHeld(): void {
-    heldDrinks.clear();
+  private publishLive(): void {
+    liveGlasses.length = 0;
     for (const glass of this.glasses) {
-      if (glass.mode !== 'held' || glass.owner === null || !glass.hand) continue;
-      const rec = this.heldRecs[glass.id];
+      if (glass.mode === 'idle') continue;
+      const rec = this.views[glass.id];
       glass.refs.root.getWorldPosition(rec.pos);
       glass.refs.root.getWorldQuaternion(rec.quat);
-      rec.hand = glass.hand;
       rec.full = glass.full;
-      heldDrinks.set(glass.owner, rec);
+      rec.heldBy = glass.mode === 'held' ? glass.owner : null;
+      liveGlasses.push(rec);
     }
   }
 
@@ -371,7 +371,7 @@ export class ClubPropsSystem extends createSystem({}) {
     this.plate.position.y = WAITER.top - WAITER.drop;
     this.highlight = {};
     this.group.visible = false;
-    heldDrinks.clear();
+    liveGlasses.length = 0;
   }
 
   /** Dealt onto the ring mid-drink: nothing rides the controllers into the
@@ -550,34 +550,6 @@ export class ClubPropsSystem extends createSystem({}) {
     return y;
   }
 
-  /**
-   * The highest thing `glass` may come to rest on at (x, z) — the room's
-   * surfaces, or ANOTHER GLASS'S RIM.
-   *
-   * `lowest` is where the glass's own bottom is right now, and a rim only
-   * counts if it is at or below that: a glass never reaches UP for a
-   * platform, which is what stops two of them lifting each other and what
-   * keeps a tower resolving from the table upward. Only a glass standing
-   * square (stackCos) offers a rim at all — nothing balances on one lying
-   * on its side — and your foot has to come down inside stackR of its axis.
-   *
-   * Every client runs this over wire-synced resting poses, so they all
-   * agree about what is holding what up without a word passing between them.
-   */
-  private supportYAt(glass: Glass, x: number, z: number, lowest: number): number {
-    let y = this.restingYAt(x, z);
-    for (const other of this.glasses) {
-      if (other === glass || other.mode !== 'rest') continue;
-      const o = other.refs.root;
-      if (Math.hypot(o.position.x - x, o.position.z - z) > PROP_PHYS.stackR) continue;
-      _up.set(0, 1, 0).applyQuaternion(o.quaternion);
-      if (_up.y < PROP_PHYS.stackCos) continue;
-      const rim = o.position.y + PROP_PHYS.rimY * _up.y;
-      if (rim > y && rim <= lowest + 0.004) y = rim;
-    }
-    return y;
-  }
-
   /** How far this glass's lowest point sits below its origin right now. */
   private bottomOffset(glass: Glass): number {
     _up.set(0, 1, 0).applyQuaternion(glass.refs.root.quaternion);
@@ -660,13 +632,8 @@ export class ClubPropsSystem extends createSystem({}) {
     // The ground (or whatever surface is under it). The contact height is
     // the glass's OWN lowest point, not its origin: the origin sits at the
     // base, so a tilted coupe would bury its stem and bowl in the floor.
-    const drop = this.bottomOffset(glass);
-    // Ask from where the glass WAS at the top of this substep, not from where
-    // it has already fallen to. By the time the step ends it is a centimetre
-    // BELOW the rim it is landing on, and a support test taken there rejects
-    // that rim as "above me" — which is exactly the frame the rim is wanted.
-    const surfaceY = this.supportYAt(glass, root.position.x, root.position.z, _prev.y + drop);
-    const restY = surfaceY - drop;
+    const surfaceY = this.restingYAt(root.position.x, root.position.z);
+    const restY = surfaceY - this.bottomOffset(glass);
     if (root.position.y <= restY && (glass.grounded || _prev.y >= restY - 0.02)) {
       root.position.y = restY;
       const vy = Math.abs(glass.vel.y);
@@ -791,10 +758,11 @@ export class ClubPropsSystem extends createSystem({}) {
 
   private stepRest(glass: Glass, delta: number): void {
     const root = glass.refs.root;
-    // A glass lands how it lands. There WAS an upright ease here, quietly
-    // standing every fallen coupe back on its foot — tidy, and the single
-    // biggest reason the drinks read as scenery rather than as objects.
-    //
+    // Ease upright — never snap. (Leaving a glass lying where it fell was
+    // tried and taken back out: see PROP_PHYS.uprightEase.)
+    const k = Math.min(1, PROP_PHYS.uprightEase * delta);
+    _q.identity();
+    root.quaternion.slerp(_q, k);
     // Keep glasses from sharing a coaster: gently push apart resting pairs —
     // but never push one off the shelf it's standing on. Every client runs
     // this for every resting glass, so it has to stay a pure, identical
@@ -803,9 +771,6 @@ export class ClubPropsSystem extends createSystem({}) {
     const surfaceY = this.restingYAt(root.position.x, root.position.z);
     for (const other of this.glasses) {
       if (other === glass || other.mode !== 'rest') continue;
-      // …and never separate a STACK. Two glasses a rim apart are meant to be
-      // sharing a footprint; only ones at the same height are crowding.
-      if (Math.abs(other.refs.root.position.y - root.position.y) > PROP_PHYS.rimY * 0.6) continue;
       _v.copy(root.position).sub(other.refs.root.position);
       _v.y = 0;
       const d = _v.length();
@@ -819,28 +784,12 @@ export class ClubPropsSystem extends createSystem({}) {
         }
       }
     }
-    // Stay SEATED through all of that. Which part of a glass is lowest
-    // depends on its tilt — a coupe on its side rests on its rim, a whole
-    // bowl-radius higher than one standing on its foot — so the height
-    // follows the tilt, or a fallen glass sits down through the table.
-    const drop = this.bottomOffset(glass);
-    const restY = this.supportYAt(glass, root.position.x, root.position.z, root.position.y + drop) - drop;
-    if (root.position.y > restY + 0.0005) {
-      // The floor went out from under it: somebody lifted the glass it was
-      // balanced on. It SINKS, at gravity's pace, rather than teleporting —
-      // and because every client computes the same support from the same
-      // synced poses, they all watch the same tower come down without a
-      // single message about it.
-      glass.sink = Math.min(4, glass.sink + PROP_PHYS.gravity * delta);
-      root.position.y = Math.max(restY, root.position.y - glass.sink * delta);
-      if (root.position.y <= restY + 1e-6) {
-        glass.sink = 0;
-        sfx.glassTap(false);
-      }
-    } else {
-      root.position.y = restY;
-      glass.sink = 0;
-    }
+    // Stay SEATED through all of that. Righting itself changes which part
+    // of the glass is lowest — a coupe on its side rests on its rim, a
+    // whole bowl-radius higher than one standing on its foot — so the
+    // height has to follow the tilt as it comes up, or the glass rights
+    // itself straight down through the table.
+    root.position.y = this.restingYAt(root.position.x, root.position.z) - this.bottomOffset(glass);
   }
 
   /* ── the wire: the room's glasses, kept true ──────────────────────────── */
