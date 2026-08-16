@@ -59,10 +59,11 @@ import {
   tourNightUnlocked,
 } from '../game/state.js';
 import {
-  CODE_ALPHABET,
   autoJoinFromUrl,
+  enterPublicRoom,
   hostRoom,
   joinRoom,
+  leaveRoom,
   net,
   setDancerHue,
   setDancerName,
@@ -183,10 +184,16 @@ export class MenuSystem extends createSystem({}) {
   private hits: Intersection[] = [];
   private hover: string | null = null;
   private lastKey = '';
-  private joinMode = false;
+  /** Where the MULTIPLAYER tab is standing:
+   *   'door' — one button, HOST / JOIN (the tab's landing)
+   *   'pick' — which of the two you want
+   *   'host' — your new room's code, to read out to your friends
+   *   'join' — the keypad you type theirs into  */
+  private multiPage: 'door' | 'pick' | 'host' | 'join' = 'door';
   /** Which in-panel mode the lobby board shows (TOUR is its own screen). */
   private mode: 'play' | 'multi' | 'sys' = 'play';
-  private joinCode = [0, 0, 0, 0];
+  /** Digits typed into the keypad so far (0-4 of them). */
+  private joinDigits = '';
   private lastNetDirty = -1;
   private clock = 0;
   /** The rail marker slides between tabs instead of teleporting: current
@@ -254,7 +261,7 @@ export class MenuSystem extends createSystem({}) {
 
     menuView.setMode = (m) => {
       this.mode = m === 'join' ? 'multi' : m;
-      this.joinMode = m === 'join';
+      this.multiPage = m === 'join' ? 'join' : 'door';
       this.profileOpen = false;
       this.keyboardOpen = false;
       if (match.screen !== 'lobby') toLobby();
@@ -321,8 +328,15 @@ export class MenuSystem extends createSystem({}) {
     // THE CLUB keeps no front desk: with a room open you're standing on the
     // social floor, and the floor's controls live on the SOCIAL panel
     // (right Ⓐ). The board belongs to the foyer.
-    const social = net.phase === 'hosting' || net.phase === 'joined';
-    const boardUp = menuRoom && !social;
+    const social = (net.phase === 'hosting' || net.phase === 'joined') && !match.holdFoyer;
+    // `introUp`: the title card is still opaque and the board is sitting
+    // right behind it. Holding it down until the black starts lifting does
+    // two things at once — it takes no rays and no clicks while nobody can
+    // see it, and its own show animation then runs WITH the reveal, so the
+    // board fades up as the black goes. (It keeps REPAINTING throughout —
+    // repaintIfNeeded doesn't read this — so it is finished and correct on
+    // the frame it appears.)
+    const boardUp = menuRoom && !social && !match.introUp;
     const exitUp = screen === 'podium';
     this.board.setShown(boardUp);
     this.exit.setShown(exitUp);
@@ -496,18 +510,18 @@ export class MenuSystem extends createSystem({}) {
       if (this.nameDraft.length < NAME_MAX) this.nameDraft += id.slice(3);
     } else if (id === 'tab-play') {
       this.mode = 'play';
-      this.joinMode = false;
+      this.leaveMulti();
       if (match.screen !== 'lobby') toLobby();
     } else if (id === 'tab-tour') {
-      this.joinMode = false;
+      this.leaveMulti();
       if (match.screen !== 'tour') toTour();
     } else if (id === 'tab-multi') {
       this.mode = 'multi';
-      this.joinMode = false;
+      this.leaveMulti();
       if (match.screen !== 'lobby') toLobby();
     } else if (id === 'tab-sys') {
       this.mode = 'sys';
-      this.joinMode = false;
+      this.leaveMulti();
       if (match.screen !== 'lobby') toLobby();
     } else if (id === 'raid') {
       // The board is foyer-only now, so a raid from here is always the solo
@@ -562,18 +576,42 @@ export class MenuSystem extends createSystem({}) {
         /* fine */
       }
       preload(trackById(picked) ?? pickRaidTrack(match.seed));
+    } else if (id === 'club') {
+      // Straight through — no code to read, so nothing to hold the foyer
+      // for. The relay puts you wherever the crowd already is.
+      enterPublicRoom();
+    } else if (id === 'rooms') {
+      this.multiPage = 'pick';
     } else if (id === 'host') {
+      // Open the room, then HOLD the foyer: the club is standing by, but
+      // the host reads their code off the board before walking in.
+      match.holdFoyer = true;
+      this.multiPage = 'host';
       hostRoom();
+    } else if (id === 'go-club') {
+      match.holdFoyer = false; // through the doors
+      this.multiPage = 'door';
     } else if (id === 'join') {
-      this.joinMode = true;
-    } else if (id.startsWith('slot')) {
-      const i = Number(id.slice(4));
-      this.joinCode[i] = (this.joinCode[i] + 1) % CODE_ALPHABET.length;
+      this.multiPage = 'join';
+      this.joinDigits = '';
+    } else if (id.startsWith('pad:')) {
+      const key = id.slice(4);
+      if (key === 'back') this.joinDigits = this.joinDigits.slice(0, -1);
+      else if (key === 'clear') this.joinDigits = '';
+      else if (this.joinDigits.length < 4) this.joinDigits += key;
     } else if (id === 'go-join') {
-      joinRoom(this.joinCode.map((i) => CODE_ALPHABET[i]).join(''));
-      this.joinMode = false;
+      if (this.joinDigits.length === 4) {
+        joinRoom(this.joinDigits);
+        this.multiPage = 'door';
+      }
     } else if (id === 'back') {
-      this.joinMode = false;
+      // One step back up the flow — and a host stepping back off their own
+      // code card leaves the room they just opened rather than stranding it.
+      if (this.multiPage === 'host') {
+        match.holdFoyer = false;
+        leaveRoom();
+      }
+      this.multiPage = this.multiPage === 'pick' ? 'door' : 'pick';
     } else if (id === 'resume') {
       this.pauseUp = false;
     } else if (id === 'bail') {
@@ -601,10 +639,10 @@ export class MenuSystem extends createSystem({}) {
     const key = [
       match.screen,
       this.hover,
-      this.joinMode,
+      this.multiPage,
       this.mode,
       this.pauseUp,
-      this.joinCode.join(''),
+      this.joinDigits,
       match.seats,
       match.difficulty,
       match.preferredTrack,
@@ -629,7 +667,7 @@ export class MenuSystem extends createSystem({}) {
     if (key === this.lastKey) return;
     this.lastKey = key;
 
-    const social = net.phase === 'hosting' || net.phase === 'joined';
+    const social = (net.phase === 'hosting' || net.phase === 'joined') && !match.holdFoyer;
     if ((match.screen === 'lobby' || match.screen === 'tour') && !social) {
       this.paintBoard();
     }
@@ -747,7 +785,9 @@ export class MenuSystem extends createSystem({}) {
     // Tab content.
     if (tab === 'tour') this.tourContent(buttons);
     else if (tab === 'multi') {
-      if (this.joinMode) this.joinContent(buttons);
+      if (this.multiPage === 'join') this.joinContent(buttons);
+      else if (this.multiPage === 'host') this.hostContent(buttons);
+      else if (this.multiPage === 'pick') this.pickContent(buttons);
       else this.multiContent(buttons);
     } else if (tab === 'sys') this.systemContent(buttons);
     else this.soloContent(buttons);
@@ -1279,6 +1319,7 @@ export class MenuSystem extends createSystem({}) {
     // carry buttons and progress, and the game teaches itself.
     if (tab === 'tour') this.drawTreasureMap(g);
     if (tab === 'play') this.drawSoloPanel(g);
+    if (tab === 'multi') this.drawMultiPanel(g);
 
     // The profile card rides the header on every tab.
     this.drawProfileChip(g);
@@ -1443,6 +1484,88 @@ export class MenuSystem extends createSystem({}) {
   }
 
   /** The list, the song page and its leaderboard — the SOLO tab's body. */
+  /** The multiplayer tab's own body: the room code on the HOST page, and
+   *  the four boxes filling up on the JOIN page. (The DOOR and PICK pages
+   *  are buttons and nothing else — the kit paints those.) */
+  private drawMultiPanel(g: CanvasRenderingContext2D): void {
+    const cx = CONTENT_X + CONTENT_W / 2;
+    if (this.multiPage === 'host') {
+      const open = net.phase === 'hosting' && net.code.length > 0;
+      g.textAlign = 'center';
+      g.textBaseline = 'middle';
+      g.font = font(600, 26);
+      g.letterSpacing = '5px';
+      g.fillStyle = UI.dim;
+      g.fillText(open ? 'YOUR ROOM' : 'OPENING A ROOM…', cx, 210);
+      g.letterSpacing = '0px';
+      if (open) {
+        // The code IS the screen: four digits, as big as the board allows,
+        // spaced like something you read out loud.
+        this.drawCodeBoxes(g, cx, 300, net.code.split(''), UI.info, true);
+        g.font = font(600, 34);
+        g.letterSpacing = '2px';
+        g.fillStyle = UI.text;
+        g.fillText('give this to your friends', cx, 618);
+        g.font = font(500, 24);
+        g.fillStyle = UI.faint;
+        g.fillText('they pick JOIN and type it in', cx, 662);
+        g.letterSpacing = '0px';
+      }
+      return;
+    }
+    if (this.multiPage === 'join') {
+      g.textAlign = 'center';
+      g.textBaseline = 'middle';
+      g.font = font(600, 26);
+      g.letterSpacing = '5px';
+      g.fillStyle = UI.dim;
+      g.fillText("YOUR FRIEND'S CODE", cx, 190);
+      g.letterSpacing = '0px';
+      const digits = this.joinDigits.split('');
+      this.drawCodeBoxes(g, cx, 218, [0, 1, 2, 3].map((i) => digits[i] ?? ''), UI.info, false);
+    }
+  }
+
+  /** Four code boxes, filled or waiting. `big` is the host's read-it-out
+   *  size; the keypad's are smaller so the pad has room under them. */
+  private drawCodeBoxes(
+    g: CanvasRenderingContext2D,
+    cx: number,
+    y: number,
+    chars: string[],
+    tone: string,
+    big: boolean,
+  ): void {
+    const w = big ? 190 : 96;
+    const h = big ? 250 : 110;
+    const gap = big ? 34 : 20;
+    const x0 = cx - (w * 4 + gap * 3) / 2;
+    chars.forEach((ch, i) => {
+      const x = x0 + i * (w + gap);
+      g.beginPath();
+      g.roundRect(x, y, w, h, big ? 22 : 14);
+      g.fillStyle = ch ? UI.accentFaint : 'rgba(255,255,255,0.035)';
+      g.fill();
+      g.lineWidth = 2.5;
+      g.strokeStyle = ch ? UI.accentDim : UI.lineFaint;
+      g.stroke();
+      if (!ch) {
+        // An empty box shows where the next digit lands, not a blank.
+        g.fillStyle = UI.lineFaint;
+        g.fillRect(x + w / 2 - 18, y + h / 2 + (big ? 40 : 20), 36, 4);
+        return;
+      }
+      g.textAlign = 'center';
+      g.textBaseline = 'middle';
+      g.font = font(700, big ? 132 : 64);
+      g.fillStyle = tone;
+      g.shadowColor = tone;
+      g.shadowBlur = big ? 26 : 14;
+      g.fillText(ch, x + w / 2, y + h / 2 + 4);
+      g.shadowBlur = 0;
+    });
+  }
+
   private drawSoloPanel(g: CanvasRenderingContext2D): void {
     g.textBaseline = 'middle';
 
@@ -1685,50 +1808,131 @@ export class MenuSystem extends createSystem({}) {
     this.lastKey = '';
   }
 
+  /** Step out of the multiplayer flow from anywhere in it. A host who
+   *  wanders off mid-code-card would otherwise leave a room standing with
+   *  the foyer held shut behind them. */
+  private leaveMulti(): void {
+    if (this.multiPage === 'host' && match.holdFoyer) {
+      match.holdFoyer = false;
+      leaveRoom();
+    }
+    this.multiPage = 'door';
+  }
+
   /* ── MULTIPLAYER: the club's front door ── */
 
   private multiContent(buttons: PanelButton[]): void {
-    // A room can't be open while this board exists (open room = club floor,
-    // and the club keeps no board) — so this tab only ever sells the doors.
     const connecting = net.phase === 'connecting';
+    // TWO DOORS, and they are genuinely different rooms — which is what
+    // the old pair got wrong (both of them hosted). The top one is the
+    // PUBLIC floor: press it and you are in, wherever the strangers are.
+    // The second is for a room you keep to yourselves.
     buttons.push({
-      id: 'host',
+      id: 'club',
       label: 'ENTER THE CLUB',
-      sub: 'the social floor · friends join with your code',
+      sub: 'the public floor · walk in, anyone can join you',
       primary: true,
       disabled: connecting,
       x: CONTENT_X,
-      y: 172,
+      y: 210,
+      w: CONTENT_W,
+      h: 230,
+    });
+    buttons.push({
+      id: 'rooms',
+      label: 'HOST / JOIN',
+      sub: 'a 4-digit code you share with your friends',
+      disabled: connecting,
+      x: CONTENT_X,
+      y: 478,
+      w: CONTENT_W,
+      h: 230,
+    });
+  }
+
+  /** …and behind it, which of the two. */
+  private pickContent(buttons: PanelButton[]): void {
+    const connecting = net.phase === 'connecting';
+    buttons.push({
+      id: 'host',
+      label: 'HOST',
+      sub: 'opens a room and hands you a 4-digit code',
+      primary: true,
+      disabled: connecting,
+      x: CONTENT_X,
+      y: 200,
       w: CONTENT_W,
       h: 210,
     });
     buttons.push({
       id: 'join',
-      label: 'JOIN A ROOM',
-      sub: 'enter a 4-letter code',
+      label: 'JOIN',
+      sub: "type a friend's code on the keypad",
       disabled: connecting,
       x: CONTENT_X,
-      y: 428,
+      y: 448,
       w: CONTENT_W,
       h: 210,
     });
+    buttons.push({ id: 'back', label: 'BACK', small: true, x: CONTENT_X, y: 706, w: 300, h: 84 });
   }
 
+  /** YOUR ROOM: the code, big, and what to do with it. */
+  private hostContent(buttons: PanelButton[]): void {
+    const open = net.phase === 'hosting' && net.code.length > 0;
+    buttons.push({
+      id: 'go-club',
+      label: 'ENTER THE CLUB',
+      primary: true,
+      disabled: !open,
+      x: CONTENT_X + 180,
+      y: 706,
+      w: CONTENT_W - 360,
+      h: 116,
+    });
+    buttons.push({ id: 'back', label: 'CANCEL', tone: UI.danger, small: true, x: CONTENT_X, y: 852, w: 300, h: 76 });
+  }
+
+  /** THE KEYPAD — a phone's, because the code is a phone number's worth of
+   *  digits. (It replaced four letter-wheels you clicked to cycle A→H.) */
   private joinContent(buttons: PanelButton[]): void {
-    for (let i = 0; i < 4; i++) {
+    const KEY = 118;
+    const PITCH = 132;
+    const x0 = CONTENT_X + (CONTENT_W - PITCH * 3 + (PITCH - KEY)) / 2;
+    const y0 = 356; // clears the code boxes above; row 4 ends at 870
+    for (let i = 0; i < 9; i++) {
       buttons.push({
-        id: `slot${i}`,
-        label: CODE_ALPHABET[this.joinCode[i]],
-        tone: UI.info,
-        px: 72,
-        x: 460 + i * 200,
-        y: 280,
-        w: 180,
-        h: 190,
+        id: `pad:${i + 1}`,
+        label: String(i + 1),
+        px: 58,
+        x: x0 + (i % 3) * PITCH,
+        y: y0 + Math.floor(i / 3) * PITCH,
+        w: KEY,
+        h: KEY,
       });
     }
-    buttons.push({ id: 'go-join', label: 'JOIN', primary: true, x: 560, y: 540, w: 360, h: 116 });
-    buttons.push({ id: 'back', label: 'BACK', x: 560, y: 690, w: 360, h: 88, small: true });
+    buttons.push({ id: 'pad:back', label: '⌫', px: 50, x: x0, y: y0 + 3 * PITCH, w: KEY, h: KEY });
+    buttons.push({ id: 'pad:0', label: '0', px: 58, x: x0 + PITCH, y: y0 + 3 * PITCH, w: KEY, h: KEY });
+    buttons.push({
+      id: 'pad:clear',
+      label: 'CLR',
+      small: true,
+      x: x0 + 2 * PITCH,
+      y: y0 + 3 * PITCH,
+      w: KEY,
+      h: KEY,
+    });
+    buttons.push({
+      id: 'go-join',
+      label: 'JOIN',
+      primary: true,
+      disabled: this.joinDigits.length < 4,
+      x: CONTENT_X + 200,
+      y: 898,
+      w: CONTENT_W - 400,
+      h: 92,
+    });
+    buttons.push({ id: 'back', label: 'BACK', small: true, x: CONTENT_X, y: 898, w: 170, h: 92 });
   }
 
   /* ── THE TOUR: the treasure map ───────────────────────────────────────

@@ -151,6 +151,17 @@ export interface MatchState {
    *  closing theme takes the decks. Cleared by dismissing it (or by walking
    *  out to the foyer). */
   credits: boolean;
+  /** HOSTING, but not through the door yet: the board is showing the new
+   *  room's code ("give this to your friends") and the foyer has to stay
+   *  standing behind it. Both the board's own visibility and the club's
+   *  swap-in read this, so the two can't disagree about where you are. */
+  holdFoyer: boolean;
+  /** The VR title card is up and still opaque. Nothing behind it may be
+   *  clicked: the board is RIGHT THERE under the black, and a stray
+   *  trigger during the show would fire a button nobody could see. Clears
+   *  the moment the black starts lifting, so the menu is live as it fades
+   *  in rather than a beat later. */
+  introUp: boolean;
 
   /* ── online ── */
   online: boolean;
@@ -189,6 +200,8 @@ export const match: MatchState = {
   eatIntro: false,
   tour: null,
   credits: false,
+  holdFoyer: false,
+  introUp: false,
   online: false,
   roomCode: '',
 };

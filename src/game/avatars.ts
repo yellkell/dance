@@ -94,6 +94,18 @@ export interface DancerRig {
   baseColor: number;
   /** Solve the whole figure from head + hands. */
   pose(p: DancerPose): void;
+  /**
+   * DETAIL. `false` hides the jewellery and the joint-fillers — the
+   * millimetre work that only exists for close range — leaving the
+   * silhouette, the lit panels, the sticks and the halos: the parts that
+   * actually carry a dancer across a room.
+   *
+   * A full ring is twenty-three other figures and they are the whole
+   * frame; on a 24-seat ring seventeen of them stand more than ten metres
+   * off, where an ear pip is smaller than a pixel. Costs nothing to solve
+   * either way (pose() runs the same maths) — this is draw calls only.
+   */
+  setDetail(near: boolean): void;
   dispose(): void;
 }
 
@@ -400,6 +412,15 @@ export function buildDancer(hue: number): DancerRig {
     return s;
   };
 
+  /* The close-range-only meshes (see setDetail). Everything pushed here
+   * is jewellery, a joint filler, or a seam — never a limb, a lit panel, a
+   * stick or a halo, because those are the silhouette. */
+  const fine: Mesh[] = [];
+  const detail = (m: Mesh): Mesh => {
+    fine.push(m);
+    return m;
+  };
+
   const M = (geo: BufferGeometry, mat: MeshStandardMaterial | MeshBasicMaterial): Mesh => new Mesh(geo, mat);
   const seg = (rt: number, rb: number, mat: MeshStandardMaterial): Mesh => M(segGeo(rt, rb), mat);
 
@@ -416,7 +437,7 @@ export function buildDancer(hue: number): DancerRig {
   // head got tried and cut: it read as a blindfold, not eyewear.) The bezel
   // is sized so its back corners bury into the cheeks of the NEW narrower
   // skull instead of poking out at the temples the way the original did.
-  const visorShell = M(boxGeo(), shell);
+  const visorShell = detail(M(boxGeo(), shell));
   visorShell.scale.set(0.105, 0.044, 0.05);
   visorShell.position.set(0, 0.014, -0.054);
   head.add(visorShell);
@@ -427,7 +448,7 @@ export function buildDancer(hue: number): DancerRig {
   // Ear pips — the little jewellery that catches at close range,
   // half-buried beads riding the skull at the temples.
   for (const side of [-1, 1]) {
-    const pip = M(sphereGeo(8), neonStd);
+    const pip = detail(M(sphereGeo(8), neonStd));
     pip.scale.setScalar(0.012);
     pip.position.set(side * 0.063, 0.004, -0.006);
     head.add(pip);
@@ -501,7 +522,7 @@ export function buildDancer(hue: number): DancerRig {
    * choker bound the neck; a clavicle V and shoulder caps hang the arms.
    * Both lathes are squashed to TORSO_X/Z and TURNED WITH THE YAW — an
    * elliptical torso, unlike a round one, has a front. */
-  const neck = seg(0.023, 0.031, suit);
+  const neck = detail(seg(0.023, 0.031, suit));
   const bodice = M(latheGeo('bodice', BODICE), suit);
   const basque = M(latheGeo('basque', BASQUE), lit); // the lit midriff
   root.add(neck, bodice, basque);
@@ -510,18 +531,18 @@ export function buildDancer(hue: number): DancerRig {
   // a blank; with it the figure is wearing something.
   // Local z is scaled by TORSO_Z with the rest of the bodice, so the seam
   // is authored to sit a whisker outside the lathe's own front radius.
-  const sternum = M(boxGeo(), neonStd);
+  const sternum = detail(M(boxGeo(), neonStd));
   sternum.scale.set(0.013, 0.34, 0.012);
   sternum.position.set(0, 0.6, -0.075);
   bodice.add(sternum);
   const collar = M(torusGeo(0.062, 0.009), neonStd);
-  const choker = M(torusGeo(0.033, 0.005), neonStd);
+  const choker = detail(M(torusGeo(0.033, 0.005), neonStd));
   const belt = M(torusGeo(0.04, 0.007), neonStd);
   collar.scale.set(TORSO_X, TORSO_Z, 1);
   belt.scale.set(TORSO_X, TORSO_Z, 1);
   root.add(collar, choker, belt);
-  const clavL = seg(0.015, 0.021, suit);
-  const clavR = seg(0.015, 0.021, suit);
+  const clavL = detail(seg(0.015, 0.021, suit));
+  const clavR = detail(seg(0.015, 0.021, suit));
   root.add(clavL, clavR);
   const capL = M(sphereGeo(8), lit);
   const capR = M(sphereGeo(8), lit);
@@ -535,8 +556,8 @@ export function buildDancer(hue: number): DancerRig {
   const foreL = seg(0.024, 0.018, lit);
   const foreR = seg(0.024, 0.018, lit);
   root.add(upperL, upperR, foreL, foreR);
-  const elbowL = M(sphereGeo(8), lit);
-  const elbowR = M(sphereGeo(8), lit);
+  const elbowL = detail(M(sphereGeo(8), lit));
+  const elbowR = detail(M(sphereGeo(8), lit));
   elbowL.scale.setScalar(0.024);
   elbowR.scale.setScalar(0.024);
   root.add(elbowL, elbowR);
@@ -549,12 +570,12 @@ export function buildDancer(hue: number): DancerRig {
     mitt.position.set(0, 0.004, -0.028);
     mitt.rotation.x = -0.12;
     hand.add(mitt);
-    const fingers = M(boxGeo(), shell);
+    const fingers = detail(M(boxGeo(), shell));
     fingers.scale.set(0.06, 0.017, 0.05);
     fingers.position.set(0, -0.012, -0.072);
     fingers.rotation.x = -0.5;
     hand.add(fingers);
-    const cuff = M(torusGeo(0.034, 0.0065), neonStd);
+    const cuff = detail(M(torusGeo(0.034, 0.0065), neonStd));
     cuff.rotation.x = Math.PI / 2;
     cuff.position.set(0, 0.008, -0.008);
     hand.add(cuff);
@@ -578,9 +599,9 @@ export function buildDancer(hue: number): DancerRig {
   const mkLeg = (): { thigh: Mesh; shin: Mesh; knee: Mesh } => {
     const thigh = seg(0.045, 0.034, suit); // full at the hip, narrow at the knee
     const shin = seg(0.031, 0.018, suit); // calf at the knee, slim at the ankle
-    const knee = M(sphereGeo(8), suit);
+    const knee = detail(M(sphereGeo(8), suit));
     knee.scale.set(0.032, 0.03, 0.032);
-    const pipe = M(segGeo(0.0055, 0.0055, 5), neonStd);
+    const pipe = detail(M(segGeo(0.0055, 0.0055, 5), neonStd));
     pipe.position.set(0, 0.06, -0.021);
     pipe.scale.y = 0.85; // proportional: children inherit the align() stretch
     shin.add(pipe);
@@ -605,12 +626,12 @@ export function buildDancer(hue: number): DancerRig {
     sole.scale.set(0.06, 0.015, 0.16);
     sole.position.set(0, -ANKLE + 0.0075, -0.025);
     boot.add(sole);
-    const toe = M(boxGeo(), shell);
+    const toe = detail(M(boxGeo(), shell));
     toe.scale.set(0.054, 0.036, 0.075);
     toe.position.set(0, -0.059, -0.072);
     toe.rotation.x = 0.16;
     boot.add(toe);
-    const heel = M(boxGeo(), shell);
+    const heel = detail(M(boxGeo(), shell));
     heel.scale.set(0.042, 0.05, 0.038);
     heel.position.set(0, -0.06, 0.042);
     boot.add(heel);
@@ -744,11 +765,17 @@ export function buildDancer(hue: number): DancerRig {
   // Park in a neutral stance so a rig never renders unsolved.
   pose({ hx: 0, hy: 1.52, hz: 0, yaw: 0, lx: -0.3, ly: 1.0, lz: -0.1, rx: 0.3, ry: 1.0, rz: -0.1, slump: 0 });
 
+  let detailed = true;
   return {
     root,
     accents,
     baseColor: color,
     pose,
+    setDetail(near: boolean) {
+      if (near === detailed) return;
+      detailed = near;
+      for (const m of fine) m.visible = near;
+    },
     dispose() {
       root.removeFromParent();
       // Geometry is module-shared (see geoCache) — release materials only.

@@ -20,8 +20,8 @@
  *  - The host can leave without folding the party: the relay promotes the
  *    longest-standing member and tells them with a fresh 'room' message.
  *
- * Join by code (the 4-letter room code uses the alphabet A–H so the XR code
- * picker only needs 8 letters per slot) or by URL: ?room=CADA&name=YELL.
+ * Join by code — four DIGITS, typed on the board's keypad — or by URL:
+ * ?room=4096&name=YELL.
  */
 
 import { NET, seatHue, serverUrl } from '../config.js';
@@ -33,7 +33,11 @@ import { clearClubPoses, clubPoses, remotePoses } from './poses.js';
 
 export type NetPhase = 'off' | 'connecting' | 'hosting' | 'joined' | 'live' | 'error';
 
-export const CODE_ALPHABET = 'ABCDEFGH';
+/** Room codes are DIGITS. Four of them — the thing you shout across a
+ *  room or type into a phone — and a numeric alphabet gives 10,000 codes
+ *  where the old eight letters gave 4,096, on a pad everybody already
+ *  knows how to use. */
+export const CODE_ALPHABET = '0123456789';
 
 export interface LobbyMember {
   name: string;
@@ -63,6 +67,10 @@ export const net = {
   code: '',
   members: [] as LobbyMember[],
   isHost: false,
+  /** Is this a PUBLIC room (strangers may walk in) or a private one behind
+   *  its four digits? The floor reads the same either way; the difference
+   *  is only whether the code is a door or just an address. */
+  isPublic: false,
   /** My own relay member index (−1 until the room hands it over). */
   myIdx: -1,
   /** The raid-summoning ball currently in the air, or null. */
@@ -160,6 +168,7 @@ function teardown(reason: string): void {
   net.code = '';
   net.members = [];
   net.isHost = false;
+  net.isPublic = false;
   net.myIdx = -1;
   net.ball = null;
   net.gamePlayers = new Set();
@@ -220,6 +229,7 @@ function handle(msg: Record<string, unknown>): void {
       const wasLive = net.phase === 'live';
       net.phase = wasLive ? 'live' : msg.host ? 'hosting' : 'joined';
       net.isHost = Boolean(msg.host);
+      net.isPublic = Boolean(msg.open);
       net.code = String(msg.code ?? net.code);
       if (Number.isFinite(Number(msg.idx))) net.myIdx = Number(msg.idx);
       net.dirty++;
@@ -436,6 +446,14 @@ export function hostRoom(): void {
   connect(() => send({ t: 'host', name: myName, hue: myHue }));
 }
 
+/** THE PUBLIC FLOOR: no code, no arranging — the relay drops you into
+ *  whichever public room has the most people and still has space, or opens
+ *  a fresh one if none does. The other door (host/join with a 4-digit
+ *  code) is for a room you want to keep to your friends. */
+export function enterPublicRoom(): void {
+  connect(() => send({ t: 'public', name: myName, hue: myHue }));
+}
+
 export function joinRoom(code: string): void {
   connect(() => send({ t: 'join', code: code.toUpperCase(), name: myName, hue: myHue }));
 }
@@ -450,7 +468,13 @@ export function leaveRoom(): void {
  *  along. The relay owns the 60-second clock from here. */
 export function callBall(pos: [number, number, number]): void {
   if (net.phase !== 'hosting' && net.phase !== 'joined') return;
-  send({ t: 'ball-up', track: match.preferredTrack, diff: match.difficulty, seats: match.seats, pos });
+  // No seat count rides the ball. A club raid is sized by WHO TURNS UP —
+  // the relay deals everyone who touched onto the smallest ring that fits
+  // them and fills the rest with groupies. It used to carry `match.seats`,
+  // which is this headset's SOLO ring: a leftover from the last solo set,
+  // so two friends in a club room got dealt onto whatever size the host
+  // last played alone.
+  send({ t: 'ball-up', track: match.preferredTrack, diff: match.difficulty, pos });
 }
 
 /** Touch in (or step back out) of the hanging ball. */

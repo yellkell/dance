@@ -64,11 +64,26 @@ export function countInBeatsFor(bpm: number): number {
 export const RING = {
   minSeats: 4,
   maxSeats: 24,
-  defaultSeats: 12,
+  /** A full ring is the headline, but it is also twenty-three other
+   *  figures — the overwhelming majority of everything drawn in a raid —
+   *  so the DEFAULT sits where the frame is comfortable and the big rings
+   *  are something a room opts into. (`detailRadius` below is what keeps
+   *  the opt-in affordable.) */
+  defaultSeats: 8,
   /** Centre-to-centre air between neighbouring platforms on the circle. */
   seatSpacing: 2.7,
   /** The ring never tightens below this radius even with 4 dancers. */
   minRadius: 4.6,
+  /** Dancers nearer than this (metres, deck centre to deck centre) get the
+   *  full figure; everyone beyond it drops the millimetre work — jewellery,
+   *  joint fillers, seams — and keeps the silhouette, the lit panels, the
+   *  sticks and the halos.
+   *
+   *  8 m takes in your two neighbours either side. On a 24-seat ring the
+   *  radius is 10.3 m, so the far side stands 20 m off and seventeen of the
+   *  twenty-three are past this line, where an ear pip is smaller than a
+   *  pixel. Small rings sit entirely inside it and are untouched. */
+  detailRadius: 8,
   /** The boss stage: a round dance floor in the middle. */
   stageRadius: 2.6,
   /** Deliberately LOW: the goop dances ON the common floor, not a riser —
@@ -319,9 +334,20 @@ export const CHOREO = {
    *  Both rolls sit high, and the twin's competition (split, X) sits lower
    *  than it did: the three-volley rally is the signature of this floor,
    *  and it was landing on barely a quarter of laser moves. It is now the
-   *  likeliest thing a double laser does. Act 1 gets a coin-flip rally too
-   *  — the rhythm is worth meeting before the expert acts, not after. */
+   *  likeliest thing a double laser does. (The act-0 and act-1 entries are
+   *  unreachable — below act 2 a laser move is a single strip and there is
+   *  no twin to answer — and are kept only so the arrays index by act.) */
   twinBounceChance: [0, 0.45, 0.85, 0.95, 0.98],
+  /** …and from THIS act up, both rolls are skipped entirely: a double
+   *  laser is three volleys or it is nothing. EXPERT sits at act 3 for its
+   *  first stretch and act 4 after the lift, so on that difficulty the
+   *  rally is a promise rather than a near-certainty — a 2-volley shove
+   *  still turned up a few times in a hundred, and one exception is all it
+   *  takes for "the double always comes in threes" to stop being a rule
+   *  you can play by. (HARD's back stretch reaches act 3 too, and inherits
+   *  it: the hardest phrases of HARD are exactly where the promise belongs
+   *  as well.) */
+  twinAlwaysFromAct: 3,
   /** THE X: two beams thrown diagonally through the deck centre at once,
    *  crossing in an X — the safe ground is the four pockets between the
    *  arms, so the dodge reads radial (out of the cross, not off a line).
@@ -787,7 +813,7 @@ export function hueToColor(hue: number, light = 0.55): number {
 
 /* ────────────────────────────── NETWORKING ───────────────────────────────
  * Optional — the game is fully playable solo against the groupies. With a
- * relay up (npm run server) you host a room, share the 4-letter code, and
+ * relay up (npm run server) you host a room, read out the 4-digit code, and
  * the server hands everyone a seat, the seed and a shared start time. The
  * whole choreography is deterministic from the seed, so the wire only
  * carries poses, hits and scores.
