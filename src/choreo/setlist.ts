@@ -141,15 +141,32 @@ function twinKeep(act: number): number[] {
   return [0, at(CHOREO.twinReturnChance), at(CHOREO.twinBounceChance)];
 }
 
+/**
+ * Which side a twin opens on: the one the last move parked the floor on,
+ * so the first pair lands where the dancers actually are. `at` is the
+ * park's coordinate on the twin's axis (x for the lateral twin, z for the
+ * vertical one); undefined — an unknowable park, i.e. after a nova —
+ * falls back to the coin. ALWAYS consumes the roll, so a chart's random
+ * stream stays aligned whether or not there was a park to aim at.
+ */
+function twinSide(rng: () => number, at: number | undefined): 1 | -1 {
+  const coin: 1 | -1 = rng() < 0.5 ? 1 : -1;
+  if (at === undefined || Math.abs(at) < 0.06) return coin; // parked on the line
+  return at > 0 ? 1 : -1;
+}
+
 /** Build one move's landings from the seeded rng (seat-local pattern).
  *  `sweptRoutines` is the chart-wide coin for THE SWEPT ROUTINE — rolled
- *  once per song, so some expert nights carry it and some never do. */
+ *  once per song, so some expert nights carry it and some never do.
+ *  `park` is where the LAST move left a dancer who played it right (see
+ *  THE FLOOR MANAGER); the twins aim their opening volley at it. */
 function buildLandings(
   kind: MoveKind,
   landBeat: number,
   act: number,
   rng: () => number,
   sweptRoutines = false,
+  park: Park = null,
 ): Landing[] {
   const landings: Landing[] = [];
   if (kind === 'beam') {
@@ -185,7 +202,18 @@ function buildLandings(
       const inner = CHOREO.beamTwinInner;
       const outer = CHOREO.beamTwinInner + halfW * 2 + 0.02;
       const keep = twinKeep(act);
-      let side = rng() < 0.5 ? 1 : -1;
+      // THE OPENER IS AIMED. Whatever ran last — a wave's march, the
+      // routine's corner, a gate, a seesaw — left the floor standing
+      // somewhere known, and the twin's first pair lands on THAT side.
+      // Rolled at random it was a coin whether the rally even started
+      // where anybody was: half the time the opening volley burned the
+      // empty half of the deck and the move only began on the answer.
+      // Aimed, the shove starts on the beat it fires, and the alternating
+      // chain still means the read never changes — go the other way.
+      // (After a NOVA the park is null: its wedge lands somewhere
+      // different on every deck, so there is no shared side to aim at and
+      // the coin is the honest answer.)
+      let side: 1 | -1 = twinSide(rng, park?.x);
       lane(side * inner);
       lane(side * outer);
       for (let v = 1; v < CHOREO.twinChainMax && rng() < keep[v]; v++) {
@@ -246,7 +274,9 @@ function buildLandings(
       const halfD = CHOREO.railHalfDepth;
       const inner = CHOREO.railTwinInner;
       const outer = CHOREO.railTwinInner + halfD * 2 + 0.02;
-      let side: 1 | -1 = rng() < 0.5 ? 1 : -1; // +1 floods the back, −1 the front
+      // Aimed like its lateral twin, on the depth axis: the pair floods
+      // the half the last move parked you in. (+1 floods the back.)
+      let side: 1 | -1 = twinSide(rng, park?.z);
       let from: 1 | -1 = rng() < 0.5 ? 1 : -1;
       const pair = (beat: number, at: number, emitter: 1 | -1) => {
         landings.push({ beat, zone: { kind: 'rail', z: at * inner, halfD, from: emitter } });
@@ -566,7 +596,7 @@ export function generateSetlist(
       let charge = MOVES[kind].chargeBeats;
       // Land on the next bar downbeat that the telegraph fits in front of.
       let landBeat = Math.ceil((cursor + charge) / barBeats) * barBeats;
-      let landings = buildLandings(kind, landBeat, act, rng, sweptRoutines);
+      let landings = buildLandings(kind, landBeat, act, rng, sweptRoutines, park);
       // THE FLOOR MANAGER: a move whose danger never touches the ground
       // the last move parked you on asks for nothing — roll another shape
       // (same seeded stream, so every client re-rolls identically).
@@ -574,7 +604,7 @@ export function generateSetlist(
         kind = pickKind(rng, act, last, banned);
         charge = MOVES[kind].chargeBeats;
         landBeat = Math.ceil((cursor + charge) / barBeats) * barBeats;
-        landings = buildLandings(kind, landBeat, act, rng, sweptRoutines);
+        landings = buildLandings(kind, landBeat, act, rng, sweptRoutines, park);
       }
       if (landBeat >= phraseEnd + barBeats) break; // phrase is full — move on
       moves.push({ index: index++, kind, telegraphBeat: landBeat - charge, landBeat, landings, act });

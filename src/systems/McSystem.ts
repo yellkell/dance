@@ -38,7 +38,7 @@ import type { MeshBasicMaterial, MeshStandardMaterial } from 'three';
 import { MC, RING, hueToColor, ringRadius } from '../config.js';
 import { arena } from '../arena/arena.js';
 import { CLUB as CLUB_LAYOUT } from '../club/config.js';
-import { buildDancer, type DancerPose, type DancerRig } from '../game/avatars.js';
+import { ACCENT_REST, buildDancer, type DancerPose, type DancerRig } from '../game/avatars.js';
 import { match, type GestureCue } from '../game/state.js';
 import { net } from '../net/session.js';
 
@@ -92,6 +92,7 @@ export class McSystem extends createSystem({}) {
     this.generation = match.generation;
     if (!this.rig) {
       this.rig = buildDancer(MC.hue);
+      this.rig.root.name = 'the-mc'; // headless probes find him by name
       this.rig.root.scale.setScalar(MC.scale);
       // He faces the crowd — every client renders him looking at THEM.
       this.rig.root.rotation.y = Math.PI;
@@ -529,15 +530,21 @@ export class McSystem extends createSystem({}) {
   private applyAccents(warn: number): void {
     const rig = this.rig;
     if (!rig) return;
-    const color = warn > 0.5 ? MC.warnColor : this.baseColor;
+    // WARN burns the NEON amber — sticks, collar, belt, cuffs, seams, the
+    // scan-slit, the halos — and leaves the cloth alone. Repainting the
+    // whole figure amber swapped the headliner for a different dancer
+    // mid-wind-up: the tell is jewellery catching fire, not a costume
+    // change. (His body still tells you what's coming; that's the mime.)
+    const warm = warn > 0.5;
     const drive = 1.1 + warn * 1.5;
-    for (const { mat, gain } of rig.accents) {
+    for (const { mat, gain, trim } of rig.accents) {
+      const color = trim && warm ? MC.warnColor : this.baseColor;
       const std = mat as MeshStandardMaterial;
       if (std.emissive) {
         std.emissive.setHex(color);
         // Scaled by the material's authored gain — the suit never outshines
-        // the sticks, warn amber included.
-        std.emissiveIntensity = drive * gain;
+        // the sticks. Cloth sits at its authored rest the whole way through.
+        std.emissiveIntensity = (trim ? drive : ACCENT_REST) * gain;
       } else {
         (mat as MeshBasicMaterial).color.setHex(color);
       }

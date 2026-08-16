@@ -89,6 +89,11 @@ await shot('club-mirror-asleep');
 await rig(6.6, -9.7, 0);
 await page.waitForTimeout(700); // the smoke thins on approach
 await shot('club-mirror-awake');
+// …and right up against it: the reflection meets you at the glass and is
+// clipped by the pane, so no part of it ever stands out in the room.
+await rig(6.6, -10.9, 0);
+await page.waitForTimeout(500);
+await shot('club-mirror-pressed');
 
 // ── THE BALL, hanging on the floor ───────────────────────────────────────
 await rig(0, -0.4, 0);
