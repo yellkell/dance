@@ -28,6 +28,7 @@ import { createSystem, InputComponent } from '@iwsdk/core';
 import {
   CanvasTexture,
   DoubleSide,
+  Euler,
   Group,
   Mesh,
   MeshBasicMaterial,
@@ -62,7 +63,7 @@ import {
 } from '../club/voice.js';
 import { buildDancer, type DancerPose, type DancerRig } from '../game/avatars.js';
 import { match } from '../game/state.js';
-import { clubPoses, remotePoses } from '../net/poses.js';
+import { clubPoses, remotePoses, type RemotePose } from '../net/poses.js';
 import {
   callBall,
   cancelBall,
@@ -88,6 +89,8 @@ const _camQ = new Quaternion();
 const _fwd = new Vector3();
 const _o = new Vector3();
 const _d = new Vector3();
+/** YXZ = the order a neck actually works in: swivel, then nod, then tilt. */
+const _e = new Euler(0, 0, 0, 'YXZ');
 
 interface ClubPuppet {
   idx: number;
@@ -402,7 +405,7 @@ export class ClubSocialSystem extends createSystem({}) {
       tag.visible = false;
       this.crowd.add(tag);
       const pose: DancerPose = {
-        hx: 0, hy: 1.55, hz: 3.8, yaw: 0,
+        hx: 0, hy: 1.55, hz: 3.8, yaw: 0, pitch: 0, roll: 0,
         lx: -0.3, ly: 1.0, lz: 3.7, rx: 0.3, ry: 1.0, rz: 3.7,
         slump: 0,
       };
@@ -413,12 +416,14 @@ export class ClubSocialSystem extends createSystem({}) {
     this.paintKey = ''; // roster changed → repaint the panel
   }
 
-  private applyPose(p: ClubPuppet, s: { hx: number; hy: number; hz: number; hyaw: number; lx: number; ly: number; lz: number; rx: number; ry: number; rz: number }, k: number): void {
+  private applyPose(p: ClubPuppet, s: RemotePose, k: number): void {
     const t = p.pose;
     t.hx += (s.hx - t.hx) * k;
     t.hy += (s.hy - t.hy) * k;
     t.hz += (s.hz - t.hz) * k;
     t.yaw += (s.hyaw - t.yaw) * k;
+    t.pitch += (s.hpitch - t.pitch) * k;
+    t.roll += (s.hroll - t.roll) * k;
     t.lx += (s.lx - t.lx) * k;
     t.ly += (s.ly - t.ly) * k;
     t.lz += (s.lz - t.lz) * k;
@@ -432,9 +437,10 @@ export class ClubSocialSystem extends createSystem({}) {
     if (!headObj) return;
     headObj.getWorldPosition(_v);
     headObj.getWorldQuaternion(_q);
-    _fwd.set(0, 0, -1).applyQuaternion(_q);
-    const yaw = Math.atan2(-_fwd.x, -_fwd.z);
-    const d: number[] = [_v.x, _v.y, _v.z, yaw];
+    // Yaw comes out of the Y term unchanged (see NetworkSystem.pumpPose);
+    // nod and tilt ride the tail so short frames still decode.
+    _e.setFromQuaternion(_q, 'YXZ');
+    const d: number[] = [_v.x, _v.y, _v.z, _e.y];
     for (const hand of ['left', 'right'] as const) {
       const obj = this.world.playerSpaceEntities?.raySpaces?.[hand]?.object3D;
       if (obj) {
@@ -444,6 +450,7 @@ export class ClubSocialSystem extends createSystem({}) {
         d.push(_v.x + (hand === 'left' ? -0.25 : 0.25), Math.max(0.6, _v.y - 0.6), _v.z - 0.1);
       }
     }
+    d.push(_e.x, _e.z);
     sendClubPose(d);
   }
 

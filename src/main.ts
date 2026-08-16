@@ -205,8 +205,10 @@ declare global {
       /** The menus, drivable headlessly: board mode/hover, the pause card,
        *  the SOCIAL panel — the style-iteration hooks. */
       menu: typeof menuView & typeof socialView;
-      /** Park the player rig at (x, z) facing `yaw` — headless club walks. */
-      rig: (x: number, z: number, yaw?: number, y?: number) => void;
+      /** Park the player rig at (x, z) facing `yaw` — headless club walks.
+       *  `pitch`/`roll` tip the rig (and so the head that rides it) the way
+       *  a neck would, for probing what the room sees of your head. */
+      rig: (x: number, z: number, yaw?: number, y?: number, pitch?: number, roll?: number) => void;
       /** The live scene graph — headless probes walk it by name. */
       scene: () => import('three').Scene | null;
       /** The title card, for captures that need to know where the show is. */
@@ -251,11 +253,14 @@ window.__gdr = {
       (menuView as Record<string | symbol, unknown>)[key] ??
       (socialView as Record<string | symbol, unknown>)[key],
   }),
-  rig: (x, z, yaw = 0, y = 0) => {
+  rig: (x, z, yaw = 0, y = 0, pitch = 0, roll = 0) => {
     const w = worldRef;
     if (!w) return;
     w.player.position.set(x, y, z);
-    w.player.rotation.set(0, yaw, 0);
+    // Same order the pose pumps decode in, so what you set is what the
+    // room reads back.
+    w.player.rotation.order = 'YXZ';
+    w.player.rotation.set(pitch, yaw, roll);
   },
   scene: () =>
     (worldRef as unknown as { scene?: import('three').Scene } | null)?.scene ?? null,

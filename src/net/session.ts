@@ -329,6 +329,9 @@ function handle(msg: Record<string, unknown>): void {
         hx: d[0], hy: d[1], hz: d[2], hyaw: d[3],
         lx: d[4], ly: d[5], lz: d[6],
         rx: d[7], ry: d[8], rz: d[9],
+        // Appended, and defaulted: a frame from before the neck existed
+        // decodes as a dancer who simply isn't nodding.
+        hpitch: d[10] ?? 0, hroll: d[11] ?? 0,
         t: performance.now(),
       });
       break;
@@ -342,6 +345,9 @@ function handle(msg: Record<string, unknown>): void {
         hx: d[0], hy: d[1], hz: d[2], hyaw: d[3],
         lx: d[4], ly: d[5], lz: d[6],
         rx: d[7], ry: d[8], rz: d[9],
+        // Appended, and defaulted: a frame from before the neck existed
+        // decodes as a dancer who simply isn't nodding.
+        hpitch: d[10] ?? 0, hroll: d[11] ?? 0,
         t: performance.now(),
       });
       break;

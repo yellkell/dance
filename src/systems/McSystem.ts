@@ -64,7 +64,7 @@ interface ActiveMime {
 }
 
 const freshPose = (): DancerPose => ({
-  hx: 0, hy: STAND, hz: 0, yaw: 0,
+  hx: 0, hy: STAND, hz: 0, yaw: 0, pitch: 0, roll: 0,
   lx: -0.3, ly: 1.0, lz: -0.1,
   rx: 0.3, ry: 1.0, rz: -0.1,
   slump: 0,
@@ -117,6 +117,8 @@ export class McSystem extends createSystem({}) {
     c.hy += (t.hy - c.hy) * k;
     c.hz += (t.hz - c.hz) * k;
     c.yaw += (t.yaw - c.yaw) * k;
+    c.pitch += (t.pitch - c.pitch) * k;
+    c.roll += (t.roll - c.roll) * k;
     c.lx += (t.lx - c.lx) * k;
     c.ly += (t.ly - c.ly) * k;
     c.lz += (t.lz - c.lz) * k;
@@ -202,6 +204,9 @@ export class McSystem extends createSystem({}) {
         p.rx = 0.34 + tremble;
         p.ly = p.ry = STAND + 0.45 - t * 0.6;
         p.lz = p.rz = -0.1;
+        // Watching it come: head back, and shaking with the rest of him.
+        p.pitch = t * 0.9;
+        p.roll = tremble * 3;
         rig.root.scale.set(this.scale * (1 + t * 0.25), this.scale * (1 - t * 0.55), this.scale * (1 + t * 0.25));
         this.applyAccents(1); // full alarm
         this.easeTo(delta, 14);
@@ -262,6 +267,10 @@ export class McSystem extends createSystem({}) {
     p.hz = 0;
     p.hy = STAND - bounce;
     p.yaw = Math.sin(beat * 0.25) * 0.2;
+    // He nods on the beat and rolls his head across the bar — the neck the
+    // rig grew for the club floor, spent on the man everyone is watching.
+    p.pitch = -0.1 - Math.abs(Math.sin(beat * Math.PI)) * 0.16;
+    p.roll = Math.sin(beat * 0.33) * 0.12;
     p.slump = 0;
     // The groupies' exact move, giant-sized: one stick up, one down.
     const wave = Math.sin(beat * Math.PI);
@@ -287,6 +296,12 @@ export class McSystem extends createSystem({}) {
     p.hz = 0;
     p.yaw = 0;
     p.hy = STAND;
+    // Chin down through the wind-up, up on the release — he stares the
+    // crowd down while he charges and throws his head back when it lands.
+    // (Set here, not left over: the groove's nod would otherwise ride out
+    // the whole mime, because easeTo only ever chases `tgt`.)
+    p.pitch = -0.24 + strike * 0.4;
+    p.roll = 0;
 
     switch (mime.cue.kind) {
       case 'beam': {

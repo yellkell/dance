@@ -75,7 +75,7 @@ export class AvatarSystem extends createSystem({}) {
         seat: d.seat,
         phase: (d.seat * 1.7) % (Math.PI * 2),
         pose: {
-          hx: 0, hy: STAND_HEAD, hz: 0, yaw: 0,
+          hx: 0, hy: STAND_HEAD, hz: 0, yaw: 0, pitch: 0, roll: 0,
           lx: -0.3, ly: 1.0, lz: -0.1,
           rx: 0.3, ry: 1.0, rz: -0.1,
           slump: 0,
@@ -144,6 +144,8 @@ export class AvatarSystem extends createSystem({}) {
     t.hy += (pose.hy - t.hy) * k;
     t.hz += (pose.hz - t.hz) * k;
     t.yaw += (pose.hyaw - t.yaw) * k;
+    t.pitch += (pose.hpitch - t.pitch) * k;
+    t.roll += (pose.hroll - t.roll) * k;
     t.lx += (pose.lx - t.lx) * k;
     t.ly += (pose.ly - t.ly) * k;
     t.lz += (pose.lz - t.lz) * k;
@@ -214,6 +216,16 @@ export class AvatarSystem extends createSystem({}) {
     const bounce = d.alive ? Math.abs(Math.sin(beat * Math.PI + p.phase)) * 0.05 : 0;
     const standY = p.duck ? DUCK_HEAD : STAND_HEAD;
     t.hy += (standY - bounce - t.hy) * Math.min(1, delta * 8);
+
+    // The NOD rides the same kick as the bob, and the head lolls across the
+    // bar on its own slower clock. Real dancers stream a live neck now; a
+    // bot whose head could only swivel would be the one figure in the ring
+    // that reads as furniture. A duck pulls the chin right down with it.
+    const nod = d.alive ? -0.06 - Math.abs(Math.sin(beat * Math.PI + p.phase)) * 0.14 : 0;
+    const targetPitch = p.duck ? nod - 0.45 : nod;
+    const targetRoll = d.alive ? Math.sin(beat * 0.3 + p.phase * 1.7) * 0.13 : 0;
+    t.pitch += (targetPitch - t.pitch) * Math.min(1, delta * 8);
+    t.roll += (targetRoll - t.roll) * Math.min(1, delta * 5);
 
     // Glowsticks: alternate arms per beat — one punches the air, one rests.
     const wave = Math.sin(beat * Math.PI + p.phase);

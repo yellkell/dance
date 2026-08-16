@@ -1,6 +1,6 @@
 /**
  * NetworkSystem — the online pumps. While a networked set is live it streams
- * my pose (10 Hz, platform-local: head + hands + head yaw) and my score line
+ * my pose (10 Hz, platform-local: head + hands + head yaw/pitch/roll) and my score line
  * (3 Hz, or instantly on a life change) to the room; the session module
  * applies everything inbound.
  *
@@ -13,6 +13,7 @@
  */
 
 import { createSystem, Quaternion, Vector3 } from '@iwsdk/core';
+import { Euler } from 'three';
 import { NET, PODIUM } from '../config.js';
 import { toLobby } from '../game/flow.js';
 import { match, me, type Screen } from '../game/state.js';
@@ -20,7 +21,8 @@ import { backToClub, net, sendPose, sendScore } from '../net/session.js';
 
 const _v = new Vector3();
 const _q = new Quaternion();
-const _f = new Vector3();
+/** YXZ = the order a neck actually works in: swivel, then nod, then tilt. */
+const _e = new Euler(0, 0, 0, 'YXZ');
 
 export class NetworkSystem extends createSystem({}) {
   private poseT = 0;
@@ -96,10 +98,12 @@ export class NetworkSystem extends createSystem({}) {
     const headObj = this.playerHeadEntity?.object3D;
     if (!headObj) return;
     headObj.getWorldQuaternion(_q);
-    _f.set(0, 0, -1).applyQuaternion(_q);
-    const yaw = Math.atan2(-_f.x, -_f.z);
+    // In YXZ the Y term IS the old atan2(-f.x, -f.z) for any pitch short of
+    // straight up, so d[3] still means exactly what it always meant and a
+    // client that never learned about pitch keeps reading it correctly.
+    _e.setFromQuaternion(_q, 'YXZ');
 
-    const d: number[] = [match.headX, match.headY, match.headZ, yaw];
+    const d: number[] = [match.headX, match.headY, match.headZ, _e.y];
     for (const hand of ['left', 'right'] as const) {
       const obj = this.world.playerSpaceEntities?.raySpaces?.[hand]?.object3D;
       if (obj) {
@@ -110,6 +114,9 @@ export class NetworkSystem extends createSystem({}) {
         d.push(hand === 'left' ? -0.25 : 0.25, Math.max(0.6, match.headY - 0.6), -0.1);
       }
     }
+    // Nod and tilt ride on the tail (d[10], d[11]) so the frame stays
+    // backwards-compatible: short frames from an old client decode to 0.
+    d.push(_e.x, _e.z);
     sendPose(d);
   }
 }

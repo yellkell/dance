@@ -51,8 +51,13 @@ export interface DancerPose {
   hx: number;
   hy: number;
   hz: number;
-  /** Head yaw (radians about +Y; 0 faces −Z, toward the stage). */
+  /** Head yaw (radians about +Y; 0 faces −Z, toward the stage), and the
+   *  other two axes a real neck has: pitch (nodding, + is up) and roll
+   *  (the tilt you do when you are listening). Applied YXZ, which is the
+   *  order a head actually works in. */
   yaw: number;
+  pitch: number;
+  roll: number;
   /** Hand targets, platform-local. */
   lx: number;
   ly: number;
@@ -119,6 +124,13 @@ const SHOULDER_W = 0.155; // half-width
 const SHOULDER_DROP = 0.15; // head centre → shoulder line
 const HIP_W = 0.082; // half-width
 const ANKLE = 0.085; // ankle height — legs end here, boots own the rest
+/* How far the neck goes before the head would bury itself in the chest or
+ * snap round. A player CAN look straight down at their own boots; the
+ * avatar stops short of that, because a rig with no spine has nowhere to
+ * put the difference. */
+const PITCH_MAX = 1.15;
+const ROLL_MAX = 0.6;
+
 /** Femur (and shin) while the figure stands — see legBone(). Sized just
  *  over half the standing hip→ankle span, so a dancer at rest STANDS UP
  *  STRAIGHT (a few centimetres of knee, not a permanent half-squat) and
@@ -426,6 +438,10 @@ export function buildDancer(hue: number): DancerRig {
 
   /* ── head: sculpted dark skull, lit visor band, jewellery, crest ── */
   const head = new Group();
+  // A head turns, then nods, then tilts — in that order. (The default XYZ
+  // would pitch about the WORLD's x axis, so a dancer facing sideways would
+  // nod their head over their own shoulder.)
+  head.rotation.order = 'YXZ';
   const skull = M(latheGeo('head', HEAD), shell);
   // Narrower across than deep, like a head — and the lathe is authored
   // base-at-0, so it drops half its height to centre on the group origin.
@@ -694,7 +710,16 @@ export function buildDancer(hue: number): DancerRig {
     const hipZ = p.hz;
 
     head.position.set(p.hx, hy, p.hz);
-    head.rotation.set(melt * 0.9, p.yaw, melt * 0.35);
+    // `|| 0` also swallows a NaN from a half-built pose: a head that spins
+    // to NaN takes its whole rig off screen, and a lost nod is cheaper.
+    const clamp = (v: number, lim: number): number => Math.max(-lim, Math.min(lim, v || 0));
+    // Melting overrides the neck: a folded dancer's head hangs, whatever
+    // they were looking at on the way down.
+    head.rotation.set(
+      clamp(p.pitch, PITCH_MAX) * (1 - melt) + melt * 0.9,
+      p.yaw,
+      clamp(p.roll, ROLL_MAX) * (1 - melt) + melt * 0.35,
+    );
 
     const cos = Math.cos(p.yaw);
     const sin = Math.sin(p.yaw);
@@ -709,9 +734,10 @@ export function buildDancer(hue: number): DancerRig {
     shoulderR.set(p.hx + SHOULDER_W * cos, shY, p.hz - SHOULDER_W * sin);
 
     // Torso line: neck → bodice (shoulder mid → waist) → basque (→ hips).
-    // The neck buries its top in the JAW, not the old sphere's equator —
-    // the chin taper means the head's underside is higher and narrower.
-    _a.set(p.hx, hy - HEAD_R * 0.85, p.hz);
+    // The neck buries its top in the JAW — and the jaw MOVES: it is a point
+    // under the head that rotates with it, so a nod swings the chin forward
+    // and the neck follows instead of the head pivoting off the top of it.
+    _a.set(0, -HEAD_R * 0.85, 0).applyEuler(head.rotation).add(head.position);
     _b.set((shoulderL.x + shoulderR.x) / 2, shY, (shoulderL.z + shoulderR.z) / 2);
     align(neck, _b, _a);
     choker.position.copy(_a).lerp(_b, 0.32);
@@ -763,7 +789,7 @@ export function buildDancer(hue: number): DancerRig {
   };
 
   // Park in a neutral stance so a rig never renders unsolved.
-  pose({ hx: 0, hy: 1.52, hz: 0, yaw: 0, lx: -0.3, ly: 1.0, lz: -0.1, rx: 0.3, ry: 1.0, rz: -0.1, slump: 0 });
+  pose({ hx: 0, hy: 1.52, hz: 0, yaw: 0, pitch: 0, roll: 0, lx: -0.3, ly: 1.0, lz: -0.1, rx: 0.3, ry: 1.0, rz: -0.1, slump: 0 });
 
   let detailed = true;
   return {
