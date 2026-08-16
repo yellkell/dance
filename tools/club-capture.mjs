@@ -82,6 +82,13 @@ await rig(-6.6, -9.6, 2.6);
 await shot('club-still-room');
 await rig(0.4, -4.0, -0.5);
 await shot('club-under-eclipse');
+// THE MIRROR: from across the hall (asleep, black glass)…
+await rig(6.6, -6.2, 0);
+await shot('club-mirror-asleep');
+// …then close enough to wake it — my own reflection in the glass.
+await rig(6.6, -9.7, 0);
+await page.waitForTimeout(700); // the smoke thins on approach
+await shot('club-mirror-awake');
 
 // ── THE BALL, hanging on the floor ───────────────────────────────────────
 await rig(0, -0.4, 0);

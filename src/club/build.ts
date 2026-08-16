@@ -190,6 +190,7 @@ export function buildClub(scene: Scene): ClubRefs {
   buildCeiling(root, W, NZ, SZ, H);
   const chandelier = buildChandelier(root);
   const consoleMat = buildStage(root);
+  buildMirror(root);
   const barBackMat = buildBar(root);
   const candleMat = new SpriteMaterial({
     map: glowTexture(),
@@ -313,7 +314,25 @@ function buildWalls(root: Group, W: number, NZ: number, SZ: number, H: number): 
     m.rotation.y = ry;
     root.add(m);
   };
-  wall(W * 2, 0, NZ, 0); // north — the stage's drape wall covers most of it
+  // North — the stage's drape wall covers most of it, EXCEPT the mirror's
+  // opening in the east corner: the glass there is a window into the
+  // mirror recess behind the wall, so the plaster (like the drapes and the
+  // trim runs below) parts around it instead of sealing it shut.
+  const MR = CLUB.mirror;
+  const mx0 = MR.x - MR.w / 2 - 0.05;
+  const mx1 = MR.x + MR.w / 2 + 0.05;
+  const mTop = MR.baseY + MR.h + 0.05;
+  const wallH = H + 1.8;
+  {
+    const north = (w: number, x: number, y0: number, y1: number): void => {
+      const m = new Mesh(new PlaneGeometry(w, y1 - y0), plaster);
+      m.position.set(x, (y0 + y1) / 2, NZ);
+      root.add(m);
+    };
+    north(mx0 + W, (mx0 - W) / 2, 0, wallH); // west of the opening
+    north(W - mx1, (mx1 + W) / 2, 0, wallH); // east of the opening
+    north(mx1 - mx0, MR.x, mTop, wallH); // over the lintel
+  }
   wall(W * 2, 0, SZ, Math.PI); // south (vestibule)
   wall(SZ - NZ, -W, (NZ + SZ) / 2, Math.PI / 2); // west
   wall(SZ - NZ, W, (NZ + SZ) / 2, -Math.PI / 2); // east
@@ -327,7 +346,11 @@ function buildWalls(root: Group, W: number, NZ: number, SZ: number, H: number): 
     box(root, railMat, len, 0.035, 0.02, x, 1.0, z, ry);
     box(root, railMat, len, 0.05, 0.025, x, 2.62, z, ry);
   };
-  trimRun(W * 2, 0, NZ + 0.02, 0);
+  // The north runs die into the mirror's frame the way the south's die
+  // into the door portal — a dado rail straight across the glass would be
+  // a brass line through everyone's reflection.
+  trimRun(mx0 + W, (mx0 - W) / 2, NZ + 0.02, 0);
+  trimRun(W - mx1, (mx1 + W) / 2, NZ + 0.02, 0);
   trimRun(SZ - NZ, -W + 0.02, (NZ + SZ) / 2, Math.PI / 2);
   trimRun(SZ - NZ, W - 0.02, (NZ + SZ) / 2, -Math.PI / 2);
   // The SOUTH wall's runs die into the entrance portal instead of ploughing
@@ -583,9 +606,14 @@ function buildStage(root: Group): MeshBasicMaterial {
 
   // Velvet drapes across the whole north wall behind the burst: full-height
   // panels hung in alternating relief so the pleats catch the cove light.
+  // They PART around the mirror in the east corner — its glass is a window
+  // through this wall, and buildMirror() hangs the tied-back pair that
+  // frames it.
   const drapeMat = new MeshStandardMaterial({ map: velvetTexture([2, 1], 6), roughness: 0.96, metalness: 0 });
+  const MR = CLUB.mirror;
   for (let i = 0; i < 12; i++) {
     const x = -8.25 + i * 1.5;
+    if (Math.abs(x - MR.x) < MR.w / 2 + 1.0) continue; // the mirror's span
     const panel = new Mesh(new PlaneGeometry(1.56, 4.6), drapeMat);
     panel.position.set(x, 2.3, CLUB.minZ + 0.05 + (i % 2) * 0.05);
     root.add(panel);
@@ -853,6 +881,198 @@ function buildBar(root: Group): MeshStandardMaterial {
   root.add(barSign);
 
   return glassMat;
+}
+
+/* ── THE MIRROR: a smoked pier glass into a recess behind the north wall ── */
+
+/** What ClubMirrorSystem drives: the pane's smoke, the figures' room, the
+ *  depth-haze and the recess key. Everything else about the mirror bakes. */
+export interface MirrorRefs {
+  /** The glass tint — near-opaque asleep, light smoke awake. */
+  pane: MeshBasicMaterial;
+  /** Where the system parents the mirrored rigs (inside the recess). */
+  figures: Group;
+  /** The translucent murk planes that swallow deep reflections. */
+  haze: Group;
+  /** The recess's own key — warm, and only paid for while the glass wakes. */
+  light: PointLight;
+}
+
+/** buildClub() → ClubMirrorSystem hand-off (same pattern as socialView:
+ *  the builder runs long before any system's init sees the refs). */
+export const mirrorRefs: { current: MirrorRefs | null } = { current: null };
+
+function buildMirror(root: Group): void {
+  const M = CLUB.mirror;
+  const wallZ = CLUB.minZ;
+  const x0 = M.x - M.w / 2;
+  const x1 = M.x + M.w / 2;
+  const yTop = M.baseY + M.h;
+  const cy = M.baseY + M.h / 2;
+
+  /* The RECESS — the room the reflections stand in: a dark shell as deep
+   * as the mirror can see, always there (it bakes; an empty black box
+   * costs nothing), so the sleeping glass has real darkness behind it. */
+  const depth = M.reflectRange + 0.5;
+  const shell = new MeshStandardMaterial({ color: 0x121016, roughness: 0.85, metalness: 0.15 });
+  const inX0 = M.x - 2.4;
+  const inX1 = Math.min(CLUB.halfW + 0.6, M.x + 2.4);
+  const inW = inX1 - inX0;
+  const inCx = (inX0 + inX1) / 2;
+  const inH = 3.1;
+  // Floor carries a whisper of the parquet's sheen — a floor, not a pit.
+  const rFloor = new Mesh(
+    new PlaneGeometry(inW, depth),
+    new MeshStandardMaterial({ color: 0x17141a, roughness: 0.45, metalness: 0.35 }),
+  );
+  rFloor.rotation.x = -Math.PI / 2;
+  rFloor.position.set(inCx, 0.002, wallZ - depth / 2);
+  root.add(rFloor);
+  const rCeil = new Mesh(new PlaneGeometry(inW, depth), shell);
+  rCeil.rotation.x = Math.PI / 2;
+  rCeil.position.set(inCx, inH, wallZ - depth / 2);
+  root.add(rCeil);
+  const rBack = new Mesh(new PlaneGeometry(inW, inH), shell);
+  rBack.position.set(inCx, inH / 2, wallZ - depth);
+  root.add(rBack);
+  for (const [sx, ry] of [
+    [inX0, Math.PI / 2],
+    [inX1, -Math.PI / 2],
+  ] as const) {
+    const side = new Mesh(new PlaneGeometry(depth, inH), shell);
+    side.position.set(sx, inH / 2, wallZ - depth / 2);
+    side.rotation.y = ry;
+    root.add(side);
+  }
+
+  // The figures' room + the murk — LIVE (the system toggles them awake).
+  const figures = new Group();
+  figures.name = 'live-mirror-figures';
+  figures.visible = false;
+  root.add(figures);
+  const haze = new Group();
+  haze.name = 'live-mirror-haze';
+  haze.visible = false;
+  // The murk starts BEYOND the reflection you came to look at: your own
+  // stands as deep as you are far, so haze hung at a metre just dims the
+  // one figure that matters. These sit past that and swallow the recess's
+  // back wall, where the far reflections trail off into nothing.
+  for (let i = 0; i < 3; i++) {
+    const murk = new Mesh(
+      new PlaneGeometry(inW, inH),
+      new MeshBasicMaterial({ color: 0x05060a, transparent: true, opacity: 0.28, depthWrite: false }),
+    );
+    murk.position.set(inCx, inH / 2, wallZ - 2.6 - i * 0.8);
+    haze.add(murk);
+  }
+  // THE ROOM BEHIND YOU, implied. A real mirror shows the hall over your
+  // shoulder; a recess this shallow can't hold one, and without something
+  // back there the glass reads as a hatch onto a black cupboard. A few
+  // deep warm embers at the candle/cove temperatures — the club's own
+  // light, too far off to resolve — sell the depth the geometry lacks,
+  // and they hide behind the murk planes rather than lighting anything.
+  const emberMat = new SpriteMaterial({
+    map: glowTexture(),
+    color: DECOR.cove,
+    transparent: true,
+    blending: AdditiveBlending,
+    depthWrite: false,
+    opacity: 0.4,
+  });
+  for (const [ex, ey, ez, s] of [
+    [-1.5, 1.85, 2.9, 0.75],
+    [1.35, 2.1, 3.35, 0.6],
+    [-0.35, 2.55, 3.6, 0.95],
+    [1.8, 1.35, 2.7, 0.5],
+    [-1.9, 1.15, 3.3, 0.42],
+  ] as const) {
+    const ember = new Sprite(emberMat);
+    ember.scale.setScalar(s);
+    ember.position.set(inCx + ex, ey, wallZ - ez);
+    haze.add(ember);
+  }
+  root.add(haze);
+  // The recess key hangs just BEHIND the glass, so it rakes the fronts of
+  // the reflections (which face the pane, and therefore you) rather than
+  // backlighting them into silhouettes.
+  const light = new PointLight(DECOR.face, 0, 6.5, 1.5);
+  light.position.set(M.x, 2.15, wallZ - 0.5);
+  light.name = 'live-mirror-light';
+  root.add(light);
+
+  /* The GLASS — one smoked pane at the wall plane. Asleep it is black
+   * glass; awake it thins to a tint over the recess. ('live-': its
+   * opacity animates, and the bake must not swallow it.) */
+  const pane = new MeshBasicMaterial({ color: 0x04050a, transparent: true, opacity: 0.93, depthWrite: false });
+  const glass = new Mesh(new PlaneGeometry(M.w, M.h), pane);
+  glass.name = 'live-mirror-pane';
+  glass.position.set(M.x, cy, wallZ + 0.012);
+  root.add(glass);
+  // A resting sheen so the black glass reads GLASS from across the hall —
+  // a faint cold gleam clipped to the pane, not a lit surface.
+  const sheen = new Mesh(
+    new PlaneGeometry(M.w * 0.86, M.h * 0.86),
+    new MeshBasicMaterial({
+      map: glowTexture(),
+      color: 0x3a4358,
+      transparent: true,
+      opacity: 0.16,
+      blending: AdditiveBlending,
+      depthWrite: false,
+    }),
+  );
+  sheen.position.set(M.x - M.w * 0.18, cy + M.h * 0.2, wallZ + 0.016);
+  root.add(sheen);
+
+  /* The FRAME — champagne brass over a bronze under-step, deco to match
+   * the pilasters; a chunky sill below, a rib fan crown above (the stage
+   * sunburst's little echo, so the two ends of the wall rhyme). Every
+   * face bar OVERLAPS both the glass edge and the wall opening's rim —
+   * a frame that covers neither is a picture taped to a hole. */
+  const brass = brassMat(0.3);
+  const bronze = bronzeMat();
+  const B = 0.14; // face bar width
+  // Bronze under-step: a sliver peeking around the brass, less proud.
+  box(root, bronze, M.w + 0.66, 0.1, 0.08, M.x, yTop + 0.16, wallZ + 0.04);
+  for (const sx of [x0 - 0.13, x1 + 0.13]) box(root, bronze, 0.1, M.h + 0.3, 0.08, sx, cy, wallZ + 0.04);
+  // Brass face frame (top bar rides the lintel, bottom bar the glass base).
+  box(root, brass, M.w + 0.5, B, 0.1, M.x, yTop + 0.05, wallZ + 0.07);
+  box(root, brass, M.w + 0.5, B, 0.1, M.x, M.baseY - 0.05, wallZ + 0.07);
+  for (const sx of [x0 - 0.02, x1 + 0.02]) box(root, brass, B, M.h + 0.34, 0.1, sx, cy, wallZ + 0.07);
+  // Corner blocks — the deco full stop on each mitre.
+  for (const sx of [x0 - 0.02, x1 + 0.02]) {
+    for (const sy of [M.baseY - 0.05, yTop + 0.05]) {
+      box(root, blackSteelMat(), B + 0.06, B + 0.06, 0.11, sx, sy, wallZ + 0.075);
+    }
+  }
+  // The sill — a proper brass shelf on a bronze plinth; the skirting run
+  // dies into it from either side.
+  box(root, brass, M.w + 0.56, 0.07, 0.22, M.x, 0.155, wallZ + 0.1);
+  box(root, bronze, M.w + 0.44, 0.16, 0.1, M.x, 0.08, wallZ + 0.05);
+  // The crown fan.
+  const crownY = yTop + 0.24;
+  for (let i = 0; i < 7; i++) {
+    const a = (i / 6) * Math.PI - Math.PI / 2;
+    const len = 0.3 + (i % 2) * 0.12;
+    const rib = new Mesh(new BoxGeometry(0.035, len, 0.025), brass);
+    rib.position.set(M.x + Math.sin(a) * (len / 2 + 0.12), crownY + Math.cos(a) * (len / 2 + 0.12), wallZ + 0.05);
+    rib.rotation.z = -a;
+    root.add(rib);
+  }
+  const hub = new Mesh(new CircleGeometry(0.12, 18, 0, Math.PI), brassGlowMat(0.7));
+  hub.position.set(M.x, crownY, wallZ + 0.06);
+  root.add(hub);
+
+  /* Tied-back velvet flanks — the drape line parts FOR the mirror. */
+  const drape = new MeshStandardMaterial({ map: velvetTexture([2, 1], 6), roughness: 0.96, metalness: 0 });
+  for (const side of [-1, 1] as const) {
+    const panel = new Mesh(new PlaneGeometry(1.3, 4.6), drape);
+    panel.position.set(M.x + side * (M.w / 2 + 0.82), 2.3, wallZ + 0.1);
+    panel.rotation.y = -side * 0.1;
+    root.add(panel);
+  }
+
+  mirrorRefs.current = { pane, figures, haze, light };
 }
 
 /* ── booths: velvet horseshoes, marble tables, candlelight ──────────────── */

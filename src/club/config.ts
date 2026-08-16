@@ -90,6 +90,29 @@ export const CLUB = {
    *  ambient mix ducks to a murmur inside; voices stay. */
   quiet: { minX: -8.7, maxX: -4.9, minZ: -11.2, maxZ: -8.45, doorX0: -6.6, doorX1: -5.4 },
 
+  /** THE MIRROR — a grand smoked pier glass on the north wall's east end,
+   *  the still room's opposite number across the DJ. The one place in the
+   *  game you can see your own body: walk up and the glass wakes, showing
+   *  the figure everyone ELSE sees (plus whoever stands near you). It
+   *  sleeps as plain black glass beyond `range` — the reflection is real
+   *  mirrored rigs in a recess behind the wall, and nobody pays for them
+   *  from across the hall.
+   *
+   *  `x` centres it in the north-east corner walk; the glass plane IS the
+   *  north wall. `reflectRange` bounds both the recess depth and which
+   *  dancers reflect; `maxFigures` caps a packed room's bill. */
+  mirror: {
+    x: 6.65,
+    w: 2.5,
+    h: 2.35,
+    baseY: 0.16,
+    /** Head → glass distance that wakes it (sleep again at +0.4). */
+    range: 3.4,
+    /** Only figures this close to the glass appear in it. */
+    reflectRange: 3.2,
+    maxFigures: 8,
+  },
+
   /** THE ARCADE — the still room's loud mirror, and its POLAR opposite:
    *  the still room is front-left by the stage, so the noise goes
    *  back-right, by the door. Its own door faces north, onto the floor.
