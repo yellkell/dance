@@ -120,6 +120,21 @@ function nameTagTexture(text: string, colorCss: string): CanvasTexture {
   return tex;
 }
 
+/** One room-mate's live presence on the floor, published for the mirror.
+ *  `pose` is the SAME object the puppet dances with (live reference, club
+ *  world space); `shown` mirrors the figure's actual visibility — blocked
+ *  dancers and dancers away on the ring are not shown, so they cast no
+ *  reflection either. */
+export interface FloorFigure {
+  pose: DancerPose;
+  hue: number;
+  shown: boolean;
+}
+
+/** The club floor's figures by member idx (me excluded — I have no figure;
+ *  ClubMirrorSystem builds my reflection from the headset directly). */
+export const clubFloorFigures = new Map<number, FloorFigure>();
+
 /** Headless/dev hook (wired into __gdr in main.ts): raise the SOCIAL panel
  *  without a controller. */
 export const socialView: {
@@ -266,6 +281,8 @@ export class ClubSocialSystem extends createSystem({}) {
         // They're away playing: their figure steps off the floor and their
         // voice sings from the stage — the set, heard from the club.
         p.rig.root.visible = false;
+        const away = clubFloorFigures.get(p.idx);
+        if (away) away.shown = false;
         p.tag.visible = false;
         _v.set(0, 1.7, CLUB.stage.z + 1.1);
         setVoiceSpeakerPosition(String(p.idx), _v);
@@ -283,6 +300,8 @@ export class ClubSocialSystem extends createSystem({}) {
       }
       p.rig.root.visible = p.live && !hidden;
       p.tag.visible = p.live && !hidden;
+      const fig = clubFloorFigures.get(p.idx);
+      if (fig) fig.shown = p.rig.root.visible;
       if (!p.live || hidden) continue;
 
       p.rig.pose(p.pose);
@@ -348,6 +367,7 @@ export class ClubSocialSystem extends createSystem({}) {
         p.tagMat.map?.dispose();
         p.tagMat.dispose();
         this.puppets.delete(idx);
+        clubFloorFigures.delete(idx);
       }
     }
     // Spawn the new (parked invisible until their first pose arrives).
@@ -367,20 +387,14 @@ export class ClubSocialSystem extends createSystem({}) {
       tag.renderOrder = 24;
       tag.visible = false;
       this.crowd.add(tag);
-      this.puppets.set(idx, {
-        idx,
-        name,
-        hue,
-        rig,
-        tag,
-        tagMat,
-        pose: {
-          hx: 0, hy: 1.55, hz: 3.8, yaw: 0,
-          lx: -0.3, ly: 1.0, lz: 3.7, rx: 0.3, ry: 1.0, rz: 3.7,
-          slump: 0,
-        },
-        live: false,
-      });
+      const pose: DancerPose = {
+        hx: 0, hy: 1.55, hz: 3.8, yaw: 0,
+        lx: -0.3, ly: 1.0, lz: 3.7, rx: 0.3, ry: 1.0, rz: 3.7,
+        slump: 0,
+      };
+      this.puppets.set(idx, { idx, name, hue, rig, tag, tagMat, pose, live: false });
+      // The mirror watches the same pose object the puppet dances with.
+      clubFloorFigures.set(idx, { pose, hue, shown: false });
     }
     this.paintKey = ''; // roster changed → repaint the panel
   }
