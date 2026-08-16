@@ -4,9 +4,14 @@
  * The interaction feel is FIRE FIGHT's pub, carried over: a fat invisible
  * grab proxy so a slim coupe is never fiddly to catch, a forgiving
  * aim-cone range grab, a five-frame ring buffer turning real hand motion
- * into throw velocity, per-surface landing, and a settle that eases a
- * tilted glass upright instead of snapping it. No physics engine — five
+ * into throw velocity, and per-surface landing. No physics engine — a few
  * cheap tricks that read as one expensive one.
+ *
+ * A glass lands how it lands. It used to right itself where it fell, which
+ * kept the club tidy and made the props feel like set dressing rather than
+ * objects; now a thrown coupe lies on its rim exactly as it came down. The
+ * surfaces it can land on include OTHER GLASSES' rims, so a steady hand can
+ * stack them.
  *
  * Geometry: the coupe is the booths' decorative glass, sized for a hand,
  * with a cocktail in it (a magenta fill that empties when you drink).
@@ -32,8 +37,6 @@ export const PROP_PHYS = {
   slideFriction: 2.2,
   /** Below this speed a landing settles instead of bouncing. */
   settleSpeed: 0.6,
-  /** How fast a settled glass eases upright (per second). */
-  uprightEase: 6,
   /** Tumble picked up from a throw. */
   spinFromThrow: 1.5,
   spinMax: 11,
@@ -67,6 +70,20 @@ export const PROP_PHYS = {
   bodyR: 0.072,
   /** Energy kept when two glasses meet (they ring more than they stick). */
   glassRestitution: 0.45,
+  /* ── STACKING ──
+   * A coupe's rim is a landing pad: set one down square on another and the
+   * foot sits in the bowl, which is how a bartender stacks them and how
+   * anyone who wants a tower is going to try. Three numbers make it a
+   * skill rather than a magnet. */
+  /** Rim height and radius above the glass's own base. */
+  rimY: 0.187,
+  rimR: 0.066,
+  /** How near the lower glass's axis your foot has to land. Under the rim
+   *  radius on purpose: catch it dead centre or it goes to the table. */
+  stackR: 0.045,
+  /** How square the glass underneath has to be standing (world-Y of its own
+   *  up axis). Nothing balances on one lying on its side. */
+  stackCos: 0.96,
 } as const;
 
 /**
@@ -176,8 +193,14 @@ export interface CoupeRefs {
 /** A hand-sized coupe with a magenta cocktail and a fat grab proxy. */
 export function buildCoupe(): CoupeRefs {
   const root = new Group();
+  // A lathe is a surface of revolution, so a profile that stops SHORT of the
+  // axis leaves a hole down the middle. Both of these used to start at 1 mm
+  // — enough to open a 2 mm pipe straight through the drink, which read as a
+  // black dot dead centre of every glass in the club (the glass writes no
+  // depth, so what showed through the hole was the dark room behind it).
+  // Touching the axis closes the pole; three caps the normals there itself.
   const pts: Vector2[] = [
-    new Vector2(0.001, 0),
+    new Vector2(0, 0),
     new Vector2(0.042, 0.003),
     new Vector2(0.006, 0.015),
     new Vector2(0.006, 0.112),
@@ -198,7 +221,9 @@ export function buildCoupe(): CoupeRefs {
 
   const fill = new Mesh(
     new LatheGeometry(
-      [new Vector2(0.001, 0.132), new Vector2(0.052, 0.145), new Vector2(0.058, 0.168), new Vector2(0.001, 0.169)],
+      // Closed at both poles for the same reason — the cocktail's surface is
+      // a DISC, not a washer.
+      [new Vector2(0, 0.132), new Vector2(0.052, 0.145), new Vector2(0.058, 0.168), new Vector2(0, 0.169)],
       12,
     ),
     new MeshStandardMaterial({
