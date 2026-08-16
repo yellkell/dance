@@ -32,10 +32,12 @@ import { createSystem } from '@iwsdk/core';
 import { Euler, Plane, Quaternion, Vector3, type Material, type Mesh } from 'three';
 import { mirrorRefs } from '../club/build.js';
 import { CLUB } from '../club/config.js';
+import { buildCoupe, type CoupeRefs } from '../club/props.js';
 import { buildDancer, type DancerPose, type DancerRig } from '../game/avatars.js';
 import { danceHue } from '../game/profile.js';
 import { match } from '../game/state.js';
 import { memberHue, net } from '../net/session.js';
+import { heldDrinks } from './ClubPropsSystem.js';
 import { clubFloorFigures } from './ClubSocialSystem.js';
 
 const _v = new Vector3();
@@ -60,6 +62,30 @@ const SMOKE_AWAKE = 0.26;
  */
 const GLASS_CLIP = [new Plane(new Vector3(0, 0, -1), CLUB.minZ)];
 
+/** Turn through π about Y — the sagittal flip the swapped hands stand in
+ *  for, as a quaternion. See castDrink(). */
+const Y_FLIP = new Quaternion(0, 1, 0, 0);
+
+interface PoolEntry {
+  rig: DancerRig;
+  hue: number;
+  /** Built the first time this figure picks a drink up, kept after. */
+  cup?: CoupeRefs;
+}
+
+/** buildCoupe() hands back a Group with no disposer of its own; a mirrored
+ *  one is built and dropped with the figure holding it, so it needs one. */
+function disposeCoupe(cup: CoupeRefs): void {
+  cup.root.traverse((o) => {
+    const mesh = o as Mesh;
+    mesh.geometry?.dispose();
+    const mat = mesh.material as Material | Material[] | undefined;
+    if (!mat) return;
+    for (const m of Array.isArray(mat) ? mat : [mat]) m.dispose();
+  });
+  cup.root.removeFromParent();
+}
+
 const freshPose = (): DancerPose => ({
   hx: 0, hy: 1.55, hz: 0, yaw: 0, pitch: 0, roll: 0,
   lx: -0.25, ly: 1.0, lz: 0, rx: 0.25, ry: 1.0, rz: 0,
@@ -78,7 +104,7 @@ export class ClubMirrorSystem extends createSystem({}) {
   private wake = 0;
   /** Mirrored rigs by member idx; −1 is me. Kept while the floor is open
    *  (hidden when asleep — posing stops, building doesn't churn). */
-  private pool = new Map<number, { rig: DancerRig; hue: number }>();
+  private pool = new Map<number, PoolEntry>();
   /** Were reflections standing last frame? (Stand them down exactly once
    *  on the way to sleep, rather than every frame we're asleep.) */
   private lit = false;
@@ -114,7 +140,10 @@ export class ClubMirrorSystem extends createSystem({}) {
     if (!onFloor) {
       // The floor is gone (set out, room left) — give the rigs back.
       if (this.pool.size) {
-        for (const p of this.pool.values()) p.rig.dispose();
+        for (const p of this.pool.values()) {
+          p.rig.dispose();
+          if (p.cup) disposeCoupe(p.cup);
+        }
         this.pool.clear();
       }
       this.lit = false;
@@ -128,7 +157,10 @@ export class ClubMirrorSystem extends createSystem({}) {
       // that rebuilds on every approach would hitch at the one moment
       // you're looking straight at it.)
       if (this.lit) {
-        for (const p of this.pool.values()) p.rig.root.visible = false;
+        for (const p of this.pool.values()) {
+          p.rig.root.visible = false;
+          if (p.cup) p.cup.root.visible = false;
+        }
         this.lit = false;
       }
       return;
@@ -143,7 +175,7 @@ export class ClubMirrorSystem extends createSystem({}) {
       const myIdx = net.myIdx;
       const me = net.members.find((m) => m.idx === myIdx);
       const hue = me ? memberHue(me) : danceHue(Math.max(0, myIdx), true);
-      this.cast(-1, hue, this.mine, glassZ);
+      this.cast(-1, hue, this.mine, glassZ, myIdx);
       used.add(-1);
     }
 
@@ -157,15 +189,20 @@ export class ClubMirrorSystem extends createSystem({}) {
     }
     nearby.sort((a, b) => a.d - b.d);
     for (const n of nearby.slice(0, M.maxFigures)) {
-      this.cast(n.idx, n.hue, n.pose, glassZ);
+      this.cast(n.idx, n.hue, n.pose, glassZ, n.idx);
       used.add(n.idx);
     }
 
-    // Everyone else's reflection stands down (kept built, hidden).
+    // Everyone else's reflection stands down (kept built, hidden) — drink
+    // and all.
     for (const [idx, p] of this.pool) {
-      if (!used.has(idx)) p.rig.root.visible = false;
+      if (!used.has(idx)) {
+        p.rig.root.visible = false;
+        if (p.cup) p.cup.root.visible = false;
+      }
       if (idx >= 0 && !clubFloorFigures.has(idx)) {
         p.rig.dispose(); // left the room — the pool lets go too
+        if (p.cup) disposeCoupe(p.cup);
         this.pool.delete(idx);
       }
     }
@@ -217,8 +254,9 @@ export class ClubMirrorSystem extends createSystem({}) {
   }
 
   /** Reflect `src` across the glass plane and pose idx's pooled rig with
-   *  it (building the rig on first sight, rebuilding on a hue change). */
-  private cast(idx: number, hue: number, src: DancerPose, glassZ: number): void {
+   *  it (building the rig on first sight, rebuilding on a hue change).
+   *  `holder` is this figure's member idx, for the drink in their hand. */
+  private cast(idx: number, hue: number, src: DancerPose, glassZ: number, holder: number): void {
     let entry = this.pool.get(idx);
     if (entry && Math.abs(entry.hue - hue) > 1e-4) {
       entry.rig.dispose();
@@ -262,5 +300,44 @@ export class ClubMirrorSystem extends createSystem({}) {
     o.slump = src.slump;
     entry.rig.root.visible = true;
     entry.rig.pose(o);
+    this.castDrink(entry, holder, glassZ);
+  }
+
+  /**
+   * The drink in that figure's hand — the one thing you carry, and the one
+   * thing the glass used to leave out. Without it you walk up holding a
+   * coupe and watch your reflection mime an empty grip.
+   *
+   * It needs no hand-swapping of its own: the reflection's left hand is
+   * already standing where your right hand's mirror image is, so a glass
+   * reflected purely by position lands in it. Orientation is the body's
+   * transform written for a quaternion — negate x and y (that is the mirror
+   * across z) and turn the result through π about Y (the sagittal flip the
+   * swapped hands stand in for). For a coupe, which is a surface of
+   * revolution, that flip changes nothing you can see; what it buys is a
+   * glass that leans the way the arm holding it leans.
+   */
+  private castDrink(entry: PoolEntry, holder: number, glassZ: number): void {
+    const drink = heldDrinks.get(holder);
+    if (!drink) {
+      if (entry.cup) entry.cup.root.visible = false;
+      return;
+    }
+    if (!entry.cup) {
+      entry.cup = buildCoupe();
+      // Clipped at the pane like the bodies: press a drink to the glass and
+      // it must stop existing at the frame, not poke out into the room.
+      entry.cup.root.traverse((o) => {
+        const mat = (o as Mesh).material as Material | Material[] | undefined;
+        if (!mat) return;
+        for (const m of Array.isArray(mat) ? mat : [mat]) m.clippingPlanes = GLASS_CLIP;
+      });
+      mirrorRefs.current!.figures.add(entry.cup.root);
+    }
+    const cup = entry.cup;
+    cup.root.visible = true;
+    cup.root.position.set(drink.pos.x, drink.pos.y, 2 * glassZ - drink.pos.z);
+    cup.root.quaternion.set(-drink.quat.x, -drink.quat.y, drink.quat.z, drink.quat.w).multiply(Y_FLIP);
+    cup.fill.visible = drink.full; // drink it and the reflection's empties too
   }
 }

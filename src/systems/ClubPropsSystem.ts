@@ -90,6 +90,26 @@ const STREAM_S = 0.05;
 /** Remote glasses ease toward the stream at this rate; snap beyond 2 m. */
 const NET_EASE = 18;
 
+/**
+ * A drink in somebody's hand, in WORLD space, keyed by the holder's member
+ * idx — republished every frame the floor is live.
+ *
+ * This exists for THE MIRROR. The glass is the one thing you carry, and the
+ * pier glass casts bodies only, so walking up to it with a drink used to
+ * show you a reflection miming an empty grip. The mirror can't reach into
+ * this system's private pool (a held glass is parented to a controller, a
+ * room-mate's is easing toward a streamed pose), so the pose it needs is
+ * resolved to world here, once, where it's already known.
+ */
+export interface HeldDrink {
+  pos: Vector3;
+  quat: Quaternion;
+  hand: Hand;
+  /** Still has a cocktail in it — drink it and the fill goes. */
+  full: boolean;
+}
+export const heldDrinks = new Map<number, HeldDrink>();
+
 type Mode = 'idle' | 'pedestal' | 'held' | 'flight' | 'rest';
 
 interface Glass {
@@ -144,11 +164,27 @@ export const propsView: {
    *  to the throw) tumbles it, which is the only way to land one anything
    *  other than upright now that nothing rights itself. */
   launch?: (id: number, at: [number, number, number], vel: [number, number, number], spin?: number) => void;
+  /** Put glass `id` in a hand (or `null` to let go of whatever is in that
+   *  hand) through the real grab/release path — there is no trigger to pull
+   *  off-device, and holding one is half of what the props do. */
+  hold?: (id: number | null, hand?: Hand) => void;
 } = {};
 
 export class ClubPropsSystem extends createSystem({}) {
   private group = new Group();
   private glasses: Glass[] = [];
+  /** Hands propsView.hold() is pretending to squeeze. There is no trigger to
+   *  pull off-device, and stepHands lets go the instant it reads one open,
+   *  so a headless grab would last exactly one frame without this. Empty in
+   *  real play. */
+  private devGrip = new Set<Hand>();
+  /** One reusable HeldDrink per pool slot — see publishHeld(). */
+  private heldRecs: HeldDrink[] = Array.from({ length: POOL }, () => ({
+    pos: new Vector3(),
+    quat: new Quaternion(),
+    hand: 'right' as Hand,
+    full: true,
+  }));
   private plate!: Mesh;
   private waiterPhase: WaiterPhase = 'down';
   private served: Glass | null = null;
@@ -208,7 +244,9 @@ export class ClubPropsSystem extends createSystem({}) {
 
     propsView.glasses = () =>
       this.glasses.map((g) => {
-        const p = g.refs.root.position;
+        // WORLD, not local: a held glass is parented to a controller, where
+        // its local position is the palm offset and tells you nothing.
+        const p = g.refs.root.getWorldPosition(_p);
         const drop = this.bottomOffset(g);
         _up.set(0, 1, 0).applyQuaternion(g.refs.root.quaternion);
         return {
@@ -245,6 +283,21 @@ export class ClubPropsSystem extends createSystem({}) {
       glass.owner = net.myIdx;
       this.toGroup(glass);
     };
+    propsView.hold = (id, hand = 'right') => {
+      const rayObj = this.world.playerSpaceEntities?.raySpaces?.[hand]?.object3D;
+      if (!rayObj) return;
+      if (id === null) {
+        this.devGrip.delete(hand);
+        for (const g of this.glasses) if (g.hand === hand && g.mode === 'held') this.release(g);
+        return;
+      }
+      const glass = this.glasses[id];
+      if (!glass) return;
+      this.disown(glass);
+      glass.refs.root.visible = true;
+      this.devGrip.add(hand);
+      this.grab(glass, hand, rayObj);
+    };
   }
 
   update(delta: number): void {
@@ -280,6 +333,26 @@ export class ClubPropsSystem extends createSystem({}) {
         this.stepRest(glass, delta);
       }
     }
+
+    this.publishHeld();
+  }
+
+  /**
+   * Who is holding what, resolved to world space for the mirror. Rebuilt in
+   * place — the records are allocated once per pool slot and re-filled, so a
+   * per-frame publish costs no garbage.
+   */
+  private publishHeld(): void {
+    heldDrinks.clear();
+    for (const glass of this.glasses) {
+      if (glass.mode !== 'held' || glass.owner === null || !glass.hand) continue;
+      const rec = this.heldRecs[glass.id];
+      glass.refs.root.getWorldPosition(rec.pos);
+      glass.refs.root.getWorldQuaternion(rec.quat);
+      rec.hand = glass.hand;
+      rec.full = glass.full;
+      heldDrinks.set(glass.owner, rec);
+    }
   }
 
   /** We left the room entirely: everything goes home, the plate parks. */
@@ -298,6 +371,7 @@ export class ClubPropsSystem extends createSystem({}) {
     this.plate.position.y = WAITER.top - WAITER.drop;
     this.highlight = {};
     this.group.visible = false;
+    heldDrinks.clear();
   }
 
   /** Dealt onto the ring mid-drink: nothing rides the controllers into the
@@ -367,7 +441,9 @@ export class ClubPropsSystem extends createSystem({}) {
         }
 
         const holding =
-          gp.getButtonPressed(InputComponent.Squeeze) || gp.getButtonPressed(InputComponent.Trigger);
+          this.devGrip.has(hand) ||
+          gp.getButtonPressed(InputComponent.Squeeze) ||
+          gp.getButtonPressed(InputComponent.Trigger);
         if (!holding) this.release(held);
         continue;
       }
