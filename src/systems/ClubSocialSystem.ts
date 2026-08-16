@@ -9,7 +9,9 @@
  *    while they talk, eased toward their streamed pose;
  *  - runs the voice room: auto-joins your mic on arrival (left Y mutes it),
  *    glues the audio listener to your head, and pins each dancer's voice to
- *    their figure — HRTF panners, distance falloff, a real hubbub;
+ *    their figure — HRTF panners, distance falloff, a real hubbub. Voice
+ *    carries within ONE PLACE only: the floor hears the floor, a set hears
+ *    the set, and neither hears the other through the wall;
  *  - applies your safety lists every frame: a MUTED dancer goes silent, a
  *    BLOCKED one vanishes — figure, tag and voice, local only;
  *  - owns the SOCIAL panel (right Ⓐ on the club floor): everyone in the
@@ -17,8 +19,9 @@
  *    master switch. The Horizon-store safety console, in house style.
  *
  * When a set drops, the figures pack away (the raid's AvatarSystem takes
- * over on the ring) but the VOICE stays live — pinned to each dancer's
- * platform, so the room keeps talking through the set it's dancing.
+ * over on the ring) but the VOICE stays live among the dancers ON it,
+ * pinned to each one's platform — so a raid keeps talking through the set
+ * it's dancing while the party it left carries on without it.
  */
 
 import { createSystem, InputComponent } from '@iwsdk/core';
@@ -40,7 +43,7 @@ import { preload } from '../audio/music.js';
 import { pickRaidTrack, trackById, tracksFor } from '../audio/tracks.js';
 import { platformRoot } from '../arena/arena.js';
 import { ballSpawnPos } from '../club/ball.js';
-import { CLUB, CLUB_NET } from '../club/config.js';
+import { CLUB_NET } from '../club/config.js';
 import { socialBlocked, socialMuted, toggleSocialBlock, toggleSocialMute } from '../club/social.js';
 import {
   clearVoiceSpeakers,
@@ -252,40 +255,43 @@ export class ClubSocialSystem extends createSystem({}) {
     const ease = 1 - Math.exp(-CLUB_NET.smoothing * delta);
     for (const p of this.puppets.values()) {
       const hidden = socialBlocked(p.name);
-      setVoiceSpeakerMuted(String(p.idx), hidden || socialMuted(p.name));
+      // THE TWO ROOMS. A set and the club floor are different places, and
+      // voice only carries within one: mid-set you hear the people dancing
+      // it with you and not the party you left, and on the floor you hear
+      // the floor and not a raid happening in another world. Spatial audio
+      // needs somewhere to put a voice, and there is no honest answer for
+      // "the club, from the ring" — it used to sing out of the stage, which
+      // made a friend twenty metres away sound like they were in the set.
+      //
+      // The frames still arrive (the relay fans to the whole room); this is
+      // a local gate, exactly like mute and block.
+      const ring = seatByIdx.get(p.idx);
+      const theyDance = liveSet ? ring !== undefined : net.gamePlayers.has(p.idx);
+      const elsewhere = theyDance !== liveSet;
+      setVoiceSpeakerMuted(String(p.idx), hidden || elsewhere || socialMuted(p.name));
 
       if (liveSet) {
         // I'M on the ring. Fellow players' voices pin to their dancer on
-        // their platform; the friends still back on the floor keep talking
-        // from where they stand in the club (their poses keep streaming).
-        const seat = seatByIdx.get(p.idx);
-        if (seat !== undefined) {
-          const root = platformRoot(seat);
-          const pose = remotePoses.get(seat);
-          if (root && pose) {
-            _v.set(pose.hx, pose.hy, pose.hz);
-            root.localToWorld(_v);
-            setVoiceSpeakerPosition(String(p.idx), _v);
-          }
-        } else {
-          const floorPose = clubPoses.get(p.idx);
-          if (floorPose) {
-            _v.set(floorPose.hx, floorPose.hy, floorPose.hz);
-            setVoiceSpeakerPosition(String(p.idx), _v);
-          }
+        // their own platform. Anyone still on the floor is muted above and
+        // needs no position at all.
+        if (ring === undefined) continue;
+        const root = platformRoot(ring);
+        const pose = remotePoses.get(ring);
+        if (root && pose) {
+          _v.set(pose.hx, pose.hy, pose.hz);
+          root.localToWorld(_v);
+          setVoiceSpeakerPosition(String(p.idx), _v);
         }
         continue;
       }
 
       if (net.gamePlayers.has(p.idx)) {
         // They're away playing: their figure steps off the floor and their
-        // voice sings from the stage — the set, heard from the club.
+        // voice goes with them (muted above) until the set folds back.
         p.rig.root.visible = false;
         const away = clubFloorFigures.get(p.idx);
         if (away) away.shown = false;
         p.tag.visible = false;
-        _v.set(0, 1.7, CLUB.stage.z + 1.1);
-        setVoiceSpeakerPosition(String(p.idx), _v);
         continue;
       }
       if (!this.crowd.visible) continue;

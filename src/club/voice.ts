@@ -223,6 +223,11 @@ export function setVoiceSpeakerMuted(id: string, m: boolean): void {
   else mutedSpeakers.delete(id);
 }
 
+/** Who is currently gated off, for headless checks. Read-only. */
+export function mutedSpeakerIds(): string[] {
+  return [...mutedSpeakers].sort();
+}
+
 /** Decode (just int16→float) and queue one PCM frame from punter `id`. */
 export function pushVoiceFrame(id: string, frame: ArrayBuffer): void {
   if (frame.byteLength <= 8) return;

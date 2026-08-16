@@ -147,6 +147,7 @@ World.create(container, {
 // without controllers — e.g. __gdr.startRaid({ seats: 8 }), or walk the
 // club with __gdr.net.host() + __gdr.rig(x, z, yaw).
 import { finishRaid, startRaid, toLobby, toTour } from './game/flow.js';
+import { mutedSpeakerIds } from './club/voice.js';
 import { match } from './game/state.js';
 import { arena } from './arena/arena.js';
 import { choreoView } from './systems/ChoreoSystem.js';
@@ -210,6 +211,8 @@ declare global {
       scene: () => import('three').Scene | null;
       /** The title card, for captures that need to know where the show is. */
       intro: typeof introView;
+      /** Voice speakers currently gated off (mute, block, or wrong room). */
+      mutedVoices: typeof mutedSpeakerIds;
     };
   }
 }
@@ -240,6 +243,7 @@ window.__gdr = {
   },
   club: { call: callBall, touch: joinBall, cancel: cancelBall },
   intro: introView,
+  mutedVoices: mutedSpeakerIds,
   props: propsView,
   menu: new Proxy({} as typeof menuView & typeof socialView, {
     // The views are populated in each system's init — resolve lazily.
