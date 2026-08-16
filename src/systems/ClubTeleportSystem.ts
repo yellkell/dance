@@ -110,6 +110,14 @@ function areaAt(x: number, z: number): FloorArea | null {
   return null;
 }
 
+/** Dev window on the moves that resolve without an arc — no thumbstick
+ *  exists off-device, so this is the only way to exercise them headlessly.
+ *  (`__gdr.move`.) */
+export const teleportView: {
+  stepBack?: () => void;
+  snapTurn?: (dir: -1 | 1) => void;
+} = {};
+
 export class ClubTeleportSystem extends createSystem({}) {
   private aimingHand: 'left' | 'right' | null = null;
   private arc!: Line2;
@@ -149,6 +157,8 @@ export class ClubTeleportSystem extends createSystem({}) {
   };
 
   init(): void {
+    teleportView.stepBack = () => this.stepBack();
+    teleportView.snapTurn = (dir) => snapTurn(this.player, dir > 0 ? -TELEPORT.snapAngle : TELEPORT.snapAngle);
     // Arc line — a fat world-unit ribbon in club brass (hazard-red when the
     // landing is refused), LineBasicMaterial ignores width so Line2 it is.
     this.arcGeo = new LineGeometry();
@@ -243,9 +253,10 @@ export class ClubTeleportSystem extends createSystem({}) {
     }
     this.wasClub = true;
 
-    // Not mid-aim? An isolated sideways flick is a snap turn (forward/back
-    // starts a teleport; sideways WHILE aiming steers facing, below).
-    if (!this.aimingHand && this.trySnapTurn()) return;
+    // Not mid-aim? A sideways flick is a snap turn and a BACKWARD flick is a
+    // step back; only forward opens the teleport arc. (Sideways WHILE aiming
+    // steers the landing's facing instead — see traceArc.)
+    if (!this.aimingHand && this.tryFlick()) return;
 
     let axes: { x: number; y: number } | null = null;
     if (this.aimingHand) {
@@ -350,11 +361,15 @@ export class ClubTeleportSystem extends createSystem({}) {
   }
 
   /**
-   * An isolated left/right flick of either stick yaws the rig by snapAngle.
-   * One turn per flick: the stick must spring back below snapReset to
-   * re-arm, so holding it sideways doesn't spin you.
+   * The two flicks that resolve on the spot rather than opening an arc: a
+   * left/right push yaws the rig by snapAngle, a BACKWARD push shuffles you
+   * half a metre away from what you're looking at.
+   *
+   * One action per flick — the stick has to spring back below snapReset to
+   * re-arm — so holding it doesn't spin you or walk you across the room, and
+   * a diagonal can't fire both.
    */
-  private trySnapTurn(): boolean {
+  private tryFlick(): boolean {
     let sx = 0;
     let sy = 0;
     let mag = 0;
@@ -372,15 +387,61 @@ export class ClubTeleportSystem extends createSystem({}) {
       this.snapArmed = true;
       return false;
     }
+    if (!this.snapArmed) return false;
     // A clear sideways flick past the threshold — turn the way it's pushed
     // (stick right yaws you right: a NEGATIVE rotation about +y).
-    if (this.snapArmed && Math.abs(sx) >= TELEPORT.snapEngage && Math.abs(sx) > Math.abs(sy)) {
+    if (Math.abs(sx) >= TELEPORT.snapEngage && Math.abs(sx) > Math.abs(sy)) {
       this.snapArmed = false;
       snapTurn(this.player, sx > 0 ? -TELEPORT.snapAngle : TELEPORT.snapAngle);
       sfx.uiClick();
       return true;
     }
+    // …and a clear BACKWARD one steps back. (Forward is −y on a thumbstick,
+    // so back is positive.) Consumes the flick either way it lands: a push
+    // that finds a wall behind you must not fall through to the teleport
+    // arc, or backing into a corner would fire a blind hop instead.
+    if (sy >= TELEPORT.snapEngage && sy > Math.abs(sx)) {
+      this.snapArmed = false;
+      this.stepBack();
+      return true;
+    }
     return false;
+  }
+
+  /**
+   * Half a metre backwards, away from where the HEAD is looking — the body
+   * can be facing anywhere, but "back" means back from what you can see.
+   *
+   * Judged the way the arc's landing is judged — real floor under it, no wall
+   * crossed on the way — plus one rule the arc doesn't need: it must stay on
+   * YOUR level. Half a step back from the counter would otherwise put you up
+   * ON the counter, because that surface is standable and it is exactly 0.5 m
+   * behind you when you're leaning on it. A shuffle that lifts you a metre in
+   * the air is not a shuffle. Climbing is what the arc is for.
+   *
+   * Shorter steps are tried in turn so backing up against something stops you
+   * short instead of refusing outright.
+   */
+  private stepBack(): void {
+    this.player.head.getWorldPosition(_head);
+    this.player.head.getWorldQuaternion(_quat);
+    _dir.set(0, 0, -1).applyQuaternion(_quat);
+    const flat = Math.hypot(_dir.x, _dir.z);
+    if (flat < 1e-4) return; // staring at your boots or the ceiling
+    const bx = -_dir.x / flat;
+    const bz = -_dir.z / flat;
+    const fromY = floorYAt(_head.x, _head.z);
+    for (const step of TELEPORT.stepBack) {
+      const x = _head.x + bx * step;
+      const z = _head.z + bz * step;
+      const area = areaAt(x, z);
+      if (!area) continue;
+      if (Math.abs(area.y - fromY) > 0.05) continue; // your level, or nothing
+      if (crossesWall(_head.x, _head.z, x, z, Math.max(fromY, area.y))) continue;
+      teleportPlayer(this.player, x, z, Math.atan2(-_dir.x, -_dir.z), area.y);
+      sfx.uiClick();
+      return;
+    }
   }
 
   /**

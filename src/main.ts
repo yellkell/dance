@@ -155,6 +155,7 @@ import { choreoView } from './systems/ChoreoSystem.js';
 import { menuView } from './systems/MenuSystem.js';
 import { socialView } from './systems/ClubSocialSystem.js';
 import { propsView } from './systems/ClubPropsSystem.js';
+import { teleportView } from './systems/ClubTeleportSystem.js';
 import { grooveView } from './systems/PlayerSystem.js';
 import {
   callBall,
@@ -218,6 +219,8 @@ declare global {
       mutedVoices: typeof mutedSpeakerIds;
       /** Which record the room is spinning right now, by track id. */
       ambient: typeof ambientTrackId;
+      /** The club moves that resolve without an arc (step back, snap turn). */
+      move: typeof teleportView;
     };
   }
 }
@@ -250,6 +253,7 @@ window.__gdr = {
   intro: introView,
   mutedVoices: mutedSpeakerIds,
   ambient: ambientTrackId,
+  move: teleportView,
   props: propsView,
   menu: new Proxy({} as typeof menuView & typeof socialView, {
     // The views are populated in each system's init — resolve lazily.

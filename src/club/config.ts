@@ -167,6 +167,13 @@ export const TELEPORT = {
   snapAngle: (35 * Math.PI) / 180,
   snapEngage: 0.7,
   snapReset: 0.3,
+  /** BACK on the stick is a short shuffle away from whatever you're facing,
+   *  not a teleport arc. Aiming an arc behind your own feet meant turning
+   *  round, throwing it, and turning back — three moves for the one thing
+   *  you actually want at a bar, which is to be half a metre further off it.
+   *  Probed at decreasing lengths so you can back right up against a wall
+   *  instead of the flick doing nothing. */
+  stepBack: [0.5, 0.34, 0.2],
 } as const;
 
 /** Where a teleport may land: floor rectangles + the height they stand at. */
