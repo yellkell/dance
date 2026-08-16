@@ -61,7 +61,7 @@
         SRGBColorSpace,
         WebGLRenderer,
       } from 'three';
-      import { buildDancer } from '/src/game/avatars.ts';
+      import { buildDancer, styleVariant, STYLE_STEP } from '/src/game/avatars.ts';
       import { seatHue } from '/src/config.ts';
 
       const params = new URLSearchParams(location.search);
@@ -103,7 +103,12 @@
 
       const rigs = [];
       for (let i = 0; i < N; i++) {
-        const hue = seatHue(i * 4 + 1);
+        // Spread the hues as the seats do, then nudge each one just far
+        // enough to land on crest i % 4 — a step is 1/4096 of the wheel, so
+        // the colours are untouched to the eye and the row shows every
+        // haircut instead of whichever ones the seat hues happened to pick.
+        const base = seatHue(i * 4 + 1);
+        const hue = base + (((i - styleVariant(base)) % 4) + 4) % 4 * STYLE_STEP;
         const rig = buildDancer(hue);
         const x = (i - (N - 1) / 2) * SPACING;
         rig.root.position.set(x, 0, 0);
@@ -224,8 +229,11 @@
           const p = poseAt(solo, t);
           const cx = rigs[solo].x + p.hx;
           const a = p.yaw + orbit;
-          camera.position.set(cx - Math.sin(a) * 0.42, p.hy + 0.03, p.hz - Math.cos(a) * 0.42);
-          camera.lookAt(cx, p.hy, p.hz);
+          // Mirror the rig's own melt sink (avatars.ts pose()), or a
+          // slumping dancer leaves the camera staring at empty air.
+          const hy = p.hy * (1 - p.slump * 0.62);
+          camera.position.set(cx - Math.sin(a) * 0.42, hy + 0.03, p.hz - Math.cos(a) * 0.42);
+          camera.lookAt(cx, hy, p.hz);
         } else if (cam === 'close') {
           camera.position.set(Math.sin(orbit) * 1.3, 1.45, -Math.cos(orbit) * 1.3);
           camera.lookAt(0, 1.25, 0);

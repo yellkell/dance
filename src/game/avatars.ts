@@ -8,7 +8,7 @@
  * shoulder yoke, hips that flow into the thighs, an elliptical
  * cross-section so the torso has a front, and a sculpted mannequin head —
  * tapered chin, full cranium, a goggle bezel framing a hot scan-slit. Four
- * style variants of GLOWING hair (mohawk / twin blades / ponytail / bare)
+ * style variants of neon hair (mohawk / twin blades / horn / twin spikes)
  * derive deterministically from the hue so a full ring isn't 24 clones.
  *
  * The rig is driven entirely from a HEAD position and two HAND targets —
@@ -291,8 +291,13 @@ function legBone(span: number): number {
   return Math.max(span * 0.51 + 0.008, Math.min(LEG_BONE, span * 0.62 + 0.12));
 }
 
+/** How finely the hue is diced to pick a crest — one step is far too small
+ *  a colour change to see, which is what lets the dev preview line up all
+ *  four crests without disturbing its hue spread. */
+export const STYLE_STEP = 1 / 4096;
+
 /** Style variant 0..3 — a pure function of the hue, so every client agrees. */
-function styleVariant(hue: number): number {
+export function styleVariant(hue: number): number {
   const h = ((hue % 1) + 1) % 1;
   return Math.floor(h * 4096) % 4;
 }
@@ -436,24 +441,29 @@ export function buildDancer(hue: number): DancerRig {
     // This one variant keeps its hair DARK: the single hot point at the top
     // is the whole silhouette, and lighting the cone loses it.
     const RAKE = 0.8;
-    const LEN = 0.155;
-    const spire = M(segGeo(0.004, 0.03), shell);
+    const LEN = 0.128;
+    const spire = M(segGeo(0.004, 0.026), shell);
     spire.scale.set(0.5, LEN, 1.7);
-    spire.position.set(0, 0.045, 0.02);
+    spire.position.set(0, 0.046, 0.02);
     spire.rotation.x = RAKE;
     head.add(spire);
     const tip = M(sphereGeo(8), neonFlat);
-    tip.scale.setScalar(0.008);
-    tip.position.set(0, 0.045 + LEN * Math.cos(RAKE), 0.02 + LEN * Math.sin(RAKE));
+    tip.scale.setScalar(0.0075);
+    tip.position.set(0, 0.046 + LEN * Math.cos(RAKE), 0.02 + LEN * Math.sin(RAKE));
     head.add(tip);
   } else {
-    // Bare — the shaved-head look; double up the jewellery to carry it.
-    // On the jaw's slope now, so the beads sit half-buried in the surface.
+    // Twin swept spikes: a matched pair of tapered cones off the crown,
+    // raked back and splayed out — a V from the front, where the mohawk is
+    // one centre blade and the twin blades both rake to the SAME side. All
+    // four crests are edges, never volume; a rounded mass on this head
+    // reads as a swelling, not a haircut.
     for (const side of [-1, 1]) {
-      const stud = M(sphereGeo(8), neonStd);
-      stud.scale.setScalar(0.008);
-      stud.position.set(side * 0.047, -0.048, -0.027);
-      head.add(stud);
+      const spike = M(segGeo(0.003, 0.016), lit);
+      spike.scale.set(0.7, 0.092, 1.5);
+      spike.position.set(side * 0.028, 0.05, 0.014);
+      spike.rotation.z = -side * 0.34;
+      spike.rotation.x = 0.72;
+      head.add(spike);
     }
   }
   head.add(glow(0.3, 0.3));
