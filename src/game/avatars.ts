@@ -400,9 +400,9 @@ export function buildDancer(hue: number): DancerRig {
     pip.position.set(side * 0.063, 0.004, -0.006);
     head.add(pip);
   }
-  // Variant crest — deterministic from the hue. Hair GLOWS: crests wear
-  // the lit cloth, so the haircut is part of the costume's neon signature
-  // and survives the dark instead of vanishing against the black skull.
+  // Variant crest — deterministic from the hue. Hair carries neon: the
+  // sweeps wear the lit cloth so the haircut is part of the costume's
+  // signature, and the horn keeps a single hot pip at its tip.
   if (variant === 0) {
     // Swept mohawk: a main blade rising from the scalp, a trailing shard
     // down the back of the skull — both rooted inside the head.
@@ -430,23 +430,22 @@ export function buildDancer(hue: number): DancerRig {
       head.add(blade);
     }
   } else if (variant === 2) {
-    // Slicked-back ponytail: a flattened cone rooted in the crown — thin
-    // across, deep front-to-back — laid almost FLAT along the back of the
-    // skull rather than standing off it. A spike as long as the skull is
-    // tall, at forty-five degrees, is a party hat; the same cone combed
-    // down the back of the head is hair. A hot tie rides its root.
-    const RAKE = 1.32;
-    const LEN = 0.095;
-    const spire = M(segGeo(0.003, 0.028), lit);
-    spire.scale.set(0.62, LEN, 1.5);
-    spire.position.set(0, 0.052, 0.03);
+    // Swept horn crest: a flattened cone rooted in the crown — thin across,
+    // deep front-to-back, so it reads as sculpted hair, not an antenna —
+    // standing UP and raked back, with a neon pip riding its exact tip.
+    // This one variant keeps its hair DARK: the single hot point at the top
+    // is the whole silhouette, and lighting the cone loses it.
+    const RAKE = 0.8;
+    const LEN = 0.155;
+    const spire = M(segGeo(0.004, 0.03), shell);
+    spire.scale.set(0.5, LEN, 1.7);
+    spire.position.set(0, 0.045, 0.02);
     spire.rotation.x = RAKE;
     head.add(spire);
-    const tie = M(boxGeo(), neonFlat);
-    tie.scale.set(0.024, 0.007, 0.016);
-    tie.position.set(0, 0.06, 0.055);
-    tie.rotation.x = RAKE;
-    head.add(tie);
+    const tip = M(sphereGeo(8), neonFlat);
+    tip.scale.setScalar(0.008);
+    tip.position.set(0, 0.045 + LEN * Math.cos(RAKE), 0.02 + LEN * Math.sin(RAKE));
+    head.add(tip);
   } else {
     // Bare — the shaved-head look; double up the jewellery to carry it.
     // On the jaw's slope now, so the beads sit half-buried in the surface.
