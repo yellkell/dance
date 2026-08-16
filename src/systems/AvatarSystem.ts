@@ -101,10 +101,13 @@ export class AvatarSystem extends createSystem({}) {
       p.slump += (slumpTarget - p.slump) * Math.min(1, delta * 2.5);
       p.pose.slump = p.slump;
 
-      for (const m of p.rig.accents) {
-        const std = m as MeshStandardMaterial;
+      // One drive for the whole rig, scaled by each material's authored
+      // gain — the suit stays cooler than its own neon trim in every state.
+      const drive = d.alive ? 1.1 + (p.flash > 0 ? 1.6 : 0) : 0.14;
+      for (const { mat, gain } of p.rig.accents) {
+        const std = mat as MeshStandardMaterial;
         if (std.emissive) {
-          std.emissiveIntensity = d.alive ? 1.1 + (p.flash > 0 ? 1.6 : 0) : 0.14;
+          std.emissiveIntensity = drive * gain;
           if (p.flash > 0) std.emissive.setHex(0xff4033);
           else std.emissive.setHex(p.rig.baseColor);
         } else {

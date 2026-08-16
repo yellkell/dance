@@ -1,16 +1,21 @@
 /**
  * The other dancers — couture rave mannequins, one per occupied platform.
- * Gloss-black lathe-sculpted body (cinched waist, flared hip basque, a real
- * clavicle line), a structured visor with a neon scan-slit, faceted gauntlet
- * hands with tapered glowstick blades, heeled boots on neon soles — all in
- * the seat's colour. Four style variants (crest fin / halo / spire / bare)
+ * One dark suit in the seat's colour — bodice and trousers cut from the
+ * same cloth, so the figure reads as an outfit rather than a black vest
+ * over glowing tights — with LIT sleeves and a lit midriff, dark gloss
+ * accessories (helm, gauntlets, heeled boots) and hot neon trim at every
+ * seam. The body is shaped, not stacked: a cinched waist under a broad
+ * shoulder yoke, hips that flow into the thighs, an elliptical
+ * cross-section so the torso has a front, and a sculpted mannequin head —
+ * tapered chin, full cranium, a goggle bezel framing a hot scan-slit. Four
+ * style variants of neon hair (mohawk / twin blades / horn / twin spikes)
  * derive deterministically from the hue so a full ring isn't 24 clones.
  *
  * The rig is driven entirely from a HEAD position and two HAND targets —
  * exactly what VR actually knows about a person. Everything else is solved:
- * the hips hang under the head, two-bone arms bend at solved elbows, long
- * legs stretch from hip to ankle (crouching shortens them naturally), and
- * elimination melts the whole figure floorward.
+ * the hips hang under the head, two-bone arms bend at solved elbows,
+ * two-bone legs bend at solved KNEES (so crouching folds the figure instead
+ * of telescoping it), and elimination melts the whole thing floorward.
  *
  * YOU have no figure. The local player never sees their own body — your
  * platform shows only your controllers; the elegance is for everyone else's
@@ -59,10 +64,22 @@ export interface DancerPose {
   slump: number;
 }
 
+/**
+ * One drivable material plus the brightness the figure was AUTHORED at,
+ * relative to `ACCENT_REST`. Callers drive one intensity for the whole rig
+ * (alive / flashing / eliminated) and multiply by `gain`, so the trim
+ * hierarchy — hot blades over lit jewellery over a glowing suit over dark
+ * leather — survives every state instead of flattening to one temperature.
+ */
+export interface DancerAccent {
+  mat: MeshStandardMaterial | MeshBasicMaterial;
+  gain: number;
+}
+
 export interface DancerRig {
   root: Group;
-  /** Every accent material (dim on elimination, flash on hit). */
-  accents: (MeshStandardMaterial | MeshBasicMaterial)[];
+  /** Every drivable material (dim on elimination, flash on hit). */
+  accents: DancerAccent[];
   baseColor: number;
   /** Solve the whole figure from head + hands. */
   pose(p: DancerPose): void;
@@ -75,10 +92,39 @@ const UPPER_ARM = 0.29;
 const FOREARM = 0.27;
 const HEAD_R = 0.085;
 const HEAD_DROP = 0.66; // head centre → hip line, standing (high hips = long legs)
-const SHOULDER_W = 0.15; // half-width
+const SHOULDER_W = 0.155; // half-width
 const SHOULDER_DROP = 0.15; // head centre → shoulder line
-const HIP_W = 0.072; // half-width
+const HIP_W = 0.082; // half-width
 const ANKLE = 0.085; // ankle height — legs end here, boots own the rest
+/** Femur (and shin) while the figure stands — see legBone(). */
+const LEG_BONE = 0.4;
+
+/* The torso's CROSS-SECTION. A lathe is round, and a round torso is a
+ * bottle; broad across the chest and slim front-to-back is what makes the
+ * same profile read as a body. Applied to the bodice, the basque and their
+ * rings — never to the limbs, which really are round. */
+const TORSO_X = 1.18;
+const TORSO_Z = 0.8;
+
+/** The emissive intensity the systems drive accents to at rest; materials
+ *  are authored here × their gain, so the dev preview matches the game. */
+const ACCENT_REST = 1.1;
+/** The suit is DARK — gloss cloth carrying only a sheen of the seat colour,
+ *  the same near-black as the helm. Bodice and trousers are cut from it, so
+ *  the top and the legs finally match instead of reading as a black vest
+ *  over glowing tights. */
+const SUIT_GAIN = 0.2;
+/** Helm, gauntlets and boots, a hair darker still — glossier leather next
+ *  to the suit's cloth. */
+const SHELL_GAIN = 0.18;
+/** …and the LIT panels: sleeves, midriff, hair. A figure in head-to-toe
+ *  black is a hole in a dark room, and a near-black arm with a glowing
+ *  stick on the end of it reads as a DETACHED hand. Lighting exactly the
+ *  sleeves, the waist and the crest keeps every stick visibly attached to
+ *  the body swinging it, crowns the silhouette, and puts a bright band at
+ *  the figure's own centre of motion — the part that sells a dance across
+ *  thirty metres of arena. */
+const LIT_GAIN = 0.62;
 
 const UP = new Vector3(0, 1, 0);
 const SIDES = [-1, 1] as const;
@@ -87,8 +133,18 @@ const _b = new Vector3();
 const _c = new Vector3();
 const _dir = new Vector3();
 const _mid = new Vector3();
-const _perp = new Vector3();
+const _hint = new Vector3();
+const _fwd = new Vector3();
+const _right = new Vector3();
+const _target = new Vector3();
+/* twoBone()'s outputs — read them before the next call. */
+const _solved = new Vector3();
+const _tip = new Vector3();
+/* Owned by twoBone() alone — never aliased by the pose solve. */
+const _chain = new Vector3();
+const _bend = new Vector3();
 const _q = new Quaternion();
+const _yawQ = new Quaternion();
 /** Pre-rotation that turns a torus (axis +Z) into a ring around +Y. */
 const X90 = new Quaternion().setFromAxisAngle(new Vector3(1, 0, 0), Math.PI / 2);
 
@@ -131,39 +187,117 @@ function latheGeo(key: string, profile: number[][]): BufferGeometry {
 }
 
 /* The couture torso, two stacked lathes meeting at a cinched waist.
- * Radii are real metres; height is unit (align() stretches to fit). */
+ * Radii are real metres (before the TORSO_X/Z cross-section); height is
+ * unit, and align() stretches it to whatever the solve asks for. */
 const BODICE = [
-  // waist cinch → ribcage → bust → shoulder root
-  [0.024, 0.0],
-  [0.048, 0.06],
-  [0.063, 0.3],
-  [0.078, 0.6],
-  [0.076, 0.8],
-  [0.058, 0.94],
+  // waist cinch → ribs → chest → SHOULDER YOKE → neck root.
+  // An S, not a cone: lean through the ribs, filling late into the chest —
+  // a straight taper reads as a funnel. The yoke is the widest ring in the
+  // whole figure (shoulder balls need something to hang off) and closes
+  // over the top as a trapezius DOME rather than a flat shelf.
+  [0.03, 0.0],
+  [0.043, 0.09],
+  [0.053, 0.26],
+  [0.064, 0.46],
+  [0.073, 0.66],
+  [0.077, 0.8],
+  [0.073, 0.9],
+  [0.06, 0.96],
+  [0.042, 0.99],
   [0.028, 1.0],
 ];
 const BASQUE = [
-  // hip line → flared basque → back up to the same waist cinch
-  [0.03, 0.0],
-  [0.069, 0.1],
-  [0.079, 0.28],
-  [0.067, 0.55],
-  [0.038, 0.86],
-  [0.025, 1.0],
+  // hip line → flared basque → back up to the same 0.03 waist cinch.
+  // Wide at the BOTTOM so the thighs emerge from inside the hips, and
+  // never wider than the chest — hips that outrun the shoulders read as a
+  // bulb on a stick.
+  [0.054, 0.0],
+  [0.065, 0.14],
+  [0.066, 0.32],
+  [0.057, 0.56],
+  [0.041, 0.83],
+  [0.03, 1.0],
 ];
+/* The head, chin-up: a soft point at the jaw, cheekbones, a full cranium.
+ * A scaled sphere is an egg on its side — widest at the equator with no
+ * chin at all — and it reads as a lollipop on the neck. This profile is
+ * the classic mannequin head: narrow below, weight above. */
+const HEAD = [
+  [0, 0],
+  [0.028, 0.05],
+  [0.048, 0.16],
+  [0.06, 0.33],
+  [0.067, 0.55],
+  [0.066, 0.73],
+  [0.057, 0.87],
+  [0.04, 0.95],
+  [0.021, 0.99],
+  [0, 1.0],
+];
+/** Head height (m); the lathe above is unit-height like the others. */
+const HEAD_H = 0.19;
 
 /** Stretch a base-at-origin unit segment from `a` to `b`. */
-function align(seg: Mesh, a: Vector3, b: Vector3): void {
+function align(seg: Mesh, a: Vector3, b: Vector3, sx = 1, sz = 1): void {
   seg.position.copy(a);
   _dir.copy(b).sub(a);
   const len = Math.max(0.02, _dir.length());
-  seg.scale.set(1, len, 1);
+  seg.scale.set(sx, len, sz);
   _q.setFromUnitVectors(UP, _dir.normalize());
   seg.quaternion.copy(_q);
 }
 
+/**
+ * Solve a two-bone chain root → joint → tip. `hint` is the direction the
+ * joint gets pushed toward; it is projected perpendicular to the chain
+ * first, so an arm bends out-and-down and a knee bends forward no matter
+ * how the chain is turned. The solved joint lands in `joint` and the
+ * (possibly clamped) tip in `end` — placing meshes is the caller's job,
+ * because arms hang DOWN from the shoulder while legs are built UP from the
+ * floor and each wants its segments aligned its own way.
+ */
+function twoBone(
+  root: Vector3,
+  tip: Vector3,
+  upper: number,
+  lower: number,
+  hint: Vector3,
+  joint: Vector3,
+  end: Vector3,
+): void {
+  _chain.copy(tip).sub(root);
+  // Out of reach: bring the tip in to full extension rather than snapping.
+  const d = Math.min(upper + lower - 0.015, Math.max(0.05, _chain.length()));
+  _chain.normalize();
+  end.copy(root).addScaledVector(_chain, d);
+
+  const along = (d * d + upper * upper - lower * lower) / (2 * d);
+  const push = Math.sqrt(Math.max(0.0004, upper * upper - along * along));
+  _bend.copy(hint).addScaledVector(_chain, -hint.dot(_chain));
+  if (_bend.lengthSq() < 1e-6) _bend.set(-_chain.y, _chain.x, 0); // hint parallel to the chain
+  _bend.normalize();
+  joint.copy(root).addScaledVector(_chain, along).addScaledVector(_bend, push);
+}
+
+/**
+ * Bone length for a hip→ankle span. A FIXED femur while the figure stands,
+ * so a crouch bends the knee instead of telescoping the leg; stretched for
+ * players taller than the reference figure; and folded down inside a deep
+ * melt, where a full-length femur would fire the knees out sideways. The
+ * floor keeps 2×bone comfortably past twoBone()'s reach clamp, so the foot
+ * never lifts off its target just to satisfy the solve.
+ */
+function legBone(span: number): number {
+  return Math.max(span * 0.51 + 0.008, Math.min(LEG_BONE, span * 0.62 + 0.12));
+}
+
+/** How finely the hue is diced to pick a crest — one step is far too small
+ *  a colour change to see, which is what lets the dev preview line up all
+ *  four crests without disturbing its hue spread. */
+export const STYLE_STEP = 1 / 4096;
+
 /** Style variant 0..3 — a pure function of the hue, so every client agrees. */
-function styleVariant(hue: number): number {
+export function styleVariant(hue: number): number {
   const h = ((hue % 1) + 1) % 1;
   return Math.floor(h * 4096) % 4;
 }
@@ -172,99 +306,128 @@ export function buildDancer(hue: number): DancerRig {
   const root = new Group();
   const color = hueToColor(hue, 0.6);
   const variant = styleVariant(hue);
-  const accents: DancerRig['accents'] = [];
+  const accents: DancerAccent[] = [];
+  const accent = <T extends MeshStandardMaterial | MeshBasicMaterial>(mat: T, gain: number): T => {
+    accents.push({ mat, gain });
+    return mat;
+  };
 
-  /* ── the three material families ── */
-  // Couture body: gloss-black with a faint sheen of the seat's own colour —
-  // the neon trim owns the silhouette, but the figure never vanishes into a
-  // dark room (or a dark real room, in passthrough).
-  const body = new MeshStandardMaterial({
-    color: 0x171a21,
-    emissive: color,
-    emissiveIntensity: 0.055,
-    metalness: 0.85,
-    roughness: 0.24,
-  });
-  // Lit limbs: in a dark club a near-black arm disappears and the glowing
-  // hand reads as DETACHED — lit limbs keep every stick visibly connected
-  // to the body that swings it. Accent-registered, so hit flashes and
-  // elimination dims run down the arms too.
-  const limb = new MeshStandardMaterial({
-    color: 0x20242e,
-    emissive: color,
-    emissiveIntensity: 0.55,
-    metalness: 0.6,
-    roughness: 0.32,
-  });
-  accents.push(limb);
+  /* ── the material families ──
+   * The costume is CUT, not patchworked: bodice and trousers share one dark
+   * cloth (that match is the whole point — a black top over glowing legs
+   * reads as two different outfits), and the light lives in the sleeves and
+   * the midriff, where the dancing is. */
+  const suit = accent(
+    new MeshStandardMaterial({
+      color: 0x1b1f28,
+      emissive: color,
+      emissiveIntensity: ACCENT_REST * SUIT_GAIN,
+      metalness: 0.6,
+      roughness: 0.32,
+    }),
+    SUIT_GAIN,
+  );
+  // Sleeves and midriff — the same cloth, lit.
+  const lit = accent(
+    new MeshStandardMaterial({
+      color: 0x20242e,
+      emissive: color,
+      emissiveIntensity: ACCENT_REST * LIT_GAIN,
+      metalness: 0.6,
+      roughness: 0.32,
+    }),
+    LIT_GAIN,
+  );
+  // The accessories: helm, gauntlets, boots, sculpted hair — gloss near-black
+  // with just enough of the seat colour in it to stay a surface rather than
+  // a silhouette-shaped hole.
+  const shell = accent(
+    new MeshStandardMaterial({
+      color: 0x171a21,
+      emissive: color,
+      emissiveIntensity: ACCENT_REST * SHELL_GAIN,
+      metalness: 0.85,
+      roughness: 0.24,
+    }),
+    SHELL_GAIN,
+  );
   // Neon trim, two temperatures: standard (lit jewellery — collar, choker,
-  // belt, cuffs) and flat (the hottest slits and blades).
-  const neonStd = new MeshStandardMaterial({
-    color: 0x101218,
-    emissive: color,
-    emissiveIntensity: 1.25,
-    metalness: 0.35,
-    roughness: 0.4,
-  });
-  accents.push(neonStd);
-  const neonFlat = new MeshBasicMaterial({ color });
-  accents.push(neonFlat);
+  // belt, cuffs, seams) and flat (the hottest slits and blades).
+  const neonStd = accent(
+    new MeshStandardMaterial({
+      color: 0x101218,
+      emissive: color,
+      emissiveIntensity: ACCENT_REST,
+      metalness: 0.35,
+      roughness: 0.4,
+    }),
+    1,
+  );
+  const neonFlat = accent(new MeshBasicMaterial({ color }), 1);
   // Halo sprites join the accent list too (structurally a color-only
   // material), so eliminated dancers' glows die with them and hit flashes
   // tint the halos red.
   const glow = (size: number, opacity: number) => {
     const s = glowSprite(color, size, opacity);
-    accents.push(s.material as unknown as MeshBasicMaterial);
+    accent(s.material as unknown as MeshBasicMaterial, 1);
     return s;
   };
 
   const M = (geo: BufferGeometry, mat: MeshStandardMaterial | MeshBasicMaterial): Mesh => new Mesh(geo, mat);
   const seg = (rt: number, rb: number, mat: MeshStandardMaterial): Mesh => M(segGeo(rt, rb), mat);
 
-  /* ── head: dark gloss oval, structured visor, jewellery, variant crest ── */
+  /* ── head: sculpted dark skull, lit visor band, jewellery, crest ── */
   const head = new Group();
-  const skull = M(sphereGeo(16), body);
-  skull.scale.set(HEAD_R * 0.86, HEAD_R * 1.12, HEAD_R * 0.94);
+  const skull = M(latheGeo('head', HEAD), shell);
+  // Narrower across than deep, like a head — and the lathe is authored
+  // base-at-0, so it drops half its height to centre on the group origin.
+  skull.scale.set(0.92, HEAD_H, 1.04);
+  skull.position.y = -HEAD_H / 2;
   head.add(skull);
-  // Visor: a gloss shell wrapping the face, framing a hot scan-slit that
-  // sits proud of the front face — a lit line in a dark bezel.
-  const visorShell = M(boxGeo(), body);
-  visorShell.scale.set(0.122, 0.048, 0.052);
-  visorShell.position.set(0, 0.012, -0.05);
+  // Visor: a structured goggle ACROSS THE FACE — a gloss bezel framing the
+  // hot scan-slit, both proud of the skull. (A lit band wrapping the whole
+  // head got tried and cut: it read as a blindfold, not eyewear.) The bezel
+  // is sized so its back corners bury into the cheeks of the NEW narrower
+  // skull instead of poking out at the temples the way the original did.
+  const visorShell = M(boxGeo(), shell);
+  visorShell.scale.set(0.105, 0.044, 0.05);
+  visorShell.position.set(0, 0.014, -0.054);
   head.add(visorShell);
   const visorSlit = M(boxGeo(), neonFlat);
-  visorSlit.scale.set(0.108, 0.009, 0.02);
-  visorSlit.position.set(0, 0.012, -0.072);
+  visorSlit.scale.set(0.088, 0.011, 0.02);
+  visorSlit.position.set(0, 0.014, -0.074);
   head.add(visorSlit);
-  // Ear pips — the little jewellery that catches at close range.
+  // Ear pips — the little jewellery that catches at close range,
+  // half-buried beads riding the skull at the temples.
   for (const side of [-1, 1]) {
     const pip = M(sphereGeo(8), neonStd);
     pip.scale.setScalar(0.012);
-    pip.position.set(side * 0.069, 0.004, -0.006);
+    pip.position.set(side * 0.063, 0.004, -0.006);
     head.add(pip);
   }
-  // Variant crest — deterministic from the hue.
+  // Variant crest — deterministic from the hue. Hair carries neon: the
+  // sweeps wear the lit cloth so the haircut is part of the costume's
+  // signature, and the horn keeps a single hot pip at its tip.
   if (variant === 0) {
     // Swept mohawk: a main blade rising from the scalp, a trailing shard
     // down the back of the skull — both rooted inside the head.
-    const fin = M(boxGeo(), limb);
+    const fin = M(boxGeo(), lit);
     fin.scale.set(0.011, 0.105, 0.13);
     fin.position.set(0, 0.06, 0.012);
     fin.rotation.x = 0.4;
     head.add(fin);
-    const tail = M(boxGeo(), limb);
+    const tail = M(boxGeo(), lit);
     tail.scale.set(0.009, 0.06, 0.085);
     tail.position.set(0, 0.02, 0.082);
     tail.rotation.x = 1.0;
     head.add(tail);
   } else if (variant === 1) {
     // Side-swept twin blades — an undercut read, raked hard to one side.
-    // (This slot used to float a halo; halos are out.)
     for (const [ox, oy, len, rake] of [
       [0.018, 0.055, 0.115, 0.55],
       [0.04, 0.035, 0.085, 0.75],
     ] as const) {
-      const blade = M(boxGeo(), limb);
+      const blade = M(boxGeo(), lit);
       blade.scale.set(0.01, len, 0.1);
       blade.position.set(ox, oy, 0.01);
       blade.rotation.z = -rake * 0.5;
@@ -274,25 +437,33 @@ export function buildDancer(hue: number): DancerRig {
   } else if (variant === 2) {
     // Swept horn crest: a flattened cone rooted in the crown — thin across,
     // deep front-to-back, so it reads as sculpted hair, not an antenna —
-    // raked back hard with a neon pip riding its exact tip.
+    // standing UP and raked back, with a neon pip riding its exact tip.
+    // This one variant keeps its hair DARK: the single hot point at the top
+    // is the whole silhouette, and lighting the cone loses it.
     const RAKE = 0.8;
-    const LEN = 0.155;
-    const spire = M(segGeo(0.004, 0.03), body);
+    const LEN = 0.128;
+    const spire = M(segGeo(0.004, 0.026), shell);
     spire.scale.set(0.5, LEN, 1.7);
-    spire.position.set(0, 0.045, 0.02);
+    spire.position.set(0, 0.046, 0.02);
     spire.rotation.x = RAKE;
     head.add(spire);
     const tip = M(sphereGeo(8), neonFlat);
-    tip.scale.setScalar(0.008);
-    tip.position.set(0, 0.045 + LEN * Math.cos(RAKE), 0.02 + LEN * Math.sin(RAKE));
+    tip.scale.setScalar(0.0075);
+    tip.position.set(0, 0.046 + LEN * Math.cos(RAKE), 0.02 + LEN * Math.sin(RAKE));
     head.add(tip);
   } else {
-    // Bare — the shaved-head look; double up the jewellery to carry it.
+    // Twin swept spikes: a matched pair of tapered cones off the crown,
+    // raked back and splayed out — a V from the front, where the mohawk is
+    // one centre blade and the twin blades both rake to the SAME side. All
+    // four crests are edges, never volume; a rounded mass on this head
+    // reads as a swelling, not a haircut.
     for (const side of [-1, 1]) {
-      const stud = M(sphereGeo(8), neonStd);
-      stud.scale.setScalar(0.008);
-      stud.position.set(side * 0.062, -0.048, -0.032);
-      head.add(stud);
+      const spike = M(segGeo(0.003, 0.016), lit);
+      spike.scale.set(0.7, 0.092, 1.5);
+      spike.position.set(side * 0.028, 0.05, 0.014);
+      spike.rotation.z = -side * 0.34;
+      spike.rotation.x = 0.72;
+      head.add(spike);
     }
   }
   head.add(glow(0.3, 0.3));
@@ -300,45 +471,58 @@ export function buildDancer(hue: number): DancerRig {
 
   /* ── torso: neck → bodice → basque, one sculpted line ──
    * Two lathes meet at the cinched waist under a neon belt; the collar and
-   * choker bound the neck; a clavicle V and shoulder caps hang the arms. */
-  const neck = seg(0.023, 0.031, body);
-  const bodice = M(latheGeo('bodice', BODICE), body);
-  const basque = M(latheGeo('basque', BASQUE), limb);
+   * choker bound the neck; a clavicle V and shoulder caps hang the arms.
+   * Both lathes are squashed to TORSO_X/Z and TURNED WITH THE YAW — an
+   * elliptical torso, unlike a round one, has a front. */
+  const neck = seg(0.023, 0.031, suit);
+  const bodice = M(latheGeo('bodice', BODICE), suit);
+  const basque = M(latheGeo('basque', BASQUE), lit); // the lit midriff
   root.add(neck, bodice, basque);
-  const collar = M(torusGeo(0.06, 0.009), neonStd);
+  // The sternum seam — the garment's own centre line, riding the bodice so
+  // it stretches and turns with the chest. Without it a one-colour suit is
+  // a blank; with it the figure is wearing something.
+  // Local z is scaled by TORSO_Z with the rest of the bodice, so the seam
+  // is authored to sit a whisker outside the lathe's own front radius.
+  const sternum = M(boxGeo(), neonStd);
+  sternum.scale.set(0.013, 0.34, 0.012);
+  sternum.position.set(0, 0.6, -0.075);
+  bodice.add(sternum);
+  const collar = M(torusGeo(0.062, 0.009), neonStd);
   const choker = M(torusGeo(0.033, 0.005), neonStd);
   const belt = M(torusGeo(0.04, 0.007), neonStd);
+  collar.scale.set(TORSO_X, TORSO_Z, 1);
+  belt.scale.set(TORSO_X, TORSO_Z, 1);
   root.add(collar, choker, belt);
-  const clavL = seg(0.015, 0.021, limb);
-  const clavR = seg(0.015, 0.021, limb);
+  const clavL = seg(0.015, 0.021, suit);
+  const clavR = seg(0.015, 0.021, suit);
   root.add(clavL, clavR);
-  const capL = M(sphereGeo(8), limb);
-  const capR = M(sphereGeo(8), limb);
-  capL.scale.set(0.05, 0.036, 0.05);
-  capR.scale.set(0.05, 0.036, 0.05);
+  const capL = M(sphereGeo(8), lit);
+  const capR = M(sphereGeo(8), lit);
+  capL.scale.set(0.046, 0.042, 0.046);
+  capR.scale.set(0.046, 0.042, 0.046);
   root.add(capL, capR);
 
-  /* ── arms: shoulder → elbow → hand, solved each pose ── */
-  const upperL = seg(0.026, 0.021, limb);
-  const upperR = seg(0.026, 0.021, limb);
-  const foreL = seg(0.021, 0.016, limb);
-  const foreR = seg(0.021, 0.016, limb);
+  /* ── arms: shoulder → elbow → hand, solved each pose — LIT sleeves ── */
+  const upperL = seg(0.03, 0.024, lit);
+  const upperR = seg(0.03, 0.024, lit);
+  const foreL = seg(0.024, 0.018, lit);
+  const foreR = seg(0.024, 0.018, lit);
   root.add(upperL, upperR, foreL, foreR);
-  const elbowL = M(sphereGeo(8), limb);
-  const elbowR = M(sphereGeo(8), limb);
-  elbowL.scale.setScalar(0.026);
-  elbowR.scale.setScalar(0.026);
+  const elbowL = M(sphereGeo(8), lit);
+  const elbowR = M(sphereGeo(8), lit);
+  elbowL.scale.setScalar(0.024);
+  elbowR.scale.setScalar(0.024);
   root.add(elbowL, elbowR);
 
   /* ── hands: faceted gauntlet mitt + neon cuff + glowstick blade ── */
   const mkHand = (): Group => {
     const hand = new Group();
-    const mitt = M(hexGeo(), body);
+    const mitt = M(hexGeo(), shell);
     mitt.scale.set(0.075, 0.05, 0.095);
     mitt.position.set(0, 0.004, -0.028);
     mitt.rotation.x = -0.12;
     hand.add(mitt);
-    const fingers = M(boxGeo(), body);
+    const fingers = M(boxGeo(), shell);
     fingers.scale.set(0.06, 0.017, 0.05);
     fingers.position.set(0, -0.012, -0.072);
     fingers.rotation.x = -0.5;
@@ -359,41 +543,47 @@ export function buildDancer(hue: number): DancerRig {
   const handL = mkHand();
   const handR = mkHand();
 
-  /* ── legs: hip → ankle, one long tapered line + a front piping seam ── */
-  const mkLeg = (): Mesh => {
-    const leg = seg(0.037, 0.019, limb);
+  /* ── legs: hip → KNEE → ankle, with a piped seam down the shin ──
+   * Two bones, not one: the old single taper telescoped on every crouch,
+   * which is the one thing a leg never does. Both segments are aligned
+   * UPWARD (ankle → knee → hip) so their local frames stay the right way
+   * up and the piping rides the front of the calf. */
+  const mkLeg = (): { thigh: Mesh; shin: Mesh; knee: Mesh } => {
+    const thigh = seg(0.045, 0.034, suit); // full at the hip, narrow at the knee
+    const shin = seg(0.031, 0.018, suit); // calf at the knee, slim at the ankle
+    const knee = M(sphereGeo(8), suit);
+    knee.scale.set(0.032, 0.03, 0.032);
     const pipe = M(segGeo(0.0055, 0.0055, 5), neonStd);
-    pipe.position.set(0, 0.03, -0.0235);
-    pipe.scale.y = 0.9; // proportional: children inherit the align() stretch
-    leg.add(pipe);
-    root.add(leg);
-    return leg;
+    pipe.position.set(0, 0.06, -0.021);
+    pipe.scale.y = 0.85; // proportional: children inherit the align() stretch
+    shin.add(pipe);
+    root.add(thigh, shin, knee);
+    return { thigh, shin, knee };
   };
   const legL = mkLeg();
   const legR = mkLeg();
-  const hipBallL = M(sphereGeo(8), limb);
-  const hipBallR = M(sphereGeo(8), limb);
-  hipBallL.scale.setScalar(0.033);
-  hipBallR.scale.setScalar(0.033);
-  root.add(hipBallL, hipBallR);
 
   /* ── boots: shaft + raked toe + chunky heel on a neon sole ── */
   const mkBoot = (): Group => {
     const boot = new Group(); // origin at the ankle, ANKLE above the floor
-    const shaft = M(segGeo(0.021, 0.03), body);
-    shaft.scale.y = 0.069;
-    shaft.position.y = -0.069; // base sits on the sole, slim top meets the leg line
+    // The shaft rises PAST the ankle so its collar swallows the shin's
+    // bottom cap at any crouch angle — no daylight at the joint. Boots
+    // themselves stay flat: the feet are planted, and a pitched sole either
+    // floats or saws through the deck.
+    const shaft = M(segGeo(0.028, 0.032), shell);
+    shaft.scale.y = 0.089;
+    shaft.position.y = -0.071;
     boot.add(shaft);
     const sole = M(boxGeo(), neonFlat);
     sole.scale.set(0.06, 0.015, 0.16);
     sole.position.set(0, -ANKLE + 0.0075, -0.025);
     boot.add(sole);
-    const toe = M(boxGeo(), body);
+    const toe = M(boxGeo(), shell);
     toe.scale.set(0.054, 0.036, 0.075);
     toe.position.set(0, -0.059, -0.072);
     toe.rotation.x = 0.16;
     boot.add(toe);
-    const heel = M(boxGeo(), body);
+    const heel = M(boxGeo(), shell);
     heel.scale.set(0.042, 0.05, 0.038);
     heel.position.set(0, -0.06, 0.042);
     boot.add(heel);
@@ -403,7 +593,7 @@ export function buildDancer(hue: number): DancerRig {
   const bootL = mkBoot();
   const bootR = mkBoot();
 
-  /** Solve one two-bone arm and place its meshes (elbow ball included). */
+  /** Solve one arm: elbow pushed out-and-down, hand riding the solved tip. */
   const solveArm = (
     side: -1 | 1,
     shoulder: Vector3,
@@ -415,30 +605,15 @@ export function buildDancer(hue: number): DancerRig {
     fore: Mesh,
     elbow: Mesh,
   ): void => {
-    _b.set(hx, hy, hz);
-    _dir.copy(_b).sub(shoulder);
-    const reach = UPPER_ARM + FOREARM - 0.015;
-    if (_dir.length() > reach) {
-      // Out of reach: bring the hand to full elegant extension.
-      _dir.setLength(reach);
-      _b.copy(shoulder).add(_dir);
-    }
-    const d = Math.max(0.05, _b.distanceTo(shoulder));
-    // Elbow: on the shoulder→hand chord, pushed out-and-down — the
-    // natural bend of an arm holding something up.
-    const along = (d * d + UPPER_ARM * UPPER_ARM - FOREARM * FOREARM) / (2 * d);
-    const lift = Math.sqrt(Math.max(0.0004, UPPER_ARM * UPPER_ARM - along * along));
-    _dir.copy(_b).sub(shoulder).normalize();
-    _perp.crossVectors(_dir, UP);
-    if (_perp.lengthSq() < 1e-6) _perp.set(side, 0, 0);
-    _perp.normalize().multiplyScalar(side);
-    _perp.y -= 0.7; // bias the bend downward
-    _perp.normalize();
-    _mid.copy(shoulder).addScaledVector(_dir, along).addScaledVector(_perp, lift);
-    align(upper, shoulder, _mid);
-    align(fore, _mid, _b);
-    elbow.position.copy(_mid);
-    hand.position.copy(_b);
+    _target.set(hx, hy, hz);
+    // The natural bend of an arm holding something up: out to the side of
+    // the body it belongs to, and biased downward.
+    _hint.set(side, -0.7, 0).normalize();
+    twoBone(shoulder, _target, UPPER_ARM, FOREARM, _hint, _solved, _tip);
+    align(upper, shoulder, _solved);
+    align(fore, _solved, _tip);
+    elbow.position.copy(_solved);
+    hand.position.copy(_tip);
     // The glowstick leans with the forearm, flared slightly outward.
     hand.quaternion.setFromUnitVectors(UP, _dir.set(side * 0.35, 1, -0.15).normalize());
   };
@@ -462,6 +637,10 @@ export function buildDancer(hue: number): DancerRig {
 
     const cos = Math.cos(p.yaw);
     const sin = Math.sin(p.yaw);
+    // The body's own axes at this yaw (yaw 0 faces −Z, toward the stage).
+    _right.set(cos, 0, -sin);
+    _fwd.set(-sin, 0, -cos);
+    _yawQ.setFromAxisAngle(UP, p.yaw);
 
     // Shoulder line under the head, turned with the yaw.
     const shY = hy - SHOULDER_DROP;
@@ -469,17 +648,20 @@ export function buildDancer(hue: number): DancerRig {
     shoulderR.set(p.hx + SHOULDER_W * cos, shY, p.hz - SHOULDER_W * sin);
 
     // Torso line: neck → bodice (shoulder mid → waist) → basque (→ hips).
-    _a.set(p.hx, hy - HEAD_R * 1.05, p.hz);
+    // The neck buries its top in the JAW, not the old sphere's equator —
+    // the chin taper means the head's underside is higher and narrower.
+    _a.set(p.hx, hy - HEAD_R * 0.85, p.hz);
     _b.set((shoulderL.x + shoulderR.x) / 2, shY, (shoulderL.z + shoulderR.z) / 2);
     align(neck, _b, _a);
     choker.position.copy(_a).lerp(_b, 0.32);
     choker.quaternion.copy(neck.quaternion).multiply(X90);
     _mid.set(hipX * 0.35 + _b.x * 0.65, hipY + (shY - hipY) * 0.42, hipZ * 0.35 + _b.z * 0.65);
-    align(bodice, _mid, _b);
+    align(bodice, _mid, _b, TORSO_X, TORSO_Z);
+    bodice.quaternion.multiply(_yawQ); // an elliptical torso has a FRONT
     _a.set(hipX, hipY, hipZ);
-    align(basque, _a, _mid);
+    align(basque, _a, _mid, TORSO_X, TORSO_Z);
+    basque.quaternion.multiply(_yawQ);
     collar.position.copy(_b);
-    collar.position.y -= 0.02;
     collar.quaternion.copy(bodice.quaternion).multiply(X90);
     belt.position.copy(_mid);
     belt.quaternion.copy(basque.quaternion).multiply(X90);
@@ -498,16 +680,23 @@ export function buildDancer(hue: number): DancerRig {
     solveArm(-1, shoulderL, handL, p.lx, p.ly * (1 - melt * 0.6), p.lz, upperL, foreL, elbowL);
     solveArm(1, shoulderR, handR, p.rx, p.ry * (1 - melt * 0.6), p.rz, upperR, foreR, elbowR);
 
-    // Legs: ankles plant a touch wider than the hips and trail the body;
-    // boots stand on the floor beneath each ankle.
+    // Legs: ankles plant a shade inside the hips (real legs converge), and
+    // trail the body a touch. Knees bend FORWARD with a slight outward
+    // splay, so a duck folds into a squat and the two never cross.
     for (const side of SIDES) {
-      hip.set(hipX + side * HIP_W * cos, hipY, hipZ - side * HIP_W * sin);
-      foot.set(hipX + side * (HIP_W + 0.032) * cos, ANKLE, hipZ - side * (HIP_W + 0.032) * sin + 0.02);
+      hip.set(hipX + _right.x * side * HIP_W, hipY, hipZ + _right.z * side * HIP_W);
+      const spread = side * (HIP_W - 0.006);
+      foot.set(hipX + _right.x * spread - _fwd.x * 0.02, ANKLE, hipZ + _right.z * spread - _fwd.z * 0.02);
+      const bone = legBone(hip.distanceTo(foot));
+      _hint.copy(_fwd).addScaledVector(_right, side * 0.32);
       const leg = side < 0 ? legL : legR;
-      align(leg, foot, hip);
-      (side < 0 ? hipBallL : hipBallR).position.copy(hip);
+      twoBone(hip, foot, bone, bone, _hint, _solved, _tip);
+      // Built from the floor up: shin ankle → knee, thigh knee → hip.
+      align(leg.shin, _tip, _solved);
+      align(leg.thigh, _solved, hip);
+      leg.knee.position.copy(_solved);
       const boot = side < 0 ? bootL : bootR;
-      boot.position.copy(foot);
+      boot.position.copy(_tip);
       boot.rotation.y = p.yaw;
     }
   };
