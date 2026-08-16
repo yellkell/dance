@@ -151,6 +151,11 @@ export interface MatchState {
    *  closing theme takes the decks. Cleared by dismissing it (or by walking
    *  out to the foyer). */
   credits: boolean;
+  /** HOSTING, but not through the door yet: the board is showing the new
+   *  room's code ("give this to your friends") and the foyer has to stay
+   *  standing behind it. Both the board's own visibility and the club's
+   *  swap-in read this, so the two can't disagree about where you are. */
+  holdFoyer: boolean;
 
   /* ── online ── */
   online: boolean;
@@ -189,6 +194,7 @@ export const match: MatchState = {
   eatIntro: false,
   tour: null,
   credits: false,
+  holdFoyer: false,
   online: false,
   roomCode: '',
 };

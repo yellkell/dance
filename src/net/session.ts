@@ -20,8 +20,8 @@
  *  - The host can leave without folding the party: the relay promotes the
  *    longest-standing member and tells them with a fresh 'room' message.
  *
- * Join by code (the 4-letter room code uses the alphabet A–H so the XR code
- * picker only needs 8 letters per slot) or by URL: ?room=CADA&name=YELL.
+ * Join by code — four DIGITS, typed on the board's keypad — or by URL:
+ * ?room=4096&name=YELL.
  */
 
 import { NET, seatHue, serverUrl } from '../config.js';
@@ -33,7 +33,11 @@ import { clearClubPoses, clubPoses, remotePoses } from './poses.js';
 
 export type NetPhase = 'off' | 'connecting' | 'hosting' | 'joined' | 'live' | 'error';
 
-export const CODE_ALPHABET = 'ABCDEFGH';
+/** Room codes are DIGITS. Four of them — the thing you shout across a
+ *  room or type into a phone — and a numeric alphabet gives 10,000 codes
+ *  where the old eight letters gave 4,096, on a pad everybody already
+ *  knows how to use. */
+export const CODE_ALPHABET = '0123456789';
 
 export interface LobbyMember {
   name: string;

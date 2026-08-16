@@ -1,5 +1,5 @@
 /**
- * RAVE RAID room relay — rooms of up to 24 dancers behind 4-letter codes.
+ * RAVE RAID room relay — rooms of up to 24 dancers behind 4-digit codes.
  *
  * The game's choreography is deterministic from the seed, so this server is
  * almost embarrassingly small: it mints room codes, tracks who's in the
@@ -53,7 +53,9 @@ import { WebSocketServer } from 'ws';
 
 const PORT = Number(process.env.PORT || 8788);
 const BALL_MS = Number(process.env.BALL_MS || 60_000);
-const CODE_ALPHABET = 'ABCDEFGH';
+// Four DIGITS: 10,000 codes, and a keypad to type them on. (Was eight
+// letters — 4,096 codes and a cycling letter-picker to enter them.)
+const CODE_ALPHABET = '0123456789';
 const MAX_ROOM = 24;
 /** RING SIZES a ball may be dealt onto. The raid takes the SMALLEST one
  *  that seats everybody who touched in, and the seats nobody claimed

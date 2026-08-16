@@ -813,7 +813,7 @@ export function hueToColor(hue: number, light = 0.55): number {
 
 /* ────────────────────────────── NETWORKING ───────────────────────────────
  * Optional — the game is fully playable solo against the groupies. With a
- * relay up (npm run server) you host a room, share the 4-letter code, and
+ * relay up (npm run server) you host a room, read out the 4-digit code, and
  * the server hands everyone a seat, the seed and a shared start time. The
  * whole choreography is deterministic from the seed, so the wire only
  * carries poses, hits and scores.

@@ -64,7 +64,9 @@ export class ClubSystem extends createSystem({}) {
     if (!club || !foyer) return;
 
     const menuRoom = match.screen === 'lobby' || match.screen === 'tour';
-    const social = net.phase === 'hosting' || net.phase === 'joined';
+    // `holdFoyer`: the room is open but its host is still reading their
+    // code off the board. The doors stay shut until they walk through.
+    const social = (net.phase === 'hosting' || net.phase === 'joined') && !match.holdFoyer;
     const wantClub = menuRoom && social;
     const wantFoyer = menuRoom && !social;
 
