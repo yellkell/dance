@@ -286,15 +286,26 @@ export function stopSet(fade = 0.5): void {
   const c = audioContext();
   const src = setSrc;
   const gain = setGain;
-  setSrc = null;
-  setGain = null;
   setTrack = null;
   state = 'off';
-  if (!c || !src || !gain) return;
+  if (!c || !src || !gain) {
+    setSrc = null;
+    setGain = null;
+    return;
+  }
   const now = c.currentTime;
   gain.gain.cancelScheduledValues(now);
   gain.gain.setValueAtTime(gain.gain.value, now);
   gain.gain.linearRampToValueAtTime(0.0001, now + fade);
+  // Keep this fading slot addressable until its source actually stops. If a
+  // player dismisses the podium early, the following menu transition can
+  // shorten the old two-second tail instead of losing its handle and mixing
+  // it under the foyer record.
+  src.onended = () => {
+    if (setSrc !== src) return;
+    setSrc = null;
+    setGain = null;
+  };
   try {
     src.stop(now + fade + 0.05);
   } catch {

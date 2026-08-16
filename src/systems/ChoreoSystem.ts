@@ -458,7 +458,10 @@ export class ChoreoSystem extends createSystem({}) {
 
     // End of the set.
     if (match.screen === 'raid' && !this.ended) {
-      const songOver = beat >= setEndBeat() + 8;
+      // The closer lands on the final downbeat. One bar lets its strike and
+      // flair finish, then the result arrives — never two bars of empty
+      // groove after an ending that has already happened.
+      const songOver = beat >= setEndBeat() + barBeats();
       const floorCleared = match.seats > 1 && aliveCount() <= 1 && beat > 0;
       // GAME OVER: the chain took you out. On your own that's the end of
       // the record — go and read the letter, don't watch bots finish it.

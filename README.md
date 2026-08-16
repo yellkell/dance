@@ -268,7 +268,7 @@ files**, not guessed — the whole game is quantized to them, so they had to be:
 | Track | BPM | Set length | Loudness | Where it plays |
 | --- | --- | --- | --- | --- |
 | MORNING | 96.665 | 5 phrases | −11.1 LUFS | tour: opening night · no ducking |
-| TARGET | 91 | 11 phrases | −9.5 LUFS | tour |
+| TARGET | 91 | 11 phrases | −9.5 LUFS | quick raid |
 | CAPTURE | 117 | 13 phrases | −15.0 LUFS | tour: first goop finale |
 | DISCO BALL | 73.33 | 4 phrases | −12.6 LUFS | tour: peak-hours opener — the night after the first goop falls · no ducking |
 | COMBAT | 135 | 12 phrases | −13.2 LUFS | quick raid |
@@ -278,7 +278,7 @@ files**, not guessed — the whole game is quantized to them, so they had to be:
 | SPREAD | 150 | 17 phrases | −13.1 LUFS | tour: after hours · skips 6 bars in |
 | BREAKCORE | 174 | 11 phrases | −8.3 LUFS | tour: the last night |
 | ASSEMBLE | 125 | 16 phrases | −7.5 LUFS | quick raid · drops on the slam |
-| SAKUPENED | 133.964 | 10 phrases | −8.1 LUFS | quick raid |
+| SAKUPENED | 133.964 | 10 phrases | −8.1 LUFS | tour: opening night 2 |
 | UNITY | 117 | 17 phrases | −13.8 LUFS | quick raid · skips its ambient open |
 | MONEY | 78.395 | 6 phrases | −14.5 LUFS | tour: peak hours · no ducking |
 | SWAG | 91.974 | — | −15.7 LUFS | foyer loop |
