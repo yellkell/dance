@@ -557,6 +557,9 @@ export class MenuSystem extends createSystem({}) {
       }
     } else if (id === 'credits-done') {
       match.credits = false;
+    } else if (id === 'view-credits') {
+      // Same modal the last night raises, same closing theme over it.
+      match.credits = true;
     } else if (id === 'vol-' || id === 'vol+') {
       setMusicVolume(musicVolume() + (id === 'vol+' ? 0.1 : -0.1));
     } else if (id === 'sfx-' || id === 'sfx+') {
@@ -2231,6 +2234,21 @@ export class MenuSystem extends createSystem({}) {
   }
 
   private tourContent(buttons: PanelButton[]): void {
+    // THE ROLL, on demand. Once the tour is finished the card stops being a
+    // one-night-only thing you either watched or missed — it lives in the
+    // empty top-left of the chart, where the trail never reaches. Like the
+    // SYSTEM switch, it simply isn't there until it's been earned.
+    if (campaignComplete()) {
+      buttons.push({
+        id: 'view-credits',
+        label: 'VIEW CREDITS',
+        small: true,
+        x: MAP_FRAME.x + 46,
+        y: MAP_FRAME.y + 40,
+        w: 292,
+        h: 76,
+      });
+    }
     // Pure hit-areas over the map stops — the map itself is the visual.
     TOUR.sets.forEach((set, s) => {
       set.songs.forEach((songId, i) => {
