@@ -147,6 +147,7 @@ World.create(container, {
 // without controllers — e.g. __gdr.startRaid({ seats: 8 }), or walk the
 // club with __gdr.net.host() + __gdr.rig(x, z, yaw).
 import { finishRaid, startRaid, toLobby, toTour } from './game/flow.js';
+import { ambientTrackId } from './audio/music.js';
 import { mutedSpeakerIds } from './club/voice.js';
 import { match } from './game/state.js';
 import { arena } from './arena/arena.js';
@@ -215,6 +216,8 @@ declare global {
       intro: typeof introView;
       /** Voice speakers currently gated off (mute, block, or wrong room). */
       mutedVoices: typeof mutedSpeakerIds;
+      /** Which record the room is spinning right now, by track id. */
+      ambient: typeof ambientTrackId;
     };
   }
 }
@@ -246,6 +249,7 @@ window.__gdr = {
   club: { call: callBall, touch: joinBall, cancel: cancelBall },
   intro: introView,
   mutedVoices: mutedSpeakerIds,
+  ambient: ambientTrackId,
   props: propsView,
   menu: new Proxy({} as typeof menuView & typeof socialView, {
     // The views are populated in each system's init — resolve lazily.

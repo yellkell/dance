@@ -456,6 +456,13 @@ export class Panel {
     }
   }
 
+  /** What this panel is currently offering, by id — the pressable ones only
+   *  (a value chip is not a button, and neither is something greyed out).
+   *  Headless checks ask this instead of hunting for shapes in pixels. */
+  liveButtons(): string[] {
+    return this.buttons.filter((b) => !b.disabled && !b.display).map((b) => b.id);
+  }
+
   /** UV (from a raycast hit) → button id, or null. */
   buttonAt(u: number, v: number): string | null {
     const x = u * this.pxW;

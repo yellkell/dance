@@ -415,6 +415,13 @@ export function ambientRunning(): boolean {
   return ambSrc !== null;
 }
 
+/** Which record the room is spinning (null between rotations) — the only way
+ *  to tell from outside whether the foyer is on the house set or the
+ *  closing theme. */
+export function ambientTrackId(): string | null {
+  return ambSrc && ambTrack ? ambTrack.id : null;
+}
+
 /** The lowpass corner that goes with a duck level: open at full, down to a
  *  through-the-wall thud when the room is hushed. */
 function duckCutoff(mult: number): number {

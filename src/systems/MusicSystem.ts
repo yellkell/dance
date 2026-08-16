@@ -24,7 +24,7 @@ import {
 } from '../audio/music.js';
 import { pickRaidTrack, trackById, tracksFor } from '../audio/tracks.js';
 import { actOfBeat } from '../choreo/setlist.js';
-import { match, phraseBeats } from '../game/state.js';
+import { campaignComplete, match, menuMusic, phraseBeats } from '../game/state.js';
 import { net } from '../net/session.js';
 
 export class MusicSystem extends createSystem({}) {
@@ -82,15 +82,20 @@ export class MusicSystem extends createSystem({}) {
         // changes and no-ops while a rotation is mid-spin.
         // …unless THE CREDITS ARE ROLLING, in which case the closing theme
         // takes the decks over both of them. It's a rotation of one, so it
-        // loops for as long as the card is up; dismissing it hands the
-        // foyer back to its own records.
+        // loops for as long as the card is up.
+        //
+        // And it can KEEP them. Finishing the tour hands over the closing
+        // theme as the foyer's record for good; dismissing the card doesn't
+        // interrupt it, because startAmbient no-ops when the rotation it's
+        // handed is already spinning — the song just carries on playing over
+        // the walk back to the map. SYSTEM can switch it back to the house
+        // rotation, and only ever offers the choice to someone who earned
+        // it. A room on the social floor still gets CHILL either way: the
+        // reward is the MENU's music, not the club's.
         const social = net.phase === 'hosting' || net.phase === 'joined';
-        const room = match.credits
-          ? tracksFor('credits')
-          : social
-            ? tracksFor('club')
-            : tracksFor('lobby');
-        if (room.length) startAmbient(room, match.credits ? 0.75 : social ? 0.7 : 0.55);
+        const closing = match.credits || (!social && menuMusic() === 'credits' && campaignComplete());
+        const room = closing ? tracksFor('credits') : social ? tracksFor('club') : tracksFor('lobby');
+        if (room.length) startAmbient(room, closing ? 0.75 : social ? 0.7 : 0.55);
         // Warm the raid record while the room track holds the floor, so the
         // drop is instant when someone hits START.
         if (!this.warmed) {

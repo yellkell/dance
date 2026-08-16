@@ -22,6 +22,7 @@ import {
   match,
   recordSoloRun,
   recordTourGrade,
+  setMenuMusic,
 } from './state.js';
 
 const phraseBeats = MUSIC.beatsPerBar * MUSIC.barsPerPhrase;
@@ -120,6 +121,11 @@ export function finishRaid(): void {
         const last = TOUR.sets.length - 1;
         if (match.tour.set === last && match.tour.song === TOUR.sets[last].songs.length - 1) {
           match.credits = true;
+          // The closing theme is the prize, and it starts collected: it keeps
+          // the decks when the card comes down instead of the foyer snapping
+          // back to the house rotation mid-song. SYSTEM has the switch from
+          // now on if they'd rather have the old menu music back.
+          setMenuMusic('credits');
         }
       }
     } else if (!match.online) {
