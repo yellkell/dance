@@ -18,18 +18,17 @@
  */
 
 import { createSystem } from '@iwsdk/core';
-import { Vector3, type MeshStandardMaterial } from 'three';
-import { BOTS, OCTAGON_HALF_DEPTH, OCTAGON_HALF_WIDTH, RING } from '../config.js';
+import { type MeshStandardMaterial } from 'three';
+import { BOTS, OCTAGON_HALF_DEPTH, OCTAGON_HALF_WIDTH } from '../config.js';
 import { platformRoot } from '../arena/arena.js';
 import { choreoView } from './ChoreoSystem.js';
 import type { Zone } from '../choreo/setlist.js';
 import { buildDancer, type DancerPose, type DancerRig } from '../game/avatars.js';
 import { roll } from '../game/rng.js';
-import { seatBearing, seatLocal } from '../game/ring.js';
+import { seatBearing, seatIsNear } from '../game/ring.js';
 import { liveSpots, match, type Dancer } from '../game/state.js';
 import { remotePoses } from '../net/poses.js';
 
-const _seatAt = new Vector3();
 
 interface Puppet {
   rig: DancerRig;
@@ -64,11 +63,10 @@ export class AvatarSystem extends createSystem({}) {
       const parent = platformRoot(d.seat);
       if (!parent) continue;
       const rig = buildDancer(d.hue);
-      // DETAIL, decided once. Platforms do not move, so how far away a
-      // dancer stands is a property of the ring, not of the frame — the
-      // whole LOD is one distance test per seat per match.
-      seatLocal(match.mySeat, d.seat, match.seats, _seatAt);
-      rig.setDetail(_seatAt.length() <= RING.detailRadius);
+      // DETAIL, decided once — see seatIsNear(). The choreography asks the
+      // same question of the same seat, so a far deck loses its dancer's
+      // jewellery, its falling blocks and its strike sparks together.
+      rig.setDetail(seatIsNear(match.mySeat, d.seat, match.seats));
       parent.add(rig.root);
       this.puppets.push({
         rig,
