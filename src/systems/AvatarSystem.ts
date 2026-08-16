@@ -18,18 +18,17 @@
  */
 
 import { createSystem } from '@iwsdk/core';
-import { Vector3, type MeshStandardMaterial } from 'three';
-import { BOTS, OCTAGON_HALF_DEPTH, OCTAGON_HALF_WIDTH, RING } from '../config.js';
+import { type MeshStandardMaterial } from 'three';
+import { BOTS, OCTAGON_HALF_DEPTH, OCTAGON_HALF_WIDTH } from '../config.js';
 import { platformRoot } from '../arena/arena.js';
 import { choreoView } from './ChoreoSystem.js';
 import type { Zone } from '../choreo/setlist.js';
 import { buildDancer, type DancerPose, type DancerRig } from '../game/avatars.js';
 import { roll } from '../game/rng.js';
-import { seatBearing, seatLocal } from '../game/ring.js';
+import { seatBearing, seatIsNear } from '../game/ring.js';
 import { liveSpots, match, type Dancer } from '../game/state.js';
 import { remotePoses } from '../net/poses.js';
 
-const _seatAt = new Vector3();
 
 interface Puppet {
   rig: DancerRig;
@@ -64,18 +63,17 @@ export class AvatarSystem extends createSystem({}) {
       const parent = platformRoot(d.seat);
       if (!parent) continue;
       const rig = buildDancer(d.hue);
-      // DETAIL, decided once. Platforms do not move, so how far away a
-      // dancer stands is a property of the ring, not of the frame — the
-      // whole LOD is one distance test per seat per match.
-      seatLocal(match.mySeat, d.seat, match.seats, _seatAt);
-      rig.setDetail(_seatAt.length() <= RING.detailRadius);
+      // DETAIL, decided once — see seatIsNear(). The choreography asks the
+      // same question of the same seat, so a far deck loses its dancer's
+      // jewellery, its falling blocks and its strike sparks together.
+      rig.setDetail(seatIsNear(match.mySeat, d.seat, match.seats));
       parent.add(rig.root);
       this.puppets.push({
         rig,
         seat: d.seat,
         phase: (d.seat * 1.7) % (Math.PI * 2),
         pose: {
-          hx: 0, hy: STAND_HEAD, hz: 0, yaw: 0,
+          hx: 0, hy: STAND_HEAD, hz: 0, yaw: 0, pitch: 0, roll: 0,
           lx: -0.3, ly: 1.0, lz: -0.1,
           rx: 0.3, ry: 1.0, rz: -0.1,
           slump: 0,
@@ -144,6 +142,8 @@ export class AvatarSystem extends createSystem({}) {
     t.hy += (pose.hy - t.hy) * k;
     t.hz += (pose.hz - t.hz) * k;
     t.yaw += (pose.hyaw - t.yaw) * k;
+    t.pitch += (pose.hpitch - t.pitch) * k;
+    t.roll += (pose.hroll - t.roll) * k;
     t.lx += (pose.lx - t.lx) * k;
     t.ly += (pose.ly - t.ly) * k;
     t.lz += (pose.lz - t.lz) * k;
@@ -214,6 +214,16 @@ export class AvatarSystem extends createSystem({}) {
     const bounce = d.alive ? Math.abs(Math.sin(beat * Math.PI + p.phase)) * 0.05 : 0;
     const standY = p.duck ? DUCK_HEAD : STAND_HEAD;
     t.hy += (standY - bounce - t.hy) * Math.min(1, delta * 8);
+
+    // The NOD rides the same kick as the bob, and the head lolls across the
+    // bar on its own slower clock. Real dancers stream a live neck now; a
+    // bot whose head could only swivel would be the one figure in the ring
+    // that reads as furniture. A duck pulls the chin right down with it.
+    const nod = d.alive ? -0.06 - Math.abs(Math.sin(beat * Math.PI + p.phase)) * 0.14 : 0;
+    const targetPitch = p.duck ? nod - 0.45 : nod;
+    const targetRoll = d.alive ? Math.sin(beat * 0.3 + p.phase * 1.7) * 0.13 : 0;
+    t.pitch += (targetPitch - t.pitch) * Math.min(1, delta * 8);
+    t.roll += (targetRoll - t.roll) * Math.min(1, delta * 5);
 
     // Glowsticks: alternate arms per beat — one punches the air, one rests.
     const wave = Math.sin(beat * Math.PI + p.phase);

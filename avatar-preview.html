@@ -121,8 +121,17 @@
         scene.add(ring);
       }
 
-      /** The catwalk routine: per-dancer body language across the row. */
+      /** Head override from __preview.look() — null while the routine runs. */
+      let neck = null;
+
+      /** The routine, with the neck override (if any) laid over the top. */
       function poseAt(i, t) {
+        const p = routineAt(i, t);
+        return neck ? { ...p, ...neck } : p;
+      }
+
+      /** The catwalk routine: per-dancer body language across the row. */
+      function routineAt(i, t) {
         const p = rigs[i].phase;
         const sway = Math.sin(t * 2.1 + p);
         const bob = Math.abs(Math.sin(t * 3.4 + p)) * 0.06;
@@ -131,6 +140,10 @@
           hy: 1.52 - bob,
           hz: Math.cos(t * 0.5 + p) * 0.06,
           yaw: Math.sin(t * 0.4 + p) * 0.5,
+          // Nod and tilt, on their own slower clocks — the thing a head does
+          // in conversation that a yaw-only puppet never could.
+          pitch: Math.sin(t * 0.55 + p * 1.7) * 0.45,
+          roll: Math.sin(t * 0.31 + p * 2.3) * 0.3,
           slump: 0,
         };
         switch (i % 6) {
@@ -155,10 +168,11 @@
               ry: 1.05 + Math.max(0, -sway) * 0.65,
               rz: -0.12,
             };
-          case 2: // the duck — low head, hands guarding
+          case 2: // the duck — low head (chin tucked), hands guarding
             return {
               ...base,
               hy: 1.06 - bob * 0.5,
+              pitch: -0.8,
               lx: base.hx - 0.24,
               ly: 0.82,
               lz: -0.18,
@@ -214,6 +228,11 @@
         run() {
           frozen = false;
         },
+        /** Pin the head where you want it — neck range shots. */
+        look(yaw, pitch, roll) {
+          frozen = true;
+          neck = { yaw, pitch, roll };
+        },
       };
 
       const t0 = performance.now();
@@ -234,6 +253,15 @@
           const hy = p.hy * (1 - p.slump * 0.62);
           camera.position.set(cx - Math.sin(a) * 0.42, hy + 0.03, p.hz - Math.cos(a) * 0.42);
           camera.lookAt(cx, hy, p.hz);
+        } else if (cam === 'neck') {
+          // The collar junction, from just under it — the one angle that
+          // shows whether the neck is still plugged into the shoulders.
+          const p = poseAt(solo, t);
+          const cx = rigs[solo].x + p.hx;
+          const a = p.yaw + orbit;
+          const y = p.hy - 0.16;
+          camera.position.set(cx - Math.sin(a) * 0.3, y - 0.06, p.hz - Math.cos(a) * 0.3);
+          camera.lookAt(cx, y + 0.02, p.hz);
         } else if (cam === 'close') {
           camera.position.set(Math.sin(orbit) * 1.3, 1.45, -Math.cos(orbit) * 1.3);
           camera.lookAt(0, 1.25, 0);

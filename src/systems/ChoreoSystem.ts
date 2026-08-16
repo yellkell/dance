@@ -39,7 +39,7 @@ import { generateSetlist, type SetMove, type Zone } from '../choreo/setlist.js';
 import { grooveView } from './PlayerSystem.js';
 import { finishRaid } from '../game/flow.js';
 import { roll } from '../game/rng.js';
-import { seatBearing } from '../game/ring.js';
+import { seatBearing, seatIsNear } from '../game/ring.js';
 import {
   aliveCount,
   barBeats,
@@ -489,9 +489,16 @@ export class ChoreoSystem extends createSystem({}) {
 
     for (const dancer of match.players) {
       if (!dancer.alive) continue;
-      // Remote platforms still get the full show — judgement stays theirs.
+      // Remote platforms still get the show — judgement stays theirs.
       const parent = platformRoot(dancer.seat);
       if (!parent) continue;
+      // ...but not the FINE show. A deck past seatIsNear() stands ten-plus
+      // metres off, where the strike's props are a few pixels and its
+      // sparks are sub-pixel; the telegraph pane still marks it, so the
+      // ring still reads as one arena under one attack. Nothing here is
+      // load-bearing: remote clients judge themselves and bots are judged
+      // from positions, so what a far deck DRAWS changes no outcome.
+      const near = seatIsNear(match.mySeat, dancer.seat, match.seats);
       move.landings.forEach((landing, landingIdx) => {
         const tg = this.buildTelegraph(landing.zone, dancer.seat, move.index, landingIdx);
         if (tg) parent.add(tg.group);
@@ -519,8 +526,10 @@ export class ChoreoSystem extends createSystem({}) {
                     : move.telegraphBeat;
         // THE ROUTINE's danger is DOWN blocks descending from above — one
         // per doomed quarter, beat-locked so the landing is the downbeat.
+        // Fifteen drawables a deck, the priciest thing an attack builds, so
+        // the far ring reads its quarter marks and skips the masonry.
         const blocks =
-          landing.zone.kind === 'quad'
+          landing.zone.kind === 'quad' && near
             ? new RoutineBlockfall(parent, landing.zone.corner, landing.beat, match.seed, move.index, landing.zone.step)
             : undefined;
         this.zones.push({
@@ -699,7 +708,14 @@ export class ChoreoSystem extends createSystem({}) {
 
     const parent = platformRoot(z.seat);
     const dancer = dancerAtSeat(z.seat);
-    if (parent && dancer?.alive) this.strikeFx(z, parent);
+    // Detonate in full only where it can be seen. The far ring's strike is
+    // where the frame actually spikes — two dozen decks each newing a spark
+    // pool that opts OUT of frustum culling, then integrating its particles
+    // in JS and re-uploading the buffer every frame, all on the one beat
+    // you most need the headset to hold framerate.
+    if (parent && dancer?.alive && seatIsNear(match.mySeat, z.seat, match.seats)) {
+      this.strikeFx(z, parent);
+    }
 
     // One landing → one sound, however many platforms it hit.
     const key = `${z.moveIdx}:${z.landingIdx}`;

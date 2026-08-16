@@ -51,8 +51,13 @@ export interface DancerPose {
   hx: number;
   hy: number;
   hz: number;
-  /** Head yaw (radians about +Y; 0 faces −Z, toward the stage). */
+  /** Head yaw (radians about +Y; 0 faces −Z, toward the stage), and the
+   *  other two axes a real neck has: pitch (nodding, + is up) and roll
+   *  (the tilt you do when you are listening). Applied YXZ, which is the
+   *  order a head actually works in. */
   yaw: number;
+  pitch: number;
+  roll: number;
   /** Hand targets, platform-local. */
   lx: number;
   ly: number;
@@ -119,6 +124,23 @@ const SHOULDER_W = 0.155; // half-width
 const SHOULDER_DROP = 0.15; // head centre → shoulder line
 const HIP_W = 0.082; // half-width
 const ANKLE = 0.085; // ankle height — legs end here, boots own the rest
+/* How far the neck goes before the head would bury itself in the chest or
+ * snap round. A player CAN look straight down at their own boots; the
+ * avatar stops short of that, because a rig with no spine has nowhere to
+ * put the difference. */
+const PITCH_MAX = 1.15;
+const ROLL_MAX = 0.6;
+/* The neck is a COLUMN THE HEAD SITS ON, not a strut stretched between the
+ * chin and the chest. Aimed at the jaw it swung a full head-radius as you
+ * nodded, which both leaned it far enough to lift its base clear of the
+ * shoulder yoke and stretched it half as long again — a straw poked loosely
+ * into the collar. So it aims at NECK_ROOT, deep enough inside the skull
+ * that a nod barely moves it, and its base is driven NECK_SINK under the
+ * yoke. Both ends are buried at every angle in the neck's range; the part
+ * on show between collar and jaw leans a few degrees and holds its length. */
+const NECK_ROOT = HEAD_R * 0.35;
+const NECK_SINK = 0.055;
+
 /** Femur (and shin) while the figure stands — see legBone(). Sized just
  *  over half the standing hip→ankle span, so a dancer at rest STANDS UP
  *  STRAIGHT (a few centimetres of knee, not a permanent half-squat) and
@@ -159,6 +181,7 @@ const SIDES = [-1, 1] as const;
 const _a = new Vector3();
 const _b = new Vector3();
 const _c = new Vector3();
+const _neck = new Vector3();
 const _dir = new Vector3();
 const _mid = new Vector3();
 const _hint = new Vector3();
@@ -426,6 +449,10 @@ export function buildDancer(hue: number): DancerRig {
 
   /* ── head: sculpted dark skull, lit visor band, jewellery, crest ── */
   const head = new Group();
+  // A head turns, then nods, then tilts — in that order. (The default XYZ
+  // would pitch about the WORLD's x axis, so a dancer facing sideways would
+  // nod their head over their own shoulder.)
+  head.rotation.order = 'YXZ';
   const skull = M(latheGeo('head', HEAD), shell);
   // Narrower across than deep, like a head — and the lathe is authored
   // base-at-0, so it drops half its height to centre on the group origin.
@@ -522,7 +549,10 @@ export function buildDancer(hue: number): DancerRig {
    * choker bound the neck; a clavicle V and shoulder caps hang the arms.
    * Both lathes are squashed to TORSO_X/Z and TURNED WITH THE YAW — an
    * elliptical torso, unlike a round one, has a front. */
-  const neck = detail(seg(0.023, 0.031, suit));
+  // Tapered to CLEAR THE JAW at the top (the skull is only ~0.026 wide down
+  // at the chin) and to PLUG THE YOKE at the bottom, where the buried part
+  // fills the lathe's neck hole instead of leaving a rim around it.
+  const neck = detail(seg(0.017, 0.034, suit));
   const bodice = M(latheGeo('bodice', BODICE), suit);
   const basque = M(latheGeo('basque', BASQUE), lit); // the lit midriff
   root.add(neck, bodice, basque);
@@ -694,7 +724,16 @@ export function buildDancer(hue: number): DancerRig {
     const hipZ = p.hz;
 
     head.position.set(p.hx, hy, p.hz);
-    head.rotation.set(melt * 0.9, p.yaw, melt * 0.35);
+    // `|| 0` also swallows a NaN from a half-built pose: a head that spins
+    // to NaN takes its whole rig off screen, and a lost nod is cheaper.
+    const clamp = (v: number, lim: number): number => Math.max(-lim, Math.min(lim, v || 0));
+    // Melting overrides the neck: a folded dancer's head hangs, whatever
+    // they were looking at on the way down.
+    head.rotation.set(
+      clamp(p.pitch, PITCH_MAX) * (1 - melt) + melt * 0.9,
+      p.yaw,
+      clamp(p.roll, ROLL_MAX) * (1 - melt) + melt * 0.35,
+    );
 
     const cos = Math.cos(p.yaw);
     const sin = Math.sin(p.yaw);
@@ -709,12 +748,19 @@ export function buildDancer(hue: number): DancerRig {
     shoulderR.set(p.hx + SHOULDER_W * cos, shY, p.hz - SHOULDER_W * sin);
 
     // Torso line: neck → bodice (shoulder mid → waist) → basque (→ hips).
-    // The neck buries its top in the JAW, not the old sphere's equator —
-    // the chin taper means the head's underside is higher and narrower.
-    _a.set(p.hx, hy - HEAD_R * 0.85, p.hz);
+    // The neck's top rides INSIDE the skull (see NECK_ROOT) so it leans with
+    // a nod without being dragged around by the chin, and its base is sunk
+    // under the shoulder yoke so the join can never open up.
+    _a.set(0, -NECK_ROOT, 0).applyEuler(head.rotation).add(head.position);
     _b.set((shoulderL.x + shoulderR.x) / 2, shY, (shoulderL.z + shoulderR.z) / 2);
-    align(neck, _b, _a);
-    choker.position.copy(_a).lerp(_b, 0.32);
+    _neck.copy(_a).sub(_b);
+    if (_neck.lengthSq() < 1e-6) _neck.set(0, 1, 0);
+    _neck.normalize();
+    _c.copy(_b).addScaledVector(_neck, -NECK_SINK);
+    align(neck, _c, _a);
+    // The choker rides the VISIBLE neck — a fixed way up from the collar,
+    // not a fraction of a segment that now starts inside the chest.
+    choker.position.copy(_b).addScaledVector(_neck, 0.05);
     choker.quaternion.copy(neck.quaternion).multiply(X90);
     _mid.set(hipX * 0.35 + _b.x * 0.65, hipY + (shY - hipY) * 0.42, hipZ * 0.35 + _b.z * 0.65);
     align(bodice, _mid, _b, TORSO_X, TORSO_Z);
@@ -763,7 +809,7 @@ export function buildDancer(hue: number): DancerRig {
   };
 
   // Park in a neutral stance so a rig never renders unsolved.
-  pose({ hx: 0, hy: 1.52, hz: 0, yaw: 0, lx: -0.3, ly: 1.0, lz: -0.1, rx: 0.3, ry: 1.0, rz: -0.1, slump: 0 });
+  pose({ hx: 0, hy: 1.52, hz: 0, yaw: 0, pitch: 0, roll: 0, lx: -0.3, ly: 1.0, lz: -0.1, rx: 0.3, ry: 1.0, rz: -0.1, slump: 0 });
 
   let detailed = true;
   return {

@@ -8,8 +8,14 @@ export interface RemotePose {
   hx: number;
   hy: number;
   hz: number;
-  /** Head yaw only — full quats are overkill for a rave silhouette. */
+  /** Head yaw, pitch and roll. Yaw alone was enough while everyone was a
+   *  silhouette across a ring; on the club floor, standing close enough to
+   *  talk, a head that can only swivel left and right is unmistakably a
+   *  puppet. Nodding, looking up at the decks, glancing down at a drink —
+   *  that is most of what a face does in a conversation. */
   hyaw: number;
+  hpitch: number;
+  hroll: number;
   lx: number;
   ly: number;
   lz: number;

@@ -29,7 +29,7 @@
  */
 
 import { createSystem } from '@iwsdk/core';
-import { Plane, Quaternion, Vector3, type Material, type Mesh } from 'three';
+import { Euler, Plane, Quaternion, Vector3, type Material, type Mesh } from 'three';
 import { mirrorRefs } from '../club/build.js';
 import { CLUB } from '../club/config.js';
 import { buildDancer, type DancerPose, type DancerRig } from '../game/avatars.js';
@@ -41,6 +41,7 @@ import { clubFloorFigures } from './ClubSocialSystem.js';
 const _v = new Vector3();
 const _q = new Quaternion();
 const _fwd = new Vector3();
+const _e = new Euler(0, 0, 0, 'YXZ');
 
 /** How fast the smoke thins/thickens (per-second exponential chase). */
 const WAKE_RATE = 5;
@@ -60,7 +61,7 @@ const SMOKE_AWAKE = 0.26;
 const GLASS_CLIP = [new Plane(new Vector3(0, 0, -1), CLUB.minZ)];
 
 const freshPose = (): DancerPose => ({
-  hx: 0, hy: 1.55, hz: 0, yaw: 0,
+  hx: 0, hy: 1.55, hz: 0, yaw: 0, pitch: 0, roll: 0,
   lx: -0.25, ly: 1.0, lz: 0, rx: 0.25, ry: 1.0, rz: 0,
   slump: 0,
 });
@@ -178,11 +179,13 @@ export class ClubMirrorSystem extends createSystem({}) {
     const p = this.mine;
     headObj.getWorldPosition(_v);
     headObj.getWorldQuaternion(_q);
-    _fwd.set(0, 0, -1).applyQuaternion(_q);
+    _e.setFromQuaternion(_q, 'YXZ');
     p.hx = _v.x;
     p.hy = _v.y;
     p.hz = _v.z;
-    p.yaw = Math.atan2(-_fwd.x, -_fwd.z);
+    p.yaw = _e.y;
+    p.pitch = _e.x;
+    p.roll = _e.z;
     for (const hand of ['left', 'right'] as const) {
       const obj = this.world.playerSpaceEntities?.raySpaces?.[hand]?.object3D;
       let x: number;
@@ -236,11 +239,20 @@ export class ClubMirrorSystem extends createSystem({}) {
     // Mirror across z = glassZ: positions reflect, yaw flips through the
     // plane, and the HANDS SWAP — the reflection's arm on your left is
     // fed by your right hand, or it reaches across its own chest.
+    //
+    // The head's nod and tilt follow from the same swap. Reflecting a frame
+    // across z and then flipping it back through its own sagittal plane
+    // (which is what feeding a normal rig swapped hands amounts to) works
+    // out to yaw → π − yaw, pitch → pitch, roll → −roll: nod down and the
+    // reflection nods down with you; tilt toward your right shoulder and it
+    // tilts toward the shoulder facing yours.
     const o = this.out;
     o.hx = src.hx;
     o.hy = src.hy;
     o.hz = 2 * glassZ - src.hz;
     o.yaw = Math.PI - src.yaw;
+    o.pitch = src.pitch;
+    o.roll = -src.roll;
     o.lx = src.rx;
     o.ly = src.ry;
     o.lz = 2 * glassZ - src.rz;
