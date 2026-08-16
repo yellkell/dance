@@ -55,6 +55,17 @@ const PORT = Number(process.env.PORT || 8788);
 const BALL_MS = Number(process.env.BALL_MS || 60_000);
 const CODE_ALPHABET = 'ABCDEFGH';
 const MAX_ROOM = 24;
+/** RING SIZES a ball may be dealt onto. The raid takes the SMALLEST one
+ *  that seats everybody who touched in, and the seats nobody claimed
+ *  become groupies — so a caller who dances alone gets a full four-ring
+ *  rather than a bare solo deck, five dancers get a proper eight, and
+ *  nobody pays to render a twenty-four-ring for a room of three.
+ *
+ *  Steps of four rather than an exact fit because a ring wants filling:
+ *  five humans on a five-ring is five decks and no crowd, while five on an
+ *  eight leaves three groupies dancing between them. */
+const RING_SIZES = [4, 8, 12, 16, 20, 24];
+const ringFor = (n) => RING_SIZES.find((size) => size >= n) ?? MAX_ROOM;
 const START_IN_MS = 5500; // count-in cushion: 8 beats at 128 BPM is 3750 ms
 const PROP_COUNT = 6; // mirrors the client's glass pool (ClubPropsSystem)
 const SERVE_MS = 1600; // the plate's sink + pause before the next coupe rises
@@ -64,7 +75,7 @@ const SERVE_RETRY_MS = 900; // every glass out on the floor — bide, try again
  * code → {
  *   members: Map<ws, {name, idx, seat}>,
  *   host: ws,
- *   ball: { caller: idx, track, diff, seats, pos, joins: Set<idx>, timer, deadline } | null,
+ *   ball: { caller: idx, track, diff, pos, joins: Set<idx>, timer, deadline } | null,
  *   playing: Set<idx>,   // members currently away on the ring
  *   props: [{ holder: idx|null, mode, pos, quat, full, restedAt }],  // the glasses
  *   serveTimer,          // the dumbwaiter's clock (server-owned, like the ball's)
@@ -212,7 +223,7 @@ function fireBall(code) {
   if (idxs.length === 0) return; // the caller walked — the ball just fades
 
   const players = idxs.map((idx) => memberByIdx(room, idx));
-  const seats = Math.min(MAX_ROOM, Math.max(4, Number(ball.seats) || players.length, players.length));
+  const seats = ringFor(players.length);
   players.forEach(([, info], i) => {
     info.seat = Math.floor((i * seats) / players.length);
   });
@@ -420,7 +431,6 @@ wss.on('connection', (ws) => {
           caller: info.idx,
           track,
           diff,
-          seats: Number(msg.seats) || 0,
           pos,
           joins: new Set(),
           deadline: Date.now() + BALL_MS,

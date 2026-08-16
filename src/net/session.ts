@@ -450,7 +450,13 @@ export function leaveRoom(): void {
  *  along. The relay owns the 60-second clock from here. */
 export function callBall(pos: [number, number, number]): void {
   if (net.phase !== 'hosting' && net.phase !== 'joined') return;
-  send({ t: 'ball-up', track: match.preferredTrack, diff: match.difficulty, seats: match.seats, pos });
+  // No seat count rides the ball. A club raid is sized by WHO TURNS UP —
+  // the relay deals everyone who touched onto the smallest ring that fits
+  // them and fills the rest with groupies. It used to carry `match.seats`,
+  // which is this headset's SOLO ring: a leftover from the last solo set,
+  // so two friends in a club room got dealt onto whatever size the host
+  // last played alone.
+  send({ t: 'ball-up', track: match.preferredTrack, diff: match.difficulty, pos });
 }
 
 /** Touch in (or step back out) of the hanging ball. */
