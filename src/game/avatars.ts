@@ -74,13 +74,17 @@ export interface DancerPose {
 export interface DancerAccent {
   mat: MeshStandardMaterial | MeshBasicMaterial;
   gain: number;
-  /** True for the NEON — collar, belt, cuffs, seams, blades, visor slit,
-   *  halos — and false for the cloth it is sewn to (suit, sleeves, helm).
-   *  A caller repainting the figure for a state (the MC's warn amber) can
-   *  then light up the jewellery alone: recolouring the whole body turns
-   *  the dancer into a different dancer, which is not what "he's winding
-   *  up" should look like. */
-  trim: boolean;
+  /** True for everything that GLOWS — the neon trim (collar, belt, cuffs,
+   *  seams, blades, visor slit, halos) AND the lit panels it is sewn to
+   *  (sleeves, midriff, crest). False for the dark cloth and the darker
+   *  accessories: bodice, trousers, helm, gauntlets, boots.
+   *
+   *  A caller repainting the figure for a state (the MC's warn amber)
+   *  drives exactly the lit parts. Those are what a dancer across the
+   *  arena actually sees change colour; recolouring the dark cloth as well
+   *  turns the headliner into a different dancer mid-wind-up, which is not
+   *  what "he is charging something" should look like. */
+  neon: boolean;
 }
 
 export interface DancerRig {
@@ -119,7 +123,7 @@ const TORSO_Z = 0.8;
 /** The emissive intensity the systems drive accents to at rest; materials
  *  are authored here × their gain, so the dev preview matches the game.
  *  Exported so a caller holding some accents at rest (the MC's warn, which
- *  lights the trim only) can put the cloth back exactly where it started. */
+ *  lights the glowing parts only) puts the cloth back where it started. */
 export const ACCENT_REST = 1.1;
 /** The suit is DARK — gloss cloth carrying only a sheen of the seat colour,
  *  the same near-black as the helm. Bodice and trousers are cut from it, so
@@ -328,8 +332,8 @@ export function buildDancer(hue: number): DancerRig {
   const color = hueToColor(hue, 0.6);
   const variant = styleVariant(hue);
   const accents: DancerAccent[] = [];
-  const accent = <T extends MeshStandardMaterial | MeshBasicMaterial>(mat: T, gain: number, trim = false): T => {
-    accents.push({ mat, gain, trim });
+  const accent = <T extends MeshStandardMaterial | MeshBasicMaterial>(mat: T, gain: number, neon = false): T => {
+    accents.push({ mat, gain, neon });
     return mat;
   };
 
@@ -358,6 +362,7 @@ export function buildDancer(hue: number): DancerRig {
       roughness: 0.32,
     }),
     LIT_GAIN,
+    true,
   );
   // The accessories: helm, gauntlets, boots, sculpted hair — gloss near-black
   // with just enough of the seat colour in it to stay a surface rather than
