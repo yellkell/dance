@@ -1519,7 +1519,7 @@ export class MenuSystem extends createSystem({}) {
       g.font = font(600, 26);
       g.letterSpacing = '5px';
       g.fillStyle = UI.dim;
-      g.fillText("YOUR FRIEND'S CODE", cx, 190);
+      g.fillText('ENTER CODE', cx, 190);
       g.letterSpacing = '0px';
       const digits = this.joinDigits.split('');
       this.drawCodeBoxes(g, cx, 218, [0, 1, 2, 3].map((i) => digits[i] ?? ''), UI.info, false);
