@@ -1,29 +1,39 @@
 /**
- * IntroSystem — the house lights going down.
+ * IntroSystem — the store-game opening ritual, once per page load, the moment
+ * the XR session opens: black, "yellkell.com PRESENTS" for three seconds, the
+ * RAVE RAID marquee for three more, then the curtain lifts on the foyer with
+ * the board already built behind it.
  *
- * The first thing inside the headset, before the foyer: black, then
- * "yellkell.com presents…", then the marquee — RAVE in goo-green, RAID in
- * hot magenta, the same two-colour split the landing page wears — and then
- * the black lifts and you are standing in the void with the board in front
- * of you. The 2D door and the VR door now open on the same title.
+ * Carried over from FIRE FIGHT's boot intro (iron-balls-boxing,
+ * src/experience/BootIntro.ts), including the parts that are easy to get
+ * wrong:
  *
- * It waits to be CUED. Systems start ticking the moment the world is
- * created — while the player is still looking at a web page deciding
- * whether to press the button — so main.ts rings it from the same place it
- * hides the landing. (Waiting on `world.session` looked equivalent and is
- * not: the emulator has a session from boot, so the show played to an
- * empty room and the real player walked in on the last two seconds.)
+ *  - The SHADE is head-locked. A featureless black cover has to follow the
+ *    view or turning your head breaks the blackout — and being featureless,
+ *    the locking is imperceptible.
+ *  - The CARDS are WORLD-LOCKED: planted once, ahead of wherever the player
+ *    happens to face as the session opens, so they hold still like a cinema
+ *    screen. Head-locked type is a VR-comfort anti-pattern — you notice it
+ *    immediately, and it is the fastest way to make somebody take a headset
+ *    off. The plant is refined once at 0.15s, because the first session pose
+ *    can lag a frame or two and the cards are near-invisible that early.
+ *  - The glow behind the marquee is LIVE planes breathing behind the card,
+ *    not bloom baked into the canvas — the same treatment the venue's own
+ *    signage gets, so the sign reads as lit rather than as a picture of a
+ *    lit sign.
+ *  - Nothing is hidden or paused behind the shade. The whole foyer keeps
+ *    building, which is what makes the reveal instant.
+ *  - Not skippable. It is six seconds.
  *
- * Comfort: the blackout is a sphere pinned to the head, so it covers the
- * whole field however you turn, but the TEXT only follows your yaw, lazily,
- * and never pitches or rolls. Type welded to your face is the fastest way
- * to make somebody take a headset off. Any button skips to the fade.
- *
- * It builds on first use and disposes itself the moment it is finished —
- * this costs nothing for the rest of the session.
+ * The show is timed off the WALL CLOCK, not accumulated frame deltas: a piece
+ * of theatre has a running time and should not run fast on a machine dropping
+ * frames. It is cued by main.ts from the same moment the web page gets out of
+ * the way — NOT by watching `world.session`, which looks equivalent and is
+ * not: the emulator holds a session from boot, so the show played to an empty
+ * room and the player walked in on the last two seconds.
  */
 
-import { createSystem, InputComponent } from '@iwsdk/core';
+import { createSystem } from '@iwsdk/core';
 import {
   BackSide,
   CanvasTexture,
@@ -32,33 +42,27 @@ import {
   Mesh,
   MeshBasicMaterial,
   PlaneGeometry,
-  Quaternion,
   SphereGeometry,
   SRGBColorSpace,
   Vector3,
 } from 'three';
 import { match } from '../game/state.js';
+import { glowTexture } from '../materials/glow.js';
 import { font, onFontsReady } from '../ui/fonts.js';
 
-/* The running order, in seconds. */
-const PRESENTS_IN = 0.5;
-const PRESENTS_OUT = 2.5;
-const TITLE_IN = 3.0;
-const TITLE_HOLD_TO = 6.2;
-const LIFT_TO = 7.4; // black gone, foyer revealed
-
-/** main.ts rings this when the player goes through the door; the second
- *  hook is for headless captures, which need to know where the show is. */
-export const introView: { begin?: () => void; at?: () => number } = {};
-
-const _cam = new Vector3();
-const _camQ = new Quaternion();
-const _fwd = new Vector3();
+/** Each card: 0.5s in, 2s hold, 0.5s out. */
+const CARD = 3;
+const FADE = 0.5;
+/** …and then the curtain goes, revealing the foyer under it. */
+const LIFT_AT = CARD * 2;
+const LIFT_FOR = 0.7;
+/** How far ahead of the opening gaze the screen is planted (metres). */
+const SCREEN_AT = 2.6;
 
 /** THE THROB — the landing page's own keyframes (0% → 6% swell, 6% → 12%
- *  dip, then a slow settle), one cycle every two bars at 128 BPM. RAVE and
- *  RAID run it half a beat apart, so the two words trade the kick exactly
- *  as they do on the web page. */
+ *  dip, then a slow settle), one cycle per bar at 128 BPM. RAVE and RAID run
+ *  it half a beat apart, so the two words trade the kick exactly as they do
+ *  on the web page. */
 const THROB_PERIOD = 1.875;
 const THROB_OFFSET = 0.234;
 function throb(t: number): number {
@@ -68,14 +72,24 @@ function throb(t: number): number {
   return 0.99 + 0.01 * Math.min(1, (f - 0.12) / 0.16);
 }
 
-/** Ease a 0→1 ramp so nothing snaps on or off. */
-const ramp = (t: number, from: number, to: number): number =>
-  Math.max(0, Math.min(1, (t - from) / (to - from)));
-const smooth = (x: number): number => x * x * (3 - 2 * x);
+/** Per-card fade envelope, in that card's own local seconds. */
+function envelope(t: number): number {
+  if (t <= 0 || t >= CARD) return 0;
+  if (t < FADE) return t / FADE;
+  if (t > CARD - FADE) return (CARD - t) / FADE;
+  return 1;
+}
 
-/** A canvas panel sized in world metres, drawn once (and re-inked when the
- *  house fonts land — the intro plays long before the woff2s are certain). */
-function cardMesh(
+const _eye = new Vector3();
+const _fwd = new Vector3();
+
+/** main.ts rings `begin` when the player goes through the door; `at` is for
+ *  headless captures, which need to know where the show is. */
+export const introView: { begin?: () => void; at?: () => number } = {};
+
+/** A canvas panel sized in world metres, re-inked when the house fonts land
+ *  (the intro plays long before the woff2s are certain). */
+function card(
   w: number,
   h: number,
   px: number,
@@ -85,39 +99,43 @@ function cardMesh(
   c.width = px;
   c.height = Math.round((px * h) / w);
   const g = c.getContext('2d')!;
-  draw(g, c.width, c.height);
+  const render = (): void => {
+    g.clearRect(0, 0, c.width, c.height);
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    draw(g, c.width, c.height);
+  };
+  render();
   const tex = new CanvasTexture(c);
   tex.colorSpace = SRGBColorSpace;
   tex.minFilter = LinearFilter;
   onFontsReady(() => {
-    g.clearRect(0, 0, c.width, c.height);
-    draw(g, c.width, c.height);
+    render();
     tex.needsUpdate = true;
   });
   const mesh = new Mesh(
     new PlaneGeometry(w, h),
-    new MeshBasicMaterial({ map: tex, transparent: true, depthTest: false, depthWrite: false, opacity: 0 }),
+    new MeshBasicMaterial({ map: tex, transparent: true, opacity: 0, depthTest: false, depthWrite: false }),
   );
-  mesh.renderOrder = 9001;
+  mesh.renderOrder = 10_003;
   return mesh;
 }
 
 export class IntroSystem extends createSystem({}) {
-  private rig: Group | null = null;
-  private black!: MeshBasicMaterial;
-  private presents!: Mesh<PlaneGeometry, MeshBasicMaterial>;
+  private shade: Mesh<SphereGeometry, MeshBasicMaterial> | null = null;
+  /** The world-locked screen: planted once, then left alone. */
+  private screen: Group | null = null;
+  private publisher!: Mesh<PlaneGeometry, MeshBasicMaterial>;
   /** RAVE and RAID are separate cards so each can throb on its own beat —
    *  one mesh could only ever pulse as a block. */
-  private words!: Mesh<PlaneGeometry, MeshBasicMaterial>[];
-  /** Wall-clock start (ms). The show is timed off the CLOCK, not off
-   *  accumulated frame deltas: a title card is a piece of theatre with a
-   *  fixed running time, and it should not run fast on a machine dropping
-   *  frames or slow on one that isn't. */
+  private words: Mesh<PlaneGeometry, MeshBasicMaterial>[] = [];
+  private glow: Group | null = null;
+  private glowMats: MeshBasicMaterial[] = [];
+
   private startedAt = 0;
   private cued = false;
   private done = false;
-  /** Lazy-follow yaw for the text (radians). NaN until the first frame. */
-  private yaw = NaN;
+  private planted = false;
 
   init(): void {
     introView.begin = () => {
@@ -127,154 +145,185 @@ export class IntroSystem extends createSystem({}) {
   }
 
   private build(): void {
-    const rig = new Group();
-    rig.name = 'live-intro';
+    // THE SHADE — head-locked, and a sphere rather than a plane so it covers
+    // the whole field however you turn. `transparent` at full opacity is
+    // load-bearing: it moves the shade into the transparent pass, which
+    // three draws after all opaque geometry. An opaque shade gets painted
+    // over by every transparent thing in the foyer behind it, and the
+    // curtain has to be the last draw of a scene we deliberately never hide.
+    const shade = new Mesh(
+      new SphereGeometry(6, 20, 14),
+      new MeshBasicMaterial({
+        color: 0x000000,
+        side: BackSide,
+        transparent: true,
+        opacity: 1,
+        depthTest: false,
+        depthWrite: false,
+      }),
+    );
+    shade.renderOrder = 10_000;
+    shade.name = 'live-intro-shade';
+    this.scene.add(shade);
+    this.shade = shade;
 
-    // The blackout: a sphere around the head, no depth test, drawn last.
-    this.black = new MeshBasicMaterial({
-      color: 0x000000,
-      side: BackSide,
-      transparent: true,
-      depthTest: false,
-      depthWrite: false,
-      opacity: 1,
-    });
-    const dome = new Mesh(new SphereGeometry(6, 20, 14), this.black);
-    dome.renderOrder = 9000;
-    rig.add(dome);
+    const screen = new Group();
+    screen.name = 'live-intro';
 
-    this.presents = cardMesh(1.9, 0.5, 900, (g, W, H) => {
-      g.textAlign = 'center';
-      g.textBaseline = 'middle';
-      g.font = font(500, 60);
-      g.letterSpacing = '10px';
-      g.fillStyle = 'rgba(228,224,240,0.9)';
-      g.shadowColor = 'rgba(160,150,200,0.5)';
-      g.shadowBlur = 18;
-      g.fillText('yellkell.com  presents…', W / 2, H / 2);
+    // CARD ONE: the publisher plate. Plain, white, quiet — the silence over
+    // it is where the room loop finishes decoding.
+    this.publisher = card(2.4, 1.2, 1200, (g, W, H) => {
+      g.font = font(600, 116);
+      g.fillStyle = '#ffffff';
+      g.shadowColor = 'rgba(255,255,255,0.45)';
+      g.shadowBlur = 30;
+      g.fillText('yellkell.com', W / 2, H / 2 - 26);
       g.shadowBlur = 0;
+      g.font = font(500, 30);
+      g.letterSpacing = '14px';
+      g.fillStyle = '#9aa0a8';
+      g.fillText('PRESENTS', W / 2, H / 2 + 82);
+      g.letterSpacing = '0px';
     });
-    this.presents.renderOrder = 9002; // over the title card they share space with
-    this.presents.position.set(0, 0, -2.4);
-    rig.add(this.presents);
+    screen.add(this.publisher);
 
-    // THE MARQUEE, the landing page's own recipe: chromatic ghosts either
-    // side of each word and a stack of blooms in its own colour, so the
-    // type reads as LIT rather than as coloured letters. A card per word,
-    // half the height each, and generous margins for the glow to spill
-    // into — bloom clipped by its own texture edge looks like a box.
-    const mkWord = (text: string, face: string, glow: string, l: string, r: string) =>
-      cardMesh(3.5, 1.25, 1400, (g, W, H) => {
-        g.textAlign = 'center';
-        g.textBaseline = 'middle';
+    // CARD TWO: the marquee. The canvas carries LETTERING ONLY — chromatic
+    // ghosts either side and a tight core bloom — and the big glow is live
+    // planes breathing behind it.
+    const word = (text: string, face: string, glowCss: string, l: string, r: string) =>
+      card(3.4, 1.15, 1360, (g, W, H) => {
         g.font = font(700, 300);
         g.letterSpacing = '12px';
         g.fillStyle = l;
         g.fillText(text, W / 2 - 15, H / 2);
         g.fillStyle = r;
         g.fillText(text, W / 2 + 15, H / 2);
-        // Three passes, wide to tight: the outer haze, the halo, the core.
-        g.shadowColor = glow;
+        g.shadowColor = glowCss;
         g.fillStyle = face;
-        for (const blur of [90, 46, 20]) {
+        for (const blur of [40, 18]) {
           g.shadowBlur = blur;
           g.fillText(text, W / 2, H / 2);
         }
         g.shadowBlur = 0;
       });
     this.words = [
-      mkWord('RAVE', '#b9ffc4', 'rgba(54,224,90,0.95)', 'rgba(255,42,213,0.6)', 'rgba(79,183,255,0.5)'),
-      mkWord('RAID', '#ffd9f6', 'rgba(255,42,213,0.95)', 'rgba(54,224,90,0.55)', 'rgba(176,107,255,0.55)'),
+      word('RAVE', '#b9ffc4', 'rgba(54,224,90,0.95)', 'rgba(255,42,213,0.6)', 'rgba(79,183,255,0.5)'),
+      word('RAID', '#ffd9f6', 'rgba(255,42,213,0.95)', 'rgba(54,224,90,0.55)', 'rgba(176,107,255,0.55)'),
     ];
-    this.words[0].position.set(0, 0.52, -2.9);
-    this.words[1].position.set(0, -0.46, -2.9);
-    for (const w of this.words) rig.add(w);
+    this.words[0].position.set(0, 0.48, 0.002);
+    this.words[1].position.set(0, -0.44, 0.002);
 
-    this.scene.add(rig);
-    this.rig = rig;
+    // The living glow: a wide haze and a hot core behind each word.
+    this.glow = new Group();
+    this.glowMats = [];
+    for (const [i, w] of this.words.entries()) {
+      for (const [size, colour] of [
+        [3.4, i ? 0xff2ad5 : 0x36e05a],
+        [2.1, i ? 0xff8fe4 : 0x9dffb4],
+      ] as const) {
+        const mat = new MeshBasicMaterial({
+          map: glowTexture(),
+          color: colour,
+          transparent: true,
+          opacity: 0,
+          depthTest: false,
+          depthWrite: false,
+        });
+        const plane = new Mesh(new PlaneGeometry(size, size * 0.5), mat);
+        plane.position.set(0, w.position.y, 0);
+        plane.renderOrder = 10_001 + this.glowMats.length;
+        this.glowMats.push(mat);
+        this.glow.add(plane);
+      }
+    }
+    screen.add(this.glow, ...this.words);
+
+    this.scene.add(screen);
+    this.screen = screen;
     match.introUp = true; // the board underneath is off limits until the lift
+  }
+
+  /** Plant the screen ahead of the CURRENT gaze: eye height, yaw only (a
+   *  downward glance must not tilt the screen into the floor). */
+  private plant(): void {
+    const screen = this.screen;
+    if (!screen) return;
+    this.camera.getWorldPosition(_eye);
+    this.camera.getWorldDirection(_fwd);
+    _fwd.y = 0;
+    if (_fwd.lengthSq() < 1e-4) _fwd.set(0, 0, -1);
+    _fwd.normalize();
+    screen.position.copy(_eye).addScaledVector(_fwd, SCREEN_AT);
+    screen.lookAt(_eye);
   }
 
   private finish(): void {
     this.done = true;
     match.introUp = false;
-    const rig = this.rig;
-    if (!rig) return;
-    rig.removeFromParent();
-    rig.traverse((o) => {
-      const m = (o as Mesh).material as MeshBasicMaterial | undefined;
-      m?.map?.dispose();
-      m?.dispose();
-      (o as Mesh).geometry?.dispose();
-    });
-    this.rig = null;
+    for (const o of [this.screen, this.shade]) {
+      o?.removeFromParent();
+      o?.traverse((n) => {
+        const m = (n as Mesh).material as MeshBasicMaterial | undefined;
+        m?.map?.dispose();
+        m?.dispose();
+        (n as Mesh).geometry?.dispose();
+      });
+    }
+    this.screen = null;
+    this.shade = null;
+    this.words = [];
+    this.glowMats = [];
   }
 
-  update(delta: number): void {
+  update(): void {
     if (this.done) return;
-
-    // Wait for the cue. Until then this system is a no-op.
     if (!this.startedAt) {
       if (!this.cued) return;
       this.build();
+      this.plant();
       this.startedAt = performance.now();
     }
-    const rig = this.rig;
-    if (!rig) return;
+    const screen = this.screen;
+    const shade = this.shade;
+    if (!screen || !shade) return;
     const t = (performance.now() - this.startedAt) / 1000;
 
-    // Any button cuts to the lift — nobody should have to sit through a
-    // title card twice.
-    const pads = this.input.xr.gamepads;
-    const pressed = (['left', 'right'] as const).some((h) =>
-      [InputComponent.Trigger, InputComponent.A_Button, InputComponent.X_Button].some((b) =>
-        pads[h]?.getButtonDown(b),
-      ),
-    );
-    // Skip: shove the start back so the clock lands on the lift.
-    if (pressed && t < TITLE_HOLD_TO) this.startedAt -= (TITLE_HOLD_TO - t) * 1000;
-
-    // Pin to the head; let the text follow the yaw a beat behind, level.
-    this.camera.getWorldPosition(_cam);
-    this.camera.getWorldQuaternion(_camQ);
-    rig.position.copy(_cam);
-    _fwd.set(0, 0, -1).applyQuaternion(_camQ);
-    const want = Math.atan2(-_fwd.x, -_fwd.z);
-    if (Number.isNaN(this.yaw)) this.yaw = want;
-    else {
-      // Shortest way round, then a soft chase.
-      let d = want - this.yaw;
-      while (d > Math.PI) d -= Math.PI * 2;
-      while (d < -Math.PI) d += Math.PI * 2;
-      this.yaw += d * Math.min(1, delta * 2.2);
+    // The first real XR pose lands a frame or two in; re-plant while the
+    // cards are still near-invisible, then never move them again.
+    if (!this.planted && t >= 0.15) {
+      this.planted = true;
+      this.plant();
     }
-    rig.rotation.y = this.yaw;
 
-    // The running order.
-    this.presents.material.opacity =
-      smooth(ramp(t, PRESENTS_IN, PRESENTS_IN + 0.7)) * (1 - smooth(ramp(t, PRESENTS_OUT, PRESENTS_OUT + 0.5)));
-    const titleUp = smooth(ramp(t, TITLE_IN, TITLE_IN + 0.8));
-    const lift = smooth(ramp(t, TITLE_HOLD_TO, LIFT_TO));
-    // Hand the menu back the instant the black begins to go.
-    if (lift > 0) match.introUp = false;
-    // It arrives big and settles — a marquee dropping into place.
-    const land = 1 + 0.1 * (1 - smooth(ramp(t, TITLE_IN, TITLE_IN + 1.4)));
+    // Only the shade follows the head.
+    this.camera.getWorldPosition(_eye);
+    shade.position.copy(_eye);
+
+    const lift = Math.max(0, Math.min(1, (t - LIFT_AT) / LIFT_FOR));
+    if (lift > 0) match.introUp = false; // hand the menu back as the black goes
+    shade.material.opacity = 1 - lift;
+    this.publisher.material.opacity = envelope(t);
+
+    const k = envelope(t - CARD) * (1 - lift);
     this.words.forEach((w, i) => {
       const phase = t - i * THROB_OFFSET;
-      // The KICK is a punch every bar and then stillness — faithful to the
-      // landing page, but on its own it leaves the marquee sitting dead for
-      // a second and a third at a time. A slow breath underneath keeps the
-      // sign alive between the hits, the way real neon never quite settles.
+      // The KICK punches once a bar and then sits still — faithful to the
+      // landing page, but on a two-metre sign that reads as a sign that has
+      // died. A slow breath underneath keeps it alive between the hits, the
+      // way real neon never quite settles.
       const breath = Math.sin(phase * 1.9 + i * 1.1);
-      w.material.opacity = titleUp * (1 - lift);
-      w.scale.setScalar(land * throb(phase) * (1 + 0.012 * breath));
-      // The tint multiplies the canvas, so the whole word brightens rather
-      // than just growing. Over 1 blows the bloom out hot — that's the kick.
-      const beat = Math.max(0, (throb(phase) - 0.99) / 0.055);
-      w.material.color.setScalar(1 + 0.3 * beat + 0.1 * breath);
+      w.material.opacity = k;
+      w.scale.setScalar(throb(phase) * (1 + 0.012 * breath));
+      w.material.color.setScalar(1 + 0.1 * breath);
     });
-    this.black.opacity = 1 - lift;
+    // The signage's own breathing, gated by the card's fade.
+    const pulse = 0.5 + 0.5 * Math.sin(t * 1.6);
+    const s = 0.93 + pulse * 0.14;
+    this.glow?.scale.set(s, s, 1);
+    this.glowMats.forEach((m, i) => {
+      m.opacity = (i % 2 ? 0.55 : 0.4) * (0.72 + pulse * 0.5) * k;
+    });
 
-    if (t >= LIFT_TO) this.finish();
+    if (t >= LIFT_AT + LIFT_FOR) this.finish();
   }
 }
