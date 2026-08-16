@@ -147,6 +147,7 @@ World.create(container, {
 // without controllers — e.g. __gdr.startRaid({ seats: 8 }), or walk the
 // club with __gdr.net.host() + __gdr.rig(x, z, yaw).
 import { finishRaid, startRaid, toLobby, toTour } from './game/flow.js';
+import { ambientTrackId } from './audio/music.js';
 import { mutedSpeakerIds } from './club/voice.js';
 import { match } from './game/state.js';
 import { arena } from './arena/arena.js';
@@ -154,6 +155,7 @@ import { choreoView } from './systems/ChoreoSystem.js';
 import { menuView } from './systems/MenuSystem.js';
 import { socialView } from './systems/ClubSocialSystem.js';
 import { propsView } from './systems/ClubPropsSystem.js';
+import { teleportView } from './systems/ClubTeleportSystem.js';
 import { grooveView } from './systems/PlayerSystem.js';
 import {
   callBall,
@@ -215,6 +217,10 @@ declare global {
       intro: typeof introView;
       /** Voice speakers currently gated off (mute, block, or wrong room). */
       mutedVoices: typeof mutedSpeakerIds;
+      /** Which record the room is spinning right now, by track id. */
+      ambient: typeof ambientTrackId;
+      /** The club moves that resolve without an arc (step back, snap turn). */
+      move: typeof teleportView;
     };
   }
 }
@@ -246,6 +252,8 @@ window.__gdr = {
   club: { call: callBall, touch: joinBall, cancel: cancelBall },
   intro: introView,
   mutedVoices: mutedSpeakerIds,
+  ambient: ambientTrackId,
+  move: teleportView,
   props: propsView,
   menu: new Proxy({} as typeof menuView & typeof socialView, {
     // The views are populated in each system's init — resolve lazily.

@@ -322,6 +322,42 @@ export function markTourNightCleared(set: number, song: number): void {
   }
 }
 
+/** Every night of every set that's actually for sale, cleared. The tour is
+ *  over, the credits have rolled, and a couple of things open up. */
+export function campaignComplete(): boolean {
+  const done = clearedTourNights();
+  for (let s = 0; s < TOUR.freeSets; s++) {
+    for (let i = 0; i < TOUR.sets[s].songs.length; i++) if (!done.has(`${s}:${i}`)) return false;
+  }
+  return true;
+}
+
+/* ── the closing theme, kept (localStorage) ───────────────────────────────
+ * Finish the tour and the record that played over the credits is yours: it
+ * stays on the foyer's decks instead of handing back to the house rotation
+ * when the card comes down. It's a preference, not a state — SYSTEM shows
+ * the switch once the tour is done, and never before. */
+
+const MENU_MUSIC_KEY = 'gdr-menu-music';
+
+export type MenuMusic = 'original' | 'credits';
+
+export function menuMusic(): MenuMusic {
+  try {
+    return localStorage.getItem(MENU_MUSIC_KEY) === 'credits' ? 'credits' : 'original';
+  } catch {
+    return 'original';
+  }
+}
+
+export function setMenuMusic(choice: MenuMusic): void {
+  try {
+    localStorage.setItem(MENU_MUSIC_KEY, choice);
+  } catch {
+    /* storage may be unavailable */
+  }
+}
+
 /** Night 1 of set 1 is always open; a night needs the previous night, and a
  *  set needs the whole set before it. */
 export function tourNightUnlocked(set: number, song: number): boolean {

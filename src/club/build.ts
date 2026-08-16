@@ -29,12 +29,15 @@ import {
   BoxGeometry,
   CanvasTexture,
   CircleGeometry,
+  Color,
   CylinderGeometry,
   DoubleSide,
   ExtrudeGeometry,
   Group,
   HemisphereLight,
+  InstancedMesh,
   LatheGeometry,
+  Matrix4,
   LinearFilter,
   Mesh,
   MeshBasicMaterial,
@@ -705,6 +708,129 @@ function buildStage(root: Group): MeshBasicMaterial {
   return consoleMat;
 }
 
+/* ── THE BACK BAR'S BOTTLES ──────────────────────────────────────────────
+ *
+ * Twenty-four bottles used to be twenty-four Meshes, each carrying its own
+ * LatheGeometry AND its own MeshStandardMaterial: twenty-four draw calls
+ * and twenty-four material binds for the smallest objects in the room —
+ * spending the budget of a crowd scene on a shelf you could count in one
+ * glance. One bottle every 66 cm is not a bar, it's a display case.
+ *
+ * Instancing makes the COUNT nearly free, and that is what pays for a bar
+ * that looks stocked: four shelves instead of three, packed shoulder to
+ * shoulder, with a second rank behind showing through the gaps — hundreds
+ * of bottles in THREE draw calls, one per silhouette.
+ *
+ * Two more things ride along. The bottles are OPAQUE now: at 0.88 they were
+ * nominally see-through and paid for it twice over — sorted every frame and
+ * blended over each other — and three hundred of them overlapping would
+ * have turned the shelf to mush rather than glass. And the profile is cut
+ * down to six rings: a 4 cm bottle two metres behind a glass wall is worth
+ * a shoulder and a neck, not a moulded lip.
+ */
+
+/** Drink colours — the one place saturated colour touches glass. */
+const BOTTLE_TINTS = [0xc97a1e, 0x8a3a10, 0x4fb7ff, 0x7dff5a, 0xb06bff, 0xe8352a, 0xf2e9d4, 0xffd24a];
+/** Silhouettes: squat rum, tall spirit, bulb liqueur. Built UNIT-HEIGHT and
+ *  stretched per instance, which is exactly what varying `h` did before —
+ *  the radius stays put while the bottle grows. */
+const BOTTLE_R = 0.036;
+const BOTTLE_SEGMENTS = 7;
+function bottleProfile(kind: number): Vector2[] {
+  const r = BOTTLE_R;
+  const bodyTop = kind === 0 ? 0.62 : kind === 1 ? 0.5 : 0.42;
+  const neckR = r * (kind === 2 ? 0.24 : 0.3);
+  return [
+    new Vector2(0, 0),
+    new Vector2(r * 0.92, 0.01),
+    new Vector2(r, bodyTop),
+    new Vector2(r * (kind === 2 ? 0.9 : 0.66), bodyTop + 0.16),
+    new Vector2(neckR, 0.86),
+    new Vector2(neckR * 1.45, 1),
+    new Vector2(0, 1),
+  ];
+}
+
+/** Shelf heights, floor up. The fourth is new: the glass wall runs to 2.75
+ *  and the old top shelf left three quarters of a metre of it bare. */
+const SHELF_YS = [0.62, 1.18, 1.74, 2.3];
+/** Where each rank stands across the shelf's 26 cm depth, how tightly it is
+ *  packed, and how much light it gets. The back rank is half as dense and
+ *  darker: it exists to fill the gaps between the front rank's shoulders,
+ *  and anything more is triangles nobody will ever see. */
+const BOTTLE_RANKS = [
+  { x: -0.225, spacing: 0.115, offset: 0, shade: 1 },
+  { x: -0.105, spacing: 0.23, offset: 0.115, shade: 0.62 },
+];
+
+function buildBackBarBottles(
+  root: Group,
+  B: typeof CLUB.bar,
+  len: number,
+  zc: number,
+): void {
+  const shelfMat = new MeshStandardMaterial({ map: marbleTexture([3, 0.4]), metalness: 0.2, roughness: 0.25 });
+  for (const y of SHELF_YS) box(root, shelfMat, 0.26, 0.03, len - 0.3, B.backX - 0.16, y, zc);
+
+  // Lay every bottle out first — the instance count has to be known before
+  // the mesh exists — then deal them into one bucket per silhouette.
+  const buckets: { x: number; y: number; z: number; h: number; tint: Color }[][] = [[], [], []];
+  const z0 = B.z0 + 0.3;
+  const z1 = B.z1 - 0.3;
+  let n = 0;
+  SHELF_YS.forEach((y, shelf) => {
+    for (const rank of BOTTLE_RANKS) {
+      for (let z = z0 + rank.offset; z <= z1; z += rank.spacing) {
+        // Deterministic, not random: the club is rebuilt on every entry and
+        // a shelf that reshuffles itself when you walk out and back in is a
+        // thing you notice.
+        const i = n++;
+        const kind = (i + shelf) % 3;
+        const tint = new Color(BOTTLE_TINTS[(i * 3 + shelf * 5) % BOTTLE_TINTS.length]);
+        tint.multiplyScalar(rank.shade);
+        buckets[kind].push({
+          x: B.backX + rank.x,
+          y: y + 0.015,
+          z,
+          h: 0.24 + ((i + shelf) % 3) * 0.035,
+          tint,
+        });
+      }
+    }
+  });
+
+  const _m = new Matrix4();
+  buckets.forEach((bottles, kind) => {
+    if (!bottles.length) return;
+    const mat = new MeshStandardMaterial({
+      color: 0xffffff,
+      emissive: 0xffffff,
+      emissiveIntensity: 0.32,
+      roughness: 0.18,
+      metalness: 0.05,
+    });
+    // instanceColor reaches the fragment shader as vColor and multiplies the
+    // DIFFUSE. These are backlit glass, so most of their tint lives in the
+    // emissive — one line makes that per-instance too, and three hundred
+    // bottles glow three hundred colours off one material.
+    mat.onBeforeCompile = (shader) => {
+      shader.fragmentShader = shader.fragmentShader.replace(
+        'vec3 totalEmissiveRadiance = emissive;',
+        'vec3 totalEmissiveRadiance = emissive * vColor.rgb;',
+      );
+    };
+    const mesh = new InstancedMesh(new LatheGeometry(bottleProfile(kind), BOTTLE_SEGMENTS), mat, bottles.length);
+    mesh.name = `live-bar-bottles-${kind}`;
+    bottles.forEach((b, i) => {
+      mesh.setMatrixAt(i, _m.makeScale(1, b.h, 1).setPosition(b.x, b.y, b.z));
+      mesh.setColorAt(i, b.tint);
+    });
+    mesh.instanceMatrix.needsUpdate = true;
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+    root.add(mesh);
+  });
+}
+
 /* ── the bar: smoked oak, honed marble, backlit ribbed glass ────────────── */
 
 function buildBar(root: Group): MeshStandardMaterial {
@@ -775,49 +901,7 @@ function buildBar(root: Group): MeshStandardMaterial {
   box(root, railBrass, 0.04, 0.04, len + 0.44, B.backX - 0.02, 2.76, zc);
   box(root, railBrass, 0.04, 0.04, len + 0.44, B.backX - 0.02, 0.26, zc);
 
-  // Shelves + bottles. Profiles vary (squat rum, tall spirit, bulb liqueur);
-  // tints are the drinks' — the one place saturated colour touches glass.
-  const shelfMat = new MeshStandardMaterial({ map: marbleTexture([3, 0.4]), metalness: 0.2, roughness: 0.25 });
-  const bottleTints = [0xc97a1e, 0x8a3a10, 0x4fb7ff, 0x7dff5a, 0xb06bff, 0xe8352a, 0xf2e9d4, 0xffd24a];
-  const bottleProfile = (h: number, r: number, kind: number): Vector2[] => {
-    const bodyTop = h * (kind === 0 ? 0.62 : kind === 1 ? 0.5 : 0.42);
-    const neckR = r * (kind === 2 ? 0.24 : 0.3);
-    return [
-      new Vector2(0.001, 0),
-      new Vector2(r * 0.88, 0),
-      new Vector2(r, h * 0.06),
-      new Vector2(r, bodyTop),
-      new Vector2(r * (kind === 2 ? 0.9 : 0.66), h * (bodyTop / h + 0.16)),
-      new Vector2(neckR, h * 0.85),
-      new Vector2(neckR, h * 0.94),
-      new Vector2(neckR * 1.5, h * 0.95),
-      new Vector2(neckR * 1.5, h),
-      new Vector2(0.001, h),
-    ];
-  };
-  for (let shelf = 0; shelf < 3; shelf++) {
-    const y = 0.62 + shelf * 0.56;
-    box(root, shelfMat, 0.26, 0.03, len - 0.3, B.backX - 0.16, y, zc);
-    const count = 9 - shelf;
-    for (let i = 0; i < count; i++) {
-      const tint = bottleTints[(i * 3 + shelf * 5) % bottleTints.length];
-      const h = 0.24 + ((i + shelf) % 3) * 0.035;
-      const bottle = new Mesh(
-        new LatheGeometry(bottleProfile(h, 0.036, (i + shelf) % 3), 10),
-        new MeshStandardMaterial({
-          color: tint,
-          emissive: tint,
-          emissiveIntensity: 0.32,
-          transparent: true,
-          opacity: 0.88,
-          roughness: 0.18,
-          metalness: 0.05,
-        }),
-      );
-      bottle.position.set(B.backX - 0.16, y + 0.015, B.z0 + 0.55 + i * ((len - 1.1) / (count - 1)));
-      root.add(bottle);
-    }
-  }
+  buildBackBarBottles(root, B, len, zc);
 
   // Five brass pendants over the counter — cones on long stems, glowing.
   const pendantShade = brassGlowMat(1.15);
@@ -865,20 +949,9 @@ function buildBar(root: Group): MeshStandardMaterial {
     root.add(g);
   }
 
-  // A quiet little BAR sign in the deco manner, on the east wall's rail.
-  const barSign = signPlane(0.8, 0.26, 512, (s, sw, sh) => {
-    s.textAlign = 'center';
-    s.textBaseline = 'middle';
-    s.fillStyle = '#e8d9b0';
-    s.shadowColor = 'rgba(255,196,110,0.9)';
-    s.shadowBlur = 14;
-    s.font = `500 88px Georgia, serif`;
-    s.fillText('B A R', sw / 2, sh / 2 + 4);
-  });
-  barSign.name = 'live-bar-sign';
-  barSign.rotation.y = -Math.PI / 2;
-  barSign.position.set(CLUB.halfW - 0.1, 2.9, zc);
-  root.add(barSign);
+  // (No sign. A wall of bottles under four shelves of light is already the
+  // most legible thing in the room — spelling BAR over it was labelling a
+  // door "DOOR".)
 
   return glassMat;
 }

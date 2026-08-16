@@ -53,8 +53,11 @@ import {
 } from '../game/profile.js';
 import {
   bestTourGrade,
+  campaignComplete,
   clearedTourNights,
   match,
+  menuMusic,
+  setMenuMusic,
   soloBoard,
   tourNightUnlocked,
 } from '../game/state.js';
@@ -171,6 +174,10 @@ export const menuView: {
   pointAt?: (x: number, y: number) => void;
   /** The board's raw canvas as a data URL — pixel-perfect style checks. */
   snapBoard?: () => string;
+  /** Which buttons the board is actually offering right now. `act` presses
+   *  an id whether or not it is on screen (it IS the finger, not the hand),
+   *  so a test that cares whether something is REACHABLE asks this. */
+  boardButtons?: () => string[];
   snapPause?: () => string;
 } = {};
 
@@ -280,6 +287,7 @@ export class MenuSystem extends createSystem({}) {
       this.hitPx = { x, y };
     };
     menuView.snapBoard = () => (this.board.ctx().canvas as HTMLCanvasElement).toDataURL('image/png');
+    menuView.boardButtons = () => this.board.liveButtons();
     menuView.snapPause = () => (this.pause.ctx().canvas as HTMLCanvasElement).toDataURL('image/png');
 
     autoJoinFromUrl();
@@ -549,11 +557,18 @@ export class MenuSystem extends createSystem({}) {
       }
     } else if (id === 'credits-done') {
       match.credits = false;
+    } else if (id === 'view-credits') {
+      // Same modal the last night raises, same closing theme over it.
+      match.credits = true;
     } else if (id === 'vol-' || id === 'vol+') {
       setMusicVolume(musicVolume() + (id === 'vol+' ? 0.1 : -0.1));
     } else if (id === 'sfx-' || id === 'sfx+') {
       setSfxVolume(sfxVolume() + (id === 'sfx+' ? 0.1 : -0.1));
       sfx.gooCharge(0.5); // an attack cue to judge the new level by
+    } else if (id === 'music-original' || id === 'music-credits') {
+      // Takes effect on the next frame — MusicSystem reads the preference
+      // every tick and startAmbient cross-fades the rotation itself.
+      setMenuMusic(id === 'music-credits' ? 'credits' : 'original');
     } else if (id === 'board-world' || id === 'board-local') {
       this.boardSource = id === 'board-world' ? 'world' : 'local';
       this.boardScroll = 0;
@@ -648,6 +663,7 @@ export class MenuSystem extends createSystem({}) {
       match.preferredTrack,
       Math.round(musicVolume() * 10),
       Math.round(sfxVolume() * 10),
+      menuMusic(),
       net.phase,
       net.code,
       net.members.length,
@@ -2218,6 +2234,21 @@ export class MenuSystem extends createSystem({}) {
   }
 
   private tourContent(buttons: PanelButton[]): void {
+    // THE ROLL, on demand. Once the tour is finished the card stops being a
+    // one-night-only thing you either watched or missed — it lives in the
+    // empty top-left of the chart, where the trail never reaches. Like the
+    // SYSTEM switch, it simply isn't there until it's been earned.
+    if (campaignComplete()) {
+      buttons.push({
+        id: 'view-credits',
+        label: 'VIEW CREDITS',
+        small: true,
+        x: MAP_FRAME.x + 46,
+        y: MAP_FRAME.y + 40,
+        w: 292,
+        h: 76,
+      });
+    }
     // Pure hit-areas over the map stops — the map itself is the visual.
     TOUR.sets.forEach((set, s) => {
       set.songs.forEach((songId, i) => {
@@ -2268,6 +2299,43 @@ export class MenuSystem extends createSystem({}) {
       small: true,
     });
     buttons.push({ id: 'sfx+', label: '+', x: CONTENT_X + 472, y: 312, w: 110, h: 110 });
+
+    // THE CLOSING THEME, kept. This row does not exist until the tour has
+    // been finished — it is the reward, so someone who hasn't earned it
+    // shouldn't be able to see what they're missing sitting greyed out.
+    if (!campaignComplete()) return;
+    buttons.push({
+      id: 'menu-music',
+      label: 'MENU MUSIC',
+      x: CONTENT_X,
+      y: 452,
+      w: 582,
+      h: 84,
+      display: true,
+      small: true,
+    });
+    buttons.push({
+      id: 'music-original',
+      label: 'ORIGINAL',
+      sub: 'the house rotation',
+      selected: menuMusic() === 'original',
+      small: true,
+      x: CONTENT_X,
+      y: 552,
+      w: 285,
+      h: 96,
+    });
+    buttons.push({
+      id: 'music-credits',
+      label: 'CREDITS',
+      sub: 'the closing theme',
+      selected: menuMusic() === 'credits',
+      small: true,
+      x: CONTENT_X + 297,
+      y: 552,
+      w: 285,
+      h: 96,
+    });
   }
 }
 
