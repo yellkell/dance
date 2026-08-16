@@ -285,7 +285,7 @@ export const CHOREO = {
    *  vocabulary rather than becoming a surprise. */
   beamSplitX: 0.5,
   beamTwinInner: 0.12,
-  beamSplitChance: [0.4, 0.4, 0.55, 0.47, 0.45],
+  beamSplitChance: [0.4, 0.36, 0.42, 0.36, 0.34],
   /** THE RETURN — the twin's second half, and the set's plainest travel
    *  order: the twin takes one side, and a bar later the SAME pair lands
    *  mirrored on the side you just ran to. Across, and straight back.
@@ -297,7 +297,7 @@ export const CHOREO = {
    *  of strips on the deck to read, and the beat you spend crossing is the
    *  beat you get to read the answer in. */
   twinReturnBeats: 4,
-  twinReturnChance: [0, 0, 0.72, 0.78, 0.82],
+  twinReturnChance: [0, 0.45, 0.85, 0.9, 0.94],
   /** How many volleys THE BOUNCE may run to, the opener included. At 3 the
    *  pattern is across, back, and across again — the third pair lands on
    *  the side the first one did, so the deck throws you left, right and
@@ -314,14 +314,20 @@ export const CHOREO = {
    *  the bounce was built to stop being. A rally that has started should
    *  finish, so on the expert acts the third pair is close to a promise.
    *  Below them it stays a coin, because a floor still learning to read one
-   *  pair does not need three bars of them. */
-  twinBounceChance: [0, 0, 0.72, 0.92, 0.96],
+   *  pair does not need three bars of them.
+   *
+   *  Both rolls sit high, and the twin's competition (split, X) sits lower
+   *  than it did: the three-volley rally is the signature of this floor,
+   *  and it was landing on barely a quarter of laser moves. It is now the
+   *  likeliest thing a double laser does. Act 1 gets a coin-flip rally too
+   *  — the rhythm is worth meeting before the expert acts, not after. */
+  twinBounceChance: [0, 0.45, 0.85, 0.95, 0.98],
   /** THE X: two beams thrown diagonally through the deck centre at once,
    *  crossing in an X — the safe ground is the four pockets between the
    *  arms, so the dodge reads radial (out of the cross, not off a line).
    *  The arms run THINNER than a straight beam: two full-width strips on
    *  the diagonals left pockets too tight to trust. */
-  beamXChance: [0, 0, 0.3, 0.35, 0.4],
+  beamXChance: [0, 0, 0.24, 0.28, 0.32],
   beamXHalfW: 0.17,
   /** THE WAVE: beams marching across the deck in order, one landing per
    *  step, with the far quarter left dark — the EXIT. EVERY wave turns:

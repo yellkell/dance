@@ -29,7 +29,7 @@
  */
 
 import { createSystem } from '@iwsdk/core';
-import { Quaternion, Vector3 } from 'three';
+import { Plane, Quaternion, Vector3, type Material, type Mesh } from 'three';
 import { mirrorRefs } from '../club/build.js';
 import { CLUB } from '../club/config.js';
 import { buildDancer, type DancerPose, type DancerRig } from '../game/avatars.js';
@@ -48,6 +48,17 @@ const WAKE_RATE = 5;
 const SMOKE_ASLEEP = 0.93;
 const SMOKE_AWAKE = 0.26;
 
+/**
+ * The glass, as a clipping plane: keep everything at or BEHIND z = the
+ * north wall, discard the rest. A reflection stands as deep as you are
+ * far, so pressing up to the pane brings its toes (0.16 m ahead of the
+ * face standing, 0.29 m in a crouch) out through the glass and into the
+ * room — the one thing that cannot be allowed to happen to a mirror.
+ * Clipping is the guarantee: the reflection still walks all the way in to
+ * meet you, and simply stops existing in front of the frame.
+ */
+const GLASS_CLIP = [new Plane(new Vector3(0, 0, -1), CLUB.minZ)];
+
 const freshPose = (): DancerPose => ({
   hx: 0, hy: 1.55, hz: 0, yaw: 0,
   lx: -0.25, ly: 1.0, lz: 0, rx: 0.25, ry: 1.0, rz: 0,
@@ -55,6 +66,13 @@ const freshPose = (): DancerPose => ({
 });
 
 export class ClubMirrorSystem extends createSystem({}) {
+  init(): void {
+    // Per-material clipping is off by default; the mirror is the only
+    // thing in the game that wants it, and it costs nothing for materials
+    // that carry no planes.
+    this.renderer.localClippingEnabled = true;
+  }
+
   /** 0 asleep … 1 awake — drives the smoke, the light and the rig work. */
   private wake = 0;
   /** Mirrored rigs by member idx; −1 is me. Kept while the floor is open
@@ -205,6 +223,13 @@ export class ClubMirrorSystem extends createSystem({}) {
     }
     if (!entry) {
       entry = { rig: buildDancer(hue), hue };
+      // Clip every surface of this reflection at the pane (set before the
+      // rig has ever been drawn, so no shader recompiles mid-approach).
+      entry.rig.root.traverse((o) => {
+        const mat = (o as Mesh).material as Material | Material[] | undefined;
+        if (!mat) return;
+        for (const m of Array.isArray(mat) ? mat : [mat]) m.clippingPlanes = GLASS_CLIP;
+      });
       mirrorRefs.current!.figures.add(entry.rig.root);
       this.pool.set(idx, entry);
     }

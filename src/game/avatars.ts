@@ -74,6 +74,13 @@ export interface DancerPose {
 export interface DancerAccent {
   mat: MeshStandardMaterial | MeshBasicMaterial;
   gain: number;
+  /** True for the NEON — collar, belt, cuffs, seams, blades, visor slit,
+   *  halos — and false for the cloth it is sewn to (suit, sleeves, helm).
+   *  A caller repainting the figure for a state (the MC's warn amber) can
+   *  then light up the jewellery alone: recolouring the whole body turns
+   *  the dancer into a different dancer, which is not what "he's winding
+   *  up" should look like. */
+  trim: boolean;
 }
 
 export interface DancerRig {
@@ -96,8 +103,11 @@ const SHOULDER_W = 0.155; // half-width
 const SHOULDER_DROP = 0.15; // head centre → shoulder line
 const HIP_W = 0.082; // half-width
 const ANKLE = 0.085; // ankle height — legs end here, boots own the rest
-/** Femur (and shin) while the figure stands — see legBone(). */
-const LEG_BONE = 0.4;
+/** Femur (and shin) while the figure stands — see legBone(). Sized just
+ *  over half the standing hip→ankle span, so a dancer at rest STANDS UP
+ *  STRAIGHT (a few centimetres of knee, not a permanent half-squat) and
+ *  the fold is saved for an actual crouch. */
+const LEG_BONE = 0.392;
 
 /* The torso's CROSS-SECTION. A lathe is round, and a round torso is a
  * bottle; broad across the chest and slim front-to-back is what makes the
@@ -107,8 +117,10 @@ const TORSO_X = 1.18;
 const TORSO_Z = 0.8;
 
 /** The emissive intensity the systems drive accents to at rest; materials
- *  are authored here × their gain, so the dev preview matches the game. */
-const ACCENT_REST = 1.1;
+ *  are authored here × their gain, so the dev preview matches the game.
+ *  Exported so a caller holding some accents at rest (the MC's warn, which
+ *  lights the trim only) can put the cloth back exactly where it started. */
+export const ACCENT_REST = 1.1;
 /** The suit is DARK — gloss cloth carrying only a sheen of the seat colour,
  *  the same near-black as the helm. Bodice and trousers are cut from it, so
  *  the top and the legs finally match instead of reading as a black vest
@@ -264,10 +276,15 @@ function twoBone(
   hint: Vector3,
   joint: Vector3,
   end: Vector3,
+  slack = 0.015,
 ): void {
   _chain.copy(tip).sub(root);
   // Out of reach: bring the tip in to full extension rather than snapping.
-  const d = Math.min(upper + lower - 0.015, Math.max(0.05, _chain.length()));
+  // `slack` keeps a chain off its own dead-straight singularity — worth it
+  // for an arm at full stretch, but a leg pays for it in permanent knee
+  // bend, and a foot that floats a centimetre off its target is worse than
+  // a straight one, so legs pass 0.
+  const d = Math.min(upper + lower - slack, Math.max(0.05, _chain.length()));
   _chain.normalize();
   end.copy(root).addScaledVector(_chain, d);
 
@@ -282,13 +299,17 @@ function twoBone(
 /**
  * Bone length for a hip→ankle span. A FIXED femur while the figure stands,
  * so a crouch bends the knee instead of telescoping the leg; stretched for
- * players taller than the reference figure; and folded down inside a deep
- * melt, where a full-length femur would fire the knees out sideways. The
- * floor keeps 2×bone comfortably past twoBone()'s reach clamp, so the foot
- * never lifts off its target just to satisfy the solve.
+ * players taller than the reference figure (the floor term, which keeps a
+ * constant sliver of bend at any height); and folded down inside a deep
+ * melt, where a full-length femur would fire the knees out sideways.
+ *
+ * The floor is barely over half the span — with twoBone's slack at 0 for
+ * legs that is all it takes to keep the ankle exactly on its target, and
+ * the knee then sits a few centimetres proud instead of the ten it used
+ * to, which is the difference between standing and half-squatting.
  */
 function legBone(span: number): number {
-  return Math.max(span * 0.51 + 0.008, Math.min(LEG_BONE, span * 0.62 + 0.12));
+  return Math.max(span * 0.5 + 0.004, Math.min(LEG_BONE, span * 0.62 + 0.12));
 }
 
 /** How finely the hue is diced to pick a crest — one step is far too small
@@ -307,8 +328,8 @@ export function buildDancer(hue: number): DancerRig {
   const color = hueToColor(hue, 0.6);
   const variant = styleVariant(hue);
   const accents: DancerAccent[] = [];
-  const accent = <T extends MeshStandardMaterial | MeshBasicMaterial>(mat: T, gain: number): T => {
-    accents.push({ mat, gain });
+  const accent = <T extends MeshStandardMaterial | MeshBasicMaterial>(mat: T, gain: number, trim = false): T => {
+    accents.push({ mat, gain, trim });
     return mat;
   };
 
@@ -362,14 +383,15 @@ export function buildDancer(hue: number): DancerRig {
       roughness: 0.4,
     }),
     1,
+    true,
   );
-  const neonFlat = accent(new MeshBasicMaterial({ color }), 1);
+  const neonFlat = accent(new MeshBasicMaterial({ color }), 1, true);
   // Halo sprites join the accent list too (structurally a color-only
   // material), so eliminated dancers' glows die with them and hit flashes
   // tint the halos red.
   const glow = (size: number, opacity: number) => {
     const s = glowSprite(color, size, opacity);
-    accent(s.material as unknown as MeshBasicMaterial, 1);
+    accent(s.material as unknown as MeshBasicMaterial, 1, true);
     return s;
   };
 
@@ -607,8 +629,14 @@ export function buildDancer(hue: number): DancerRig {
   ): void => {
     _target.set(hx, hy, hz);
     // The natural bend of an arm holding something up: out to the side of
-    // the body it belongs to, and biased downward.
-    _hint.set(side, -0.7, 0).normalize();
+    // THE BODY it belongs to — the body's own right axis, not the world's
+    // +x — and biased downward. Hinting along world x splayed the elbows
+    // toward a fixed compass point, so any dancer not facing −z bent their
+    // arms across their own chest; a figure turned all the way round (a
+    // mirror reflection, half the club floor) got them backwards.
+    _hint.copy(_right).multiplyScalar(side);
+    _hint.y = -0.7;
+    _hint.normalize();
     twoBone(shoulder, _target, UPPER_ARM, FOREARM, _hint, _solved, _tip);
     align(upper, shoulder, _solved);
     align(fore, _solved, _tip);
@@ -629,8 +657,15 @@ export function buildDancer(hue: number): DancerRig {
     const melt = p.slump;
     const hy = p.hy * (1 - melt * 0.62);
     const hipY = Math.max(0.12, (p.hy - HEAD_DROP) * (1 - melt * 0.85));
-    const hipX = p.hx * 0.94;
-    const hipZ = p.hz * 0.94;
+    // The hips hang UNDER THE HEAD. They used to be scaled toward the
+    // origin (`p.hx * 0.94`), which reads as a subtle lean only while the
+    // origin is the body's own rest position — true on a platform, false
+    // everywhere else. On the CLUB floor, where poses are world-space, a
+    // dancer standing at x 6.6 got their hips dragged 0.4 m across the
+    // room and their legs splayed out from under them; the mirror made it
+    // impossible to miss, because you were finally looking at yourself.
+    const hipX = p.hx;
+    const hipZ = p.hz;
 
     head.position.set(p.hx, hy, p.hz);
     head.rotation.set(melt * 0.9, p.yaw, melt * 0.35);
@@ -690,7 +725,7 @@ export function buildDancer(hue: number): DancerRig {
       const bone = legBone(hip.distanceTo(foot));
       _hint.copy(_fwd).addScaledVector(_right, side * 0.32);
       const leg = side < 0 ? legL : legR;
-      twoBone(hip, foot, bone, bone, _hint, _solved, _tip);
+      twoBone(hip, foot, bone, bone, _hint, _solved, _tip, 0);
       // Built from the floor up: shin ankle → knee, thigh knee → hip.
       align(leg.shin, _tip, _solved);
       align(leg.thigh, _solved, hip);
