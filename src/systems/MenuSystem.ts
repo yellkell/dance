@@ -631,7 +631,8 @@ export class MenuSystem extends createSystem({}) {
       this.pauseUp = false;
     } else if (id === 'bail') {
       this.pauseUp = false;
-      toLobby();
+      if (match.tour) toTour();
+      else toLobby();
     } else if (id === 'exit') {
       if (match.tour) toTour(); // tour podium → back to the map
       else toLobby();

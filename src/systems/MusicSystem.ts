@@ -70,7 +70,11 @@ export class MusicSystem extends createSystem({}) {
     if (!inSet) {
       if (this.stoppedFor !== screen) {
         this.stoppedFor = screen;
-        if (setRunning()) stopSet(screen === 'podium' ? 2.0 : 0.6);
+        // Always stop, including the LOADING state. Guarding this with
+        // setRunning() let an abandoned decode complete in the menu and
+        // start the set underneath the room music. Manual/menu exits cut
+        // promptly; the podium keeps its deliberate musical tail.
+        stopSet(screen === 'podium' ? 2.0 : 0.08);
         match.playing = false;
         this.generation = -1; // the next countdown always re-drops
       }

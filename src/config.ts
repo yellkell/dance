@@ -485,6 +485,17 @@ export const CHOREO = {
   /** Minimum clear beats between one landing and the next telegraph —
    *  bar/half-bar multiples so successive moves stay on the grid. */
   restBeats: [4, 4, 2, 2, 0],
+  /** THE DEAD AIR CEILING, by act. `movesPerPhrase` is a floor, not a
+   *  quota: while a phrase still has more than this many beats of unclaimed
+   *  music, it books another move. Nothing else in the generator bounds
+   *  silence — a phrase whose shapes wouldn't fit used to abandon its
+   *  remaining slots and hand the floor twenty seconds of standing about.
+   *  Easy acts still breathe; the peak never rests two bars.
+   *
+   *  These are measured inside a phrase, so the gap a dancer actually feels
+   *  runs a little longer — the next phrase's opening telegraph still has to
+   *  clear its own downbeat. Three bars here reads as about four out there. */
+  maxSilentBeats: [12, 10, 8, 8, 8],
 };
 
 /**
@@ -689,9 +700,9 @@ export const TOUR: { sets: TourSet[]; freeSets: number; maxPhrases: number } = {
     {
       id: 'opening',
       name: 'OPENING SET',
-      // The night starts in the MORNING — short, fun, duck-free. MONEY
-      // moved to the quick-raid pool when it gave up the slot.
-      songs: ['morning', 'target', 'capture'], // 97 → 91 → 117 BPM
+      // The night starts in the MORNING — short, fun, duck-free — then
+      // SAKUPENED kicks the pace up before CAPTURE brings in the first goop.
+      songs: ['morning', 'sakupened', 'capture'], // 97 → 134 → 117 BPM
       tint: null, // the classic green goop
     },
     {
