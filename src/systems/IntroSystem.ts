@@ -37,6 +37,7 @@ import {
   SRGBColorSpace,
   Vector3,
 } from 'three';
+import { match } from '../game/state.js';
 import { font, onFontsReady } from '../ui/fonts.js';
 
 /* The running order, in seconds. */
@@ -53,6 +54,19 @@ export const introView: { begin?: () => void; at?: () => number } = {};
 const _cam = new Vector3();
 const _camQ = new Quaternion();
 const _fwd = new Vector3();
+
+/** THE THROB — the landing page's own keyframes (0% → 6% swell, 6% → 12%
+ *  dip, then a slow settle), one cycle every two bars at 128 BPM. RAVE and
+ *  RAID run it half a beat apart, so the two words trade the kick exactly
+ *  as they do on the web page. */
+const THROB_PERIOD = 1.875;
+const THROB_OFFSET = 0.234;
+function throb(t: number): number {
+  const f = (((t / THROB_PERIOD) % 1) + 1) % 1;
+  if (f < 0.06) return 1 + 0.045 * (f / 0.06);
+  if (f < 0.12) return 1.045 - 0.055 * ((f - 0.06) / 0.06);
+  return 0.99 + 0.01 * Math.min(1, (f - 0.12) / 0.16);
+}
 
 /** Ease a 0→1 ramp so nothing snaps on or off. */
 const ramp = (t: number, from: number, to: number): number =>
@@ -92,7 +106,9 @@ export class IntroSystem extends createSystem({}) {
   private rig: Group | null = null;
   private black!: MeshBasicMaterial;
   private presents!: Mesh<PlaneGeometry, MeshBasicMaterial>;
-  private title!: Mesh<PlaneGeometry, MeshBasicMaterial>;
+  /** RAVE and RAID are separate cards so each can throb on its own beat —
+   *  one mesh could only ever pulse as a block. */
+  private words!: Mesh<PlaneGeometry, MeshBasicMaterial>[];
   /** Wall-clock start (ms). The show is timed off the CLOCK, not off
    *  accumulated frame deltas: a title card is a piece of theatre with a
    *  fixed running time, and it should not run fast on a machine dropping
@@ -142,38 +158,46 @@ export class IntroSystem extends createSystem({}) {
     this.presents.position.set(0, 0, -2.4);
     rig.add(this.presents);
 
-    // The marquee, the landing page's own recipe: each word gets chromatic
-    // ghosts either side and a bloom of its own colour.
-    this.title = cardMesh(2.6, 1.5, 1300, (g, W, H) => {
-      g.textAlign = 'center';
-      g.textBaseline = 'middle';
-      const word = (text: string, y: number, face: string, glow: string, l: string, r: string) => {
-        g.font = font(700, 290);
-        g.letterSpacing = '10px';
+    // THE MARQUEE, the landing page's own recipe: chromatic ghosts either
+    // side of each word and a stack of blooms in its own colour, so the
+    // type reads as LIT rather than as coloured letters. A card per word,
+    // half the height each, and generous margins for the glow to spill
+    // into — bloom clipped by its own texture edge looks like a box.
+    const mkWord = (text: string, face: string, glow: string, l: string, r: string) =>
+      cardMesh(3.5, 1.25, 1400, (g, W, H) => {
+        g.textAlign = 'center';
+        g.textBaseline = 'middle';
+        g.font = font(700, 300);
+        g.letterSpacing = '12px';
         g.fillStyle = l;
-        g.fillText(text, W / 2 - 14, y);
+        g.fillText(text, W / 2 - 15, H / 2);
         g.fillStyle = r;
-        g.fillText(text, W / 2 + 14, y);
+        g.fillText(text, W / 2 + 15, H / 2);
+        // Three passes, wide to tight: the outer haze, the halo, the core.
         g.shadowColor = glow;
-        g.shadowBlur = 46;
         g.fillStyle = face;
-        g.fillText(text, W / 2, y);
-        g.shadowBlur = 24;
-        g.fillText(text, W / 2, y);
+        for (const blur of [90, 46, 20]) {
+          g.shadowBlur = blur;
+          g.fillText(text, W / 2, H / 2);
+        }
         g.shadowBlur = 0;
-      };
-      word('RAVE', H * 0.29, '#b9ffc4', 'rgba(54,224,90,0.95)', 'rgba(255,42,213,0.55)', 'rgba(79,183,255,0.45)');
-      word('RAID', H * 0.74, '#ffd9f6', 'rgba(255,42,213,0.95)', 'rgba(54,224,90,0.5)', 'rgba(176,107,255,0.5)');
-    });
-    this.title.position.set(0, 0.06, -2.4);
-    rig.add(this.title);
+      });
+    this.words = [
+      mkWord('RAVE', '#b9ffc4', 'rgba(54,224,90,0.95)', 'rgba(255,42,213,0.6)', 'rgba(79,183,255,0.5)'),
+      mkWord('RAID', '#ffd9f6', 'rgba(255,42,213,0.95)', 'rgba(54,224,90,0.55)', 'rgba(176,107,255,0.55)'),
+    ];
+    this.words[0].position.set(0, 0.52, -2.9);
+    this.words[1].position.set(0, -0.46, -2.9);
+    for (const w of this.words) rig.add(w);
 
     this.scene.add(rig);
     this.rig = rig;
+    match.introUp = true; // the board underneath is off limits until the lift
   }
 
   private finish(): void {
     this.done = true;
+    match.introUp = false;
     const rig = this.rig;
     if (!rig) return;
     rig.removeFromParent();
@@ -231,10 +255,24 @@ export class IntroSystem extends createSystem({}) {
       smooth(ramp(t, PRESENTS_IN, PRESENTS_IN + 0.7)) * (1 - smooth(ramp(t, PRESENTS_OUT, PRESENTS_OUT + 0.5)));
     const titleUp = smooth(ramp(t, TITLE_IN, TITLE_IN + 0.8));
     const lift = smooth(ramp(t, TITLE_HOLD_TO, LIFT_TO));
-    this.title.material.opacity = titleUp * (1 - lift);
-    // The marquee swells a touch as it lands, then settles.
-    const swell = 1 + 0.06 * (1 - smooth(ramp(t, TITLE_IN, TITLE_IN + 1.4)));
-    this.title.scale.setScalar(swell);
+    // Hand the menu back the instant the black begins to go.
+    if (lift > 0) match.introUp = false;
+    // It arrives big and settles — a marquee dropping into place.
+    const land = 1 + 0.1 * (1 - smooth(ramp(t, TITLE_IN, TITLE_IN + 1.4)));
+    this.words.forEach((w, i) => {
+      const phase = t - i * THROB_OFFSET;
+      // The KICK is a punch every bar and then stillness — faithful to the
+      // landing page, but on its own it leaves the marquee sitting dead for
+      // a second and a third at a time. A slow breath underneath keeps the
+      // sign alive between the hits, the way real neon never quite settles.
+      const breath = Math.sin(phase * 1.9 + i * 1.1);
+      w.material.opacity = titleUp * (1 - lift);
+      w.scale.setScalar(land * throb(phase) * (1 + 0.012 * breath));
+      // The tint multiplies the canvas, so the whole word brightens rather
+      // than just growing. Over 1 blows the bloom out hot — that's the kick.
+      const beat = Math.max(0, (throb(phase) - 0.99) / 0.055);
+      w.material.color.setScalar(1 + 0.3 * beat + 0.1 * breath);
+    });
     this.black.opacity = 1 - lift;
 
     if (t >= LIFT_TO) this.finish();

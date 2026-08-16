@@ -329,7 +329,14 @@ export class MenuSystem extends createSystem({}) {
     // social floor, and the floor's controls live on the SOCIAL panel
     // (right Ⓐ). The board belongs to the foyer.
     const social = (net.phase === 'hosting' || net.phase === 'joined') && !match.holdFoyer;
-    const boardUp = menuRoom && !social;
+    // `introUp`: the title card is still opaque and the board is sitting
+    // right behind it. Holding it down until the black starts lifting does
+    // two things at once — it takes no rays and no clicks while nobody can
+    // see it, and its own show animation then runs WITH the reveal, so the
+    // board fades up as the black goes. (It keeps REPAINTING throughout —
+    // repaintIfNeeded doesn't read this — so it is finished and correct on
+    // the frame it appears.)
+    const boardUp = menuRoom && !social && !match.introUp;
     const exitUp = screen === 'podium';
     this.board.setShown(boardUp);
     this.exit.setShown(exitUp);
@@ -1834,7 +1841,7 @@ export class MenuSystem extends createSystem({}) {
     buttons.push({
       id: 'rooms',
       label: 'HOST / JOIN',
-      sub: 'a private room · a 4-digit code only your friends have',
+      sub: 'a 4-digit code you share with your friends',
       disabled: connecting,
       x: CONTENT_X,
       y: 478,
