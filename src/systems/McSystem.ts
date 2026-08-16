@@ -19,8 +19,11 @@
  *  donut  : arms thrown wide, then hauled in — the gather.
  *  duckdonut: the gather AND the limbo at once — get close and get small.
  *
- * While a move charges, his sticks and trim burn WARN amber (danger speaks
- * amber, always); between moves he does exactly the groupies' dance — one
+ * While a move charges, everything of his that GLOWS burns WARN amber —
+ * sticks, trim, and the lit sleeves and midriff — while his dark cloth
+ * holds his own colour (danger speaks amber, always, but it should not
+ * repaint the headliner into somebody else); between moves he does exactly
+ * the groupies' dance — one
  * stick up, one down, swapping on the beat — so the crowd's motion and the
  * boss's motion are one language. Zones are platform-local and identical
  * for every seat, so one giant's mime is honest for the whole ring.
@@ -530,21 +533,25 @@ export class McSystem extends createSystem({}) {
   private applyAccents(warn: number): void {
     const rig = this.rig;
     if (!rig) return;
-    // WARN burns the NEON amber — sticks, collar, belt, cuffs, seams, the
-    // scan-slit, the halos — and leaves the cloth alone. Repainting the
-    // whole figure amber swapped the headliner for a different dancer
-    // mid-wind-up: the tell is jewellery catching fire, not a costume
-    // change. (His body still tells you what's coming; that's the mime.)
+    // WARN burns everything of his that GLOWS amber — sticks, collar, belt,
+    // cuffs, seams, scan-slit, halos, and the lit sleeves and midriff with
+    // them — while the dark cloth and the helm hold his own colour.
+    //
+    // That split is the whole point: the parts that light up are the parts
+    // a dancer thirty metres away can see change, so the tell lands, and
+    // the figure stays recognisably HIM. Burning the dark cloth as well
+    // swapped the headliner for a different dancer mid-wind-up.
     const warm = warn > 0.5;
     const drive = 1.1 + warn * 1.5;
-    for (const { mat, gain, trim } of rig.accents) {
-      const color = trim && warm ? MC.warnColor : this.baseColor;
+    for (const { mat, gain, neon } of rig.accents) {
+      const color = neon && warm ? MC.warnColor : this.baseColor;
       const std = mat as MeshStandardMaterial;
       if (std.emissive) {
         std.emissive.setHex(color);
-        // Scaled by the material's authored gain — the suit never outshines
-        // the sticks. Cloth sits at its authored rest the whole way through.
-        std.emissiveIntensity = (trim ? drive : ACCENT_REST) * gain;
+        // Scaled by the material's authored gain — his sleeves never
+        // outshine his sticks. The dark cloth sits at its authored rest
+        // the whole way through.
+        std.emissiveIntensity = (neon ? drive : ACCENT_REST) * gain;
       } else {
         (mat as MeshBasicMaterial).color.setHex(color);
       }
