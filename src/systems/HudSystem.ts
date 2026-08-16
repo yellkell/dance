@@ -87,7 +87,11 @@ function ink(
 /** Ink with a neon halo — the same casing, then the colour BLOOMS. The
  *  whites stay white; everything coloured earns a glow of its own hue,
  *  which is where the vibrance lives (a saturated fill with no bloom
- *  reads as flat print, not light). */
+ *  reads as flat print, not light).
+ *
+ *  TWO bloom passes, wide then tight. One pass is a haze around a letter;
+ *  two compound into something that reads as actually emitting, which is
+ *  the difference between a coloured numeral and a lit one. */
 function neon(
   g: CanvasRenderingContext2D,
   text: string,
@@ -99,12 +103,14 @@ function neon(
   maxWidth?: number,
 ): void {
   ink(g, text, x, y, px, fill, maxWidth);
-  g.shadowColor = glow;
-  g.shadowBlur = Math.max(14, px * 0.4);
   g.fillStyle = fill;
   g.font = font(700, px);
-  if (maxWidth) g.fillText(text, x, y, maxWidth);
-  else g.fillText(text, x, y);
+  g.shadowColor = glow;
+  for (const blur of [Math.max(20, px * 0.55), Math.max(11, px * 0.24)]) {
+    g.shadowBlur = blur;
+    if (maxWidth) g.fillText(text, x, y, maxWidth);
+    else g.fillText(text, x, y);
+  }
   g.shadowBlur = 0;
 }
 
@@ -260,7 +266,7 @@ export class HudSystem extends createSystem({}) {
     const color = GRADE.colors[letter] ?? '#f4f6fb';
     const faced = d.dodges + d.hits;
 
-    ink(g, d.alive ? 'THE SET SAYS' : 'GAME OVER', CW / 2, 46, 32, d.alive ? 'rgba(232,236,242,0.85)' : '#ff5040');
+    ink(g, d.alive ? 'THE SET SAYS' : 'GAME OVER', CW / 2, 46, 32, d.alive ? 'rgba(240,244,250,0.95)' : '#ff5040');
     // The letter, huge, with its own halo.
     g.shadowColor = color;
     g.shadowBlur = 40;
@@ -273,7 +279,7 @@ export class HudSystem extends createSystem({}) {
       CW / 2,
       CH - 66,
       30,
-      'rgba(232,236,242,0.9)',
+      'rgba(240,244,250,1)',
     );
     if (d.perfects > 0) ink(g, `${d.perfects} PERFECT`, CW / 2, CH - 28, 26, '#ffd75e');
     this.cardTex.needsUpdate = true;
@@ -308,7 +314,10 @@ export class HudSystem extends createSystem({}) {
         SET_COLORS[match.tour.set % SET_COLORS.length],
       );
     }
-    neon(g, `${Math.max(1, count)}`, CW / 2, CH / 2 - 4, 150, '#ff2ad5');
+    // A flat magenta numeral reads DARK on a black card, however saturated
+    // it is: magenta's own luminance is low. Real neon is a near-white core
+    // inside a coloured halo, so that is what the count wears now.
+    neon(g, `${Math.max(1, count)}`, CW / 2, CH / 2 - 4, 150, '#ffe3f8', '#ff2ad5');
     if (cued) neon(g, `♪ ${cued.title}`, CW / 2, CH - 52, 36, '#7dffb2');
     this.cardTex.needsUpdate = true;
   }
@@ -337,7 +346,7 @@ export class HudSystem extends createSystem({}) {
     if (d?.alive !== false) this.drawGroove(g, cx);
 
     if (d?.alive === false) {
-      ink(g, 'SPECTATING', cx, 252, 34, 'rgba(232,236,242,0.8)');
+      ink(g, 'SPECTATING', cx, 252, 34, 'rgba(240,244,250,0.92)');
     } else if (d && d.missChain > 0) {
       // THE CHAIN WARNING — nothing at all until you're clipped, then a
       // row of marks counting toward the end of the night. One dodge and

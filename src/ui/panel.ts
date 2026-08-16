@@ -67,15 +67,20 @@ export const UI = {
   plate: 'rgba(255,255,255,0.045)',
   plateHover: 'rgba(255,255,255,0.09)',
   /* Hairlines */
-  line: 'rgba(255,255,255,0.10)',
-  lineHover: 'rgba(255,255,255,0.30)',
-  lineFaint: 'rgba(255,255,255,0.07)',
-  /* Text */
-  text: '#f2f3f7',
+  line: 'rgba(255,255,255,0.14)',
+  lineHover: 'rgba(255,255,255,0.34)',
+  lineFaint: 'rgba(255,255,255,0.10)',
+  /* Text. The whites are WHITE — #f2f3f7 is a blue-grey that reads as
+   *  dirty on a black panel, and the tiers under it were set at web
+   *  contrast ratios. A headset panel is a small emissive rectangle in a
+   *  dark room, not a page in an office: every tier here is a step
+   *  brighter than its web equivalent, or the secondary type reads as
+   *  disabled and the disabled type reads as absent. */
+  text: '#ffffff',
   textHi: '#ffffff',
-  dim: 'rgba(233,236,244,0.55)',
-  faint: 'rgba(233,236,244,0.35)',
-  disabled: 'rgba(233,236,244,0.28)',
+  dim: 'rgba(240,243,250,0.74)',
+  faint: 'rgba(240,243,250,0.52)',
+  disabled: 'rgba(240,243,250,0.36)',
   /* The accent — identity, selection, primacy. Nothing else. */
   accent: '#ff2ad5',
   accentDim: 'rgba(255,42,213,0.55)',
