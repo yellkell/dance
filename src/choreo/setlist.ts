@@ -133,10 +133,16 @@ function pickKind(
 }
 
 /** THE BOUNCE's two odds, indexed by volley: [_, does it answer, does it
- *  come back across]. Volley 2 is a shove; volley 3 is the rally, and on
- *  the expert acts the rally is close to a promise once it has begun. Both
- *  twins — lateral and vertical — read the same pair. */
+ *  come back across]. Volley 2 is a shove; volley 3 is the rally. From
+ *  `twinAlwaysFromAct` up both are certainties, so a double laser on the
+ *  expert acts is ALWAYS the full three — left, right, left — and never a
+ *  single shove across. Both twins, lateral and vertical, read this pair.
+ *
+ *  Returning 1 rather than skipping the rolls keeps the seeded stream
+ *  aligned: every client still draws the same numbers in the same order,
+ *  whatever the act. */
 function twinKeep(act: number): number[] {
+  if (act >= CHOREO.twinAlwaysFromAct) return [0, 1, 1];
   const at = (a: readonly number[]): number => a[Math.min(act, a.length - 1)]!;
   return [0, at(CHOREO.twinReturnChance), at(CHOREO.twinBounceChance)];
 }

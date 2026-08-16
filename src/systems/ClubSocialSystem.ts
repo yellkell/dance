@@ -34,7 +34,7 @@ import {
   SRGBColorSpace,
   Vector3,
 } from 'three';
-import { DIFFICULTY, hueToColor } from '../config.js';
+import { DIFFICULTY, RING, hueToColor } from '../config.js';
 import * as sfx from '../audio/sfx.js';
 import { preload } from '../audio/music.js';
 import { pickRaidTrack, trackById, tracksFor } from '../audio/tracks.js';
@@ -304,6 +304,15 @@ export class ClubSocialSystem extends createSystem({}) {
       if (fig) fig.shown = p.rig.root.visible;
       if (!p.live || hidden) continue;
 
+      this.camera.getWorldPosition(_cam);
+      // DETAIL by distance, like the ring — but re-tested each frame,
+      // because a club floor is people WALKING rather than fixed decks.
+      // The hall is 18 m end to end, so somebody at the far booths is as
+      // far off as the other side of a full ring. (setDetail early-outs
+      // unless the answer actually changed.)
+      p.rig.setDetail(
+        (p.pose.hx - _cam.x) ** 2 + (p.pose.hz - _cam.z) ** 2 <= RING.detailRadius ** 2,
+      );
       p.rig.pose(p.pose);
       // Their voice speaks from their figure's head.
       _v.set(p.pose.hx, p.pose.hy, p.pose.hz);
@@ -311,7 +320,6 @@ export class ClubSocialSystem extends createSystem({}) {
       // The name tag rides over the head, faces you, and swells a touch
       // while they hold the floor.
       p.tag.position.set(p.pose.hx, p.pose.hy + 0.38, p.pose.hz);
-      this.camera.getWorldPosition(_cam);
       p.tag.rotation.y = Math.atan2(_cam.x - p.pose.hx, _cam.z - p.pose.hz);
       const swell = isSpeaking(String(p.idx)) ? 1.14 : 1;
       p.tag.scale.set(swell, swell, 1);
