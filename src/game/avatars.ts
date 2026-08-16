@@ -7,9 +7,9 @@
  * seam. The body is shaped, not stacked: a cinched waist under a broad
  * shoulder yoke, hips that flow into the thighs, an elliptical
  * cross-section so the torso has a front, and a sculpted mannequin head —
- * tapered chin, full cranium, a lit visor band for a face. Four style
- * variants (mohawk / twin blades / ponytail / bare) derive
- * deterministically from the hue so a full ring isn't 24 clones.
+ * tapered chin, full cranium, a goggle bezel framing a hot scan-slit. Four
+ * style variants of GLOWING hair (mohawk / twin blades / ponytail / bare)
+ * derive deterministically from the hue so a full ring isn't 24 clones.
  *
  * The rig is driven entirely from a HEAD position and two HAND targets —
  * exactly what VR actually knows about a person. Everything else is solved:
@@ -117,13 +117,13 @@ const SUIT_GAIN = 0.2;
 /** Helm, gauntlets and boots, a hair darker still — glossier leather next
  *  to the suit's cloth. */
 const SHELL_GAIN = 0.18;
-/** …and the LIT panels: sleeves, midriff, visor band. A figure in
- *  head-to-toe black is a hole in a dark room, and a near-black arm with a
- *  glowing stick on the end of it reads as a DETACHED hand. Lighting
- *  exactly the sleeves, the waist and the eyes keeps every stick visibly
- *  attached to the body swinging it, gives the head a face, and puts a
- *  bright band at the figure's own centre of motion — the part that sells
- *  a dance across thirty metres of arena. */
+/** …and the LIT panels: sleeves, midriff, hair. A figure in head-to-toe
+ *  black is a hole in a dark room, and a near-black arm with a glowing
+ *  stick on the end of it reads as a DETACHED hand. Lighting exactly the
+ *  sleeves, the waist and the crest keeps every stick visibly attached to
+ *  the body swinging it, crowns the silhouette, and puts a bright band at
+ *  the figure's own centre of motion — the part that sells a dance across
+ *  thirty metres of arena. */
 const LIT_GAIN = 0.62;
 
 const UP = new Vector3(0, 1, 0);
@@ -379,50 +379,39 @@ export function buildDancer(hue: number): DancerRig {
   skull.scale.set(0.92, HEAD_H, 1.04);
   skull.position.y = -HEAD_H / 2;
   head.add(skull);
-  // Visor: a LIT band that rings the skull at eye level — an ellipsoid a
-  // hair larger than the head and squashed flat, so it wraps the curve
-  // instead of a straight box burying itself in the face and poking its
-  // corners out at the temples. It glows with the sleeves (a dark band on a
-  // dark skull is a helmet; a lit one is a face), and the hot scan-slit
-  // riding proud at the front stays the brightest thing on the head, so
-  // facing still reads at range.
-  const visorShell = M(sphereGeo(16), lit);
-  visorShell.scale.set(0.066, 0.026, 0.075);
-  visorShell.position.set(0, 0.014, -0.002);
+  // Visor: a structured goggle ACROSS THE FACE — a gloss bezel framing the
+  // hot scan-slit, both proud of the skull. (A lit band wrapping the whole
+  // head got tried and cut: it read as a blindfold, not eyewear.) The bezel
+  // is sized so its back corners bury into the cheeks of the NEW narrower
+  // skull instead of poking out at the temples the way the original did.
+  const visorShell = M(boxGeo(), shell);
+  visorShell.scale.set(0.105, 0.044, 0.05);
+  visorShell.position.set(0, 0.014, -0.054);
   head.add(visorShell);
-  // Narrow enough to hug the band's curve, and pushed far enough forward
-  // that its front face clears the band at the CENTRE — a slit that only
-  // surfaces where the head curves away is two bright corners, not a face.
   const visorSlit = M(boxGeo(), neonFlat);
-  visorSlit.scale.set(0.064, 0.012, 0.022);
-  visorSlit.position.set(0, 0.014, -0.08);
+  visorSlit.scale.set(0.088, 0.011, 0.02);
+  visorSlit.position.set(0, 0.014, -0.074);
   head.add(visorSlit);
-  // Ear pips — the little jewellery that catches at close range. They cap
-  // the visor band's ends at the temples; buried in it they'd surface as
-  // two clipped chevrons instead of two beads.
+  // Ear pips — the little jewellery that catches at close range,
+  // half-buried beads riding the skull at the temples.
   for (const side of [-1, 1]) {
     const pip = M(sphereGeo(8), neonStd);
     pip.scale.setScalar(0.012);
-    pip.position.set(side * 0.07, 0.014, -0.006);
+    pip.position.set(side * 0.063, 0.004, -0.006);
     head.add(pip);
   }
-  // Variant crest — deterministic from the hue. Hair is SCULPTED, not lit:
-  // crests wear the accessory shell, and a neon edge carries them in the
-  // dark, so nobody grows a glowing shrub out of their scalp.
+  // Variant crest — deterministic from the hue. Hair GLOWS: crests wear
+  // the lit cloth, so the haircut is part of the costume's neon signature
+  // and survives the dark instead of vanishing against the black skull.
   if (variant === 0) {
     // Swept mohawk: a main blade rising from the scalp, a trailing shard
     // down the back of the skull — both rooted inside the head.
-    const fin = M(boxGeo(), shell);
+    const fin = M(boxGeo(), lit);
     fin.scale.set(0.011, 0.105, 0.13);
     fin.position.set(0, 0.06, 0.012);
     fin.rotation.x = 0.4;
     head.add(fin);
-    const edge = M(boxGeo(), neonFlat);
-    edge.scale.set(0.006, 0.008, 0.118);
-    edge.position.set(0, 0.109, 0.001);
-    edge.rotation.x = 0.4;
-    head.add(edge);
-    const tail = M(boxGeo(), shell);
+    const tail = M(boxGeo(), lit);
     tail.scale.set(0.009, 0.06, 0.085);
     tail.position.set(0, 0.02, 0.082);
     tail.rotation.x = 1.0;
@@ -433,7 +422,7 @@ export function buildDancer(hue: number): DancerRig {
       [0.018, 0.055, 0.115, 0.55],
       [0.04, 0.035, 0.085, 0.75],
     ] as const) {
-      const blade = M(boxGeo(), shell);
+      const blade = M(boxGeo(), lit);
       blade.scale.set(0.01, len, 0.1);
       blade.position.set(ox, oy, 0.01);
       blade.rotation.z = -rake * 0.5;
@@ -445,10 +434,10 @@ export function buildDancer(hue: number): DancerRig {
     // across, deep front-to-back — laid almost FLAT along the back of the
     // skull rather than standing off it. A spike as long as the skull is
     // tall, at forty-five degrees, is a party hat; the same cone combed
-    // down the back of the head is hair. A neon tie rides its root.
+    // down the back of the head is hair. A hot tie rides its root.
     const RAKE = 1.32;
     const LEN = 0.095;
-    const spire = M(segGeo(0.003, 0.028), shell);
+    const spire = M(segGeo(0.003, 0.028), lit);
     spire.scale.set(0.62, LEN, 1.5);
     spire.position.set(0, 0.052, 0.03);
     spire.rotation.x = RAKE;
