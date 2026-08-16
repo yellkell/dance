@@ -253,6 +253,15 @@
           const hy = p.hy * (1 - p.slump * 0.62);
           camera.position.set(cx - Math.sin(a) * 0.42, hy + 0.03, p.hz - Math.cos(a) * 0.42);
           camera.lookAt(cx, hy, p.hz);
+        } else if (cam === 'neck') {
+          // The collar junction, from just under it — the one angle that
+          // shows whether the neck is still plugged into the shoulders.
+          const p = poseAt(solo, t);
+          const cx = rigs[solo].x + p.hx;
+          const a = p.yaw + orbit;
+          const y = p.hy - 0.16;
+          camera.position.set(cx - Math.sin(a) * 0.3, y - 0.06, p.hz - Math.cos(a) * 0.3);
+          camera.lookAt(cx, y + 0.02, p.hz);
         } else if (cam === 'close') {
           camera.position.set(Math.sin(orbit) * 1.3, 1.45, -Math.cos(orbit) * 1.3);
           camera.lookAt(0, 1.25, 0);

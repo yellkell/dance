@@ -130,6 +130,16 @@ const ANKLE = 0.085; // ankle height — legs end here, boots own the rest
  * put the difference. */
 const PITCH_MAX = 1.15;
 const ROLL_MAX = 0.6;
+/* The neck is a COLUMN THE HEAD SITS ON, not a strut stretched between the
+ * chin and the chest. Aimed at the jaw it swung a full head-radius as you
+ * nodded, which both leaned it far enough to lift its base clear of the
+ * shoulder yoke and stretched it half as long again — a straw poked loosely
+ * into the collar. So it aims at NECK_ROOT, deep enough inside the skull
+ * that a nod barely moves it, and its base is driven NECK_SINK under the
+ * yoke. Both ends are buried at every angle in the neck's range; the part
+ * on show between collar and jaw leans a few degrees and holds its length. */
+const NECK_ROOT = HEAD_R * 0.35;
+const NECK_SINK = 0.055;
 
 /** Femur (and shin) while the figure stands — see legBone(). Sized just
  *  over half the standing hip→ankle span, so a dancer at rest STANDS UP
@@ -171,6 +181,7 @@ const SIDES = [-1, 1] as const;
 const _a = new Vector3();
 const _b = new Vector3();
 const _c = new Vector3();
+const _neck = new Vector3();
 const _dir = new Vector3();
 const _mid = new Vector3();
 const _hint = new Vector3();
@@ -538,7 +549,10 @@ export function buildDancer(hue: number): DancerRig {
    * choker bound the neck; a clavicle V and shoulder caps hang the arms.
    * Both lathes are squashed to TORSO_X/Z and TURNED WITH THE YAW — an
    * elliptical torso, unlike a round one, has a front. */
-  const neck = detail(seg(0.023, 0.031, suit));
+  // Tapered to CLEAR THE JAW at the top (the skull is only ~0.026 wide down
+  // at the chin) and to PLUG THE YOKE at the bottom, where the buried part
+  // fills the lathe's neck hole instead of leaving a rim around it.
+  const neck = detail(seg(0.017, 0.034, suit));
   const bodice = M(latheGeo('bodice', BODICE), suit);
   const basque = M(latheGeo('basque', BASQUE), lit); // the lit midriff
   root.add(neck, bodice, basque);
@@ -734,13 +748,19 @@ export function buildDancer(hue: number): DancerRig {
     shoulderR.set(p.hx + SHOULDER_W * cos, shY, p.hz - SHOULDER_W * sin);
 
     // Torso line: neck → bodice (shoulder mid → waist) → basque (→ hips).
-    // The neck buries its top in the JAW — and the jaw MOVES: it is a point
-    // under the head that rotates with it, so a nod swings the chin forward
-    // and the neck follows instead of the head pivoting off the top of it.
-    _a.set(0, -HEAD_R * 0.85, 0).applyEuler(head.rotation).add(head.position);
+    // The neck's top rides INSIDE the skull (see NECK_ROOT) so it leans with
+    // a nod without being dragged around by the chin, and its base is sunk
+    // under the shoulder yoke so the join can never open up.
+    _a.set(0, -NECK_ROOT, 0).applyEuler(head.rotation).add(head.position);
     _b.set((shoulderL.x + shoulderR.x) / 2, shY, (shoulderL.z + shoulderR.z) / 2);
-    align(neck, _b, _a);
-    choker.position.copy(_a).lerp(_b, 0.32);
+    _neck.copy(_a).sub(_b);
+    if (_neck.lengthSq() < 1e-6) _neck.set(0, 1, 0);
+    _neck.normalize();
+    _c.copy(_b).addScaledVector(_neck, -NECK_SINK);
+    align(neck, _c, _a);
+    // The choker rides the VISIBLE neck — a fixed way up from the collar,
+    // not a fraction of a segment that now starts inside the chest.
+    choker.position.copy(_b).addScaledVector(_neck, 0.05);
     choker.quaternion.copy(neck.quaternion).multiply(X90);
     _mid.set(hipX * 0.35 + _b.x * 0.65, hipY + (shY - hipY) * 0.42, hipZ * 0.35 + _b.z * 0.65);
     align(bodice, _mid, _b, TORSO_X, TORSO_Z);
