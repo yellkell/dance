@@ -5,10 +5,11 @@
  * over glowing tights — with LIT sleeves and a lit midriff, dark gloss
  * accessories (helm, gauntlets, heeled boots) and hot neon trim at every
  * seam. The body is shaped, not stacked: a cinched waist under a broad
- * shoulder yoke, hips that flow into the thighs, and an elliptical
- * cross-section so the torso has a front. Four style variants (mohawk /
- * twin blades / ponytail / bare) derive deterministically from the hue so a
- * full ring isn't 24 clones.
+ * shoulder yoke, hips that flow into the thighs, an elliptical
+ * cross-section so the torso has a front, and a sculpted mannequin head —
+ * tapered chin, full cranium, a lit visor band for a face. Four style
+ * variants (mohawk / twin blades / ponytail / bare) derive
+ * deterministically from the hue so a full ring isn't 24 clones.
  *
  * The rig is driven entirely from a HEAD position and two HAND targets —
  * exactly what VR actually knows about a person. Everything else is solved:
@@ -116,12 +117,13 @@ const SUIT_GAIN = 0.2;
 /** Helm, gauntlets and boots, a hair darker still — glossier leather next
  *  to the suit's cloth. */
 const SHELL_GAIN = 0.18;
-/** …and the LIT panels: sleeves and midriff. A figure in head-to-toe black
- *  is a hole in a dark room, and a near-black arm with a glowing stick on
- *  the end of it reads as a DETACHED hand. Lighting exactly the sleeves and
- *  the waist keeps every stick visibly attached to the body swinging it,
- *  and puts a bright band at the figure's own centre of motion — the part
- *  that sells a dance across thirty metres of arena. */
+/** …and the LIT panels: sleeves, midriff, visor band. A figure in
+ *  head-to-toe black is a hole in a dark room, and a near-black arm with a
+ *  glowing stick on the end of it reads as a DETACHED hand. Lighting
+ *  exactly the sleeves, the waist and the eyes keeps every stick visibly
+ *  attached to the body swinging it, gives the head a face, and puts a
+ *  bright band at the figure's own centre of motion — the part that sells
+ *  a dance across thirty metres of arena. */
 const LIT_GAIN = 0.62;
 
 const UP = new Vector3(0, 1, 0);
@@ -189,18 +191,17 @@ function latheGeo(key: string, profile: number[][]): BufferGeometry {
  * unit, and align() stretches it to whatever the solve asks for. */
 const BODICE = [
   // waist cinch → ribs → chest → SHOULDER YOKE → neck root.
-  // The yoke is the widest ring in the whole figure: an upper body that
-  // tapers to a point at the top is a funnel, not a torso, and leaves the
-  // shoulder balls floating with nothing to hang off. It closes over the
-  // top as a trapezius DOME rather than a flat shelf — the last three rings
-  // are the slope from shoulder to neck, and they earn their vertices.
+  // An S, not a cone: lean through the ribs, filling late into the chest —
+  // a straight taper reads as a funnel. The yoke is the widest ring in the
+  // whole figure (shoulder balls need something to hang off) and closes
+  // over the top as a trapezius DOME rather than a flat shelf.
   [0.03, 0.0],
-  [0.046, 0.1],
-  [0.058, 0.3],
-  [0.068, 0.52],
-  [0.074, 0.7],
-  [0.076, 0.82],
-  [0.072, 0.9],
+  [0.043, 0.09],
+  [0.053, 0.26],
+  [0.064, 0.46],
+  [0.073, 0.66],
+  [0.077, 0.8],
+  [0.073, 0.9],
   [0.06, 0.96],
   [0.042, 0.99],
   [0.028, 1.0],
@@ -210,13 +211,31 @@ const BASQUE = [
   // Wide at the BOTTOM so the thighs emerge from inside the hips, and
   // never wider than the chest — hips that outrun the shoulders read as a
   // bulb on a stick.
-  [0.052, 0.0],
-  [0.064, 0.16],
-  [0.066, 0.34],
-  [0.058, 0.58],
-  [0.042, 0.84],
+  [0.054, 0.0],
+  [0.065, 0.14],
+  [0.066, 0.32],
+  [0.057, 0.56],
+  [0.041, 0.83],
   [0.03, 1.0],
 ];
+/* The head, chin-up: a soft point at the jaw, cheekbones, a full cranium.
+ * A scaled sphere is an egg on its side — widest at the equator with no
+ * chin at all — and it reads as a lollipop on the neck. This profile is
+ * the classic mannequin head: narrow below, weight above. */
+const HEAD = [
+  [0, 0],
+  [0.028, 0.05],
+  [0.048, 0.16],
+  [0.06, 0.33],
+  [0.067, 0.55],
+  [0.066, 0.73],
+  [0.057, 0.87],
+  [0.04, 0.95],
+  [0.021, 0.99],
+  [0, 1.0],
+];
+/** Head height (m); the lathe above is unit-height like the others. */
+const HEAD_H = 0.19;
 
 /** Stretch a base-at-origin unit segment from `a` to `b`. */
 function align(seg: Mesh, a: Vector3, b: Vector3, sx = 1, sz = 1): void {
@@ -352,35 +371,39 @@ export function buildDancer(hue: number): DancerRig {
   const M = (geo: BufferGeometry, mat: MeshStandardMaterial | MeshBasicMaterial): Mesh => new Mesh(geo, mat);
   const seg = (rt: number, rb: number, mat: MeshStandardMaterial): Mesh => M(segGeo(rt, rb), mat);
 
-  /* ── head: dark gloss oval, structured visor, jewellery, variant crest ── */
+  /* ── head: sculpted dark skull, lit visor band, jewellery, crest ── */
   const head = new Group();
-  const skull = M(sphereGeo(16), shell);
-  skull.scale.set(HEAD_R * 0.86, HEAD_R * 1.12, HEAD_R * 0.94);
+  const skull = M(latheGeo('head', HEAD), shell);
+  // Narrower across than deep, like a head — and the lathe is authored
+  // base-at-0, so it drops half its height to centre on the group origin.
+  skull.scale.set(0.92, HEAD_H, 1.04);
+  skull.position.y = -HEAD_H / 2;
   head.add(skull);
-  // Visor: a gloss band that RINGS the skull at eye level — an ellipsoid
-  // a hair larger than the head and squashed flat, so it wraps the curve
+  // Visor: a LIT band that rings the skull at eye level — an ellipsoid a
+  // hair larger than the head and squashed flat, so it wraps the curve
   // instead of a straight box burying itself in the face and poking its
-  // corners out at the temples. A hot scan-slit rides proud at the front,
-  // which is also the only thing on the head that says which way he's
-  // looking.
-  const visorShell = M(sphereGeo(16), shell);
-  visorShell.scale.set(HEAD_R * 0.98, 0.028, HEAD_R * 1.09);
-  visorShell.position.set(0, 0.012, -0.004);
+  // corners out at the temples. It glows with the sleeves (a dark band on a
+  // dark skull is a helmet; a lit one is a face), and the hot scan-slit
+  // riding proud at the front stays the brightest thing on the head, so
+  // facing still reads at range.
+  const visorShell = M(sphereGeo(16), lit);
+  visorShell.scale.set(0.066, 0.026, 0.075);
+  visorShell.position.set(0, 0.014, -0.002);
   head.add(visorShell);
   // Narrow enough to hug the band's curve, and pushed far enough forward
   // that its front face clears the band at the CENTRE — a slit that only
   // surfaces where the head curves away is two bright corners, not a face.
   const visorSlit = M(boxGeo(), neonFlat);
   visorSlit.scale.set(0.064, 0.012, 0.022);
-  visorSlit.position.set(0, 0.012, -0.087);
+  visorSlit.position.set(0, 0.014, -0.08);
   head.add(visorSlit);
-  // Ear pips — the little jewellery that catches at close range. They ride
-  // OUTSIDE the visor band's widest point; buried in it they surface as two
-  // clipped chevrons at the temples instead of two beads.
+  // Ear pips — the little jewellery that catches at close range. They cap
+  // the visor band's ends at the temples; buried in it they'd surface as
+  // two clipped chevrons instead of two beads.
   for (const side of [-1, 1]) {
     const pip = M(sphereGeo(8), neonStd);
     pip.scale.setScalar(0.012);
-    pip.position.set(side * 0.084, 0.006, -0.006);
+    pip.position.set(side * 0.07, 0.014, -0.006);
     head.add(pip);
   }
   // Variant crest — deterministic from the hue. Hair is SCULPTED, not lit:
@@ -437,10 +460,11 @@ export function buildDancer(hue: number): DancerRig {
     head.add(tie);
   } else {
     // Bare — the shaved-head look; double up the jewellery to carry it.
+    // On the jaw's slope now, so the beads sit half-buried in the surface.
     for (const side of [-1, 1]) {
       const stud = M(sphereGeo(8), neonStd);
       stud.scale.setScalar(0.008);
-      stud.position.set(side * 0.062, -0.048, -0.032);
+      stud.position.set(side * 0.047, -0.048, -0.027);
       head.add(stud);
     }
   }
@@ -626,7 +650,9 @@ export function buildDancer(hue: number): DancerRig {
     shoulderR.set(p.hx + SHOULDER_W * cos, shY, p.hz - SHOULDER_W * sin);
 
     // Torso line: neck → bodice (shoulder mid → waist) → basque (→ hips).
-    _a.set(p.hx, hy - HEAD_R * 1.05, p.hz);
+    // The neck buries its top in the JAW, not the old sphere's equator —
+    // the chin taper means the head's underside is higher and narrower.
+    _a.set(p.hx, hy - HEAD_R * 0.85, p.hz);
     _b.set((shoulderL.x + shoulderR.x) / 2, shY, (shoulderL.z + shoulderR.z) / 2);
     align(neck, _b, _a);
     choker.position.copy(_a).lerp(_b, 0.32);
