@@ -41,14 +41,12 @@ import { pickRaidTrack, trackById, tracksFor } from '../audio/tracks.js';
 import { platformRoot } from '../arena/arena.js';
 import { ballSpawnPos } from '../club/ball.js';
 import { CLUB, CLUB_NET } from '../club/config.js';
-import { socialBlocked, socialMuted, toggleSocialBlock, toggleSocialMute } from '../club/social.js';
+import { socialBlocked, socialMuted } from '../club/social.js';
 import {
   clearVoiceSpeakers,
   isSpeaking,
   isVoiceCapturing,
-  isVoiceMuted,
   pushVoiceFrame,
-  setVoiceEnabled,
   setVoiceSpeakerMuted,
   setVoiceSpeakerPosition,
   startVoiceCapture,
@@ -73,6 +71,15 @@ import {
 } from '../net/session.js';
 import { font } from '../ui/fonts.js';
 import { Panel, UI, type PanelButton } from '../ui/panel.js';
+import {
+  drawSafetyRows,
+  safetyButtons,
+  safetyClick,
+  safetyKey,
+  safetyRoster,
+  voiceButtons,
+  type SafetyLayout,
+} from '../ui/safety.js';
 import { PointerRay } from '../ui/pointer.js';
 
 const TRACK_KEY = 'gdr-track';
@@ -479,10 +486,8 @@ export class ClubSocialSystem extends createSystem({}) {
         const pick = clicked.slice(5);
         if (pick !== 'close') this.setTrack(pick === 'shuffle' ? '' : pick);
         this.closeSongs();
-      } else if (clicked === 'voice') {
-        setVoiceEnabled(!voiceEnabled());
-      } else if (clicked === 'mic') {
-        toggleVoiceMuted();
+      } else if (safetyClick(clicked)) {
+        /* the safety console owns mute/block/mic/voice */
       } else if (clicked === 'track') {
         this.openSongs(!this.songsOpen);
       } else if (clicked === 'call') {
@@ -502,10 +507,6 @@ export class ClubSocialSystem extends createSystem({}) {
         this.panel.setShown(false);
         this.closeSongs();
         leaveRoom();
-      } else if (clicked.startsWith('mute:')) {
-        toggleSocialMute(clicked.slice(5));
-      } else if (clicked.startsWith('block:')) {
-        toggleSocialBlock(clicked.slice(6));
       }
       this.paintKey = '';
     }
@@ -657,47 +658,22 @@ export class ClubSocialSystem extends createSystem({}) {
   }
 
   private paint(): void {
-    const members = net.members.filter((m) => m.idx !== net.myIdx).slice(0, 8);
-    const more = Math.max(0, net.members.length - 1 - members.length);
-    const on = voiceEnabled();
-    const mic = !isVoiceMuted() && isVoiceCapturing();
+    const { rows: members, more } = safetyRoster(8);
     const cued = trackById(match.preferredTrack);
     const ballUp = net.ball !== null;
     const mine = ballUp && net.ball!.callerIdx === net.myIdx;
     const setOut = net.gamePlayers.size > 0;
     const inRoom = net.phase === 'hosting' || net.phase === 'joined';
     const key =
-      members.map((m) => `${m.name}|${socialMuted(m.name) ? 1 : 0}${socialBlocked(m.name) ? 1 : 0}`).join(';') +
-      `#${this.hover ?? ''}#${on ? 1 : 0}#${mic ? 1 : 0}#${net.phase}#${cued?.id ?? ''}#${ballUp ? (mine ? 'B' : 'b') : ''}#${setOut ? net.gamePlayers.size : 0}#${more}#${match.difficulty}#${this.songsOpen ? 1 : 0}`;
+      safetyKey(members, more) +
+      `#${this.hover ?? ''}#${net.phase}#${cued?.id ?? ''}#${ballUp ? (mine ? 'B' : 'b') : ''}#${setOut ? net.gamePlayers.size : 0}#${match.difficulty}#${this.songsOpen ? 1 : 0}`;
     if (key === this.paintKey) return;
     this.paintKey = key;
 
-    const buttons: PanelButton[] = [];
     const ROW0 = 172;
     const ROW_H = 58;
-    members.forEach((m, i) => {
-      const y = ROW0 + i * ROW_H;
-      buttons.push({
-        id: `mute:${m.name}`,
-        label: socialMuted(m.name) ? 'MUTED' : 'MUTE',
-        tone: socialMuted(m.name) ? UI.danger : undefined,
-        x: 396,
-        y,
-        w: 136,
-        h: 50,
-        small: true,
-      });
-      buttons.push({
-        id: `block:${m.name}`,
-        label: socialBlocked(m.name) ? 'BLOCKED' : 'BLOCK',
-        tone: socialBlocked(m.name) ? UI.danger : undefined,
-        x: 546,
-        y,
-        w: 136,
-        h: 50,
-        small: true,
-      });
-    });
+    const rowsAt: SafetyLayout = { left: 28, right: 682, y: ROW0, rowH: ROW_H };
+    const buttons: PanelButton[] = safetyButtons(members, rowsAt);
 
     // ── calling a raid: the song pick, the chart, the ball ──────────────
     buttons.push({
@@ -756,26 +732,7 @@ export class ClubSocialSystem extends createSystem({}) {
       });
     }
 
-    buttons.push({
-      id: 'mic',
-      label: mic ? 'MIC LIVE — left Ⓨ mutes' : on ? 'MIC MUTED — left Ⓨ opens it' : 'MIC OFF',
-      tone: mic ? UI.positive : UI.danger,
-      x: 24,
-      y: 896,
-      w: 652,
-      h: 54,
-      small: true,
-    });
-    buttons.push({
-      id: 'voice',
-      label: on ? 'VOICE CHAT: ON' : 'VOICE CHAT: OFF',
-      tone: on ? undefined : UI.danger,
-      x: 24,
-      y: 958,
-      w: 652,
-      h: 60,
-      small: true,
-    });
+    buttons.push(...voiceButtons(24, 896, 652));
     if (inRoom) {
       // The board's LEAVE moved in with the desk — the one door out of the
       // room that isn't a set.
@@ -829,58 +786,7 @@ export class ClubSocialSystem extends createSystem({}) {
         }
         g.letterSpacing = '0px';
 
-        members.forEach((m, i) => {
-          const y = ROW0 + i * ROW_H + 25;
-          const hidden = socialBlocked(m.name);
-          const away = net.gamePlayers.has(m.idx);
-          if (i > 0) {
-            g.fillStyle = UI.lineFaint;
-            g.fillRect(28, y - 29, 652 - 8, 1.5);
-          }
-          g.font = font(600, 29);
-          g.letterSpacing = '1px';
-          g.fillStyle = hidden
-            ? UI.faint
-            : `#${hueToColor(memberHue(m), 0.62).toString(16).padStart(6, '0')}`;
-          const label = m.name.slice(0, 12);
-          g.fillText(label, 28, y);
-          g.letterSpacing = '0px';
-          if (hidden) {
-            const w = g.measureText(label).width;
-            g.strokeStyle = 'rgba(172,182,198,0.6)';
-            g.lineWidth = 2.5;
-            g.beginPath();
-            g.moveTo(28, y);
-            g.lineTo(28 + w, y);
-            g.stroke();
-          }
-          if (away) {
-            g.fillStyle = UI.warn;
-            g.font = font(600, 19);
-            g.letterSpacing = '1.5px';
-            g.fillText('ON THE RING', 246, y);
-            g.letterSpacing = '0px';
-          } else if (isSpeaking(String(m.idx))) {
-            // The presence dot: they're holding the floor right now.
-            g.fillStyle = UI.positive;
-            g.shadowColor = UI.positive;
-            g.shadowBlur = 8;
-            g.beginPath();
-            g.arc(352, y, 6, 0, Math.PI * 2);
-            g.fill();
-            g.shadowBlur = 0;
-          }
-        });
-        if (more > 0) {
-          g.font = font(500, 21);
-          g.fillStyle = UI.dim;
-          g.fillText(`…and ${more} more on the floor`, 28, ROW0 + members.length * ROW_H + 22);
-        }
-        if (!members.length) {
-          g.font = font(500, 24);
-          g.fillStyle = UI.dim;
-          g.fillText('nobody else on the floor right now', 28, ROW0 + 30);
-        }
+        drawSafetyRows(g, members, more, rowsAt, 'nobody else on the floor right now');
 
         // Section seams: the ball's console, the voice desk, the door.
         g.fillStyle = UI.lineFaint;

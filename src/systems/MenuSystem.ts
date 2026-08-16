@@ -70,6 +70,25 @@ import {
 import { refreshWorldBoard, scores, worldBoard, type WorldRow } from '../net/scores.js';
 import { font } from '../ui/fonts.js';
 import { Panel, UI, type PanelButton } from '../ui/panel.js';
+import {
+  drawSafetyRows,
+  safetyButtons,
+  safetyClick,
+  safetyKey,
+  safetyRoster,
+  voiceButtons,
+  type SafetyLayout,
+} from '../ui/safety.js';
+
+/* THE PAUSE CARD'S ROOM EDITION — geometry on its 600×800 canvas. Six rows
+ * is what fits above the voice desk without the card growing taller than
+ * the space a dancer has stopped in; beyond that the console says how many
+ * more are in the room, same as the club's does. The voice desk is pinned
+ * clear of the bottom edge — its second row is 60 tall and the canvas ends
+ * at 800. */
+const PAUSE_ROWS = 5;
+const PAUSE_ROW0 = 322;
+const PAUSE_VOICE_Y = 660;
 import { PointerRay } from '../ui/pointer.js';
 
 const SEATS_KEY = 'gdr-seats';
@@ -171,12 +190,17 @@ export const menuView: {
   /** The board's raw canvas as a data URL — pixel-perfect style checks. */
   snapBoard?: () => string;
   snapPause?: () => string;
+  /** Every button id on the pause card that's up — the headless read of
+   *  "does the mid-set card actually carry the room's controls?". */
+  pauseButtons?: () => string[];
 } = {};
 
 export class MenuSystem extends createSystem({}) {
   private board!: Panel;
   private exit!: Panel;
   private pause!: Panel;
+  /** The same card with the room's safety console under it (multiplayer). */
+  private pauseRoom!: Panel;
   private pauseUp = false;
   private pointers!: Record<'left' | 'right', PointerRay>;
   private ray = new Raycaster();
@@ -244,6 +268,17 @@ export class MenuSystem extends createSystem({}) {
     this.pause.setShown(false, true);
     this.scene.add(this.pause.group);
 
+    // ...and its ROOM edition. A set danced with other people is a set you
+    // can hear them through, so the card carries the club's safety console
+    // too: the voices you're sharing the record with, and the switches to
+    // stop hearing any of them. It's a separate panel because a Panel's
+    // plane is sized once, and the solo card should stay exactly as small
+    // as it always was — there's nobody to mute out there.
+    this.pauseRoom = new Panel(0.6, 0.8, 600, 800);
+    this.pauseRoom.group.position.set(0, 1.4, -1.05);
+    this.pauseRoom.setShown(false, true);
+    this.scene.add(this.pauseRoom.group);
+
     this.pointers = { left: new PointerRay(this.scene), right: new PointerRay(this.scene) };
 
     // The stored profile signs the club tag from the first frame — name and
@@ -273,7 +308,13 @@ export class MenuSystem extends createSystem({}) {
       this.hitPx = { x, y };
     };
     menuView.snapBoard = () => (this.board.ctx().canvas as HTMLCanvasElement).toDataURL('image/png');
-    menuView.snapPause = () => (this.pause.ctx().canvas as HTMLCanvasElement).toDataURL('image/png');
+    // Whichever card is actually up — solo or the room's.
+    menuView.snapPause = () =>
+      ((net.phase === 'live' ? this.pauseRoom : this.pause).ctx().canvas as HTMLCanvasElement).toDataURL(
+        'image/png',
+      );
+    menuView.pauseButtons = () =>
+      (net.phase === 'live' ? this.pauseRoom : this.pause).buttonIds();
 
     autoJoinFromUrl();
   }
@@ -324,9 +365,13 @@ export class MenuSystem extends createSystem({}) {
     const social = net.phase === 'hosting' || net.phase === 'joined';
     const boardUp = menuRoom && !social;
     const exitUp = screen === 'podium';
+    // Which pause card: the plain one solo, the one with the room's safety
+    // console when there are other voices in the set.
+    const roomSet = net.phase === 'live';
     this.board.setShown(boardUp);
     this.exit.setShown(exitUp);
-    this.pause.setShown(pauseUp);
+    this.pause.setShown(pauseUp && !roomSet);
+    this.pauseRoom.setShown(pauseUp && roomSet);
 
     const pulse = this.beatPulse();
 
@@ -340,7 +385,7 @@ export class MenuSystem extends createSystem({}) {
     const targets: Object3D[] = [];
     if (boardUp) targets.push(this.board.mesh);
     if (exitUp) targets.push(this.exit.mesh);
-    if (pauseUp) targets.push(this.pause.mesh);
+    if (pauseUp) targets.push(roomSet ? this.pauseRoom.mesh : this.pause.mesh);
 
     let hover: string | null = null;
     let clicked: string | null = null;
@@ -413,12 +458,14 @@ export class MenuSystem extends createSystem({}) {
     this.board.tick(delta, pulse);
     this.exit.tick(delta, pulse);
     this.pause.tick(delta, pulse);
+    this.pauseRoom.tick(delta, pulse);
   }
 
   private panelFor(obj: Object3D): Panel | null {
     if (obj === this.board.mesh) return this.board;
     if (obj === this.exit.mesh) return this.exit;
     if (obj === this.pause.mesh) return this.pause;
+    if (obj === this.pauseRoom.mesh) return this.pauseRoom;
     return null;
   }
 
@@ -574,6 +621,10 @@ export class MenuSystem extends createSystem({}) {
       this.joinMode = false;
     } else if (id === 'back') {
       this.joinMode = false;
+    } else if (safetyClick(id)) {
+      // The room's safety console, on the mid-set card. It edits nothing
+      // but this headset — the card stays up, because muting someone is
+      // rarely the only thing you stopped the song to do.
     } else if (id === 'resume') {
       this.pauseUp = false;
     } else if (id === 'bail') {
@@ -625,6 +676,9 @@ export class MenuSystem extends createSystem({}) {
       match.credits,
       this.boardSource,
       this.boardScroll,
+      // The pause card's safety console has its own live state — who's
+      // talking, who you've muted — and none of it is visible from here.
+      this.pauseUp && net.phase === 'live' ? safetyKey(...this.pauseRoster()) : '',
     ].join('|');
     if (key === this.lastKey) return;
     this.lastKey = key;
@@ -634,15 +688,17 @@ export class MenuSystem extends createSystem({}) {
       this.paintBoard();
     }
     if (this.pauseUp && (match.screen === 'raid' || match.screen === 'countdown')) {
-      this.pause.paint(
-        '',
-        () => {},
-        [
-          { id: 'resume', label: 'KEEP DANCING', primary: true, x: 24, y: 24, w: 512, h: 148 },
-          { id: 'bail', label: 'LEAVE THE SET', tone: UI.danger, x: 24, y: 196, w: 512, h: 140, small: true },
-        ],
-        this.hover,
-      );
+      if (net.phase === 'live') this.paintRoomPause();
+      else
+        this.pause.paint(
+          '',
+          () => {},
+          [
+            { id: 'resume', label: 'KEEP DANCING', primary: true, x: 24, y: 24, w: 512, h: 148 },
+            { id: 'bail', label: 'LEAVE THE SET', tone: UI.danger, x: 24, y: 196, w: 512, h: 140, small: true },
+          ],
+          this.hover,
+        );
     }
     if (match.screen === 'podium') {
       this.exit.paint(
@@ -663,6 +719,51 @@ export class MenuSystem extends createSystem({}) {
         this.hover,
       );
     }
+  }
+
+  /** Everyone else in the set's room, capped to what the card can hold. */
+  private pauseRoster(): [ReturnType<typeof safetyRoster>['rows'], number] {
+    const { rows, more } = safetyRoster(PAUSE_ROWS);
+    return [rows, more];
+  }
+
+  /**
+   * THE PAUSE CARD, ROOM EDITION: the two decisions on top, then the club's
+   * safety console — because the people you can hear mid-set are exactly
+   * the people you might need to stop hearing, and until now the only way
+   * to reach that switch was to leave the song.
+   */
+  private paintRoomPause(): void {
+    const [rows, more] = this.pauseRoster();
+    const layout: SafetyLayout = { left: 28, right: 572, y: PAUSE_ROW0, rowH: 58 };
+    const buttons: PanelButton[] = [
+      { id: 'resume', label: 'KEEP DANCING', primary: true, x: 24, y: 24, w: 552, h: 116 },
+      { id: 'bail', label: 'LEAVE THE SET', tone: UI.danger, x: 24, y: 152, w: 552, h: 92, small: true },
+      ...safetyButtons(rows, layout),
+      ...voiceButtons(24, PAUSE_VOICE_Y, 552),
+    ];
+    this.pauseRoom.paint(
+      '',
+      (g) => {
+        g.textAlign = 'left';
+        g.textBaseline = 'middle';
+        g.fillStyle = UI.lineFaint;
+        g.fillRect(24, 262, 552, 2);
+        g.font = font(700, 26);
+        g.letterSpacing = '2.5px';
+        g.fillStyle = UI.textHi;
+        g.fillText('THE ROOM', 28, 296);
+        g.letterSpacing = '0px';
+        g.font = font(500, 19);
+        g.fillStyle = UI.faint;
+        g.fillText('you can hear them through the record', 200, 297);
+        drawSafetyRows(g, rows, more, layout, 'nobody else in the room right now');
+        g.fillStyle = UI.lineFaint;
+        g.fillRect(24, PAUSE_VOICE_Y - 22, 552, 2);
+      },
+      buttons,
+      this.hover,
+    );
   }
 
   /** The shell every tab shares: header, rail — then the content. */
