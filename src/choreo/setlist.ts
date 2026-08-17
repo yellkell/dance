@@ -132,20 +132,53 @@ function pickKind(
   return pool[0]?.[0] ?? 'beam';
 }
 
+/** THE BOUNCE's two odds, indexed by volley: [_, does it answer, does it
+ *  come back across]. Volley 2 is a shove; volley 3 is the rally. From
+ *  `twinAlwaysFromAct` up both are certainties, so a double laser on the
+ *  expert acts is ALWAYS the full three — left, right, left — and never a
+ *  single shove across. Both twins, lateral and vertical, read this pair.
+ *
+ *  Returning 1 rather than skipping the rolls keeps the seeded stream
+ *  aligned: every client still draws the same numbers in the same order,
+ *  whatever the act. */
+function twinKeep(act: number): number[] {
+  if (act >= CHOREO.twinAlwaysFromAct) return [0, 1, 1];
+  const at = (a: readonly number[]): number => a[Math.min(act, a.length - 1)]!;
+  return [0, at(CHOREO.twinReturnChance), at(CHOREO.twinBounceChance)];
+}
+
+/**
+ * Which side a twin opens on: the one the last move parked the floor on,
+ * so the first pair lands where the dancers actually are. `at` is the
+ * park's coordinate on the twin's axis (x for the lateral twin, z for the
+ * vertical one); undefined — an unknowable park, i.e. after a nova —
+ * falls back to the coin. ALWAYS consumes the roll, so a chart's random
+ * stream stays aligned whether or not there was a park to aim at.
+ */
+function twinSide(rng: () => number, at: number | undefined): 1 | -1 {
+  const coin: 1 | -1 = rng() < 0.5 ? 1 : -1;
+  if (at === undefined || Math.abs(at) < 0.06) return coin; // parked on the line
+  return at > 0 ? 1 : -1;
+}
+
 /** Build one move's landings from the seeded rng (seat-local pattern).
  *  `sweptRoutines` is the chart-wide coin for THE SWEPT ROUTINE — rolled
- *  once per song, so some expert nights carry it and some never do. */
+ *  once per song, so some expert nights carry it and some never do.
+ *  `park` is where the LAST move left a dancer who played it right (see
+ *  THE FLOOR MANAGER); the twins aim their opening volley at it. */
 function buildLandings(
   kind: MoveKind,
   landBeat: number,
   act: number,
   rng: () => number,
   sweptRoutines = false,
+  park: Park = null,
 ): Landing[] {
   const landings: Landing[] = [];
   if (kind === 'beam') {
     const halfW = CHOREO.beamHalfWidth;
-    const lane = (x: number) => landings.push({ beat: landBeat, zone: { kind: 'lane', x, halfW } });
+    const laneAt = (beat: number, x: number) => landings.push({ beat, zone: { kind: 'lane', x, halfW } });
+    const lane = (x: number) => laneAt(landBeat, x);
     if (act < 2) {
       // One laser, and it lands on a SLOT: the middle, or a third out.
       lane(CHOREO.beamSlots[Math.floor(rng() * CHOREO.beamSlots.length)]);
@@ -165,9 +198,36 @@ function buildLandings(
     } else {
       // TWIN: two strips shoulder to shoulder, taking one whole side and
       // the middle with them. No corridor, no choice — get across.
-      const s = rng() < 0.5 ? 1 : -1;
-      lane(s * CHOREO.beamTwinInner);
-      lane(s * (CHOREO.beamTwinInner + halfW * 2 + 0.02));
+      //
+      // THE BOUNCE: and then it does it again, mirrored, a bar later — and
+      // again after that, back on the side it opened with. Each volley
+      // lands on the ground the one before it chased you onto, so the pair
+      // stops being a shove across the deck and becomes a rally: left,
+      // right, left. The chain always ALTERNATES, so however long it runs
+      // the answer never changes — the strips are coming, go the other way.
+      const inner = CHOREO.beamTwinInner;
+      const outer = CHOREO.beamTwinInner + halfW * 2 + 0.02;
+      const keep = twinKeep(act);
+      // THE OPENER IS AIMED. Whatever ran last — a wave's march, the
+      // routine's corner, a gate, a seesaw — left the floor standing
+      // somewhere known, and the twin's first pair lands on THAT side.
+      // Rolled at random it was a coin whether the rally even started
+      // where anybody was: half the time the opening volley burned the
+      // empty half of the deck and the move only began on the answer.
+      // Aimed, the shove starts on the beat it fires, and the alternating
+      // chain still means the read never changes — go the other way.
+      // (After a NOVA the park is null: its wedge lands somewhere
+      // different on every deck, so there is no shared side to aim at and
+      // the coin is the honest answer.)
+      let side: 1 | -1 = twinSide(rng, park?.x);
+      lane(side * inner);
+      lane(side * outer);
+      for (let v = 1; v < CHOREO.twinChainMax && rng() < keep[v]; v++) {
+        side = -side as 1 | -1;
+        const at = landBeat + v * CHOREO.twinReturnBeats;
+        laneAt(at, side * inner);
+        laneAt(at, side * outer);
+      }
     }
   } else if (kind === 'donut') {
     // THE ONE-TWO: a laser straight down the middle drives everyone off
@@ -207,6 +267,37 @@ function buildLandings(
         beat: landBeat,
         zone: { kind: 'rail', z: CHOREO.railTrapZ, halfD: CHOREO.railHalfDepth, from: 1 },
       });
+      return landings;
+    }
+    // THE VERTICAL TWIN: the beam's twin, quarter-turned. Two rails
+    // shoulder to shoulder take one whole HALF — both from the same
+    // emitter, one battery firing a pair — and the RETURN mirrors them onto
+    // the other half a bar later. Two at the back, then two at the front:
+    // the deck's front/back answer to the lateral twin's walk across, and
+    // the surest way to make a floor that only ever sidesteps travel.
+    const twinChance = CHOREO.railTwinChance[Math.min(act, CHOREO.railTwinChance.length - 1)];
+    if (rng() < twinChance) {
+      const halfD = CHOREO.railHalfDepth;
+      const inner = CHOREO.railTwinInner;
+      const outer = CHOREO.railTwinInner + halfD * 2 + 0.02;
+      // Aimed like its lateral twin, on the depth axis: the pair floods
+      // the half the last move parked you in. (+1 floods the back.)
+      let side: 1 | -1 = twinSide(rng, park?.z);
+      let from: 1 | -1 = rng() < 0.5 ? 1 : -1;
+      const pair = (beat: number, at: number, emitter: 1 | -1) => {
+        landings.push({ beat, zone: { kind: 'rail', z: at * inner, halfD, from: emitter } });
+        landings.push({ beat, zone: { kind: 'rail', z: at * outer, halfD, from: emitter } });
+      };
+      pair(landBeat, side, from);
+      // The same BOUNCE, quarter-turned: back, front, back. Each answering
+      // battery fires from the OTHER rail, so every volley announces itself
+      // as a new machine rather than a repeat of the last one.
+      const keep = twinKeep(act);
+      for (let v = 1; v < CHOREO.twinChainMax && rng() < keep[v]; v++) {
+        side = -side as 1 | -1;
+        from = from === 1 ? -1 : 1;
+        pair(landBeat + v * CHOREO.twinReturnBeats, side, from);
+      }
       return landings;
     }
     // A single rail always lands on the FRONT half (toward the stage,
@@ -415,17 +506,33 @@ export function parkOf(kind: MoveKind, landings: readonly Landing[], prev: Park)
       return prev;
     }
     case 'cross': {
-      const rails = landings.filter((l) => l.zone.kind === 'rail');
-      if (rails.length >= 2) return { x: p.x, z: 0 }; // the trap's middle band
-      const r = rails[0]?.zone;
+      // Only the LAST volley decides where you end up: a vertical twin that
+      // returns chases you off one half and then off the other.
+      const all: { beat: number; z: number; halfD: number }[] = [];
+      for (const l of landings) if (l.zone.kind === 'rail') all.push({ beat: l.beat, ...l.zone });
       const lane = landings.find((l) => l.zone.kind === 'lane')?.zone;
-      const z = r?.kind === 'rail' ? cz(r.z + r.halfD + 0.3) : p.z; // step off, away from the stage
       const x = lane?.kind === 'lane' ? cx(lane.x + (p.x >= lane.x ? 1 : -1) * (lane.halfW + 0.2)) : p.x;
-      return { x, z };
+      if (!all.length) return { x, z: p.z };
+      const lastBeat = Math.max(...all.map((r) => r.beat));
+      const rails = all.filter((r) => r.beat === lastBeat);
+      if (rails.length >= 2) {
+        // Opposite sides of centre is THE TRAP — the jaws leave a corridor
+        // down the middle. Same side is the TWIN, which leaves you a whole
+        // half and no corridor at all.
+        return rails[0].z * rails[1].z < 0
+          ? { x, z: 0 }
+          : { x, z: -Math.sign(rails[0].z || rails[1].z) * 0.42 };
+      }
+      return { x, z: cz(rails[0].z + rails[0].halfD + 0.3) }; // step off, away from the stage
     }
     case 'beam': {
-      const lanes: { x: number; halfW: number; yaw?: number }[] = [];
-      for (const l of landings) if (l.zone.kind === 'lane') lanes.push(l.zone);
+      const all: { beat: number; x: number; halfW: number; yaw?: number }[] = [];
+      for (const l of landings) if (l.zone.kind === 'lane') all.push({ beat: l.beat, ...l.zone });
+      if (!all.length) return prev;
+      // A twin that RETURNS lands twice: only the second pair decides where
+      // the dodge finally leaves you standing.
+      const lastBeat = Math.max(...all.map((l) => l.beat));
+      const lanes = all.filter((l) => l.beat === lastBeat);
       if (lanes.some((l) => l.yaw)) {
         // THE X: the nearest pocket between the arms.
         const pockets = [
@@ -457,6 +564,69 @@ export function parkOf(kind: MoveKind, landings: readonly Landing[], prev: Park)
   }
 }
 
+/** THE AIMED SHAPES: moves whose whole attack lands in one impact, aimed at
+ *  wherever the last move parked the floor. That lets the chart promise a
+ *  strike on a given downbeat without guessing how long a randomly rolled
+ *  cascade will become — and, because the aim is derived from the park
+ *  rather than rolled, one of these ALWAYS asks for a dodge.
+ *
+ *  Two jobs, one vocabulary: THE CLOSER on the final downbeat, and the
+ *  STAND-IN that keeps a phrase from going quiet when nothing the grammar
+ *  rolled will fit the room that's left. All three charge in at most one
+ *  bar; keep the reservation beside the vocabulary. */
+const CLOSER_KINDS: readonly MoveKind[] = ['gate', 'beam', 'sweep'];
+const CLOSER_CHARGE_BEATS = Math.max(...CLOSER_KINDS.map((kind) => MOVES[kind].chargeBeats));
+
+function buildAimed(
+  landBeat: number,
+  act: number,
+  banned: readonly MoveKind[],
+  last: MoveKind | null,
+  park: Park,
+  rng: () => number,
+): { kind: MoveKind; landings: Landing[] } | null {
+  const available = CLOSER_KINDS.filter((kind) => {
+    const weights = MOVES[kind].weights;
+    return !banned.includes(kind) && weights[Math.min(act, weights.length - 1)] > 0;
+  });
+  if (!available.length) return null;
+  // Preserve the chart-wide no-repeat law whenever at least two closers are
+  // legal. A deliberately over-banned dev chart still gets an ending.
+  const fresh = available.filter((kind) => kind !== last);
+  const pool = fresh.length ? fresh : available;
+  const kind = pool[Math.floor(rng() * pool.length)]!;
+
+  if (kind === 'sweep') {
+    return { kind, landings: [{ beat: landBeat, zone: { kind: 'sweep' } }] };
+  }
+  if (kind === 'beam') {
+    // Aim the final single strip through the park, so the closer always asks
+    // for one last dodge instead of decorating empty ground.
+    const x = park
+      ? CHOREO.beamSlots.reduce((best, slot) =>
+          Math.abs(slot - park.x) < Math.abs(best - park.x) ? slot : best,
+        )
+      : CHOREO.beamSlots[Math.floor(rng() * CHOREO.beamSlots.length)]!;
+    return {
+      kind,
+      landings: [{ beat: landBeat, zone: { kind: 'lane', x, halfW: CHOREO.beamHalfWidth } }],
+    };
+  }
+
+  // Put the gate's SAFE band on the opposite edge from the park. The ground
+  // the last move left you on is therefore guaranteed to burn, while the
+  // bright doorway remains a full, ordinary gate-width target.
+  const axis: 0 | 1 = rng() < 0.5 ? 1 : 0;
+  const coord = park ? (axis ? park.z : park.x) : rng() < 0.5 ? -1 : 1;
+  const at = (coord >= 0 ? -1 : 1) * (axis ? 0.35 : 0.5);
+  const half =
+    act >= 4 ? CHOREO.gateHalfWExpert : act >= 3 ? CHOREO.gateHalfWLate : CHOREO.gateHalfW;
+  return {
+    kind,
+    landings: [{ beat: landBeat, zone: { kind: 'gate', at, half, axis } }],
+  };
+}
+
 /**
  * The full raid set. Pure function of (seed, phrases, banned, difficulty)
  * — every client, and every rewatch of the same seed, gets the identical
@@ -485,31 +655,103 @@ export function generateSetlist(
   let index = 0;
 
   for (let phrase = 0; phrase < phrases; phrase++) {
+    // A phrase is a place on the record, not merely a quota. When an easy
+    // phrase's two moves finished early, the old shared cursor stayed there;
+    // the NEXT phrase then spent its quota in the same stretch of music.
+    // Whole charts were pulled toward the front until the final minute had
+    // nothing left in it. Never let a phrase begin before its own downbeat.
+    cursor = Math.max(cursor, phrase * phraseBeats);
     const act = actOfPhrase(phrase, phrases, difficulty);
     const want = CHOREO.movesPerPhrase[Math.min(act, CHOREO.movesPerPhrase.length - 1)];
     const phraseEnd = (phrase + 1) * phraseBeats;
     const rest = CHOREO.restBeats[Math.min(act, CHOREO.restBeats.length - 1)];
+    const finalPhrase = phrase === phrases - 1;
+    // The last quota includes THE CLOSER below, whose four-beat wind-up owns
+    // the final bar. No rest is kept in front of it: a clear bar before the
+    // one move the whole set has been building to is the emptiest the floor
+    // ever felt, and the finale reads better arriving on the heels of the
+    // move before it.
+    const restHere = finalPhrase ? 0 : rest;
+    const moveEnd = finalPhrase ? phraseEnd - CLOSER_CHARGE_BEATS : phraseEnd;
+    const ordinaryMoves = finalPhrase ? Math.max(0, want - 1) : want;
+    // THE DEAD AIR CEILING: the quota is a FLOOR. While this phrase still
+    // holds more than `maxSilent` beats of unclaimed music the loop keeps
+    // booking moves, so a phrase can never hand the floor a long stretch of
+    // nothing to do. `cursor` climbs by at least a move's charge every pass,
+    // so the extra condition always terminates.
+    const maxSilent = CHOREO.maxSilentBeats[Math.min(act, CHOREO.maxSilentBeats.length - 1)];
 
-    for (let m = 0; m < want; m++) {
+    for (let m = 0; m < ordinaryMoves || moveEnd - cursor > maxSilent; m++) {
       let kind = pickKind(rng, act, last, banned);
       let charge = MOVES[kind].chargeBeats;
       // Land on the next bar downbeat that the telegraph fits in front of.
       let landBeat = Math.ceil((cursor + charge) / barBeats) * barBeats;
-      let landings = buildLandings(kind, landBeat, act, rng, sweptRoutines);
+      let landings = buildLandings(kind, landBeat, act, rng, sweptRoutines, park);
       // THE FLOOR MANAGER: a move whose danger never touches the ground
       // the last move parked you on asks for nothing — roll another shape
-      // (same seeded stream, so every client re-rolls identically).
-      for (let attempt = 0; attempt < 6 && !evictsPark(landings, park); attempt++) {
+      // (same seeded stream, so every client re-rolls identically). A WHOLE
+      // move must also fit: checking only its first landing let waves and
+      // rallies run beyond the record's ending.
+      for (
+        let attempt = 0;
+        attempt < 12 &&
+        (!evictsPark(landings, park) || landings[landings.length - 1].beat > moveEnd);
+        attempt++
+      ) {
         kind = pickKind(rng, act, last, banned);
         charge = MOVES[kind].chargeBeats;
         landBeat = Math.ceil((cursor + charge) / barBeats) * barBeats;
-        landings = buildLandings(kind, landBeat, act, rng, sweptRoutines);
+        landings = buildLandings(kind, landBeat, act, rng, sweptRoutines, park);
       }
-      if (landBeat >= phraseEnd + barBeats) break; // phrase is full — move on
+      if (!evictsPark(landings, park) || landings[landings.length - 1].beat > moveEnd) {
+        // TWELVE SHAPES AND NOT ONE OF THEM FITS. This used to abandon the
+        // phrase — every remaining slot with it — which is how a chart ended
+        // up with a whole phrase of nothing and the floor stood there
+        // grooving for twenty seconds. Book a STAND-IN instead: one aimed
+        // impact, drawn from the closer's vocabulary, short enough to fit
+        // any room a bar can hold and aimed through the park so it always
+        // asks for a dodge. Only genuinely empty ground ends the phrase now.
+        const standBeat = Math.ceil((cursor + CLOSER_CHARGE_BEATS) / barBeats) * barBeats;
+        if (standBeat > moveEnd) break;
+        const stand = buildAimed(standBeat, act, banned, last, park, rng);
+        if (!stand) break; // a record that bans the whole vocabulary
+        moves.push({
+          index: index++,
+          kind: stand.kind,
+          telegraphBeat: standBeat - MOVES[stand.kind].chargeBeats,
+          landBeat: standBeat,
+          landings: stand.landings,
+          act,
+        });
+        park = parkOf(stand.kind, stand.landings, park);
+        last = stand.kind;
+        cursor = standBeat + restHere;
+        continue;
+      }
       moves.push({ index: index++, kind, telegraphBeat: landBeat - charge, landBeat, landings, act });
       park = parkOf(kind, landings, park);
       last = kind;
-      cursor = landings[landings.length - 1].beat + rest;
+      cursor = landings[landings.length - 1].beat + restHere;
+    }
+  }
+
+  // Every chart finishes with an authored one-impact move ON the final
+  // downbeat. The ordinary final-phrase moves reserved its wind-up above,
+  // so the ending is guaranteed without overlapping another landing or
+  // letting a long random cascade spill past the record.
+  if (phrases > 0) {
+    const landBeat = phrases * phraseBeats;
+    const act = actOfPhrase(phrases - 1, phrases, difficulty);
+    const closer = buildAimed(landBeat, act, banned, last, park, rng);
+    if (closer) {
+      moves.push({
+        index: index++,
+        kind: closer.kind,
+        telegraphBeat: landBeat - MOVES[closer.kind].chargeBeats,
+        landBeat,
+        landings: closer.landings,
+        act,
+      });
     }
   }
   return moves;

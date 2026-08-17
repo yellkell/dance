@@ -45,10 +45,23 @@ function getCtx(): Ctx | null {
     sfxOut.gain.value = sfxVol;
     sfxOut.connect(ctx.destination);
     ctx._sfxOut = sfxOut;
-    // Quiet synth mix bus → the fader.
+    // A gentle glue compressor between the synth mix and the fader: forty
+    // hand-tuned one-shots will never sit at exactly one loudness, so the
+    // bus evens the spread — the big landings lose a little of their spike,
+    // the small ticks keep their place, and the SFX slider scales ONE
+    // coherent level instead of a lottery. Soft knee, low ratio: glue, not
+    // pumping.
+    const glue = ctx.createDynamicsCompressor();
+    glue.threshold.value = -24;
+    glue.knee.value = 14;
+    glue.ratio.value = 3;
+    glue.attack.value = 0.004;
+    glue.release.value = 0.18;
+    glue.connect(sfxOut);
+    // Quiet synth mix bus → the glue → the fader.
     const master = ctx.createGain();
     master.gain.value = 0.28;
-    master.connect(sfxOut);
+    master.connect(glue);
     ctx._master = master;
   }
   return ctx;
@@ -297,7 +310,8 @@ function servo(from: number, to: number, dur: number, gain = 0.07, delay = 0): v
   osc.stop(t0 + dur + 0.05);
 }
 
-// --- Drone Hunt (arcade cabinet) -----------------------------------------
+// --- SUPER OCTAGON (the club's arcade cabinet) ----------------------------
+// Carried over from FIRE FIGHT's pub cabinet, where these four were born.
 
 /** The light-gun shot: a fast downward zap "pew". */
 export function huntShot(): void {
@@ -454,12 +468,13 @@ export function bossRoar(depth = 1): void {
 }
 
 /** An attack charging — a detuned rising whine over building dread, ending
- *  exactly at the strike. */
+ *  exactly at the strike. Like gooCharge, this is a WARNING first: a step
+ *  louder than it was, still under the landing. */
 export function chargeWhine(dur: number): void {
-  servo(140, 980, dur, 0.09);
-  servo(137, 964, dur, 0.05); // detuned twin — width, not volume
-  whooshNoise(dur, 0.05, 200, 1400);
-  subSwell(36, 58, dur, 0.14, 0, dur * 0.7); // dread building underneath
+  servo(140, 980, dur, 0.11);
+  servo(137, 964, dur, 0.06); // detuned twin — width, not volume
+  whooshNoise(dur, 0.06, 200, 1400);
+  subSwell(36, 58, dur, 0.16, 0, dur * 0.7); // dread building underneath
 }
 
 /** A titan fist crashing onto the platform — punch, then the earth answers. */
@@ -569,12 +584,14 @@ export function glassTap(hard = false): void {
   whooshNoise(0.025, g * 0.4, 6500, 3000); // the glassy attack tick
 }
 
-/** Glass meeting glass — a stacked pint clinking onto another. Brighter, two-tone. */
+/** Glass meeting glass — a stacked pint clinking onto another. Brighter,
+ *  two-tone. (The attack tick used to spike 0.28 — twice anything else in
+ *  its family — and stabbed at high slider settings.) */
 export function glassClink(): void {
   tone({ freq: 3000, type: 'sine', dur: 0.2, gain: 0.14 });
   tone({ freq: 4550, type: 'sine', dur: 0.12, gain: 0.07, delay: 0.006 });
   tone({ freq: 6100, type: 'sine', dur: 0.05, gain: 0.04 });
-  whooshNoise(0.02, 0.28, 7500, 3500);
+  whooshNoise(0.02, 0.12, 7500, 3500);
 }
 
 /** A steel dart clattering down on the floor — light metal tink + a low rattle. */
@@ -588,6 +605,13 @@ export function dartFloor(): void {
 export function dartStick(): void {
   tone({ freq: 320, to: 150, type: 'sine', dur: 0.06, gain: 0.16 });
   whooshNoise(0.04, 0.12, 1300, 320);
+}
+
+/** The dumbwaiter's little lift — a soft servo travel with a settle tick.
+ *  `up` pitches the run rising or sinking. */
+export function dumbwaiter(up: boolean): void {
+  servo(up ? 110 : 200, up ? 200 : 110, 0.55, 0.045);
+  clank(up ? 900 : 600, 0.05, 0.06, 0.5);
 }
 
 
@@ -849,12 +873,15 @@ export function gooSink(): void {
   splat(0.7);
 }
 
-/** Attack telegraph — a rising bubbly whine ending exactly at the strike. */
+/** Attack telegraph — a rising bubbly whine ending exactly at the strike.
+ *  The single most load-bearing sound in the game (it IS the warning), so
+ *  it sits a step above the old whisper — clearly audible under the mix
+ *  without competing with the landing it announces. */
 export function gooCharge(dur: number): void {
-  tone({ freq: 90, to: 640, type: 'sawtooth', dur, gain: 0.055 });
-  whooshNoise(dur, 0.05, 160, 1200);
+  tone({ freq: 90, to: 640, type: 'sawtooth', dur, gain: 0.07 });
+  whooshNoise(dur, 0.065, 160, 1200);
   for (let i = 0; i < 4; i++) {
-    bubble(300 + i * 180, 0.045, dur * (0.25 + i * 0.18), 0.06);
+    bubble(300 + i * 180, 0.055, dur * (0.25 + i * 0.18), 0.06);
   }
 }
 
@@ -866,8 +893,8 @@ export function gooWhoosh(): void {
 
 /** Its strike landing — a wet sledgehammer you feel in your teeth. */
 export function gooSlam(): void {
-  tone({ freq: 85, to: 22, type: 'sine', dur: 0.5, gain: 0.46 }); // deep gut sub, felt
-  noiseHit(0.22, 0.4, 1900, 100, 1.5); // the big wet body caving in
+  tone({ freq: 85, to: 22, type: 'sine', dur: 0.5, gain: 0.4 }); // deep gut sub, felt
+  noiseHit(0.22, 0.36, 1900, 100, 1.5); // the big wet body caving in
   noiseHit(0.06, 0.2, 4200, 1300, 0.7); // duller front slap — weight, not sting
   noiseHit(0.24, 0.16, 640, 100, 5.0, 0.015); // watery glug under the impact
   tone({ freq: 140, to: 44, type: 'sine', dur: 0.22, gain: 0.22, delay: 0.005 }); // low thud
@@ -928,9 +955,9 @@ export function donutSlam(): void {
 
 /** The pie detonating — one shockwave rolling over the whole ring. */
 export function novaBoom(): void {
-  noiseHit(0.4, 0.4, 3000, 120, 1.6); // the blast front
+  noiseHit(0.4, 0.36, 3000, 120, 1.6); // the blast front
   whooshNoise(0.7, 0.15, 2200, 200, 0.05); // rolling outward
-  tone({ freq: 60, to: 24, type: 'sine', dur: 0.8, gain: 0.4 }); // sub drop
+  tone({ freq: 60, to: 24, type: 'sine', dur: 0.8, gain: 0.36 }); // sub drop
   subSwell(40, 26, 1.0, 0.2, 0.05, 0.05);
   clank(90, 0.11, 0.6, 0.14); // the room answering
 }

@@ -48,7 +48,12 @@ everyone else.
   **You have no body of your own**: the local player sees only their
   controllers; the figure is for everyone else's view of you.
 - Last dancer standing (or the highest score when the set ends) **owns the
-  night**: podium, crown, confetti cannons.
+  night**: podium, crown, confetti cannons. When the set was called from
+  the club, the crown is REAL: the winner walks back onto the floor with a
+  champagne-brass **crown** turning slowly over their figure — everyone in
+  the room sees it (the mirror included), a 👑 leads their name on the
+  SOCIAL panel, and it stays on until their **next game** takes it off at
+  the door (or they leave the room, and it leaves with them).
 - Between sets, online rooms live in **THE CLUB** (it has no name — the
   sign over the stage is a moon, not a word). An Art Deco hall with a dance
   floor, a backlit bar, velvet booths, a raised terrace and a hushed STILL
@@ -56,9 +61,13 @@ everyone else.
   it, **talk** to your room (spatial voice), and mute/block anyone from the
   SOCIAL panel.
 - Raids are **called from the floor with THE BALL**: anyone sends a mirror
-  ball up (their song pick rides along), it hangs for sixty seconds, and
-  whoever **touches it** rides to the ring with them at zero — while the
-  rest of the room keeps the floor. When the set resolves, the players are
+  ball up (their song pick rides along) — and *up* means up: it **bounces**
+  from knee height to its hang on an under-damped spring, glimmers there
+  (lens glints popping and dying across the facets, riding the spin the
+  way a real mirror ball throws its dots), and hangs for sixty seconds.
+  Whoever **touches it** rides to the ring with them at zero — while the
+  rest of the room keeps the floor, watching the ball **whirl away down
+  to the boards** as it resolves. When the set ends, the players are
   deposited straight back among their friends.
 - The set itself happens inside **THE VOID** — an actual environment in the
   Beat-Saber-background bloodline, built in four depth layers so a black
@@ -197,23 +206,41 @@ There are **three places**, and where you are is what you're doing:
    board and the MC posing. The club's door is the board's MULTIPLAYER
    seat, nothing in the room.
 2. **THE CLUB** — the social place, the warm room between the voids.
-   **ENTER THE CLUB** (the multiplayer tab's first door — it opens a room
-   around you) → share the 4-letter code (or the `?room=CODE&name=YOU`
-   link) → friends **JOIN A ROOM** — and your whole room stands in the
-   club together. Every member is a raver figure in
+   Two doors. **ENTER THE CLUB** walks you straight onto the PUBLIC floor —
+   no code, no arranging; the relay puts you wherever the crowd already is.
+   **HOST / JOIN** is the private one: **HOST** opens a room and hands you a
+   4-digit code to give your friends (or the `?room=CODE&name=YOU` link) →
+   they pick **JOIN** and type it on the keypad. Either way your whole room
+   stands in the club together. Every member is a raver figure in
    their join colour with a name tag that swells while they talk. Voice is
    **spatial** (each voice comes from its figure, HRTF + distance falloff)
    and rides the same room socket as Int16 PCM — no SFU, no peer soup, the
    exact system proven in FIRE FIGHT's pub. Movement is **teleport-only**:
    deflect a thumbstick, aim the arc, roll the stick to set your landing
    facing, release to go; an isolated sideways flick snap-turns. Left
-   **Ⓨ** mutes your mic. Right **Ⓐ** raises the **SOCIAL panel**: MUTE
-   (silence) or BLOCK (silence + vanish) anyone, persisted by name,
-   strictly local — the voice-chat master switch, your ♪ song pick, and
-   **SEND THE BALL UP**. Step into **THE STILL ROOM** (north-west corner)
-   and the music falls to a murmur; voices stay.
+   **Ⓨ** mutes your mic. Right **Ⓐ** raises the **SOCIAL panel** — the
+   club floor's whole console (the big board stays in the foyer; the club
+   keeps no front desk): MUTE (silence) or BLOCK (silence + vanish)
+   anyone, persisted by name, strictly local — the voice-chat master
+   switch, your ♪ song pick, the DIFFICULTY row (your pick rides the ball
+   you call), **SEND THE BALL UP**, and **LEAVE THE CLUB**. Step into
+   **THE STILL ROOM** (north-west corner) and the music falls to a
+   murmur; voices stay. Its loud mirror in the north-east corner is
+   **THE ARCADE**: the **SUPER OCTAGON** cabinet — aim at the CRT with
+   the laser, trigger to shoot the octagons, streaks build a ×4
+   multiplier, three through the glass ends the night — with a wall
+   leaderboard riding the same world scores collection as the songs
+   (pseudo-chart `superoctagon`). At the bar, **THE DUMBWAITER** serves:
+   a brass square rises with a cocktail; aim at it (or any resting
+   glass) and squeeze to take it — five-frame throw velocity, per-wall
+   bounce heights, glasses that settle upright, and a sip near your face
+   empties the drink. Teleport can land **on the booth tables** (and the
+   still room's), the north corridors, and the backstage walk — the
+   perimeter is a loop. Props and the cabinet are local-per-headset for
+   now: syncing them across the room needs relay verbs the wire doesn't
+   carry yet.
 3. **THE SET** — the game place, called with **THE BALL**. Anyone sends it
-   up (from the SOCIAL panel or the board); a mirror ball hangs in front
+   up (from the SOCIAL panel); a mirror ball hangs in front
    of them for **60 seconds** wearing a countdown plate — the song, the
    caller, who's touched in. **Touch the ball** (hand close + trigger) to
    join; touch again to step out; the caller's touch cancels. At zero the
@@ -243,36 +270,52 @@ else in the game needs the server: the whole tour is playable solo.
 
 ## The music
 
-Fifteen real tracks drive the game (`src/assets/music/`, registry in
-`src/audio/tracks.ts`). Every number in that registry was **measured from the
-files**, not guessed — the whole game is quantized to them, so they had to be:
+Twenty-four real records are in the box (`src/assets/music/`, registry in
+`src/audio/tracks.ts`) — twenty of them raid charts. Every number in that
+registry was **measured from the files**, not guessed — the whole game is
+quantized to them, so they had to be:
 
 | Track | BPM | Set length | Loudness | Where it plays |
 | --- | --- | --- | --- | --- |
-| MORNING | 96.665 | 5 phrases | −11.1 LUFS | tour: opening night · no ducking |
-| TARGET | 91 | 11 phrases | −9.5 LUFS | tour |
-| CAPTURE | 117 | 13 phrases | −15.0 LUFS | tour: first goop finale |
-| DISCO BALL | 73.33 | 4 phrases | −12.6 LUFS | tour: peak-hours opener — the night after the first goop falls · no ducking |
+| SAKUPENED | 133.964 | 10 phrases | −8.1 LUFS | tour: opening night 2 |
 | COMBAT | 135 | 12 phrases | −13.2 LUFS | quick raid |
+| DISCO BALL | 109.965 | 6 phrases | −12.6 LUFS | tour: peak-hours opener · its tour night never ducks |
 | LOOP | 150 | 17 phrases | −11.2 LUFS | quick raid |
-| DYNASTY | 155 | 10 phrases | −9.6 LUFS | tour: peak-hours finale |
-| INFECTION | 138 | 15 phrases | −10.9 LUFS | tour: after hours |
-| SPREAD | 150 | 17 phrases | −13.1 LUFS | tour: after hours · skips 6 bars in |
+| CAPTURE | 117 | 13 phrases | −15.0 LUFS | tour: first goop finale |
+| MORNING | 96.665 | 5 phrases | −11.1 LUFS | tour: opening night · never asks a duck |
+| MONEY | 97.994 | 8 phrases | −14.5 LUFS | tour: peak hours · its tour night never ducks |
+| TARGET | 91 | 11 phrases | −9.5 LUFS | quick raid |
 | BREAKCORE | 174 | 11 phrases | −8.3 LUFS | tour: the last night |
-| ASSEMBLE | 125 | 16 phrases | −7.5 LUFS | quick raid · drops on the slam |
-| SAKUPENED | 133.964 | 10 phrases | −8.1 LUFS | quick raid |
+| DYNASTY | 155 | 10 phrases | −9.6 LUFS | tour: peak-hours finale |
+| SPREAD | 150 | 17 phrases | −13.1 LUFS | tour: after hours · skips its ambient open |
 | UNITY | 117 | 17 phrases | −13.8 LUFS | quick raid · skips its ambient open |
-| MONEY | 78.395 | 6 phrases | −14.5 LUFS | tour: peak hours · no ducking |
-| SWAG | 91.974 | — | −15.7 LUFS | foyer loop |
-| ECLIPSE | 70 | — | −10.4 LUFS | the club's house record |
+| ASSEMBLE | 125 | 16 phrases | −7.5 LUFS | quick raid · drops on the slam |
+| INFECTION | 138 | 15 phrases | −10.9 LUFS | quick raid |
+| GIVE IT TO ME | 112 | 13 phrases | −14.2 LUFS | tour: after-hours opener |
+| V ONE | 95 | 8 phrases | −10.8 LUFS | quick raid |
+| FUSION | 122 | 5 phrases | −8.1 LUFS | quick raid |
+| BRAIN EATER | 149.959 | 7 phrases | −9.1 LUFS | quick raid |
+| VFALL | 165.015 | 10 phrases | −9.4 LUFS | quick raid |
+| FUTURE VIBE | 93.984 | 6 phrases | −14.2 LUFS | quick raid · second on the club rotation |
+| CHILL | 125.001 | — | −8.9 LUFS | the club's house record — opens the rotation |
+| SWAG | 91.974 | — | −15.7 LUFS | foyer rotation |
+| ECLIPSE | 70 | — | −10.4 LUFS | foyer rotation |
+| CREDITS | 70 | — | −10.4 LUFS | the closing theme |
+
+(Set lengths are the single-time chart; EXPERT's double-time records — see
+**Picking a difficulty** below — run twice the phrases across the same
+minutes of music.)
 
 - **Tempo** came from an onset-flux autocorrelation phase-locked across each
-  whole track. Four land on exact integers (a DAW grid). Three genuinely sit a
-  hair under — and it matters: locking SAKUPENED at a round 134 instead of
-  133.964 drifts off the kick by the last third of the song (grid retention
-  falls from 68% to 35%), so the fractions stay.
-- **Loudness** is EBU R128 integrated. The masters span **7.6 dB** — SWAG at
-  −15.7 against SAKUPENED at −8.1 — so every track is gain-matched to −14 LUFS
+  whole track, audited by `tools/octave-check` for lattice errors (DISCO
+  BALL first arrived as 73.33 — exactly 2/3 of its real 110 grid — and
+  VFALL as a third of its 165). Several land on exact integers (a DAW
+  grid); the rest genuinely sit a hair off — and it matters: locking
+  SAKUPENED at a round 134 instead of 133.964 drifts off the kick by the
+  last third of the song (grid retention falls from 68% to 35%), so the
+  fractions stay.
+- **Loudness** is EBU R128 integrated. The masters span **8.2 dB** — SWAG at
+  −15.7 against ASSEMBLE at −7.5 — so every track is gain-matched to −14 LUFS
   at playback and the mix runs through a limiter. Nothing is re-encoded; it's
   a gain node, and the files ship untouched.
 - **Downbeat** (seconds to bar 1 beat 1) is the one number a human ear might
@@ -298,10 +341,41 @@ the floor (hosting or joined), **ECLIPSE** — the club's own slow-burn
 70 BPM record — takes the decks, and the chandelier phases to it. Step
 into THE STILL ROOM and the mix ducks to a murmur without stopping.
 
-**Picking a record**: the lobby's `♪` row cycles SHUFFLE → each raid track.
-SHUFFLE derives the record from the match seed, so an online room agrees on the
-song without anyone sending it; a host's explicit pick rides along in the start
-message.
+**Picking a record**: the board's **SOLO** tab is a SELECT SONG list — the
+whole raid pool with each record's BPM and your best letter **at the
+selected difficulty** beside it, and the song's page on the right: the
+**leaderboard**, over the GO RAVE seat. SHUFFLE heads the list and derives
+the record from the match seed, so an online room agrees on the song
+without anyone sending it (the club floor picks from the SOCIAL panel's
+`♪` row); a host's explicit pick rides along in the start message. On THE
+TOUR's map, each stop wears the best letter you've ever taken home from
+that night.
+
+**The leaderboards** are per song × difficulty and **solo only** — campaign
+nights and club raids never post. Two views on the song page:
+
+- **WORLD** — everyone's, from Firestore. One row per player per chart
+  (personal bests, not a log), top 100, scrollable with the ▲▼ pager or a
+  thumbstick nudge; your own row is marked. Reads are public, writes need
+  an anonymous sign-in, and the document id carries the writer's uid so
+  nobody can post as somebody else or hold two rows on one chart. Scores
+  only ever go up — the ratchet is in `firestore.rules`, not in the client.
+- **THIS HEADSET** — your own book in `localStorage`, ten deep, and the
+  source of the list's BEST column. It works with no network at all, so a
+  headset that can't reach the world board still keeps every run; the page
+  says so and offers RETRY rather than pretending.
+
+Scores are signed by your **profile** — the card at the board's top right,
+born a generic RAVER-#### tag; open it and RENAME on the pop-up arcade
+keyboard. The same name rides your club tag. Because those names land on a
+public board, the rename field refuses the obvious slurs — a coarse net,
+not moderation.
+
+> **Honest limits.** The client computes the score and posts it, so the
+> rules can only bound what a liar can do (sane shape and ranges, one row
+> each, monotonic) — they can't make a client honest. If the board ever
+> matters enough to attack, submission moves behind the relay, which can
+> validate a run before writing it.
 
 **Picking a difficulty**: the EASY / NORMAL / HARD / EXPERT row under it is
 the act floor for the whole song — every record used to open trivially easy
@@ -310,6 +384,22 @@ stretch. EXPERT's back stretch is act 4: six moves a phrase with no rest,
 duck donut twice as common, and — on the charts that carry it — THE SWEPT
 ROUTINE. Online, the ball carries the caller's difficulty with their song
 pick.
+
+**EXPERT DOUBLE TIME**: the whole pressure curve is written in beats, so
+its real-time density used to scale with the record — at act 4 a 91 BPM
+night threw barely half the landings per second of BREAKCORE's 174, and
+its bar grid walked past where the slow shelf's grooves actually live
+(those records ride the eighths; V ONE's onsets sit on a literal 190
+lattice). So on EXPERT, any record **under 100 BPM charts at 2×**: the
+clock runs on the eighths, landings hit the real half-bars, and the
+91–98 shelf (TARGET, FUTURE VIBE, V ONE, MORNING, MONEY) plays at an
+effective 182–196 — the songs the difficulty was quietly under-charging
+are now the ones that bite hardest. Nothing announces it: the menus show
+each record's own measured tempo, because a badge beside the BPM explains
+an implementation to somebody picking a song, and the floor tells you
+anyway. The file itself plays untouched — only the grid the game counts
+on changes. No other difficulty is touched, and the tour never reaches
+EXPERT, so no authored night moves.
 
 **Adding a track**: drop the file in `src/assets/music/`, add a row to
 `TRACKS`, done. Roles decide where it plays. `npm run analyze -- <file…>` prints
@@ -345,7 +435,8 @@ server/index.mjs       the room relay (seats/seed/poses + club poses,
                        voice fan-out, THE BALL's clock, rooms that
                        outlive their sets)
 tools/                 track analyzer · preview-shot · club-capture ·
-                       social-check (two-headset end-to-end)
+                       social-check (three-headset end-to-end) ·
+                       crown-check (the crown's relay protocol)
 avatar-preview.html    dev-only dancer catwalk (never shipped)
 ```
 
@@ -374,6 +465,37 @@ Two pipelines ship `dist/` (both in `.github/workflows/`):
     measurementId: 'G-3MV2K6R84H',
   };
   ```
+
+  (This config is baked into `src/net/scores.ts`. It is **public by
+  design** — every client ships it; `firestore.rules` is the security
+  boundary, not the key.)
+
+- **Firestore** — the world leaderboards (`src/net/scores.ts`). The client
+  code, the rules and the index are all in the repo and fail soft, so the
+  game runs fine against a project that has none of it: the world board
+  just reports itself out of reach. Three **console** steps switch it on,
+  and none of them can be done from CI as configured:
+
+  1. **Create the Firestore database** (Firebase console → Build →
+     Firestore Database → Create). Production mode; the rules below replace
+     the default.
+  2. **Enable Anonymous sign-in** (Build → Authentication → Sign-in method
+     → Anonymous). Without it every write is rejected and the board reads
+     as offline.
+  3. **Deploy the rules and index**:
+
+     ```bash
+     firebase deploy --only firestore:rules,firestore:indexes
+     ```
+
+     The `FIREBASE_SERVICE_ACCOUNT` secret used by the hosting workflow
+     only holds **Hosting Admin**, so it cannot do this — deploy from a
+     logged-in machine, or widen the service account to include
+     *Cloud Datastore Owner* / *Firebase Rules Admin* first.
+
+  The composite index (`track`, `diff`, `score ↓`) in
+  `firestore.indexes.json` is what the board's query needs; without it the
+  first read fails and the page shows the error with a RETRY.
 
 The static site is fully playable solo. Online rooms need the relay
 (`server/index.mjs`) hosted somewhere reachable — see **Hosting the relay**

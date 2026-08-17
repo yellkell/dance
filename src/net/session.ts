@@ -20,11 +20,11 @@
  *  - The host can leave without folding the party: the relay promotes the
  *    longest-standing member and tells them with a fresh 'room' message.
  *
- * Join by code (the 4-letter room code uses the alphabet A–H so the XR code
- * picker only needs 8 letters per slot) or by URL: ?room=CADA&name=YELL.
+ * Join by code — four DIGITS, typed on the board's keypad — or by URL:
+ * ?room=4096&name=YELL.
  */
 
-import { NET, serverUrl } from '../config.js';
+import { NET, seatHue, serverUrl } from '../config.js';
 import { audioContext, ensureAudio } from '../audio/sfx.js';
 import { clearVoiceSpeakers, removeVoiceSpeaker, stopVoiceCapture } from '../club/voice.js';
 import { startRaid } from '../game/flow.js';
@@ -33,12 +33,20 @@ import { clearClubPoses, clubPoses, remotePoses } from './poses.js';
 
 export type NetPhase = 'off' | 'connecting' | 'hosting' | 'joined' | 'live' | 'error';
 
-export const CODE_ALPHABET = 'ABCDEFGH';
+/** Room codes are DIGITS. Four of them — the thing you shout across a
+ *  room or type into a phone — and a numeric alphabet gives 10,000 codes
+ *  where the old eight letters gave 4,096, on a pad everybody already
+ *  knows how to use. */
+export const CODE_ALPHABET = '0123456789';
 
 export interface LobbyMember {
   name: string;
   /** Stable relay member index — club poses and voice are keyed by it. */
   idx: number;
+  /** The colour they picked (hue 0..1), or null for "whatever my slot says".
+   *  It rides the wire so a choice made in the foyer follows its dancer onto
+   *  the club floor; an older relay simply never sends it. */
+  hue?: number | null;
 }
 
 /** THE BALL, while it hangs: who sent it up, on what song, where it floats,
@@ -59,12 +67,20 @@ export const net = {
   code: '',
   members: [] as LobbyMember[],
   isHost: false,
+  /** Is this a PUBLIC room (strangers may walk in) or a private one behind
+   *  its four digits? The floor reads the same either way; the difference
+   *  is only whether the code is a door or just an address. */
+  isPublic: false,
   /** My own relay member index (−1 until the room hands it over). */
   myIdx: -1,
   /** The raid-summoning ball currently in the air, or null. */
   ball: null as BallState | null,
   /** Members currently away playing a set (the floor sees them out). */
   gamePlayers: new Set<number>(),
+  /** THE CROWN: member idx of the last club raid's winner, worn on their
+   *  figure across the floor until their NEXT game (or they leave the
+   *  room). null = bare heads. The relay owns it; clients only wear it. */
+  crownIdx: null as number | null,
   error: '',
   rttMs: 0,
   /** Bumped on any lobby change so menus know to repaint. */
@@ -77,6 +93,7 @@ export const seatByIdx = new Map<number, number>();
 
 let ws: WebSocket | null = null;
 let pingTimer: number | null = null;
+let myHue: number | null = null;
 let myName = 'DANCER';
 
 function send(obj: unknown): void {
@@ -155,9 +172,11 @@ function teardown(reason: string): void {
   net.code = '';
   net.members = [];
   net.isHost = false;
+  net.isPublic = false;
   net.myIdx = -1;
   net.ball = null;
   net.gamePlayers = new Set();
+  net.crownIdx = null;
   net.dirty++;
   seatByIdx.clear();
   stopVoiceCapture();
@@ -182,6 +201,31 @@ export function onVoice(fn: (id: string, frame: ArrayBuffer) => void): void {
   voiceHook = fn;
 }
 
+/** Everything the relay says about drinks (see server/index.mjs, DRINKS). */
+export type PropWire =
+  | { t: 'serve'; id: number }
+  | {
+      t: 'props';
+      props: {
+        id: number;
+        holder: number | null;
+        mode: string;
+        pos: number[] | null;
+        quat: number[] | null;
+        full: boolean;
+      }[];
+    }
+  | { t: 'prop-grab'; id: number; idx: number }
+  | { t: 'prop-release'; id: number; idx: number }
+  | { t: 'prop'; id: number; idx: number; d: number[] }
+  | { t: 'prop-rest'; id: number; idle?: boolean; pos?: number[]; quat?: number[] };
+
+/** ClubPropsSystem keeps the shared glasses true to the wire. */
+let propHook: ((msg: PropWire) => void) | null = null;
+export function onProp(fn: (msg: PropWire) => void): void {
+  propHook = fn;
+}
+
 function handle(msg: Record<string, unknown>): void {
   switch (msg.t) {
     case 'room': {
@@ -190,6 +234,7 @@ function handle(msg: Record<string, unknown>): void {
       const wasLive = net.phase === 'live';
       net.phase = wasLive ? 'live' : msg.host ? 'hosting' : 'joined';
       net.isHost = Boolean(msg.host);
+      net.isPublic = Boolean(msg.open);
       net.code = String(msg.code ?? net.code);
       if (Number.isFinite(Number(msg.idx))) net.myIdx = Number(msg.idx);
       net.dirty++;
@@ -246,6 +291,14 @@ function handle(msg: Record<string, unknown>): void {
       net.dirty++;
       break;
     }
+    case 'crown': {
+      // The relay crowned (or bared) a head. Guarded by type, not Number():
+      // a JSON null must read as "nobody", never as member 0.
+      const idx = msg.idx;
+      net.crownIdx = typeof idx === 'number' && Number.isFinite(idx) ? idx : null;
+      net.dirty++;
+      break;
+    }
     case 'start': {
       // The ball fired with ME on it: seed + seats + my ring seat + the
       // player seat map + a shared "beat 0 in N ms" (RTT-compensated).
@@ -289,6 +342,9 @@ function handle(msg: Record<string, unknown>): void {
         hx: d[0], hy: d[1], hz: d[2], hyaw: d[3],
         lx: d[4], ly: d[5], lz: d[6],
         rx: d[7], ry: d[8], rz: d[9],
+        // Appended, and defaulted: a frame from before the neck existed
+        // decodes as a dancer who simply isn't nodding.
+        hpitch: d[10] ?? 0, hroll: d[11] ?? 0,
         t: performance.now(),
       });
       break;
@@ -302,6 +358,9 @@ function handle(msg: Record<string, unknown>): void {
         hx: d[0], hy: d[1], hz: d[2], hyaw: d[3],
         lx: d[4], ly: d[5], lz: d[6],
         rx: d[7], ry: d[8], rz: d[9],
+        // Appended, and defaulted: a frame from before the neck existed
+        // decodes as a dancer who simply isn't nodding.
+        hpitch: d[10] ?? 0, hroll: d[11] ?? 0,
         t: performance.now(),
       });
       break;
@@ -344,6 +403,15 @@ function handle(msg: Record<string, unknown>): void {
       net.dirty++;
       break;
     }
+    case 'serve':
+    case 'props':
+    case 'prop-grab':
+    case 'prop-release':
+    case 'prop':
+    case 'prop-rest':
+      // Drinks traffic goes straight to the glasses (ClubPropsSystem).
+      propHook?.(msg as unknown as PropWire);
+      break;
     case 'pong': {
       const t0 = Number(msg.t0);
       if (Number.isFinite(t0)) net.rttMs = performance.now() - t0;
@@ -361,16 +429,52 @@ export function setDancerName(name: string): void {
   myName = name.trim().slice(0, 12).toUpperCase() || 'DANCER';
 }
 
+/**
+ * Hand the session the colour this headset dances in (null = the slot's).
+ *
+ * It travels with the greeting that opens or joins a room — and, if a room
+ * is already standing, straight down the wire, since the board is reachable
+ * from the foyer with a room open and the club floor should never show a
+ * dancer a colour they've stopped wearing.
+ *
+ * Only the COLOUR updates this way, not the name: the club's mute and block
+ * lists are keyed by name, so a rename that propagated would shrug off a
+ * block. Renaming stays a between-rooms act.
+ */
+export function setDancerHue(hue: number | null): void {
+  const next = hue === null || !Number.isFinite(hue) ? null : ((hue % 1) + 1) % 1;
+  if (next === myHue) return;
+  myHue = next;
+  if (net.phase === 'hosting' || net.phase === 'joined' || net.phase === 'live') {
+    send({ t: 'hue', hue: myHue });
+  }
+}
+
 export function dancerName(): string {
   return myName;
 }
 
+/** The hue a room-mate wears on the club floor: the colour they chose, or
+ *  their slot's if they never picked one (or the relay is too old to say). */
+export function memberHue(m: LobbyMember): number {
+  const h = m.hue;
+  return h === null || h === undefined || !Number.isFinite(h) ? seatHue(m.idx) : ((h % 1) + 1) % 1;
+}
+
 export function hostRoom(): void {
-  connect(() => send({ t: 'host', name: myName }));
+  connect(() => send({ t: 'host', name: myName, hue: myHue }));
+}
+
+/** THE PUBLIC FLOOR: no code, no arranging — the relay drops you into
+ *  whichever public room has the most people and still has space, or opens
+ *  a fresh one if none does. The other door (host/join with a 4-digit
+ *  code) is for a room you want to keep to your friends. */
+export function enterPublicRoom(): void {
+  connect(() => send({ t: 'public', name: myName, hue: myHue }));
 }
 
 export function joinRoom(code: string): void {
-  connect(() => send({ t: 'join', code: code.toUpperCase(), name: myName }));
+  connect(() => send({ t: 'join', code: code.toUpperCase(), name: myName, hue: myHue }));
 }
 
 export function leaveRoom(): void {
@@ -383,7 +487,13 @@ export function leaveRoom(): void {
  *  along. The relay owns the 60-second clock from here. */
 export function callBall(pos: [number, number, number]): void {
   if (net.phase !== 'hosting' && net.phase !== 'joined') return;
-  send({ t: 'ball-up', track: match.preferredTrack, diff: match.difficulty, seats: match.seats, pos });
+  // No seat count rides the ball. A club raid is sized by WHO TURNS UP —
+  // the relay deals everyone who touched onto the smallest ring that fits
+  // them and fills the rest with groupies. It used to carry `match.seats`,
+  // which is this headset's SOLO ring: a leftover from the last solo set,
+  // so two friends in a club room got dealt onto whatever size the host
+  // last played alone.
+  send({ t: 'ball-up', track: match.preferredTrack, diff: match.difficulty, pos });
 }
 
 /** Touch in (or step back out) of the hanging ball. */
@@ -400,12 +510,19 @@ export function cancelBall(): void {
  * A finished (or bailed) set folds back onto the club floor, NOT out of the
  * room: phase returns to hosting/joined and the relay is told this player
  * is home — when the last one is, the floor can raise the next ball.
+ *
+ * `winnerIdx` is THE CROWN's claim, sent only when the set actually
+ * RESOLVED (walked out through the podium): the member idx of the night's
+ * winner, or null when a groupie took it. Every client on the ring
+ * computed the identical standings, so the relay believes the first
+ * player home. A mid-set bail passes undefined — it names nobody, and a
+ * player who finishes the record will.
  */
-export function backToClub(): void {
+export function backToClub(winnerIdx?: number | null): void {
   if (net.phase !== 'live') return;
   net.phase = net.isHost ? 'hosting' : 'joined';
   net.dirty++;
-  send({ t: 'game-out' });
+  send(winnerIdx === undefined ? { t: 'game-out' } : { t: 'game-out', winner: winnerIdx });
   remotePoses.clear();
   seatByIdx.clear();
 }
@@ -417,6 +534,33 @@ export function sendPose(d: number[]): void {
 /** My spot on the club floor (world space) — for the room-mates' view. */
 export function sendClubPose(d: number[]): void {
   if (net.phase === 'hosting' || net.phase === 'joined') send({ t: 'cp', d });
+}
+
+/* ── DRINKS: the glasses' side of the wire (see PropWire) ──────────────── */
+
+function onClubFloor(): boolean {
+  return net.phase === 'hosting' || net.phase === 'joined';
+}
+
+/** Ask the relay for glass `id` — the hand has already taken it on spec. */
+export function sendPropGrab(id: number): void {
+  if (onClubFloor()) send({ t: 'prop-grab', id });
+}
+
+/** The glass left my hand — mark it catchable; I still fly it. */
+export function sendPropRelease(id: number): void {
+  if (onClubFloor()) send({ t: 'prop-release', id });
+}
+
+/** Owner pose stream: [px,py,pz, qx,qy,qz,qw, full01] at ~20 Hz. */
+export function sendPropPose(id: number, d: number[]): void {
+  if (onClubFloor()) send({ t: 'prop', id, d });
+}
+
+/** My throw settled at pos/quat — or fell out of the world (nulls: idle). */
+export function sendPropRest(id: number, pos: number[] | null, quat: number[] | null): void {
+  if (!onClubFloor()) return;
+  send(pos && quat ? { t: 'prop-rest', id, pos, quat } : { t: 'prop-rest', id, idle: true });
 }
 
 /** Ship one local voice frame to the room (binary; any connected phase). */

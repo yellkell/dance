@@ -24,7 +24,7 @@ import {
 } from '../audio/music.js';
 import { pickRaidTrack, trackById, tracksFor } from '../audio/tracks.js';
 import { actOfBeat } from '../choreo/setlist.js';
-import { match, phraseBeats } from '../game/state.js';
+import { campaignComplete, match, menuMusic, phraseBeats } from '../game/state.js';
 import { net } from '../net/session.js';
 
 export class MusicSystem extends createSystem({}) {
@@ -42,16 +42,20 @@ export class MusicSystem extends createSystem({}) {
       stopAmbient(0.35);
       const track = trackById(match.trackId) ?? pickRaidTrack(match.seed);
       const total = match.phrases;
+      // match.bpm is the CHART clock mountTrack settled (EXPERT doubles
+      // slow records) — the set-list, the phrase count and this needle all
+      // count the same grid.
       startSet({
         track,
-        countInBeats: countInBeatsFor(track.bpm),
+        bpm: match.bpm,
+        countInBeats: countInBeatsFor(match.bpm),
         endBeat: total * phraseBeats(),
         seed: match.seed,
         actAt: (beat) => actOfBeat(beat, total, match.difficulty),
         beatZeroAt: Number.isFinite(match.beatZeroAt) ? match.beatZeroAt : undefined,
         loop: false,
       });
-      match.beatLen = 60 / track.bpm;
+      match.beatLen = 60 / match.bpm;
       match.playing = true;
     }
 
@@ -70,17 +74,36 @@ export class MusicSystem extends createSystem({}) {
     if (!inSet) {
       if (this.stoppedFor !== screen) {
         this.stoppedFor = screen;
-        if (setRunning()) stopSet(screen === 'podium' ? 2.0 : 0.6);
+        // Always stop, including the LOADING state. Guarding this with
+        // setRunning() let an abandoned decode complete in the menu and
+        // start the set underneath the room music. Manual/menu exits cut
+        // promptly; the podium keeps its deliberate musical tail.
+        stopSet(screen === 'podium' ? 2.0 : 0.08);
         match.playing = false;
         this.generation = -1; // the next countdown always re-drops
       }
       if (screen === 'lobby' || screen === 'tour') {
-        // The house sound: SWAG holds the club solo; the moment a room has
-        // the floor (hosting or joined — the SOCIAL night), ECLIPSE takes
-        // the decks. startAmbient switches cleanly when the id changes.
+        // The house sound: the foyer runs its ROTATION (SWAG opens, ECLIPSE
+        // follows, and they trade all night); the moment a room has the
+        // floor (hosting or joined — the SOCIAL night), CHILL takes the
+        // decks and loops. startAmbient switches cleanly when the set
+        // changes and no-ops while a rotation is mid-spin.
+        // …unless THE CREDITS ARE ROLLING, in which case the closing theme
+        // takes the decks over both of them. It's a rotation of one, so it
+        // loops for as long as the card is up.
+        //
+        // And it can KEEP them. Finishing the tour hands over the closing
+        // theme as the foyer's record for good; dismissing the card doesn't
+        // interrupt it, because startAmbient no-ops when the rotation it's
+        // handed is already spinning — the song just carries on playing over
+        // the walk back to the map. SYSTEM can switch it back to the house
+        // rotation, and only ever offers the choice to someone who earned
+        // it. A room on the social floor still gets CHILL either way: the
+        // reward is the MENU's music, not the club's.
         const social = net.phase === 'hosting' || net.phase === 'joined';
-        const room = (social ? tracksFor('club')[0] : undefined) ?? tracksFor('lobby')[0];
-        if (room) startAmbient(room, social ? 0.7 : 0.55);
+        const closing = match.credits || (!social && menuMusic() === 'credits' && campaignComplete());
+        const room = closing ? tracksFor('credits') : social ? tracksFor('club') : tracksFor('lobby');
+        if (room.length) startAmbient(room, closing ? 0.75 : social ? 0.7 : 0.55);
         // Warm the raid record while the room track holds the floor, so the
         // drop is instant when someone hits START.
         if (!this.warmed) {

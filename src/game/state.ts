@@ -4,7 +4,8 @@
  * a couple of tiny queues ("buses") for cross-system one-shots.
  */
 
-import { BOTS, GRADE, MUSIC, RING, seatHue, type MoveKind } from '../config.js';
+import { BOTS, GRADE, MUSIC, RING, type MoveKind } from '../config.js';
+import { danceHue } from './profile.js';
 import { mix, mulberry32 } from './rng.js';
 
 export type Screen =
@@ -145,6 +146,22 @@ export interface MatchState {
   /* ── the tour (campaign) ── */
   /** Which night this raid is, or null for a free-play set. */
   tour: { set: number; song: number } | null;
+  /** THE CREDITS ARE ROLLING. Set when the tour's last night is cleared and
+   *  carried back to the map, where the board wears the credits card and the
+   *  closing theme takes the decks. Cleared by dismissing it (or by walking
+   *  out to the foyer). */
+  credits: boolean;
+  /** HOSTING, but not through the door yet: the board is showing the new
+   *  room's code ("give this to your friends") and the foyer has to stay
+   *  standing behind it. Both the board's own visibility and the club's
+   *  swap-in read this, so the two can't disagree about where you are. */
+  holdFoyer: boolean;
+  /** The VR title card is up and still opaque. Nothing behind it may be
+   *  clicked: the board is RIGHT THERE under the black, and a stray
+   *  trigger during the show would fire a button nobody could see. Clears
+   *  the moment the black starts lifting, so the menu is live as it fades
+   *  in rather than a beat later. */
+  introUp: boolean;
 
   /* ── online ── */
   online: boolean;
@@ -182,6 +199,9 @@ export const match: MatchState = {
   goopTint: null,
   eatIntro: false,
   tour: null,
+  credits: false,
+  holdFoyer: false,
+  introUp: false,
   online: false,
   roomCode: '',
 };
@@ -209,7 +229,7 @@ export function buildRoster(seats: number, seed: number, mySeat: number, humans?
       seat,
       kind: seat === mySeat ? 'local' : human ? 'remote' : 'bot',
       name: human?.name ?? botName,
-      hue: seatHue(seat),
+      hue: danceHue(seat, seat === mySeat),
       skill: BOTS.skillMin + rng() * (BOTS.skillMax - BOTS.skillMin),
       score: 0,
       combo: 0,
@@ -232,6 +252,20 @@ export function buildRoster(seats: number, seed: number, mySeat: number, humans?
 
 export function dancerAtSeat(seat: number): Dancer | undefined {
   return match.players.find((p) => p.seat === seat);
+}
+
+/** THE RANK LAW, as a comparator: the living above the fallen; the living
+ *  by score; the fallen by who lasted longest. RankSystem orders the board
+ *  with it, and the club uses it to name the night's winner (the crown). */
+export function standingOrder(a: Dancer, b: Dancer): number {
+  if (a.alive !== b.alive) return a.alive ? -1 : 1;
+  if (a.alive) return b.score - a.score || b.combo - a.combo || a.seat - b.seat;
+  return b.elimAtBeat - a.elimAtBeat || b.score - a.score || a.seat - b.seat;
+}
+
+/** Who owned the night — rank 1 under the law above. */
+export function nightWinner(): Dancer | undefined {
+  return [...match.players].sort(standingOrder)[0];
 }
 
 export function aliveCount(): number {
@@ -302,6 +336,42 @@ export function markTourNightCleared(set: number, song: number): void {
   }
 }
 
+/** Every night of every set that's actually for sale, cleared. The tour is
+ *  over, the credits have rolled, and a couple of things open up. */
+export function campaignComplete(): boolean {
+  const done = clearedTourNights();
+  for (let s = 0; s < TOUR.freeSets; s++) {
+    for (let i = 0; i < TOUR.sets[s].songs.length; i++) if (!done.has(`${s}:${i}`)) return false;
+  }
+  return true;
+}
+
+/* ── the closing theme, kept (localStorage) ───────────────────────────────
+ * Finish the tour and the record that played over the credits is yours: it
+ * stays on the foyer's decks instead of handing back to the house rotation
+ * when the card comes down. It's a preference, not a state — SYSTEM shows
+ * the switch once the tour is done, and never before. */
+
+const MENU_MUSIC_KEY = 'gdr-menu-music';
+
+export type MenuMusic = 'original' | 'credits';
+
+export function menuMusic(): MenuMusic {
+  try {
+    return localStorage.getItem(MENU_MUSIC_KEY) === 'credits' ? 'credits' : 'original';
+  } catch {
+    return 'original';
+  }
+}
+
+export function setMenuMusic(choice: MenuMusic): void {
+  try {
+    localStorage.setItem(MENU_MUSIC_KEY, choice);
+  } catch {
+    /* storage may be unavailable */
+  }
+}
+
 /** Night 1 of set 1 is always open; a night needs the previous night, and a
  *  set needs the whole set before it. */
 export function tourNightUnlocked(set: number, song: number): boolean {
@@ -312,5 +382,94 @@ export function tourNightUnlocked(set: number, song: number): boolean {
   }
   for (let i = 0; i < song; i++) if (!done.has(`${set}:${i}`)) return false;
   return true;
+}
+
+/* ── the record book (localStorage) ─────────────────────────────────────
+ * Two ledgers, both strictly local to this headset:
+ *  - TOUR GRADES: the best letter ever taken home from each campaign
+ *    night (any difficulty) — the map wears them under its stops.
+ *  - SOLO RUNS: per song × difficulty, the top scores of finished solo
+ *    sets (bots only — online raids and campaign nights never post here)
+ *    plus the best letter at that difficulty. The SOLO tab's leaderboard.
+ */
+
+const TOUR_GRADES_KEY = 'gdr-tour-grades';
+const SOLO_KEY = 'gdr-solo';
+/** Deep enough that the song page's scroll has something to do. */
+const SOLO_TOP = 10;
+
+/** Higher is better; unknown letters rank below F. */
+export function gradeRank(letter: string): number {
+  return ['F', 'C', 'B', 'A', 'S'].indexOf(letter);
+}
+
+function readStore<T>(key: string): T | null {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as T) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeStore(key: string, value: unknown): void {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    /* storage may be unavailable */
+  }
+}
+
+export function bestTourGrade(set: number, song: number): string | null {
+  const book = readStore<Record<string, string>>(TOUR_GRADES_KEY);
+  return book?.[`${set}:${song}`] ?? null;
+}
+
+export function recordTourGrade(set: number, song: number, grade: string): void {
+  const key = `${set}:${song}`;
+  const book = readStore<Record<string, string>>(TOUR_GRADES_KEY) ?? {};
+  const prev = book[key];
+  if (prev !== undefined && gradeRank(prev) >= gradeRank(grade)) return;
+  book[key] = grade;
+  writeStore(TOUR_GRADES_KEY, book);
+}
+
+export interface SoloRun {
+  /** Final score. */
+  s: number;
+  /** The night's letter. */
+  g: string;
+  /** Who set it (the profile name when the run finished). */
+  n: string;
+}
+
+interface SoloEntry {
+  best: string;
+  runs: SoloRun[];
+}
+
+const soloKey = (trackId: string, difficulty: number): string => `${trackId}:${difficulty}`;
+
+/** The song's local leaderboard at one difficulty: best letter + top runs
+ *  (score-sorted, capped). Empty runs = the chart is unclaimed. */
+export function soloBoard(trackId: string, difficulty: number): { best: string | null; runs: SoloRun[] } {
+  const book = readStore<Record<string, SoloEntry>>(SOLO_KEY);
+  const entry = book?.[soloKey(trackId, difficulty)];
+  return { best: entry?.best ?? null, runs: entry?.runs ?? [] };
+}
+
+/** Post a finished solo set. Keeps the top runs by score and the best
+ *  letter by rank (they can disagree: a careful low-score set may out-grade
+ *  a flashy one — both records deserve keeping). */
+export function recordSoloRun(trackId: string, difficulty: number, score: number, grade: string, name: string): void {
+  const key = soloKey(trackId, difficulty);
+  const book = readStore<Record<string, SoloEntry>>(SOLO_KEY) ?? {};
+  const entry = book[key] ?? { best: grade, runs: [] };
+  if (gradeRank(grade) > gradeRank(entry.best)) entry.best = grade;
+  entry.runs.push({ s: Math.round(score), g: grade, n: name });
+  entry.runs.sort((a, b) => b.s - a.s);
+  entry.runs.length = Math.min(entry.runs.length, SOLO_TOP);
+  book[key] = entry;
+  writeStore(SOLO_KEY, book);
 }
 

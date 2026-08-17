@@ -33,6 +33,11 @@ export type SetState = 'off' | 'loading' | 'scheduled' | 'playing' | 'synth';
 
 export interface SetOptions {
   track: Track;
+  /** The CHART tempo the beat clock runs at. Defaults to the track's
+   *  measured tempo; EXPERT hands in the doubled clock for slow records
+   *  (see config.chartBpm) — the file plays untouched either way, only the
+   *  grid the game counts on changes. */
+  bpm?: number;
   /** Beats of count-in before game beat 0 (the "get ready" bars). */
   countInBeats: number;
   /** Set length in beats — the last landing lives before this. */
@@ -84,6 +89,13 @@ let ambZero = 0;
 let ambToken = 0;
 let ambBase = 0;
 let ambDuck = 1;
+/** The still room's door, as a filter: the muffle stage the loop runs
+ *  through so a duck sounds like a wall and not like a volume knob. */
+let ambMuffle: BiquadFilterNode | null = null;
+/** The rotation: the records the room trades between, and where it is. */
+let ambSet: Track[] = [];
+let ambIdx = 0;
+let ambKey = '';
 
 export function musicVolume(): number {
   return musicVol;
@@ -195,7 +207,7 @@ export function startSet(opts: SetOptions): void {
   const token = ++setToken;
   const track = opts.track;
   setTrack = track;
-  beatLen = beatLenOf(track);
+  beatLen = 60 / (opts.bpm ?? track.bpm);
   state = 'loading';
 
   const c = ctx();
@@ -233,7 +245,9 @@ export function startSet(opts: SetOptions): void {
     src.buffer = buf;
     src.connect(gain);
     if (opts.loop) {
-      const bar = beatLen * 4;
+      // The AUDIO loops on the record's own bars, whatever clock the chart
+      // runs — a doubled beat grid must never cut the music mid-bar.
+      const bar = beatLenOf(track) * 4;
       const bars = Math.floor((buf.duration - track.downbeat) / bar);
       if (bars >= 4) {
         src.loop = true;
@@ -261,9 +275,9 @@ export function startSet(opts: SetOptions): void {
 /** The synth takes the set at the same tempo and the same beat-zero rules. */
 function fallback(opts: SetOptions): void {
   const track = opts.track;
-  beatLen = beatLenOf(track);
+  beatLen = 60 / (opts.bpm ?? track.bpm);
   beatZero = synth.startSet({
-    bpm: track.bpm,
+    bpm: opts.bpm ?? track.bpm,
     countInBeats: opts.countInBeats,
     endBeat: opts.endBeat,
     seed: opts.seed,
@@ -279,15 +293,26 @@ export function stopSet(fade = 0.5): void {
   const c = audioContext();
   const src = setSrc;
   const gain = setGain;
-  setSrc = null;
-  setGain = null;
   setTrack = null;
   state = 'off';
-  if (!c || !src || !gain) return;
+  if (!c || !src || !gain) {
+    setSrc = null;
+    setGain = null;
+    return;
+  }
   const now = c.currentTime;
   gain.gain.cancelScheduledValues(now);
   gain.gain.setValueAtTime(gain.gain.value, now);
   gain.gain.linearRampToValueAtTime(0.0001, now + fade);
+  // Keep this fading slot addressable until its source actually stops. If a
+  // player dismisses the podium early, the following menu transition can
+  // shorten the old two-second tail instead of losing its handle and mixing
+  // it under the foyer record.
+  src.onended = () => {
+    if (setSrc !== src) return;
+    setSrc = null;
+    setGain = null;
+  };
   try {
     src.stop(now + fade + 0.05);
   } catch {
@@ -298,34 +323,81 @@ export function stopSet(fade = 0.5): void {
 /* ── the lobby loop ─────────────────────────────────────────────────────── */
 
 /**
- * The room is never dead: the soft track loops under the lobby and the
- * rehearsal map at reduced level, and publishes its own beat so the mirror
- * ball, the lasers and the GOOPLIATH's idle bounce are already grooving
- * before anyone starts a set.
+ * The room is never dead: the house sound plays under the lobby and the
+ * club at reduced level, and publishes its own beat so the mirror ball,
+ * the lasers and the GOOPLIATH's idle bounce are already grooving before
+ * anyone starts a set.
+ *
+ * Hand it ONE record and it loops the musical body seamlessly (the club's
+ * behaviour). Hand it SEVERAL and the room runs a ROTATION: each record
+ * plays through and the next takes the decks — the foyer's SWAG → ECLIPSE
+ * trade. The published beat always belongs to whichever record is on.
  */
-export function startAmbient(track: Track, level = 0.55): void {
-  if (ambTrack?.id === track.id && ambSrc) return;
+export function startAmbient(tracks: Track | Track[], level = 0.55): void {
+  const set = Array.isArray(tracks) ? tracks : [tracks];
+  if (!set.length) return;
+  const key = set.map((t) => t.id).join('>');
+  if (key === ambKey && ambSrc) return; // this rotation already has the decks
   stopAmbient(0.3);
+  ambKey = key;
+  ambSet = set;
+  ambIdx = 0;
+  spinAmbient(level);
+}
+
+/** Put the rotation's current record on; single-record sets loop in place,
+ *  longer sets hand the decks over when the record runs out. `hops` counts
+ *  consecutive failed decodes so a broken record is skipped, not fatal —
+ *  and a rotation of nothing but broken records gives up instead of
+ *  spinning forever. */
+function spinAmbient(level: number, hops = 0): void {
+  if (hops >= ambSet.length) return;
   const token = ++ambToken;
+  const track = ambSet[ambIdx];
   ambTrack = track;
 
   const c = ctx();
   if (!c) return;
   void loadTrack(track).then((buf) => {
-    if (token !== ambToken || !buf) return;
+    if (token !== ambToken) return;
+    if (!buf) {
+      if (ambSet.length > 1) {
+        ambIdx = (ambIdx + 1) % ambSet.length;
+        spinAmbient(level, hops + 1);
+      }
+      return;
+    }
     const gain = c.createGain();
     ambBase = trackGain(track) * level;
     gain.gain.value = ambBase * ambDuck;
-    gain.connect(chain(c));
+    // src → gain → muffle → the bus. Wide open out on the floor; closing
+    // down to a thud when you step into the still room.
+    const muffle = c.createBiquadFilter();
+    muffle.type = 'lowpass';
+    muffle.frequency.value = duckCutoff(ambDuck);
+    muffle.Q.value = 0.4;
+    gain.connect(muffle);
+    muffle.connect(chain(c));
+    ambMuffle = muffle;
     const src = c.createBufferSource();
     src.buffer = buf;
-    src.loop = true;
-    // Loop the musical body, not the file: out of the last whole bar, back
-    // to the first downbeat — so the lobby groove never hiccups.
-    const bar = beatLenOf(track) * 4;
-    const bars = Math.floor((buf.duration - track.downbeat) / bar);
-    src.loopStart = track.downbeat;
-    src.loopEnd = track.downbeat + bars * bar;
+    if (ambSet.length === 1) {
+      src.loop = true;
+      // Loop the musical body, not the file: out of the last whole bar, back
+      // to the first downbeat — so the groove never hiccups.
+      const bar = beatLenOf(track) * 4;
+      const bars = Math.floor((buf.duration - track.downbeat) / bar);
+      src.loopStart = track.downbeat;
+      src.loopEnd = track.downbeat + bars * bar;
+    } else {
+      src.onended = () => {
+        // Only a natural run-out advances the rotation — a stopAmbient (or
+        // a newer spin) has already bumped the token past this record.
+        if (token !== ambToken) return;
+        ambIdx = (ambIdx + 1) % ambSet.length;
+        spinAmbient(level);
+      };
+    }
     src.connect(gain);
     const at = c.currentTime + 0.1;
     src.start(at);
@@ -337,11 +409,13 @@ export function startAmbient(track: Track, level = 0.55): void {
 
 export function stopAmbient(fade = 0.4): void {
   ambToken++;
+  ambKey = '';
   const c = audioContext();
   const src = ambSrc;
   const gain = ambGain;
   ambSrc = null;
   ambGain = null;
+  ambMuffle = null;
   ambTrack = null;
   if (!c || !src || !gain) return;
   const now = c.currentTime;
@@ -359,17 +433,41 @@ export function ambientRunning(): boolean {
   return ambSrc !== null;
 }
 
+/** Which record the room is spinning (null between rotations) — the only way
+ *  to tell from outside whether the foyer is on the house set or the
+ *  closing theme. */
+export function ambientTrackId(): string | null {
+  return ambSrc && ambTrack ? ambTrack.id : null;
+}
+
+/** The lowpass corner that goes with a duck level: open at full, down to a
+ *  through-the-wall thud when the room is hushed. */
+function duckCutoff(mult: number): number {
+  return 320 + Math.pow(Math.min(1, Math.max(0, mult)), 0.5) * 19680;
+}
+
 /**
  * Duck the room loop without stopping it — THE STILL ROOM's whole trick:
  * step through its door and the club's music falls away to a murmur (the
  * ClubSystem drives this from your head position). 1 = full level.
+ *
+ * Level ALONE never sounded like a quiet room, only like a quieter club —
+ * what a wall actually does is eat the top end and leave you the kick. So
+ * the duck drives a lowpass with it, and the still room finally sounds like
+ * somewhere you stepped out to rather than somewhere with the volume down.
  */
 export function setAmbientDuck(mult: number): void {
   ambDuck = Math.min(1, Math.max(0, mult));
   const c = audioContext();
-  if (!c || !ambGain) return;
-  ambGain.gain.cancelScheduledValues(c.currentTime);
-  ambGain.gain.setTargetAtTime(ambBase * ambDuck, c.currentTime, 0.35);
+  if (!c) return;
+  if (ambGain) {
+    ambGain.gain.cancelScheduledValues(c.currentTime);
+    ambGain.gain.setTargetAtTime(ambBase * ambDuck, c.currentTime, 0.35);
+  }
+  if (ambMuffle) {
+    ambMuffle.frequency.cancelScheduledValues(c.currentTime);
+    ambMuffle.frequency.setTargetAtTime(duckCutoff(ambDuck), c.currentTime, 0.35);
+  }
 }
 
 /** The lobby loop's beat position — the club's idle pulse. */

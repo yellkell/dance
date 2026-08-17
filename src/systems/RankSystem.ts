@@ -1,5 +1,5 @@
 /**
- * RankSystem — who's winning the night.
+ * RankSystem — who's winning the set.
  *
  * The law: the living rank above the fallen; the living rank by score; the
  * fallen rank by who lasted longest. Lifts are ABSOLUTE: the top ten ride
@@ -26,17 +26,13 @@ import { createSystem, Vector3 } from '@iwsdk/core';
 import { GRADE, PLATFORM, PODIUM, RANK, hueToColor } from '../config.js';
 import { arena } from '../arena/arena.js';
 import { toLobby, toTour } from '../game/flow.js';
-import { gradeOf, match, type Dancer } from '../game/state.js';
+import { gradeOf, match, standingOrder, type Dancer } from '../game/state.js';
 import { HoloBoard, type BoardRow } from '../ui/board.js';
 import { discoRig } from './DiscoSystem.js';
 import * as sfx from '../audio/sfx.js';
 
 function standing(): Dancer[] {
-  return [...match.players].sort((a, b) => {
-    if (a.alive !== b.alive) return a.alive ? -1 : 1;
-    if (a.alive) return b.score - a.score || b.combo - a.combo || a.seat - b.seat;
-    return b.elimAtBeat - a.elimAtBeat || b.score - a.score || a.seat - b.seat;
-  });
+  return [...match.players].sort(standingOrder);
 }
 
 function tierOf(d: Dancer | undefined): number {
@@ -164,13 +160,10 @@ export class RankSystem extends createSystem({}) {
     for (const d of top) rows.push(this.row(d, podium));
     if (me && !top.includes(me)) rows.push(this.row(me, podium));
 
-    const winner = order[0];
-    this.board.redraw(
-      podium ? '🏆 FINAL' : '',
-      podium && winner ? `${winner.name} OWNS THE NIGHT` : '',
-      rows,
-      podium ? '#ffd75e' : '#ff2ad5',
-    );
+    // No subtitle: the winner is already rank 1 in gold at the top of the
+    // board, and "OWNS THE NIGHT" spoke in campaign language on a board
+    // that shows up for solo sets and club raids too.
+    this.board.redraw(podium ? '🏆 FINAL' : '', '', rows, podium ? '#ffd75e' : '#ff2ad5');
   }
 
   private row(d: Dancer, podium: boolean): BoardRow {

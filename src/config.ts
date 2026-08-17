@@ -64,11 +64,26 @@ export function countInBeatsFor(bpm: number): number {
 export const RING = {
   minSeats: 4,
   maxSeats: 24,
-  defaultSeats: 12,
+  /** A full ring is the headline, but it is also twenty-three other
+   *  figures — the overwhelming majority of everything drawn in a raid —
+   *  so the DEFAULT sits where the frame is comfortable and the big rings
+   *  are something a room opts into. (`detailRadius` below is what keeps
+   *  the opt-in affordable.) */
+  defaultSeats: 8,
   /** Centre-to-centre air between neighbouring platforms on the circle. */
   seatSpacing: 2.7,
   /** The ring never tightens below this radius even with 4 dancers. */
   minRadius: 4.6,
+  /** Dancers nearer than this (metres, deck centre to deck centre) get the
+   *  full figure; everyone beyond it drops the millimetre work — jewellery,
+   *  joint fillers, seams — and keeps the silhouette, the lit panels, the
+   *  sticks and the halos.
+   *
+   *  8 m takes in your two neighbours either side. On a 24-seat ring the
+   *  radius is 10.3 m, so the far side stands 20 m off and seventeen of the
+   *  twenty-three are past this line, where an ear pip is smaller than a
+   *  pixel. Small rings sit entirely inside it and are untouched. */
+  detailRadius: 8,
   /** The boss stage: a round dance floor in the middle. */
   stageRadius: 2.6,
   /** Deliberately LOW: the goop dances ON the common floor, not a riser —
@@ -150,6 +165,12 @@ export const GOOP = {
  *           shoulder to shoulder covering one side and the middle (get
  *           across), or a SPLIT evenly either side of centre (stand in the
  *           corridor between them). Deliberate shapes, read at a glance.
+ *           A twin usually comes with THE RETURN: a bar after it lands,
+ *           the same pair arrives mirrored on the side you just ran to, so
+ *           the move walks you across the deck and straight back. On the
+ *           EXPERT acts the return almost always comes back a third time,
+ *           onto the side it opened on — left, right, left, a rally rather
+ *           than a shove, and the shape those acts are built around.
  *  sweep  : the AIR burns, never the floor — a danger roof overhead with a
  *           blazing limbo line as its underside, a short chevron fringe
  *           dripping off it — get UNDER the line (duck). The deck stays
@@ -182,6 +203,11 @@ export const GOOP = {
  *           an emitter at one rail — step FORWARD or BACK off it (the beam's
  *           quarter-turn cousin: same read, the other axis). Late on it
  *           lays a stage lane across itself and the safe ground is a cell.
+ *           It carries the beam's doubles too, quarter-turned: the TRAP
+ *           (two rails closing like jaws, stand in the corridor) and the
+ *           VERTICAL TWIN — two shoulder to shoulder taking a whole half,
+ *           with the same RETURN a bar later on the other half. Two at the
+ *           back then two at the front, and the deck travels that way.
  *  wire   : the trip web — a shin-high lattice of laser wire cutting the
  *           deck into a 4×4 grid. Base form: no safe ground drawn, because
  *           there isn't any — HOLD STILL until it clears (the one dodge
@@ -266,16 +292,68 @@ export const CHOREO = {
    *     is to stand BETWEEN the lasers.
    *   TWIN — two shoulder to shoulder from beamTwinInner outward, covering
    *     one whole side AND the middle: the answer is to get across.
-   *  The split gets likelier at the peak, where precision is the point. */
+   *  The split owns the middle acts, where precision is the point. It gives
+   *  ground back on the EXPERT acts — not because it stops being good, but
+   *  because the twin is the only double that TRAVELS, and an expert night
+   *  is supposed to move you. It keeps about a tenth of the laser moves
+   *  there, which is often enough that the corridor read stays in the
+   *  vocabulary rather than becoming a surprise. */
   beamSplitX: 0.5,
   beamTwinInner: 0.12,
-  beamSplitChance: [0.4, 0.4, 0.55, 0.55, 0.55],
+  beamSplitChance: [0.4, 0.36, 0.42, 0.36, 0.34],
+  /** THE RETURN — the twin's second half, and the set's plainest travel
+   *  order: the twin takes one side, and a bar later the SAME pair lands
+   *  mirrored on the side you just ran to. Across, and straight back.
+   *
+   *  Only the TWIN earns it. A split is symmetrical — it has no "other
+   *  side" to answer with — and the X already sends you radial. And it's a
+   *  full BAR apart, like the donut's one-two: the return's telegraph opens
+   *  exactly as the first pair fires, so there is never more than one pair
+   *  of strips on the deck to read, and the beat you spend crossing is the
+   *  beat you get to read the answer in. */
+  twinReturnBeats: 4,
+  twinReturnChance: [0, 0.45, 0.85, 0.9, 0.94],
+  /** How many volleys THE BOUNCE may run to, the opener included. At 3 the
+   *  pattern is across, back, and across again — the third pair lands on
+   *  the side the first one did, so the deck throws you left, right and
+   *  left rather than shunting you over once and letting go. Each extra
+   *  volley costs another bar, and three bars of one idea is the most a
+   *  phrase can carry without becoming the whole phrase. */
+  twinChainMax: 3,
+  /** ...and whether it actually gets there. The first roll (twinReturnChance)
+   *  asks "does this twin answer at all"; THIS one asks the different and
+   *  more important question: having answered, does it come back across?
+   *
+   *  They were one number, and that made the two-volley chain — shove you
+   *  over, let go — as likely as the full rally, which is the exact thing
+   *  the bounce was built to stop being. A rally that has started should
+   *  finish, so on the expert acts the third pair is close to a promise.
+   *  Below them it stays a coin, because a floor still learning to read one
+   *  pair does not need three bars of them.
+   *
+   *  Both rolls sit high, and the twin's competition (split, X) sits lower
+   *  than it did: the three-volley rally is the signature of this floor,
+   *  and it was landing on barely a quarter of laser moves. It is now the
+   *  likeliest thing a double laser does. (The act-0 and act-1 entries are
+   *  unreachable — below act 2 a laser move is a single strip and there is
+   *  no twin to answer — and are kept only so the arrays index by act.) */
+  twinBounceChance: [0, 0.45, 0.85, 0.95, 0.98],
+  /** …and from THIS act up, both rolls are skipped entirely: a double
+   *  laser is three volleys or it is nothing. EXPERT sits at act 3 for its
+   *  first stretch and act 4 after the lift, so on that difficulty the
+   *  rally is a promise rather than a near-certainty — a 2-volley shove
+   *  still turned up a few times in a hundred, and one exception is all it
+   *  takes for "the double always comes in threes" to stop being a rule
+   *  you can play by. (HARD's back stretch reaches act 3 too, and inherits
+   *  it: the hardest phrases of HARD are exactly where the promise belongs
+   *  as well.) */
+  twinAlwaysFromAct: 3,
   /** THE X: two beams thrown diagonally through the deck centre at once,
    *  crossing in an X — the safe ground is the four pockets between the
    *  arms, so the dodge reads radial (out of the cross, not off a line).
    *  The arms run THINNER than a straight beam: two full-width strips on
    *  the diagonals left pockets too tight to trust. */
-  beamXChance: [0, 0, 0.3, 0.35, 0.4],
+  beamXChance: [0, 0, 0.24, 0.28, 0.32],
   beamXHalfW: 0.17,
   /** THE WAVE: beams marching across the deck in order, one landing per
    *  step, with the far quarter left dark — the EXIT. EVERY wave turns:
@@ -368,6 +446,30 @@ export const CHOREO = {
    *  is the corridor pinned between them. */
   railTrapChance: [0, 0, 0.35, 0.5, 0.5],
   railTrapZ: 0.44,
+  /** THE VERTICAL TWIN: the beam's twin, quarter-turned. Two rails shoulder
+   *  to shoulder covering one whole HALF of the deck — both fired from the
+   *  same emitter, so they read as one battery rather than two decisions —
+   *  and then, on the return, the mirrored pair covering the other half.
+   *  Two at the back and then two at the front, or the other way about.
+   *
+   *  This is the one shape allowed to flood the ground BEHIND you, and it
+   *  earns that the way the trap and the wave do: it isn't a strip you
+   *  could miss, it's half the floor going up at once. The rule the single
+   *  rail obeys — always land on the front half, where your eyes already
+   *  are — is about thin lasers sneaking in behind your back, and a whole
+   *  half of the deck is not sneaking anywhere.
+   *
+   *  Inner rail centred just past the middle so the pair covers its half
+   *  plus a shade over, exactly as the lateral twin does: no corridor, no
+   *  choice, step off it.
+   *
+   *  On the expert acts it takes most of what the SINGLE rail used to have.
+   *  That's the cheapest trade on the deck: one thin strip across the front
+   *  is the plainest shape in the crossfire's vocabulary, and a floor at
+   *  this act has read it a hundred times. (The trap rolls first and keeps
+   *  its half regardless, so the jaws are untouched.) */
+  railTwinInner: 0.11,
+  railTwinChance: [0, 0, 0.4, 0.72, 0.8],
   /** From this act on, the crossfire lays a stage lane ACROSS the rail: the
    *  safe ground becomes a quarter of the deck and the dodge is diagonal. */
   latticeFromAct: 2,
@@ -383,6 +485,17 @@ export const CHOREO = {
   /** Minimum clear beats between one landing and the next telegraph —
    *  bar/half-bar multiples so successive moves stay on the grid. */
   restBeats: [4, 4, 2, 2, 0],
+  /** THE DEAD AIR CEILING, by act. `movesPerPhrase` is a floor, not a
+   *  quota: while a phrase still has more than this many beats of unclaimed
+   *  music, it books another move. Nothing else in the generator bounds
+   *  silence — a phrase whose shapes wouldn't fit used to abandon its
+   *  remaining slots and hand the floor twenty seconds of standing about.
+   *  Easy acts still breathe; the peak never rests two bars.
+   *
+   *  These are measured inside a phrase, so the gap a dancer actually feels
+   *  runs a little longer — the next phrase's opening telegraph still has to
+   *  clear its own downbeat. Three bars here reads as about four out there. */
+  maxSilentBeats: [12, 10, 8, 8, 8],
 };
 
 /**
@@ -406,7 +519,35 @@ export const DIFFICULTY = {
   /** The ceiling. Act 4 is EXPERT's back stretch: six moves a phrase with
    *  no rest between them, and the hardest combinations in the game. */
   maxAct: 4,
+  /** EXPERT DOUBLE TIME. The whole pressure curve is written in BEATS —
+   *  moves per phrase, rests, charges, cascade gaps — so its real-time
+   *  density scales with the record: at act 4 a 91 BPM night threw barely
+   *  half the landings per second of a 174 one, and its bar grid walked
+   *  right past where those records' grooves actually live (the slow shelf
+   *  is shuffles and struts whose onsets ride the eighths — V ONE's sit on
+   *  a literal 190 lattice). So on EXPERT, a record under this tempo runs
+   *  its whole chart clock at 2×: the grid rides the eighths, landings hit
+   *  the real half-bars (the 1 and the 3), and the 91–98 shelf charts at
+   *  182–196 — a shade past BREAKCORE's 174, which is fair: these are the
+   *  records the difficulty was quietly under-charging. The catalog's gap
+   *  between 98 and 110 makes 100 a robust line, and EXPERT is unreachable
+   *  on the tour, so no authored night changes feel.
+   *
+   *  Deliberately UNANNOUNCED. The menus wear the record's own measured
+   *  tempo and nothing else: a "×2" badge beside the BPM explained an
+   *  implementation to somebody choosing a song, and the floor already
+   *  tells you — a slow record on EXPERT simply comes at you like a fast
+   *  one, which is the whole point. */
+  doubleTimeBelowBpm: 100,
 };
+
+/** The tempo a record CHARTS at — its measured tempo, except on EXPERT
+ *  under the double-time line, where the whole clock runs at 2×. Pure, so
+ *  every client in a room (same track, same difficulty off the ball)
+ *  derives the identical grid. */
+export function chartBpm(trackBpm: number, difficulty: number): number {
+  return difficulty >= 3 && trackBpm < DIFFICULTY.doubleTimeBelowBpm ? trackBpm * 2 : trackBpm;
+}
 
 /* ────────────────────────────── THE GROOVE ───────────────────────────────
  * Dance like the groupies dance: ONE HAND UP, ONE HAND DOWN, and swap on
@@ -587,9 +728,9 @@ export const TOUR: { sets: TourSet[]; freeSets: number; maxPhrases: number } = {
     {
       id: 'opening',
       name: 'OPENING SET',
-      // The night starts in the MORNING — short, fun, duck-free. MONEY
-      // moved to the quick-raid pool when it gave up the slot.
-      songs: ['morning', 'target', 'capture'], // 97 → 91 → 117 BPM
+      // The night starts in the MORNING — short, fun, duck-free — then
+      // SAKUPENED kicks the pace up before CAPTURE brings in the first goop.
+      songs: ['morning', 'sakupened', 'capture'], // 97 → 134 → 117 BPM
       tint: null, // the classic green goop
     },
     {
@@ -610,7 +751,11 @@ export const TOUR: { sets: TourSet[]; freeSets: number; maxPhrases: number } = {
       // No repeats anywhere on the tour. SPREAD replaced UNITY (a fight
       // record where a five-minute journey used to sit) and, being the
       // faster of the two openers, it plays second so the set still climbs.
-      songs: ['infection', 'spread', 'breakcore'], // 138 → 150 → 174 BPM
+      // GIVE IT TO ME has INFECTION's old seat, which opens the last night
+      // 26 BPM lower and makes the step into SPREAD the steepest on the
+      // tour — the climb is the whole shape of this set, so a longer run-up
+      // suits it. (INFECTION keeps its place on the SOLO shelf.)
+      songs: ['giveit', 'spread', 'breakcore'], // 112 → 150 → 174 BPM
       tint: { shallow: 0xffd24a, deep: 0x6e3c06, nucleus: 0xffefad }, // molten gold
     },
   ],
@@ -707,7 +852,7 @@ export function hueToColor(hue: number, light = 0.55): number {
 
 /* ────────────────────────────── NETWORKING ───────────────────────────────
  * Optional — the game is fully playable solo against the groupies. With a
- * relay up (npm run server) you host a room, share the 4-letter code, and
+ * relay up (npm run server) you host a room, read out the 4-digit code, and
  * the server hands everyone a seat, the seed and a shared start time. The
  * whole choreography is deterministic from the seed, so the wire only
  * carries poses, hits and scores.

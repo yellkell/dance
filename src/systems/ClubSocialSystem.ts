@@ -9,7 +9,9 @@
  *    while they talk, eased toward their streamed pose;
  *  - runs the voice room: auto-joins your mic on arrival (left Y mutes it),
  *    glues the audio listener to your head, and pins each dancer's voice to
- *    their figure — HRTF panners, distance falloff, a real hubbub;
+ *    their figure — HRTF panners, distance falloff, a real hubbub. Voice
+ *    carries within ONE PLACE only: the floor hears the floor, a set hears
+ *    the set, and neither hears the other through the wall;
  *  - applies your safety lists every frame: a MUTED dancer goes silent, a
  *    BLOCKED one vanishes — figure, tag and voice, local only;
  *  - owns the SOCIAL panel (right Ⓐ on the club floor): everyone in the
@@ -17,14 +19,16 @@
  *    master switch. The Horizon-store safety console, in house style.
  *
  * When a set drops, the figures pack away (the raid's AvatarSystem takes
- * over on the ring) but the VOICE stays live — pinned to each dancer's
- * platform, so the room keeps talking through the set it's dancing.
+ * over on the ring) but the VOICE stays live among the dancers ON it,
+ * pinned to each one's platform — so a raid keeps talking through the set
+ * it's dancing while the party it left carries on without it.
  */
 
 import { createSystem, InputComponent } from '@iwsdk/core';
 import {
   CanvasTexture,
   DoubleSide,
+  Euler,
   Group,
   Mesh,
   MeshBasicMaterial,
@@ -34,13 +38,13 @@ import {
   SRGBColorSpace,
   Vector3,
 } from 'three';
-import { hueToColor, seatHue } from '../config.js';
+import { DIFFICULTY, RING, hueToColor } from '../config.js';
 import * as sfx from '../audio/sfx.js';
 import { preload } from '../audio/music.js';
 import { pickRaidTrack, trackById, tracksFor } from '../audio/tracks.js';
 import { platformRoot } from '../arena/arena.js';
 import { ballSpawnPos } from '../club/ball.js';
-import { CLUB, CLUB_NET } from '../club/config.js';
+import { CLUB_NET } from '../club/config.js';
 import { socialBlocked, socialMuted, toggleSocialBlock, toggleSocialMute } from '../club/social.js';
 import {
   clearVoiceSpeakers,
@@ -59,11 +63,24 @@ import {
 } from '../club/voice.js';
 import { buildDancer, type DancerPose, type DancerRig } from '../game/avatars.js';
 import { match } from '../game/state.js';
-import { clubPoses, remotePoses } from '../net/poses.js';
-import { callBall, cancelBall, net, onVoice, seatByIdx, sendClubPose, sendVoice } from '../net/session.js';
+import { clubPoses, remotePoses, type RemotePose } from '../net/poses.js';
+import {
+  callBall,
+  cancelBall,
+  leaveRoom,
+  memberHue,
+  net,
+  onVoice,
+  seatByIdx,
+  sendClubPose,
+  sendVoice,
+} from '../net/session.js';
+import { font } from '../ui/fonts.js';
 import { Panel, UI, type PanelButton } from '../ui/panel.js';
+import { PointerRay } from '../ui/pointer.js';
 
 const TRACK_KEY = 'gdr-track';
+const DIFF_KEY = 'gdr-diff';
 
 const _v = new Vector3();
 const _q = new Quaternion();
@@ -72,10 +89,14 @@ const _camQ = new Quaternion();
 const _fwd = new Vector3();
 const _o = new Vector3();
 const _d = new Vector3();
+/** YXZ = the order a neck actually works in: swivel, then nod, then tilt. */
+const _e = new Euler(0, 0, 0, 'YXZ');
 
 interface ClubPuppet {
   idx: number;
   name: string;
+  /** The hue this figure was built in — respawned if their pick changes. */
+  hue: number;
   rig: DancerRig;
   tag: Mesh;
   tagMat: MeshBasicMaterial;
@@ -89,7 +110,7 @@ function nameTagTexture(text: string, colorCss: string): CanvasTexture {
   c.width = 512;
   c.height = 128;
   const g = c.getContext('2d')!;
-  g.font = "900 58px 'Arial Black', system-ui, sans-serif";
+  g.font = font(700, 58);
   g.textAlign = 'center';
   g.textBaseline = 'middle';
   g.shadowColor = colorCss;
@@ -98,12 +119,39 @@ function nameTagTexture(text: string, colorCss: string): CanvasTexture {
   g.fillText(text, 256, 64, 470);
   g.shadowBlur = 0;
   g.fillStyle = 'rgba(255,255,255,0.94)';
-  g.font = "900 52px 'Arial Black', system-ui, sans-serif";
+  g.font = font(700, 52);
   g.fillText(text, 256, 64, 460);
   const tex = new CanvasTexture(c);
   tex.colorSpace = SRGBColorSpace;
   return tex;
 }
+
+/** One room-mate's live presence on the floor, published for the mirror.
+ *  `pose` is the SAME object the puppet dances with (live reference, club
+ *  world space); `shown` mirrors the figure's actual visibility — blocked
+ *  dancers and dancers away on the ring are not shown, so they cast no
+ *  reflection either. */
+export interface FloorFigure {
+  pose: DancerPose;
+  hue: number;
+  shown: boolean;
+}
+
+/** The club floor's figures by member idx (me excluded — I have no figure;
+ *  ClubMirrorSystem builds my reflection from the headset directly). */
+export const clubFloorFigures = new Map<number, FloorFigure>();
+
+/** Headless/dev hook (wired into __gdr in main.ts): raise the SOCIAL panel
+ *  without a controller. */
+export const socialView: {
+  show?: (on: boolean) => void;
+  /** Is it actually up? `show(true)` off the club floor is refused, so the
+   *  ask and the answer are not the same question. */
+  shown?: () => boolean;
+  snapSocial?: () => string;
+  snapSongs?: () => string;
+  openSongs?: (on: boolean) => void;
+} = {};
 
 export class ClubSocialSystem extends createSystem({}) {
   private crowd = new Group();
@@ -114,9 +162,15 @@ export class ClubSocialSystem extends createSystem({}) {
   private voiceRetry = 0;
 
   private panel!: Panel;
+  /** The song list, flown out beside the desk (see SONGS). */
+  private songs!: Panel;
+  private songsOpen = false;
+  private songsKey = '';
+  private pointers!: Record<'left' | 'right', PointerRay>;
   private ray = new Raycaster();
   private hover: string | null = null;
   private paintKey = '';
+  private clock = 0;
 
   init(): void {
     this.crowd.name = 'club-crowd';
@@ -125,10 +179,34 @@ export class ClubSocialSystem extends createSystem({}) {
     // Inbound voice frames route straight to their spatial speaker.
     onVoice((id, frame) => pushVoiceFrame(id, frame));
 
-    this.panel = new Panel(0.6, 0.9, 700, 1050);
-    this.panel.mesh.visible = false;
-    this.panel.mesh.rotation.order = 'YXZ';
+    // With the board gone from the club floor, this panel is the floor's
+    // whole console — the extra rows (difficulty, leave) earn it the height.
+    this.panel = new Panel(0.6, 0.99, 700, 1155);
+    this.panel.setShown(false, true);
+    this.panel.group.rotation.order = 'YXZ';
     this.scene.add(this.panel.group);
+
+    // THE SONG LIST, as a leaf off the desk: the ♪ row used to CYCLE, so
+    // finding a record meant tapping through fourteen of them and reading
+    // the label each time. It flies out to the left instead, whole, and
+    // rides the desk (a child of its group) wherever the desk is placed.
+    this.songs = new Panel(0.38, 0.777, 440, 900);
+    this.songs.setShown(false, true);
+    this.songs.group.position.set(-0.51, 0.107, 0.008);
+    this.panel.group.add(this.songs.group);
+
+    this.pointers = { left: new PointerRay(this.scene), right: new PointerRay(this.scene) };
+
+    socialView.show = (on) => {
+      this.panel.setShown(on);
+      if (!on) this.closeSongs();
+      if (on) this.place();
+      this.paintKey = '';
+    };
+    socialView.shown = () => this.panel.isShown;
+    socialView.snapSongs = () => (this.songs.ctx().canvas as HTMLCanvasElement).toDataURL('image/png');
+    socialView.openSongs = (on) => this.openSongs(on);
+    socialView.snapSocial = () => (this.panel.ctx().canvas as HTMLCanvasElement).toDataURL('image/png');
   }
 
   update(delta: number): void {
@@ -180,38 +258,43 @@ export class ClubSocialSystem extends createSystem({}) {
     const ease = 1 - Math.exp(-CLUB_NET.smoothing * delta);
     for (const p of this.puppets.values()) {
       const hidden = socialBlocked(p.name);
-      setVoiceSpeakerMuted(String(p.idx), hidden || socialMuted(p.name));
+      // THE TWO ROOMS. A set and the club floor are different places, and
+      // voice only carries within one: mid-set you hear the people dancing
+      // it with you and not the party you left, and on the floor you hear
+      // the floor and not a raid happening in another world. Spatial audio
+      // needs somewhere to put a voice, and there is no honest answer for
+      // "the club, from the ring" — it used to sing out of the stage, which
+      // made a friend twenty metres away sound like they were in the set.
+      //
+      // The frames still arrive (the relay fans to the whole room); this is
+      // a local gate, exactly like mute and block.
+      const ring = seatByIdx.get(p.idx);
+      const theyDance = liveSet ? ring !== undefined : net.gamePlayers.has(p.idx);
+      const elsewhere = theyDance !== liveSet;
+      setVoiceSpeakerMuted(String(p.idx), hidden || elsewhere || socialMuted(p.name));
 
       if (liveSet) {
         // I'M on the ring. Fellow players' voices pin to their dancer on
-        // their platform; the friends still back on the floor keep talking
-        // from where they stand in the club (their poses keep streaming).
-        const seat = seatByIdx.get(p.idx);
-        if (seat !== undefined) {
-          const root = platformRoot(seat);
-          const pose = remotePoses.get(seat);
-          if (root && pose) {
-            _v.set(pose.hx, pose.hy, pose.hz);
-            root.localToWorld(_v);
-            setVoiceSpeakerPosition(String(p.idx), _v);
-          }
-        } else {
-          const floorPose = clubPoses.get(p.idx);
-          if (floorPose) {
-            _v.set(floorPose.hx, floorPose.hy, floorPose.hz);
-            setVoiceSpeakerPosition(String(p.idx), _v);
-          }
+        // their own platform. Anyone still on the floor is muted above and
+        // needs no position at all.
+        if (ring === undefined) continue;
+        const root = platformRoot(ring);
+        const pose = remotePoses.get(ring);
+        if (root && pose) {
+          _v.set(pose.hx, pose.hy, pose.hz);
+          root.localToWorld(_v);
+          setVoiceSpeakerPosition(String(p.idx), _v);
         }
         continue;
       }
 
       if (net.gamePlayers.has(p.idx)) {
         // They're away playing: their figure steps off the floor and their
-        // voice sings from the stage — the set, heard from the club.
+        // voice goes with them (muted above) until the set folds back.
         p.rig.root.visible = false;
+        const away = clubFloorFigures.get(p.idx);
+        if (away) away.shown = false;
         p.tag.visible = false;
-        _v.set(0, 1.7, CLUB.stage.z + 1.1);
-        setVoiceSpeakerPosition(String(p.idx), _v);
         continue;
       }
       if (!this.crowd.visible) continue;
@@ -226,8 +309,22 @@ export class ClubSocialSystem extends createSystem({}) {
       }
       p.rig.root.visible = p.live && !hidden;
       p.tag.visible = p.live && !hidden;
+      const fig = clubFloorFigures.get(p.idx);
+      if (fig) fig.shown = p.rig.root.visible;
       if (!p.live || hidden) continue;
 
+      this.camera.getWorldPosition(_cam);
+      // DETAIL by distance, like the ring — but re-tested each frame,
+      // because a club floor is people WALKING rather than fixed decks.
+      // The hall is 18 m end to end, so somebody at the far booths is as
+      // far off as the other side of a full ring. (setDetail early-outs
+      // unless the answer actually changed.)
+      p.rig.setDetail(
+        (p.pose.hx - _cam.x) ** 2 + (p.pose.hz - _cam.z) ** 2 <= RING.detailRadius ** 2,
+      );
+      // THE CROWN: the room's reigning winner wears it home. (setCrown
+      // no-ops for the bare-headed majority; pose() below places it.)
+      p.rig.setCrown(net.crownIdx === p.idx);
       p.rig.pose(p.pose);
       // Their voice speaks from their figure's head.
       _v.set(p.pose.hx, p.pose.hy, p.pose.hz);
@@ -235,44 +332,68 @@ export class ClubSocialSystem extends createSystem({}) {
       // The name tag rides over the head, faces you, and swells a touch
       // while they hold the floor.
       p.tag.position.set(p.pose.hx, p.pose.hy + 0.38, p.pose.hz);
-      this.camera.getWorldPosition(_cam);
       p.tag.rotation.y = Math.atan2(_cam.x - p.pose.hx, _cam.z - p.pose.hz);
       const swell = isSpeaking(String(p.idx)) ? 1.14 : 1;
       p.tag.scale.set(swell, swell, 1);
     }
 
     // ── the SOCIAL panel ────────────────────────────────────────────────
-    this.updatePanel(inClub && (inRoom || net.phase === 'off' || net.phase === 'error'));
+    this.clock += delta;
+    // The panel belongs to the SOCIAL FLOOR and nowhere else. It used to
+    // open with no room too, on the theory that its empty state ("host or
+    // join a room") was a signpost — but the foyer already has the board
+    // for that, so all it did was put a second menu on a button in the
+    // middle of the first one. Off the floor, right Ⓐ does nothing.
+    this.updatePanel(delta, inClub && inRoom);
+    const pulse = this.beatPulse();
+    this.panel.tick(delta, pulse);
+    this.songs.tick(delta, pulse);
+  }
+
+  /** The under-halo's beat envelope (the same curve the board uses) —
+   *  ECLIPSE publishes match.beat on the floor; a house clock covers gaps. */
+  private beatPulse(): number {
+    const beat = Number.isFinite(match.beat) ? match.beat : this.clock / 0.86;
+    const f = beat - Math.floor(beat);
+    const att = Math.min(1, f / 0.06);
+    const env = att * (1 - f) ** 3;
+    return env * (Math.floor(beat) % 4 === 0 ? 1 : 0.5);
   }
 
   /* ── roster → puppets ─────────────────────────────────────────────────── */
 
   private syncRoster(connected: boolean): void {
-    const key = connected ? net.members.map((m) => `${m.idx}:${m.name}`).join('|') + `#${net.myIdx}` : '';
+    const key = connected
+      ? net.members.map((m) => `${m.idx}:${m.name}:${memberHue(m).toFixed(4)}`).join('|') + `#${net.myIdx}`
+      : '';
     if (key === this.lastRosterKey) return;
     this.lastRosterKey = key;
 
-    const want = new Map<number, string>();
+    // Everyone but me, in the colour they dance in — their own pick if they
+    // made one back in the foyer, otherwise the neon their slot handed out.
+    const want = new Map<number, { name: string; hue: number }>();
     if (connected) {
       for (const m of net.members) {
-        if (m.idx !== net.myIdx) want.set(m.idx, m.name);
+        if (m.idx !== net.myIdx) want.set(m.idx, { name: m.name, hue: memberHue(m) });
       }
     }
-    // Despawn the departed.
+    // Despawn the departed — and anyone whose name or colour changed under
+    // them, since both are baked into the rig and the tag's texture.
     for (const [idx, p] of [...this.puppets]) {
-      if (!want.has(idx)) {
+      const w = want.get(idx);
+      if (!w || w.name !== p.name || Math.abs(w.hue - p.hue) > 1e-4) {
         p.rig.dispose();
         p.tag.removeFromParent();
         p.tagMat.map?.dispose();
         p.tagMat.dispose();
         this.puppets.delete(idx);
+        clubFloorFigures.delete(idx);
       }
     }
     // Spawn the new (parked invisible until their first pose arrives).
-    for (const [idx, name] of want) {
+    for (const [idx, { name, hue }] of want) {
       const existing = this.puppets.get(idx);
       if (existing) continue;
-      const hue = seatHue(idx);
       const rig = buildDancer(hue);
       rig.root.visible = false;
       this.crowd.add(rig.root);
@@ -286,29 +407,26 @@ export class ClubSocialSystem extends createSystem({}) {
       tag.renderOrder = 24;
       tag.visible = false;
       this.crowd.add(tag);
-      this.puppets.set(idx, {
-        idx,
-        name,
-        rig,
-        tag,
-        tagMat,
-        pose: {
-          hx: 0, hy: 1.55, hz: 3.8, yaw: 0,
-          lx: -0.3, ly: 1.0, lz: 3.7, rx: 0.3, ry: 1.0, rz: 3.7,
-          slump: 0,
-        },
-        live: false,
-      });
+      const pose: DancerPose = {
+        hx: 0, hy: 1.55, hz: 3.8, yaw: 0, pitch: 0, roll: 0,
+        lx: -0.3, ly: 1.0, lz: 3.7, rx: 0.3, ry: 1.0, rz: 3.7,
+        slump: 0,
+      };
+      this.puppets.set(idx, { idx, name, hue, rig, tag, tagMat, pose, live: false });
+      // The mirror watches the same pose object the puppet dances with.
+      clubFloorFigures.set(idx, { pose, hue, shown: false });
     }
     this.paintKey = ''; // roster changed → repaint the panel
   }
 
-  private applyPose(p: ClubPuppet, s: { hx: number; hy: number; hz: number; hyaw: number; lx: number; ly: number; lz: number; rx: number; ry: number; rz: number }, k: number): void {
+  private applyPose(p: ClubPuppet, s: RemotePose, k: number): void {
     const t = p.pose;
     t.hx += (s.hx - t.hx) * k;
     t.hy += (s.hy - t.hy) * k;
     t.hz += (s.hz - t.hz) * k;
     t.yaw += (s.hyaw - t.yaw) * k;
+    t.pitch += (s.hpitch - t.pitch) * k;
+    t.roll += (s.hroll - t.roll) * k;
     t.lx += (s.lx - t.lx) * k;
     t.ly += (s.ly - t.ly) * k;
     t.lz += (s.lz - t.lz) * k;
@@ -322,9 +440,10 @@ export class ClubSocialSystem extends createSystem({}) {
     if (!headObj) return;
     headObj.getWorldPosition(_v);
     headObj.getWorldQuaternion(_q);
-    _fwd.set(0, 0, -1).applyQuaternion(_q);
-    const yaw = Math.atan2(-_fwd.x, -_fwd.z);
-    const d: number[] = [_v.x, _v.y, _v.z, yaw];
+    // Yaw comes out of the Y term unchanged (see NetworkSystem.pumpPose);
+    // nod and tilt ride the tail so short frames still decode.
+    _e.setFromQuaternion(_q, 'YXZ');
+    const d: number[] = [_v.x, _v.y, _v.z, _e.y];
     for (const hand of ['left', 'right'] as const) {
       const obj = this.world.playerSpaceEntities?.raySpaces?.[hand]?.object3D;
       if (obj) {
@@ -334,55 +453,93 @@ export class ClubSocialSystem extends createSystem({}) {
         d.push(_v.x + (hand === 'left' ? -0.25 : 0.25), Math.max(0.6, _v.y - 0.6), _v.z - 0.1);
       }
     }
+    d.push(_e.x, _e.z);
     sendClubPose(d);
   }
 
   /* ── the SOCIAL panel ─────────────────────────────────────────────────── */
 
-  private updatePanel(allowed: boolean): void {
-    if (!allowed && this.panel.mesh.visible) this.panel.mesh.visible = false;
+  private updatePanel(delta: number, allowed: boolean): void {
+    if (!allowed && this.panel.isShown) this.panel.setShown(false);
     if (allowed && this.input.xr.gamepads.right?.getButtonDown(InputComponent.A_Button)) {
-      this.panel.mesh.visible = !this.panel.mesh.visible;
-      if (this.panel.mesh.visible) this.place();
+      this.panel.setShown(!this.panel.isShown);
+      if (this.panel.isShown) this.place();
       sfx.uiClick();
     }
-    if (!this.panel.mesh.visible) return;
+    if (!this.panel.isShown) {
+      this.pointers.left.hide();
+      this.pointers.right.hide();
+      return;
+    }
 
     // Pointer: either controller ray; trigger clicks the hovered button.
     let hover: string | null = null;
     let clicked: string | null = null;
     for (const hand of ['left', 'right'] as const) {
+      const p = this.pointers[hand];
       const rayObj = this.world.playerSpaceEntities?.raySpaces?.[hand]?.object3D;
-      if (!rayObj) continue;
+      if (!rayObj) {
+        p.hide();
+        continue;
+      }
       rayObj.getWorldPosition(_o);
       rayObj.getWorldQuaternion(_q);
       _d.set(0, 0, -1).applyQuaternion(_q).normalize();
       this.ray.set(_o, _d);
       this.ray.far = 3;
-      const hit = this.ray.intersectObject(this.panel.mesh, false)[0];
-      if (!hit?.uv) continue;
-      const id = this.panel.buttonAt(hit.uv.x, hit.uv.y);
+      // Both surfaces when the list is out — nearest hit wins, and the id
+      // says which panel owns it ('song:' is the list's).
+      const hit = this.ray.intersectObjects(
+        this.songsOpen ? [this.panel.mesh, this.songs.mesh] : [this.panel.mesh],
+        false,
+      )[0];
+      const owner = hit?.object === this.songs.mesh ? this.songs : this.panel;
+      const id = hit?.uv ? owner.buttonAt(hit.uv.x, hit.uv.y) : null;
+      p.update(delta, _o, hit ? hit.point : null, Boolean(id));
       if (!id) continue;
       hover = id;
-      if (this.input.xr.gamepads[hand]?.getButtonDown(InputComponent.Trigger)) clicked = id;
+      if (this.input.xr.gamepads[hand]?.getButtonDown(InputComponent.Trigger)) {
+        clicked = id;
+        p.click();
+      }
     }
     if (hover !== this.hover) {
       this.hover = hover;
       if (hover) sfx.uiHover();
       this.paintKey = '';
+      this.songsKey = '';
     }
     if (clicked) {
       sfx.uiClick();
-      if (clicked === 'voice') {
+      const onList = clicked.startsWith('song:');
+      (onList ? this.songs : this.panel).press(clicked);
+      if (onList) {
+        const pick = clicked.slice(5);
+        if (pick !== 'close') this.setTrack(pick === 'shuffle' ? '' : pick);
+        this.closeSongs();
+      } else if (clicked === 'voice') {
         setVoiceEnabled(!voiceEnabled());
       } else if (clicked === 'mic') {
         toggleVoiceMuted();
       } else if (clicked === 'track') {
-        this.cycleTrack();
+        this.openSongs(!this.songsOpen);
       } else if (clicked === 'call') {
         this.callFromHere();
       } else if (clicked === 'cancel') {
         cancelBall();
+      } else if (clicked.startsWith('diff')) {
+        // The act floor for the chart my ball calls — same store the board
+        // uses, so the foyer and the floor always agree.
+        match.difficulty = Math.max(0, Math.min(3, Number(clicked.slice(4))));
+        try {
+          localStorage.setItem(DIFF_KEY, String(match.difficulty));
+        } catch {
+          /* fine */
+        }
+      } else if (clicked === 'leave') {
+        this.panel.setShown(false);
+        this.closeSongs();
+        leaveRoom();
       } else if (clicked.startsWith('mute:')) {
         toggleSocialMute(clicked.slice(5));
       } else if (clicked.startsWith('block:')) {
@@ -392,21 +549,124 @@ export class ClubSocialSystem extends createSystem({}) {
     }
 
     this.paint();
+    if (this.songsOpen) this.paintSongs();
   }
 
-  /** Cycle my song pick: SHUFFLE → each raid record → back. The pick rides
-   *  the ball when I call one (same store the board's ♪ row uses). */
-  private cycleTrack(): void {
-    const pool = tracksFor('raid');
-    const at = pool.findIndex((t) => t.id === match.preferredTrack);
-    const next = at + 1 >= pool.length ? '' : pool[at + 1].id;
-    match.preferredTrack = next;
+  /* ── SONGS: the list that flies out of the ♪ row ──────────────────────── */
+
+  private openSongs(on: boolean): void {
+    this.songsOpen = on;
+    this.songs.setShown(on);
+    this.songsKey = '';
+    this.paintKey = '';
+    if (on) this.paintSongs();
+  }
+
+  private closeSongs(): void {
+    if (this.songsOpen) this.openSongs(false);
+  }
+
+  /** Take a record (or '' for SHUFFLE). The pick rides the ball when I call
+   *  one — same store the foyer's board uses, so the two always agree. */
+  private setTrack(id: string): void {
+    match.preferredTrack = id;
     try {
-      localStorage.setItem(TRACK_KEY, next);
+      localStorage.setItem(TRACK_KEY, id);
     } catch {
       /* fine */
     }
-    preload(trackById(next) ?? pickRaidTrack(match.seed));
+    preload(trackById(id) ?? pickRaidTrack(match.seed));
+  }
+
+  private paintSongs(): void {
+    const pool = tracksFor('raid');
+    const cur = match.preferredTrack || '';
+    const key = `${cur}#${this.hover ?? ''}#${pool.length}`;
+    if (key === this.songsKey) return;
+    this.songsKey = key;
+
+    const Y0 = 104;
+    const CLOSE_Y = 848;
+    const rows: { id: string; title: string; bpm: string }[] = [
+      { id: 'shuffle', title: 'SHUFFLE', bpm: '—' },
+      ...pool.map((t) => ({ id: t.id, title: t.title, bpm: String(Math.round(t.bpm)) })),
+    ];
+    // The whole shelf fits on one surface, however long the shelf gets: the
+    // pitch tightens rather than running a record off the bottom edge.
+    const PITCH = Math.min(46, (CLOSE_Y - Y0) / rows.length);
+    const ROW_H = PITCH - 4;
+    // Ghost hit-areas: the body paints the rows itself so the title and the
+    // BPM can share one line (the kit's label/sub would stack them).
+    const buttons: PanelButton[] = rows.map((r, i) => ({
+      id: `song:${r.id}`,
+      label: r.title,
+      ghost: true,
+      x: 16,
+      y: Y0 + i * PITCH,
+      w: 408,
+      h: ROW_H,
+    }));
+    buttons.push({
+      id: 'song:close',
+      label: 'CLOSE',
+      x: 16,
+      y: CLOSE_Y,
+      w: 408,
+      h: 44,
+      small: true,
+    });
+
+    this.songs.paint(
+      '',
+      (g) => {
+        g.textBaseline = 'middle';
+        g.textAlign = 'left';
+        g.font = font(600, 22);
+        g.letterSpacing = '4px';
+        g.fillStyle = UI.dim;
+        g.fillText('SELECT SONG', 22, 50);
+        g.letterSpacing = '1.5px';
+        g.font = font(500, 15);
+        g.fillStyle = UI.faint;
+        g.textAlign = 'right';
+        g.fillText('BPM', 424, 50);
+        g.letterSpacing = '0px';
+        g.fillStyle = UI.lineFaint;
+        g.fillRect(22, 76, 402, 2);
+
+        rows.forEach((r, i) => {
+          const y = Y0 + i * PITCH;
+          const selected = cur === (r.id === 'shuffle' ? '' : r.id);
+          const hov = this.songs.hoverOf(`song:${r.id}`);
+          g.beginPath();
+          g.roundRect(16, y, 408, ROW_H, 9);
+          g.fillStyle = selected ? UI.accentFaint : `rgba(255,255,255,${(0.03 + 0.05 * hov).toFixed(3)})`;
+          g.fill();
+          if (selected) {
+            g.lineWidth = 2;
+            g.strokeStyle = UI.accentDim;
+            g.stroke();
+            g.fillStyle = UI.accent;
+            g.beginPath();
+            g.roundRect(21, y + 8, 4, ROW_H - 16, 2);
+            g.fill();
+          }
+          const cy = y + ROW_H / 2 + 1;
+          g.textAlign = 'left';
+          g.font = font(600, Math.min(23, ROW_H - 19));
+          g.letterSpacing = '1px';
+          g.fillStyle = selected ? UI.textHi : UI.text;
+          g.fillText(r.title, 38, cy, 286);
+          g.letterSpacing = '0px';
+          g.textAlign = 'right';
+          g.font = font(500, 20);
+          g.fillStyle = UI.dim;
+          g.fillText(r.bpm, 408, cy);
+        });
+      },
+      buttons,
+      this.hover,
+    );
   }
 
   /** Send the ball up just ahead of me, and warm my record for the drop. */
@@ -428,7 +688,7 @@ export class ClubSocialSystem extends createSystem({}) {
     _fwd.y = 0;
     if (_fwd.lengthSq() < 1e-4) _fwd.set(0, 0, -1);
     _fwd.normalize();
-    const m = this.panel.mesh;
+    const m = this.panel.group;
     m.position.set(_cam.x + _fwd.x * 0.6, _cam.y - 0.42, _cam.z + _fwd.z * 0.6);
     m.rotation.set(-0.3, Math.atan2(_cam.x - m.position.x, _cam.z - m.position.z), 0);
     this.paintKey = '';
@@ -443,9 +703,10 @@ export class ClubSocialSystem extends createSystem({}) {
     const ballUp = net.ball !== null;
     const mine = ballUp && net.ball!.callerIdx === net.myIdx;
     const setOut = net.gamePlayers.size > 0;
+    const inRoom = net.phase === 'hosting' || net.phase === 'joined';
     const key =
       members.map((m) => `${m.name}|${socialMuted(m.name) ? 1 : 0}${socialBlocked(m.name) ? 1 : 0}`).join(';') +
-      `#${this.hover ?? ''}#${on ? 1 : 0}#${mic ? 1 : 0}#${net.phase}#${cued?.id ?? ''}#${ballUp ? (mine ? 'B' : 'b') : ''}#${setOut ? net.gamePlayers.size : 0}#${more}`;
+      `#${this.hover ?? ''}#${on ? 1 : 0}#${mic ? 1 : 0}#${net.phase}#${cued?.id ?? ''}#${ballUp ? (mine ? 'B' : 'b') : ''}#${setOut ? net.gamePlayers.size : 0}#${more}#${match.difficulty}#${this.songsOpen ? 1 : 0}#${net.crownIdx ?? ''}`;
     if (key === this.paintKey) return;
     this.paintKey = key;
 
@@ -457,7 +718,7 @@ export class ClubSocialSystem extends createSystem({}) {
       buttons.push({
         id: `mute:${m.name}`,
         label: socialMuted(m.name) ? 'MUTED' : 'MUTE',
-        accent: socialMuted(m.name) ? UI.danger : UI.amber,
+        tone: socialMuted(m.name) ? UI.danger : undefined,
         x: 396,
         y,
         w: 136,
@@ -467,7 +728,7 @@ export class ClubSocialSystem extends createSystem({}) {
       buttons.push({
         id: `block:${m.name}`,
         label: socialBlocked(m.name) ? 'BLOCKED' : 'BLOCK',
-        accent: socialBlocked(m.name) ? UI.danger : UI.violet,
+        tone: socialBlocked(m.name) ? UI.danger : undefined,
         x: 546,
         y,
         w: 136,
@@ -476,43 +737,57 @@ export class ClubSocialSystem extends createSystem({}) {
       });
     });
 
-    // ── calling a raid: the song pick + the ball ────────────────────────
+    // ── calling a raid: the song pick, the chart, the ball ──────────────
     buttons.push({
       id: 'track',
-      label: cued ? `♪ ${cued.title}` : '♪ SHUFFLE',
-      sub: cued ? `${cued.bpm.toFixed(cued.bpm % 1 ? 2 : 0)} BPM — rides the ball you call` : 'the seed picks — rides the ball you call',
-      accent: UI.cyan,
+      // The chevron says the row opens onto something, rather than
+      // advancing one notch per press.
+      label: `${this.songsOpen ? '◂' : '▸'}  ♪ ${cued ? cued.title : 'SHUFFLE'}`,
+      sub: cued ? `${cued.bpm.toFixed(cued.bpm % 1 ? 2 : 0)} BPM` : undefined,
+      selected: this.songsOpen,
       x: 24,
-      y: 668,
+      y: 652,
       w: 652,
       h: 74,
       small: true,
+    });
+    // DIFFICULTY: the chart's act floor — the caller's pick rides the ball
+    // with the song (the board's row, moved in with the rest of the desk).
+    DIFFICULTY.labels.forEach((label, i) => {
+      buttons.push({
+        id: `diff${i}`,
+        label,
+        selected: match.difficulty === i,
+        x: 24 + i * 165,
+        y: 740,
+        w: 157,
+        h: 54,
+        small: true,
+      });
     });
     if (mine) {
       buttons.push({
         id: 'cancel',
         label: 'CALL IT OFF',
-        sub: 'your ball is up — or just touch it',
-        accent: UI.danger,
+        tone: UI.danger,
         x: 24,
-        y: 752,
+        y: 808,
         w: 652,
         h: 74,
         small: true,
       });
     } else {
+      // The floor's one CTA. It says what it does and nothing else: the
+      // subtitle used to explain the ball's whole ritual to a room that
+      // can see the ball hanging in front of them.
       buttons.push({
         id: 'call',
-        label: ballUp ? 'THE BALL IS UP' : setOut ? 'A SET IS OUT' : 'SEND THE BALL UP',
-        sub: ballUp
-          ? 'touch it to dance — 60 s from the call'
-          : setOut
-            ? `${net.gamePlayers.size} on the ring — the floor waits for them`
-            : 'a ball spawns before you · touchers ride at zero',
-        accent: UI.goop,
+        label: ballUp ? 'BALL IS UP' : setOut ? 'SET IS OUT' : 'HOST',
+        sub: setOut ? `${net.gamePlayers.size} on the ring` : undefined,
+        primary: true,
         disabled: ballUp || setOut,
         x: 24,
-        y: 752,
+        y: 808,
         w: 652,
         h: 74,
         small: true,
@@ -522,84 +797,135 @@ export class ClubSocialSystem extends createSystem({}) {
     buttons.push({
       id: 'mic',
       label: mic ? 'MIC LIVE — left Ⓨ mutes' : on ? 'MIC MUTED — left Ⓨ opens it' : 'MIC OFF',
-      accent: mic ? UI.goop : UI.danger,
+      tone: mic ? UI.positive : UI.danger,
       x: 24,
-      y: 844,
+      y: 896,
       w: 652,
-      h: 56,
+      h: 54,
       small: true,
     });
     buttons.push({
       id: 'voice',
       label: on ? 'VOICE CHAT: ON' : 'VOICE CHAT: OFF',
-      sub: on ? 'the room can talk — spatial, by the figure' : 'hear no one, send nothing',
-      accent: on ? UI.cyan : UI.danger,
+      tone: on ? undefined : UI.danger,
       x: 24,
-      y: 908,
+      y: 958,
       w: 652,
-      h: 64,
+      h: 60,
       small: true,
     });
+    if (inRoom) {
+      // The board's LEAVE moved in with the desk — the one door out of the
+      // room that isn't a set.
+      buttons.push({
+        id: 'leave',
+        label: 'LEAVE THE CLUB',
+        tone: UI.danger,
+        x: 24,
+        y: 1036,
+        w: 652,
+        h: 64,
+        small: true,
+      });
+    }
 
     this.panel.paint(
       '',
       (g) => {
         g.textAlign = 'left';
         g.textBaseline = 'middle';
-        g.font = "900 44px 'Arial Black', system-ui, sans-serif";
-        g.fillStyle = UI.amber;
+        g.font = font(700, 42);
+        g.letterSpacing = '3px';
+        g.fillStyle = UI.textHi;
         g.fillText('THE ROOM', 28, 56);
-        g.font = "700 22px 'Arial Black', system-ui, sans-serif";
-        g.fillStyle = UI.dim;
-        g.fillText(
-          net.phase === 'hosting' || net.phase === 'joined'
-            ? `${net.code} · mute silences · block also hides · yours to undo`
-            : 'host or join a room and the floor fills up',
-          28,
-          98,
-        );
-        if (net.phase === 'hosting' || net.phase === 'joined') {
-          g.fillText('right Ⓐ closes this panel', 28, 130);
+        g.letterSpacing = '0px';
+        if (inRoom) {
+          // The code IS the invitation — it gets the data colour and the
+          // wide tracking; everything around it stays quiet.
+          g.font = font(600, 20);
+          g.letterSpacing = '2px';
+          g.fillStyle = UI.faint;
+          g.fillText('ROOM', 28, 102);
+          const rw = g.measureText('ROOM').width;
+          g.font = font(700, 30);
+          g.letterSpacing = '8px';
+          g.fillStyle = UI.info;
+          g.fillText(net.code, 28 + rw + 18, 102);
+          const cw = g.measureText(net.code).width;
+          g.font = font(500, 21);
+          g.letterSpacing = '0.5px';
+          g.fillStyle = UI.dim;
+          g.fillText(`· ${net.members.length} on the floor`, 28 + rw + 18 + cw + 16, 102);
+          g.font = font(500, 20);
+          g.fillStyle = UI.faint;
+          g.fillText('right Ⓐ closes', 28, 138);
+        } else {
+          g.font = font(500, 21);
+          g.letterSpacing = '0.5px';
+          g.fillStyle = UI.dim;
+          g.fillText('host or join a room', 28, 102);
         }
+        g.letterSpacing = '0px';
+
         members.forEach((m, i) => {
           const y = ROW0 + i * ROW_H + 25;
           const hidden = socialBlocked(m.name);
           const away = net.gamePlayers.has(m.idx);
-          g.font = "900 30px 'Arial Black', system-ui, sans-serif";
+          if (i > 0) {
+            g.fillStyle = UI.lineFaint;
+            g.fillRect(28, y - 29, 652 - 8, 1.5);
+          }
+          g.font = font(600, 29);
+          g.letterSpacing = '1px';
           g.fillStyle = hidden
-            ? 'rgba(172,182,198,0.45)'
-            : `#${hueToColor(seatHue(m.idx), 0.62).toString(16).padStart(6, '0')}`;
-          const label = m.name.slice(0, 12);
+            ? UI.faint
+            : `#${hueToColor(memberHue(m), 0.62).toString(16).padStart(6, '0')}`;
+          // The reigning winner's row leads with the crown they're wearing.
+          const label = (net.crownIdx === m.idx ? '👑 ' : '') + m.name.slice(0, 12);
           g.fillText(label, 28, y);
+          g.letterSpacing = '0px';
           if (hidden) {
             const w = g.measureText(label).width;
             g.strokeStyle = 'rgba(172,182,198,0.6)';
-            g.lineWidth = 3;
+            g.lineWidth = 2.5;
             g.beginPath();
             g.moveTo(28, y);
             g.lineTo(28 + w, y);
             g.stroke();
           }
           if (away) {
-            g.fillStyle = UI.amber;
-            g.font = "700 20px 'Arial Black', system-ui, sans-serif";
-            g.fillText('ON THE RING', 250, y);
+            g.fillStyle = UI.warn;
+            g.font = font(600, 19);
+            g.letterSpacing = '1.5px';
+            g.fillText('ON THE RING', 246, y);
+            g.letterSpacing = '0px';
           } else if (isSpeaking(String(m.idx))) {
-            g.fillStyle = UI.goop;
-            g.font = "700 22px 'Arial Black', system-ui, sans-serif";
-            g.fillText('◉', 340, y);
+            // The presence dot: they're holding the floor right now.
+            g.fillStyle = UI.positive;
+            g.shadowColor = UI.positive;
+            g.shadowBlur = 8;
+            g.beginPath();
+            g.arc(352, y, 6, 0, Math.PI * 2);
+            g.fill();
+            g.shadowBlur = 0;
           }
         });
         if (more > 0) {
-          g.font = "700 22px 'Arial Black', system-ui, sans-serif";
+          g.font = font(500, 21);
           g.fillStyle = UI.dim;
           g.fillText(`…and ${more} more on the floor`, 28, ROW0 + members.length * ROW_H + 22);
         }
         if (!members.length) {
-          g.font = "700 26px 'Arial Black', system-ui, sans-serif";
+          g.font = font(500, 24);
           g.fillStyle = UI.dim;
           g.fillText('nobody else on the floor right now', 28, ROW0 + 30);
         }
+
+        // Section seams: the ball's console, the voice desk, the door.
+        g.fillStyle = UI.lineFaint;
+        g.fillRect(24, 634, 652, 2);
+        g.fillRect(24, 884, 652, 2);
+        if (inRoom) g.fillRect(24, 1024, 652, 2);
       },
       buttons,
       this.hover,

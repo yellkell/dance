@@ -38,9 +38,11 @@ import {
   MeshBasicMaterial,
   PlaneGeometry,
 } from 'three';
-import { GRADE, GROOVE, SCORE, TOUR, seatHue } from '../config.js';
+import { GRADE, GROOVE, SCORE, TOUR } from '../config.js';
 import { trackById } from '../audio/tracks.js';
+import { danceHue } from '../game/profile.js';
 import { dodgeRate, gradeOf, match, me } from '../game/state.js';
+import { font } from '../ui/fonts.js';
 
 const SET_COLORS = ['#8cff70', '#ff6ee0', '#ffd24a'];
 
@@ -53,6 +55,10 @@ const SH = 288;
 /** The groove's own colour — electric ice, never the seat's, so the two
  *  never blur. Turquoise, per the boss. */
 const GROOVE_CSS = '#1cf5c9';
+/** THE ALARM: getting clipped. One red, shared by the HIT pop and the
+ *  chain marks so the two always read as the same event — and a deep,
+ *  full-chroma one: the old coral sat too light to alarm anybody. */
+const ALARM_CSS = '#ff0033';
 
 const _head = new Vector3();
 
@@ -66,7 +72,7 @@ function ink(
   fill: string,
   maxWidth?: number,
 ): void {
-  g.font = `900 ${px}px 'Arial Black', system-ui, sans-serif`;
+  g.font = font(700, px);
   g.lineJoin = 'round';
   g.lineCap = 'round';
   g.lineWidth = Math.max(6, px * 0.22);
@@ -81,7 +87,11 @@ function ink(
 /** Ink with a neon halo — the same casing, then the colour BLOOMS. The
  *  whites stay white; everything coloured earns a glow of its own hue,
  *  which is where the vibrance lives (a saturated fill with no bloom
- *  reads as flat print, not light). */
+ *  reads as flat print, not light).
+ *
+ *  TWO bloom passes, wide then tight. One pass is a haze around a letter;
+ *  two compound into something that reads as actually emitting, which is
+ *  the difference between a coloured numeral and a lit one. */
 function neon(
   g: CanvasRenderingContext2D,
   text: string,
@@ -93,12 +103,14 @@ function neon(
   maxWidth?: number,
 ): void {
   ink(g, text, x, y, px, fill, maxWidth);
-  g.shadowColor = glow;
-  g.shadowBlur = Math.max(14, px * 0.4);
   g.fillStyle = fill;
-  g.font = `900 ${px}px 'Arial Black', system-ui, sans-serif`;
-  if (maxWidth) g.fillText(text, x, y, maxWidth);
-  else g.fillText(text, x, y);
+  g.font = font(700, px);
+  g.shadowColor = glow;
+  for (const blur of [Math.max(20, px * 0.55), Math.max(11, px * 0.24)]) {
+    g.shadowBlur = blur;
+    if (maxWidth) g.fillText(text, x, y, maxWidth);
+    else g.fillText(text, x, y);
+  }
   g.shadowBlur = 0;
 }
 
@@ -163,9 +175,12 @@ export class HudSystem extends createSystem({}) {
       depthWrite: false,
       side: DoubleSide,
     });
-    this.flair = new Mesh(new PlaneGeometry(1.1, 0.34), this.flairMat);
+    // Smaller than it was, and BENEATH the wedge instead of floating high
+    // right: the pop and the numbers it explains now live in one glance,
+    // and the action line above stays clear.
+    this.flair = new Mesh(new PlaneGeometry(0.76, 0.24), this.flairMat);
     this.flair.renderOrder = 31;
-    this.flair.position.set(0.62, 1.5, -1.25); // high right — off the action line
+    this.flair.position.set(-0.52, 0.93, -0.88);
     this.scene.add(this.flair);
   }
 
@@ -251,7 +266,7 @@ export class HudSystem extends createSystem({}) {
     const color = GRADE.colors[letter] ?? '#f4f6fb';
     const faced = d.dodges + d.hits;
 
-    ink(g, d.alive ? 'THE SET SAYS' : 'GAME OVER', CW / 2, 46, 32, d.alive ? 'rgba(232,236,242,0.85)' : '#ff5040');
+    ink(g, d.alive ? 'THE SET SAYS' : 'GAME OVER', CW / 2, 46, 32, d.alive ? 'rgba(240,244,250,0.95)' : '#ff5040');
     // The letter, huge, with its own halo.
     g.shadowColor = color;
     g.shadowBlur = 40;
@@ -264,7 +279,7 @@ export class HudSystem extends createSystem({}) {
       CW / 2,
       CH - 66,
       30,
-      'rgba(232,236,242,0.9)',
+      'rgba(240,244,250,1)',
     );
     if (d.perfects > 0) ink(g, `${d.perfects} PERFECT`, CW / 2, CH - 28, 26, '#ffd75e');
     this.cardTex.needsUpdate = true;
@@ -299,7 +314,10 @@ export class HudSystem extends createSystem({}) {
         SET_COLORS[match.tour.set % SET_COLORS.length],
       );
     }
-    neon(g, `${Math.max(1, count)}`, CW / 2, CH / 2 - 4, 150, '#ff2ad5');
+    // A flat magenta numeral reads DARK on a black card, however saturated
+    // it is: magenta's own luminance is low. Real neon is a near-white core
+    // inside a coloured halo, so that is what the count wears now.
+    neon(g, `${Math.max(1, count)}`, CW / 2, CH / 2 - 4, 150, '#ffe3f8', '#ff2ad5');
     if (cued) neon(g, `♪ ${cued.title}`, CW / 2, CH - 52, 36, '#7dffb2');
     this.cardTex.needsUpdate = true;
   }
@@ -312,7 +330,7 @@ export class HudSystem extends createSystem({}) {
     g.textBaseline = 'middle';
 
     const d = me();
-    const seatCss = seatNeonCss(seatHue(match.mySeat));
+    const seatCss = seatNeonCss(danceHue(match.mySeat, true));
     const cx = SW / 2;
 
     // Score — big and white with the faintest white bloom (the whites are
@@ -328,7 +346,7 @@ export class HudSystem extends createSystem({}) {
     if (d?.alive !== false) this.drawGroove(g, cx);
 
     if (d?.alive === false) {
-      ink(g, 'SPECTATING', cx, 252, 34, 'rgba(232,236,242,0.8)');
+      ink(g, 'SPECTATING', cx, 252, 34, 'rgba(240,244,250,0.92)');
     } else if (d && d.missChain > 0) {
       // THE CHAIN WARNING — nothing at all until you're clipped, then a
       // row of marks counting toward the end of the night. One dodge and
@@ -341,17 +359,21 @@ export class HudSystem extends createSystem({}) {
         const lit = i < d.missChain;
         g.beginPath();
         g.arc(x0 + i * gapX, 254, r, 0, Math.PI * 2);
-        g.lineWidth = 7;
+        // A thinner casing: the ring used to eat a third of the disc, so
+        // what little red survived read as a dull bead.
+        g.lineWidth = 5;
         g.strokeStyle = 'rgba(0,2,6,0.96)';
         g.stroke();
         if (lit) {
-          g.shadowColor = '#ff0a3c';
-          g.shadowBlur = last ? 30 : 18;
-          g.fillStyle = '#ff0a3c';
+          g.shadowColor = ALARM_CSS;
+          g.shadowBlur = last ? 34 : 22;
+          g.fillStyle = ALARM_CSS;
+          g.fill();
+          g.fill(); // twice through the bloom — the mark burns, not blushes
         } else {
           g.fillStyle = 'rgba(70,78,92,0.85)';
+          g.fill();
         }
-        g.fill();
         g.shadowBlur = 0;
       }
     }
@@ -423,14 +445,36 @@ export class HudSystem extends createSystem({}) {
   private drawFlair(text: string, tone: 'dodge' | 'perfect' | 'hit' | 'milestone' | 'info'): void {
     const g = this.flairCanvas.getContext('2d')!;
     g.clearRect(0, 0, 512, 160);
+    // The house semantic set — each tone unmistakably its own: green
+    // survived, WHITE rode the last beat (a perfect is the cleanest thing
+    // you can do, and white is the cleanest thing on the strip), the alarm
+    // red got clipped, magenta is a milestone, cyan is information.
     const color =
-      tone === 'perfect' ? '#ffd75e' : tone === 'hit' ? '#ff5040' : tone === 'milestone' ? '#ff2ad5' : '#b9ffc4';
+      tone === 'perfect'
+        ? '#ffffff'
+        : tone === 'hit'
+          ? ALARM_CSS
+          : tone === 'milestone'
+            ? '#ff2ad5'
+            : tone === 'info'
+              ? '#6fc8ff'
+              : '#2be28a';
     g.textAlign = 'center';
     g.textBaseline = 'middle';
     g.shadowColor = color;
-    g.shadowBlur = 26;
-    ink(g, text, 256, 80, 72, color, 490);
+    // The alarm blooms hardest: a deep red only reads as VIVID against the
+    // void if it throws light, and this is the pop you must not miss.
+    g.shadowBlur = tone === 'hit' ? 22 : 12;
+    ink(g, text, 256, 80, 52, color, 490);
     g.shadowBlur = 0;
+    if (tone === 'hit') {
+      // ...then a crisp core ON TOP of its own bloom. A heavy casing eats
+      // into 52px glyphs, and a halo brighter than the letters it surrounds
+      // reads as dark text in a red fog — the opposite of vivid.
+      g.fillStyle = color;
+      g.font = font(700, 52);
+      g.fillText(text, 256, 80, 490);
+    }
     this.flairTex.needsUpdate = true;
   }
 }

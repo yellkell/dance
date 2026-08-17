@@ -7,8 +7,9 @@
   Six dancers at spread hues run the full body-language range on a loop:
   idle groove, big rave (sticks high), duck, lean, and one melting out. The
   camera orbits slowly; `?still=1` (or window.__preview.still()) freezes the
-  choreography at its most readable pose for screenshots, and ?cam=close
-  parks the camera at 1.2 m for material close-ups.
+  choreography at its most readable pose for screenshots, `?cam=close` parks
+  the camera at 1.2 m for material close-ups, and `?cam=head&i=N` frames
+  dancer N's head at arm's length for visor / crest / jewellery work.
 
   Never shipped: nothing imports it, and the production build only bundles
   index.html. Screenshot it with `node tools/preview-shot.mjs`.
@@ -60,12 +61,17 @@
         SRGBColorSpace,
         WebGLRenderer,
       } from 'three';
-      import { buildDancer } from '/src/game/avatars.ts';
+      import { buildDancer, styleVariant, STYLE_STEP } from '/src/game/avatars.ts';
       import { seatHue } from '/src/config.ts';
 
       const params = new URLSearchParams(location.search);
       const still = params.get('still') === '1';
-      const close = params.get('cam') === 'close';
+      /** `?crown=1` crowns the whole row — clearance over every crest. */
+      const crowned = params.get('crown') === '1';
+      const cam = params.get('cam') ?? '';
+      /** `?cam=head` frames ONE dancer's head — the only way to judge visor,
+       *  jewellery and crest work, which is invisible at catwalk range. */
+      const solo = Math.min(5, Math.max(0, Number(params.get('i') ?? 1) | 0));
 
       const scene = new Scene();
       scene.background = new Color(0x08060d);
@@ -99,8 +105,14 @@
 
       const rigs = [];
       for (let i = 0; i < N; i++) {
-        const hue = seatHue(i * 4 + 1);
+        // Spread the hues as the seats do, then nudge each one just far
+        // enough to land on crest i % 4 — a step is 1/4096 of the wheel, so
+        // the colours are untouched to the eye and the row shows every
+        // haircut instead of whichever ones the seat hues happened to pick.
+        const base = seatHue(i * 4 + 1);
+        const hue = base + (((i - styleVariant(base)) % 4) + 4) % 4 * STYLE_STEP;
         const rig = buildDancer(hue);
+        if (crowned) rig.setCrown(true);
         const x = (i - (N - 1) / 2) * SPACING;
         rig.root.position.set(x, 0, 0);
         scene.add(rig.root);
@@ -112,8 +124,17 @@
         scene.add(ring);
       }
 
-      /** The catwalk routine: per-dancer body language across the row. */
+      /** Head override from __preview.look() — null while the routine runs. */
+      let neck = null;
+
+      /** The routine, with the neck override (if any) laid over the top. */
       function poseAt(i, t) {
+        const p = routineAt(i, t);
+        return neck ? { ...p, ...neck } : p;
+      }
+
+      /** The catwalk routine: per-dancer body language across the row. */
+      function routineAt(i, t) {
         const p = rigs[i].phase;
         const sway = Math.sin(t * 2.1 + p);
         const bob = Math.abs(Math.sin(t * 3.4 + p)) * 0.06;
@@ -122,6 +143,10 @@
           hy: 1.52 - bob,
           hz: Math.cos(t * 0.5 + p) * 0.06,
           yaw: Math.sin(t * 0.4 + p) * 0.5,
+          // Nod and tilt, on their own slower clocks — the thing a head does
+          // in conversation that a yaw-only puppet never could.
+          pitch: Math.sin(t * 0.55 + p * 1.7) * 0.45,
+          roll: Math.sin(t * 0.31 + p * 2.3) * 0.3,
           slump: 0,
         };
         switch (i % 6) {
@@ -146,10 +171,11 @@
               ry: 1.05 + Math.max(0, -sway) * 0.65,
               rz: -0.12,
             };
-          case 2: // the duck — low head, hands guarding
+          case 2: // the duck — low head (chin tucked), hands guarding
             return {
               ...base,
               hy: 1.06 - bob * 0.5,
+              pitch: -0.8,
               lx: base.hx - 0.24,
               ly: 0.82,
               lz: -0.18,
@@ -205,6 +231,11 @@
         run() {
           frozen = false;
         },
+        /** Pin the head where you want it — neck range shots. */
+        look(yaw, pitch, roll) {
+          frozen = true;
+          neck = { yaw, pitch, roll };
+        },
       };
 
       const t0 = performance.now();
@@ -213,11 +244,34 @@
         for (let i = 0; i < N; i++) rigs[i].rig.pose(poseAt(i, t));
 
         const orbit = frozen ? 0.35 : Math.sin(t * 0.12) * 0.55;
-        if (close) {
-          camera.position.set(Math.sin(orbit) * 1.3, 1.45, Math.cos(orbit) * 1.3);
+        if (cam === 'head') {
+          // Orbit the dancer's OWN facing direction, not the world — a head
+          // shot that drifts round to the back of the skull as the figure
+          // turns tells you nothing about the face.
+          const p = poseAt(solo, t);
+          const cx = rigs[solo].x + p.hx;
+          const a = p.yaw + orbit;
+          // Mirror the rig's own melt sink (avatars.ts pose()), or a
+          // slumping dancer leaves the camera staring at empty air.
+          const hy = p.hy * (1 - p.slump * 0.62);
+          camera.position.set(cx - Math.sin(a) * 0.42, hy + 0.03, p.hz - Math.cos(a) * 0.42);
+          camera.lookAt(cx, hy, p.hz);
+        } else if (cam === 'neck') {
+          // The collar junction, from just under it — the one angle that
+          // shows whether the neck is still plugged into the shoulders.
+          const p = poseAt(solo, t);
+          const cx = rigs[solo].x + p.hx;
+          const a = p.yaw + orbit;
+          const y = p.hy - 0.16;
+          camera.position.set(cx - Math.sin(a) * 0.3, y - 0.06, p.hz - Math.cos(a) * 0.3);
+          camera.lookAt(cx, y + 0.02, p.hz);
+        } else if (cam === 'close') {
+          camera.position.set(Math.sin(orbit) * 1.3, 1.45, -Math.cos(orbit) * 1.3);
           camera.lookAt(0, 1.25, 0);
         } else {
-          camera.position.set(Math.sin(orbit) * 4.6, 1.7, Math.cos(orbit) * 4.6);
+          // NEGATIVE z: the rig's forward is −Z, so a camera parked at +Z
+          // spends the whole session judging the backs of their heads.
+          camera.position.set(Math.sin(orbit) * 4.6, 1.7, -Math.cos(orbit) * 4.6);
           camera.lookAt(0, 1.05, 0);
         }
         renderer.render(scene, camera);

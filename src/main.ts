@@ -16,16 +16,20 @@ import { launchXR, SessionMode, World } from '@iwsdk/core';
 import { Color } from 'three';
 import { ensureAudio } from './audio/sfx.js';
 import { VOID_BG } from './arena/voidkit.js';
+import { ArcadeSystem } from './systems/ArcadeSystem.js';
 import { ArenaSystem } from './systems/ArenaSystem.js';
 import { AvatarSystem } from './systems/AvatarSystem.js';
 import { ChoreoSystem } from './systems/ChoreoSystem.js';
 import { ClubBallSystem } from './systems/ClubBallSystem.js';
+import { ClubMirrorSystem } from './systems/ClubMirrorSystem.js';
+import { ClubPropsSystem } from './systems/ClubPropsSystem.js';
 import { ClubSocialSystem } from './systems/ClubSocialSystem.js';
 import { ClubSystem } from './systems/ClubSystem.js';
 import { ClubTeleportSystem } from './systems/ClubTeleportSystem.js';
 import { DiscoSystem } from './systems/DiscoSystem.js';
 import { GoopliathSystem } from './systems/GoopliathSystem.js';
 import { HudSystem } from './systems/HudSystem.js';
+import { IntroSystem, introView } from './systems/IntroSystem.js';
 import { McSystem } from './systems/McSystem.js';
 import { MenuSystem } from './systems/MenuSystem.js';
 import { MusicSystem } from './systems/MusicSystem.js';
@@ -43,6 +47,9 @@ enterButton?.setAttribute('disabled', '');
 
 function hideLanding(): void {
   document.body.classList.add('app-entered');
+  // House lights down: the title card plays on the inside of the headset,
+  // cued by the same moment the web page gets out of the way.
+  introView.begin?.();
 }
 
 function showLanding(): void {
@@ -86,7 +93,10 @@ World.create(container, {
   world.registerSystem(ClubSystem);
   world.registerSystem(ClubTeleportSystem);
   world.registerSystem(ClubSocialSystem);
+  world.registerSystem(ClubMirrorSystem);
   world.registerSystem(ClubBallSystem);
+  world.registerSystem(ArcadeSystem);
+  world.registerSystem(ClubPropsSystem);
   world.registerSystem(MusicSystem);
   world.registerSystem(ChoreoSystem);
   world.registerSystem(GoopliathSystem);
@@ -97,6 +107,8 @@ World.create(container, {
   world.registerSystem(HudSystem);
   world.registerSystem(MenuSystem);
   world.registerSystem(NetworkSystem);
+  // Last, so its blackout is built after everything it covers.
+  world.registerSystem(IntroSystem);
 
   const xrSupported =
     (await navigator.xr?.isSessionSupported(SessionMode.ImmersiveVR).catch(() => false)) === true;
@@ -135,11 +147,27 @@ World.create(container, {
 // without controllers — e.g. __gdr.startRaid({ seats: 8 }), or walk the
 // club with __gdr.net.host() + __gdr.rig(x, z, yaw).
 import { finishRaid, startRaid, toLobby, toTour } from './game/flow.js';
+import { ambientTrackId } from './audio/music.js';
+import { mutedSpeakerIds } from './club/voice.js';
 import { match } from './game/state.js';
 import { arena } from './arena/arena.js';
 import { choreoView } from './systems/ChoreoSystem.js';
+import { menuView } from './systems/MenuSystem.js';
+import { socialView } from './systems/ClubSocialSystem.js';
+import { propsView } from './systems/ClubPropsSystem.js';
+import { teleportView } from './systems/ClubTeleportSystem.js';
 import { grooveView } from './systems/PlayerSystem.js';
-import { callBall, cancelBall, hostRoom, joinBall, joinRoom, leaveRoom, net, setDancerName } from './net/session.js';
+import {
+  callBall,
+  cancelBall,
+  hostRoom,
+  joinBall,
+  joinRoom,
+  leaveRoom,
+  net,
+  setDancerHue,
+  setDancerName,
+} from './net/session.js';
 import { clubPoses } from './net/poses.js';
 
 declare global {
@@ -157,18 +185,42 @@ declare global {
       choreo: typeof choreoView;
       /** Fire a glowstick sparkle burst (heat 0..1) for tuning. */
       sparkle: (heat?: number) => void;
+      /** What the controller models are doing (see grooveView.controllers). */
+      pads: () => ReturnType<NonNullable<typeof grooveView.controllers>>;
+      /** The live controller visual adapters — the only handle on the
+       *  hide-for-a-song path off-device. */
+      padAdapters: () => ReturnType<NonNullable<typeof grooveView.padAdapters>>;
       net: {
         host: typeof hostRoom;
         join: typeof joinRoom;
         leave: typeof leaveRoom;
         setName: typeof setDancerName;
+        /** Repaint this headset — pushes to a room already standing. */
+        setHue: typeof setDancerHue;
         state: typeof net;
         poses: typeof clubPoses;
       };
       /** THE BALL, drivable headlessly: call one, touch in, call it off. */
       club: { call: typeof callBall; touch: typeof joinBall; cancel: typeof cancelBall };
-      /** Park the player rig at (x, z) facing `yaw` — headless club walks. */
-      rig: (x: number, z: number, yaw?: number, y?: number) => void;
+      /** THE DRINKS: read the pool, or launch a glass on a known arc. */
+      props: typeof propsView;
+      /** The menus, drivable headlessly: board mode/hover, the pause card,
+       *  the SOCIAL panel — the style-iteration hooks. */
+      menu: typeof menuView & typeof socialView;
+      /** Park the player rig at (x, z) facing `yaw` — headless club walks.
+       *  `pitch`/`roll` tip the rig (and so the head that rides it) the way
+       *  a neck would, for probing what the room sees of your head. */
+      rig: (x: number, z: number, yaw?: number, y?: number, pitch?: number, roll?: number) => void;
+      /** The live scene graph — headless probes walk it by name. */
+      scene: () => import('three').Scene | null;
+      /** The title card, for captures that need to know where the show is. */
+      intro: typeof introView;
+      /** Voice speakers currently gated off (mute, block, or wrong room). */
+      mutedVoices: typeof mutedSpeakerIds;
+      /** Which record the room is spinning right now, by track id. */
+      ambient: typeof ambientTrackId;
+      /** The club moves that resolve without an arc (step back, snap turn). */
+      move: typeof teleportView;
     };
   }
 }
@@ -186,19 +238,38 @@ window.__gdr = {
   arena,
   choreo: choreoView,
   sparkle: (heat = 1) => grooveView.burst?.(heat),
+  pads: () => grooveView.controllers?.() ?? [],
+  padAdapters: () => grooveView.padAdapters?.() ?? null,
   net: {
     host: hostRoom,
     join: joinRoom,
     leave: leaveRoom,
     setName: setDancerName,
+    setHue: setDancerHue,
     state: net,
     poses: clubPoses,
   },
   club: { call: callBall, touch: joinBall, cancel: cancelBall },
-  rig: (x, z, yaw = 0, y = 0) => {
+  intro: introView,
+  mutedVoices: mutedSpeakerIds,
+  ambient: ambientTrackId,
+  move: teleportView,
+  props: propsView,
+  menu: new Proxy({} as typeof menuView & typeof socialView, {
+    // The views are populated in each system's init — resolve lazily.
+    get: (_t, key) =>
+      (menuView as Record<string | symbol, unknown>)[key] ??
+      (socialView as Record<string | symbol, unknown>)[key],
+  }),
+  rig: (x, z, yaw = 0, y = 0, pitch = 0, roll = 0) => {
     const w = worldRef;
     if (!w) return;
     w.player.position.set(x, y, z);
-    w.player.rotation.set(0, yaw, 0);
+    // Same order the pose pumps decode in, so what you set is what the
+    // room reads back.
+    w.player.rotation.order = 'YXZ';
+    w.player.rotation.set(pitch, yaw, roll);
   },
+  scene: () =>
+    (worldRef as unknown as { scene?: import('three').Scene } | null)?.scene ?? null,
 };

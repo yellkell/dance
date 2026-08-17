@@ -19,8 +19,11 @@
  *  donut  : arms thrown wide, then hauled in — the gather.
  *  duckdonut: the gather AND the limbo at once — get close and get small.
  *
- * While a move charges, his sticks and trim burn WARN amber (danger speaks
- * amber, always); between moves he does exactly the groupies' dance — one
+ * While a move charges, everything of his that GLOWS burns WARN amber —
+ * sticks, trim, and the lit sleeves and midriff — while his dark cloth
+ * holds his own colour (danger speaks amber, always, but it should not
+ * repaint the headliner into somebody else); between moves he does exactly
+ * the groupies' dance — one
  * stick up, one down, swapping on the beat — so the crowd's motion and the
  * boss's motion are one language. Zones are platform-local and identical
  * for every seat, so one giant's mime is honest for the whole ring.
@@ -38,7 +41,7 @@ import type { MeshBasicMaterial, MeshStandardMaterial } from 'three';
 import { MC, RING, hueToColor, ringRadius } from '../config.js';
 import { arena } from '../arena/arena.js';
 import { CLUB as CLUB_LAYOUT } from '../club/config.js';
-import { buildDancer, type DancerPose, type DancerRig } from '../game/avatars.js';
+import { ACCENT_REST, buildDancer, type DancerPose, type DancerRig } from '../game/avatars.js';
 import { match, type GestureCue } from '../game/state.js';
 import { net } from '../net/session.js';
 
@@ -61,7 +64,7 @@ interface ActiveMime {
 }
 
 const freshPose = (): DancerPose => ({
-  hx: 0, hy: STAND, hz: 0, yaw: 0,
+  hx: 0, hy: STAND, hz: 0, yaw: 0, pitch: 0, roll: 0,
   lx: -0.3, ly: 1.0, lz: -0.1,
   rx: 0.3, ry: 1.0, rz: -0.1,
   slump: 0,
@@ -92,6 +95,7 @@ export class McSystem extends createSystem({}) {
     this.generation = match.generation;
     if (!this.rig) {
       this.rig = buildDancer(MC.hue);
+      this.rig.root.name = 'the-mc'; // headless probes find him by name
       this.rig.root.scale.setScalar(MC.scale);
       // He faces the crowd — every client renders him looking at THEM.
       this.rig.root.rotation.y = Math.PI;
@@ -113,6 +117,8 @@ export class McSystem extends createSystem({}) {
     c.hy += (t.hy - c.hy) * k;
     c.hz += (t.hz - c.hz) * k;
     c.yaw += (t.yaw - c.yaw) * k;
+    c.pitch += (t.pitch - c.pitch) * k;
+    c.roll += (t.roll - c.roll) * k;
     c.lx += (t.lx - c.lx) * k;
     c.ly += (t.ly - c.ly) * k;
     c.lz += (t.lz - c.lz) * k;
@@ -198,6 +204,9 @@ export class McSystem extends createSystem({}) {
         p.rx = 0.34 + tremble;
         p.ly = p.ry = STAND + 0.45 - t * 0.6;
         p.lz = p.rz = -0.1;
+        // Watching it come: head back, and shaking with the rest of him.
+        p.pitch = t * 0.9;
+        p.roll = tremble * 3;
         rig.root.scale.set(this.scale * (1 + t * 0.25), this.scale * (1 - t * 0.55), this.scale * (1 + t * 0.25));
         this.applyAccents(1); // full alarm
         this.easeTo(delta, 14);
@@ -258,6 +267,10 @@ export class McSystem extends createSystem({}) {
     p.hz = 0;
     p.hy = STAND - bounce;
     p.yaw = Math.sin(beat * 0.25) * 0.2;
+    // He nods on the beat and rolls his head across the bar — the neck the
+    // rig grew for the club floor, spent on the man everyone is watching.
+    p.pitch = -0.1 - Math.abs(Math.sin(beat * Math.PI)) * 0.16;
+    p.roll = Math.sin(beat * 0.33) * 0.12;
     p.slump = 0;
     // The groupies' exact move, giant-sized: one stick up, one down.
     const wave = Math.sin(beat * Math.PI);
@@ -283,6 +296,12 @@ export class McSystem extends createSystem({}) {
     p.hz = 0;
     p.yaw = 0;
     p.hy = STAND;
+    // Chin down through the wind-up, up on the release — he stares the
+    // crowd down while he charges and throws his head back when it lands.
+    // (Set here, not left over: the groove's nod would otherwise ride out
+    // the whole mime, because easeTo only ever chases `tgt`.)
+    p.pitch = -0.24 + strike * 0.4;
+    p.roll = 0;
 
     switch (mime.cue.kind) {
       case 'beam': {
@@ -529,14 +548,27 @@ export class McSystem extends createSystem({}) {
   private applyAccents(warn: number): void {
     const rig = this.rig;
     if (!rig) return;
-    const color = warn > 0.5 ? MC.warnColor : this.baseColor;
-    for (const m of rig.accents) {
-      const std = m as MeshStandardMaterial;
+    // WARN burns everything of his that GLOWS amber — sticks, collar, belt,
+    // cuffs, seams, scan-slit, halos, and the lit sleeves and midriff with
+    // them — while the dark cloth and the helm hold his own colour.
+    //
+    // That split is the whole point: the parts that light up are the parts
+    // a dancer thirty metres away can see change, so the tell lands, and
+    // the figure stays recognisably HIM. Burning the dark cloth as well
+    // swapped the headliner for a different dancer mid-wind-up.
+    const warm = warn > 0.5;
+    const drive = 1.1 + warn * 1.5;
+    for (const { mat, gain, neon } of rig.accents) {
+      const color = neon && warm ? MC.warnColor : this.baseColor;
+      const std = mat as MeshStandardMaterial;
       if (std.emissive) {
         std.emissive.setHex(color);
-        std.emissiveIntensity = 1.1 + warn * 1.5;
+        // Scaled by the material's authored gain — his sleeves never
+        // outshine his sticks. The dark cloth sits at its authored rest
+        // the whole way through.
+        std.emissiveIntensity = (neon ? drive : ACCENT_REST) * gain;
       } else {
-        (m as MeshBasicMaterial).color.setHex(color);
+        (mat as MeshBasicMaterial).color.setHex(color);
       }
     }
   }

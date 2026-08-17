@@ -10,19 +10,32 @@
  * boundaries are fractions of the set) stretches to fit whatever is on.
  */
 
-import { MUSIC, RING, TOUR, countInBeatsFor } from '../config.js';
+import { MUSIC, RING, TOUR, chartBpm, countInBeatsFor } from '../config.js';
 import { pickRaidTrack, trackById, trackPhrases, type Track } from '../audio/tracks.js';
+import { submitWorldScore } from '../net/scores.js';
+import { profileName } from './profile.js';
 import { freshSeed } from './rng.js';
-import { buildRoster, gradeOf, markTourNightCleared, match, pushFlair } from './state.js';
+import {
+  buildRoster,
+  gradeOf,
+  markTourNightCleared,
+  match,
+  recordSoloRun,
+  recordTourGrade,
+  setMenuMusic,
+} from './state.js';
 
 const phraseBeats = MUSIC.beatsPerBar * MUSIC.barsPerPhrase;
 
-/** Apply a track to the match: tempo, set length, id. */
+/** Apply a track to the match: tempo, set length, id. The tempo mounted is
+ *  the CHART tempo — EXPERT runs slow records in double time — so
+ *  startRaid settles the difficulty before the track goes on. */
 function mountTrack(track: Track): void {
+  const bpm = chartBpm(track.bpm, match.difficulty);
   match.trackId = track.id;
-  match.bpm = track.bpm;
-  match.beatLen = 60 / track.bpm;
-  match.phrases = trackPhrases(track, countInBeatsFor(track.bpm), phraseBeats);
+  match.bpm = bpm;
+  match.beatLen = 60 / bpm;
+  match.phrases = trackPhrases(track, countInBeatsFor(bpm), phraseBeats, bpm);
   match.grooveStreak = 0;
 }
 
@@ -51,6 +64,12 @@ export function startRaid(opts: RaidOptions = {}): void {
   match.mySeat = opts.mySeat ?? 0;
   match.seed = opts.seed ?? freshSeed();
   if (opts.difficulty !== undefined) match.difficulty = Math.max(0, Math.min(3, opts.difficulty));
+  // THE CAMPAIGN CURVE: tour nights ignore every picker. The road teaches —
+  // EASY through the opening set, NORMAL through peak hours, HARD after
+  // hours — and EXPERT stays a thing you choose on the SOLO shelf, never
+  // something the entry night ambushes you with because the difficulty row
+  // happened to be parked high. (toLobby/toTour hand the picker back.)
+  if (opts.tour) match.difficulty = Math.min(2, opts.tour.set);
 
   // The headliner: the MC runs most nights; the GOOP takes tour finales.
   const tourSet = opts.tour ? TOUR.sets[opts.tour.set] : undefined;
@@ -87,15 +106,53 @@ export function startRaid(opts: RaidOptions = {}): void {
 /** The set resolves — freeze the board, raise the champion, pop confetti. */
 export function finishRaid(): void {
   if (match.screen !== 'raid') return;
-  // A tour night is CLEARED by surviving it — the letter is for bragging.
-  if (match.tour) {
-    const me = match.players.find((p) => p.kind === 'local');
-    if (me?.alive) {
-      markTourNightCleared(match.tour.set, match.tour.song);
-      pushFlair(`NIGHT CLEARED — ${gradeOf(me)}`, 'milestone');
+  const me = match.players.find((p) => p.kind === 'local');
+  if (me) {
+    const grade = gradeOf(me);
+    if (match.tour) {
+      // A tour night is CLEARED by surviving it — the letter is for
+      // bragging, and the map keeps the best one ever taken home.
+      recordTourGrade(match.tour.set, match.tour.song, grade);
+      // No pop for the clear: that strip says HIT and PERFECT and nothing
+      // else. The grade card, the podium board and the map's fresh ✓ all
+      // carry the news anyway.
+      if (me.alive) {
+        markTourNightCleared(match.tour.set, match.tour.song);
+        // THE LAST NIGHT. Survive the final record of the final set and the
+        // credits are due: the podium plays out as usual, and the map you
+        // walk back to is wearing them.
+        const last = TOUR.sets.length - 1;
+        if (match.tour.set === last && match.tour.song === TOUR.sets[last].songs.length - 1) {
+          match.credits = true;
+          // The closing theme is the prize, and it starts collected: it keeps
+          // the decks when the card comes down instead of the foyer snapping
+          // back to the house rotation mid-song. SYSTEM has the switch from
+          // now on if they'd rather have the old menu music back.
+          setMenuMusic('credits');
+        }
+      }
+    } else if (!match.online) {
+      // A finished solo set posts to the song's leaderboards — this
+      // headset's book, and the world board. The campaign and the club's
+      // raids never do. The world post is fire-and-forget: it must never
+      // hold up the podium, and a set danced offline is still a set.
+      recordSoloRun(match.trackId, match.difficulty, me.score, grade, profileName());
+      void submitWorldScore(match.trackId, match.difficulty, me.score, grade, profileName());
     }
   }
   match.screen = 'podium';
+}
+
+/** The campaign clamps match.difficulty per set; leaving a night hands the
+ *  SOLO picker's stored choice back so the shelf shows what YOU set. */
+function restorePickedDifficulty(): void {
+  try {
+    const raw = localStorage.getItem('gdr-diff');
+    const n = raw === null ? NaN : Number(raw);
+    match.difficulty = Number.isFinite(n) && n >= 0 && n <= 3 ? n : 1;
+  } catch {
+    match.difficulty = 1;
+  }
 }
 
 /** The tour screen (the campaign of song sets). */
@@ -103,6 +160,7 @@ export function toTour(): void {
   match.screen = 'tour';
   match.playing = false;
   match.beat = -Infinity;
+  restorePickedDifficulty();
   match.generation++;
 }
 
@@ -112,5 +170,7 @@ export function toLobby(): void {
   match.playing = false;
   match.beat = -Infinity;
   match.tour = null;
+  match.credits = false; // walking out to the foyer ends the roll
+  restorePickedDifficulty();
   match.generation++;
 }

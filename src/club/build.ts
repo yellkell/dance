@@ -29,11 +29,15 @@ import {
   BoxGeometry,
   CanvasTexture,
   CircleGeometry,
+  Color,
   CylinderGeometry,
   DoubleSide,
+  ExtrudeGeometry,
   Group,
   HemisphereLight,
+  InstancedMesh,
   LatheGeometry,
+  Matrix4,
   LinearFilter,
   Mesh,
   MeshBasicMaterial,
@@ -43,11 +47,13 @@ import {
   RingGeometry,
   Shape,
   ShapeGeometry,
+  SphereGeometry,
   Sprite,
   SpriteMaterial,
   SRGBColorSpace,
   TorusGeometry,
   Vector2,
+  Vector3,
   type Object3D,
   type Scene,
 } from 'three';
@@ -70,6 +76,8 @@ import {
   velvetTexture,
 } from './materials.js';
 import { collapseStatic } from './merge.js';
+import { registerArcade } from './arcade.js';
+import { font, onFontsReady } from '../ui/fonts.js';
 
 export interface ChandelierRing {
   pivot: Group;
@@ -93,8 +101,6 @@ export interface ClubRefs {
   chandelier: {
     group: Group;
     rings: ChandelierRing[];
-    moonMat: MeshStandardMaterial;
-    coronaMat: SpriteMaterial;
   };
   /** The brass inlay rings set into the dance floor (beat shimmer). */
   inlayMat: MeshBasicMaterial;
@@ -156,6 +162,13 @@ function signPlane(w: number, h: number, px: number, draw: (g: CanvasRenderingCo
   const tex = new CanvasTexture(c);
   tex.colorSpace = SRGBColorSpace;
   tex.minFilter = LinearFilter;
+  // The venue is built before the house woff2s land — re-ink the signage
+  // the moment the real glyphs arrive (first paint used the fallback).
+  onFontsReady(() => {
+    g.clearRect(0, 0, c.width, c.height);
+    draw(g, c.width, c.height);
+    tex.needsUpdate = true;
+  });
   const mesh = new Mesh(
     new PlaneGeometry(w, h),
     new MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false }),
@@ -180,6 +193,7 @@ export function buildClub(scene: Scene): ClubRefs {
   buildCeiling(root, W, NZ, SZ, H);
   const chandelier = buildChandelier(root);
   const consoleMat = buildStage(root);
+  buildMirror(root);
   const barBackMat = buildBar(root);
   const candleMat = new SpriteMaterial({
     map: glowTexture(),
@@ -193,6 +207,7 @@ export function buildClub(scene: Scene): ClubRefs {
   buildTerrace(root);
   buildVestibule(root);
   const stillLampMat = buildStillRoom(root, candleMat);
+  buildArcade(root);
   const inlayMat = buildFloorInlay(root);
   buildLights(root);
 
@@ -302,7 +317,25 @@ function buildWalls(root: Group, W: number, NZ: number, SZ: number, H: number): 
     m.rotation.y = ry;
     root.add(m);
   };
-  wall(W * 2, 0, NZ, 0); // north — the stage's drape wall covers most of it
+  // North — the stage's drape wall covers most of it, EXCEPT the mirror's
+  // opening in the east corner: the glass there is a window into the
+  // mirror recess behind the wall, so the plaster (like the drapes and the
+  // trim runs below) parts around it instead of sealing it shut.
+  const MR = CLUB.mirror;
+  const mx0 = MR.x - MR.w / 2 - 0.05;
+  const mx1 = MR.x + MR.w / 2 + 0.05;
+  const mTop = MR.baseY + MR.h + 0.05;
+  const wallH = H + 1.8;
+  {
+    const north = (w: number, x: number, y0: number, y1: number): void => {
+      const m = new Mesh(new PlaneGeometry(w, y1 - y0), plaster);
+      m.position.set(x, (y0 + y1) / 2, NZ);
+      root.add(m);
+    };
+    north(mx0 + W, (mx0 - W) / 2, 0, wallH); // west of the opening
+    north(W - mx1, (mx1 + W) / 2, 0, wallH); // east of the opening
+    north(mx1 - mx0, MR.x, mTop, wallH); // over the lintel
+  }
   wall(W * 2, 0, SZ, Math.PI); // south (vestibule)
   wall(SZ - NZ, -W, (NZ + SZ) / 2, Math.PI / 2); // west
   wall(SZ - NZ, W, (NZ + SZ) / 2, -Math.PI / 2); // east
@@ -311,15 +344,26 @@ function buildWalls(root: Group, W: number, NZ: number, SZ: number, H: number): 
   // three horizontal registers that make plaster read as a dressed room.
   const skirt = blackSteelMat();
   const railMat = brassMat(0.34);
-  for (const [len, x, z, ry] of [
-    [W * 2, 0, NZ + 0.02, 0],
-    [W * 2, 0, SZ - 0.02, Math.PI],
-    [SZ - NZ, -W + 0.02, (NZ + SZ) / 2, Math.PI / 2],
-    [SZ - NZ, W - 0.02, (NZ + SZ) / 2, -Math.PI / 2],
-  ] as const) {
+  const trimRun = (len: number, x: number, z: number, ry: number): void => {
     box(root, skirt, len, 0.16, 0.03, x, 0.08, z, ry);
     box(root, railMat, len, 0.035, 0.02, x, 1.0, z, ry);
     box(root, railMat, len, 0.05, 0.025, x, 2.62, z, ry);
+  };
+  // The north runs die into the mirror's frame the way the south's die
+  // into the door portal — a dado rail straight across the glass would be
+  // a brass line through everyone's reflection.
+  trimRun(mx0 + W, (mx0 - W) / 2, NZ + 0.02, 0);
+  trimRun(W - mx1, (mx1 + W) / 2, NZ + 0.02, 0);
+  trimRun(SZ - NZ, -W + 0.02, (NZ + SZ) / 2, Math.PI / 2);
+  trimRun(SZ - NZ, W - 0.02, (NZ + SZ) / 2, -Math.PI / 2);
+  // The SOUTH wall's runs die into the entrance portal instead of ploughing
+  // through it: a door surround interrupts the mouldings, and the picture
+  // rail in particular used to draw a brass line clean across the fanlight
+  // sitting in front of it. The gap clears the widest frame (±1.635).
+  const doorGap = 1.75;
+  const southRun = W - doorGap;
+  for (const side of [-1, 1] as const) {
+    trimRun(southRun, side * (doorGap + southRun / 2), SZ - 0.02, Math.PI);
   }
 
   // Fluted brass pilasters pace the long walls — each a slim core wrapped
@@ -327,7 +371,14 @@ function buildWalls(root: Group, W: number, NZ: number, SZ: number, H: number): 
   // varies subtly (the anti-repetition rule: no five modules identical).
   const coreMat = bronzeMat();
   const reedMat = brassMat(0.3);
+  // The hall's wall dressing stops at the side rooms' doors: a pilaster or
+  // a sconce that lands inside the arcade is hall furniture standing in
+  // somebody's room. (Generic, so the rooms can be moved again.)
+  const A = CLUB.arcade;
+  const inRoom = (x: number, z: number): boolean =>
+    x > A.minX && x < A.maxX && z > A.minZ && z < A.maxZ;
   const pilaster = (x: number, z: number): void => {
+    if (inRoom(x, z)) return;
     const g = new Group();
     g.position.set(x, 0, z);
     const plinthL = new Mesh(new BoxGeometry(0.4, 0.14, 0.24), skirt);
@@ -367,6 +418,7 @@ function buildWalls(root: Group, W: number, NZ: number, SZ: number, H: number): 
     opacity: 0.5,
   });
   const sconce = (x: number, z: number, ry: number): void => {
+    if (inRoom(x, z)) return;
     const g = new Group();
     g.position.set(x, 1.78, z);
     g.rotation.y = ry;
@@ -497,37 +549,14 @@ function buildChandelier(root: Group): ClubRefs['chandelier'] {
     rings.push({ pivot, glowMat, speed: def.speed });
   });
 
-  // The moon at the heart — a disc of moon-white with a bronze occluder
-  // easing across it: the eclipse. The corona halo breathes on the bar.
-  const moonMat = new MeshStandardMaterial({
-    color: 0x2a2a33,
-    emissive: DECOR.moon,
-    emissiveIntensity: 1.1,
-    roughness: 0.5,
-    metalness: 0.1,
-  });
-  const moon = new Mesh(new CylinderGeometry(0.3, 0.3, 0.05, 28), moonMat);
-  group.add(moon);
-  const shadowMat = new MeshStandardMaterial({ color: 0x14100e, roughness: 0.8, metalness: 0.3 });
-  const occluder = new Mesh(new CylinderGeometry(0.27, 0.27, 0.056, 28), shadowMat);
-  occluder.position.set(0.13, 0, 0.05);
-  group.add(occluder);
-  const coronaMat = new SpriteMaterial({
-    map: glowTexture(),
-    color: DECOR.moon,
-    transparent: true,
-    blending: AdditiveBlending,
-    depthWrite: false,
-    opacity: 0.55,
-  });
-  const corona = new Sprite(coronaMat);
-  corona.scale.setScalar(1.5);
-  group.add(corona);
+  // No moon at the heart. The crescent disc and its corona used to hang in
+  // the middle of the rings; the rings are the fixture, and they read
+  // better as an open eclipse with nothing in the eye of it.
   const stem = new Mesh(new CylinderGeometry(0.012, 0.012, 1.6, 6), cableMat);
   stem.position.y = 0.8;
   group.add(stem);
 
-  return { group, rings, moonMat, coronaMat };
+  return { group, rings };
 }
 
 /* ── the stage: crescent riser, DJ console, sunburst, drapes ────────────── */
@@ -537,19 +566,23 @@ function buildStage(root: Group): MeshBasicMaterial {
   const oakSkirtMat = new MeshStandardMaterial({ map: oakTexture([6, 1]), roughness: 0.55, metalness: 0.05 });
   const topMat = new MeshStandardMaterial({ map: parquetTexture([3, 3]), metalness: 0.2, roughness: 0.42 });
 
-  // Riser: a half-drum against the north wall.
-  const drum = new Mesh(new CylinderGeometry(S.r, S.r, S.h, 40, 1, false, Math.PI / 2, Math.PI), oakSkirtMat);
+  // Riser: a half-drum bulging SOUTH toward the crowd. Skirt, lid and
+  // nosing all cover the SAME half now — the three used to be authored a
+  // half-turn apart, so the curved skirt hid inside the wall and the whole
+  // front of the stage was an open see-through shell.
+  const drum = new Mesh(new CylinderGeometry(S.r, S.r, S.h, 40, 1, true, -Math.PI / 2, Math.PI), oakSkirtMat);
   drum.position.set(0, S.h / 2, S.z);
   root.add(drum);
-  const lid = new Mesh(new CircleGeometry(S.r, 40, Math.PI / 2, Math.PI), topMat);
+  const lid = new Mesh(new CircleGeometry(S.r, 40, Math.PI, Math.PI), topMat);
   lid.rotation.x = -Math.PI / 2;
-  lid.rotation.z = Math.PI;
   lid.position.set(0, S.h + 0.001, S.z);
   root.add(lid);
+  // The flat back of the half-drum, closed — the backstage walk sees a
+  // panelled face, not the underside of the lid.
+  box(root, oakSkirtMat, S.r * 2, S.h, 0.07, 0, S.h / 2, S.z - 0.03);
   // Brass nosing along the curved lip + two shallow guest steps at centre.
   const nose = new Mesh(new TorusGeometry(S.r, 0.02, 8, 40, Math.PI), brassMat(0.25));
   nose.rotation.x = Math.PI / 2;
-  nose.rotation.z = Math.PI;
   nose.position.set(0, S.h, S.z);
   root.add(nose);
   const stepMat = blackSteelMat();
@@ -576,9 +609,14 @@ function buildStage(root: Group): MeshBasicMaterial {
 
   // Velvet drapes across the whole north wall behind the burst: full-height
   // panels hung in alternating relief so the pleats catch the cove light.
+  // They PART around the mirror in the east corner — its glass is a window
+  // through this wall, and buildMirror() hangs the tied-back pair that
+  // frames it.
   const drapeMat = new MeshStandardMaterial({ map: velvetTexture([2, 1], 6), roughness: 0.96, metalness: 0 });
+  const MR = CLUB.mirror;
   for (let i = 0; i < 12; i++) {
     const x = -8.25 + i * 1.5;
+    if (Math.abs(x - MR.x) < MR.w / 2 + 1.0) continue; // the mirror's span
     const panel = new Mesh(new PlaneGeometry(1.56, 4.6), drapeMat);
     panel.position.set(x, 2.3, CLUB.minZ + 0.05 + (i % 2) * 0.05);
     root.add(panel);
@@ -590,12 +628,22 @@ function buildStage(root: Group): MeshBasicMaterial {
   // and two platters — where the MC earns the name.
   const deskMat = new MeshStandardMaterial({ map: oakTexture([2, 1]), roughness: 0.5, metalness: 0.08 });
   const console = new Group();
-  console.position.set(0, S.h, S.z + 0.9);
+  // Stood on the footprint the physics tables read, so the desk the drinks
+  // ring off is the desk you can see (club/config.ts, stage.desk).
+  console.position.set(0, S.h, S.desk.z);
+  // The desk WORKS for the MC: fascia, fader surface and platters face HIM
+  // (he stands north of it, deeper on the stage) — the crowd gets the oak
+  // back of a working console, the way a real booth reads.
+  console.rotation.y = Math.PI;
   const body = new Mesh(new BoxGeometry(2.2, 0.92, 0.6), deskMat);
   body.position.y = 0.46;
   console.add(body);
-  const fascia = new Mesh(new BoxGeometry(2.24, 0.2, 0.62), brassMat(0.35));
-  fascia.position.y = 0.86;
+  // Width, depth and TOP all come from the config: the brass fascia is the
+  // widest, tallest part of the desk, so it's the part the drinks' collision
+  // box describes. Sizing it from there means the two can't drift apart.
+  const FASCIA_H = 0.2;
+  const fascia = new Mesh(new BoxGeometry(S.desk.halfW * 2, FASCIA_H, S.desk.halfD * 2), brassMat(0.35));
+  fascia.position.y = S.desk.top - S.h - FASCIA_H / 2;
   console.add(fascia);
   // The lit control surface (canvas: faders, dials, a spectrum bar).
   const cc = document.createElement('canvas');
@@ -641,41 +689,8 @@ function buildStage(root: Group): MeshBasicMaterial {
   }
   root.add(console);
 
-  // The house mark over the stage: no name, just the sign of the place —
-  // an eclipsed moon in a thin double keyline, flanked by its phases. The
-  // room doesn't say what it's called; it just is.
-  const sign = signPlane(3.2, 0.85, 1024, (s, sw, sh) => {
-    s.strokeStyle = 'rgba(201,168,106,0.9)';
-    s.lineWidth = 3;
-    s.strokeRect(10, 10, sw - 20, sh - 20);
-    s.lineWidth = 1.5;
-    s.strokeRect(20, 20, sw - 40, sh - 40);
-    // The glyph, centre: a moon disc bitten by its shadow — and a phase
-    // march either side, waxing in, waning out.
-    const moon = (gx: number, r: number, bite: number): void => {
-      s.shadowColor = 'rgba(242,236,255,0.8)';
-      s.shadowBlur = 14;
-      s.beginPath();
-      s.arc(gx, sh / 2, r, 0, Math.PI * 2);
-      s.fillStyle = '#f2ecff';
-      s.fill();
-      s.shadowBlur = 0;
-      if (bite > 0) {
-        s.beginPath();
-        s.arc(gx + r * bite, sh / 2, r * 0.92, 0, Math.PI * 2);
-        s.fillStyle = '#0d0a14';
-        s.fill();
-      }
-    };
-    moon(sw / 2, 64, 0.42);
-    moon(sw * 0.26, 30, 0.85);
-    moon(sw * 0.74, 30, -0.0001);
-    moon(sw * 0.13, 20, 1.15);
-    moon(sw * 0.87, 20, 0.6);
-  });
-  sign.name = 'live-house-sign';
-  sign.position.set(0, 2.95, CLUB.minZ + 0.6);
-  root.add(sign);
+  // Nothing hangs over the stage: the wall behind the MC is his backdrop,
+  // not a billboard. (The moon-phase house mark used to live here.)
 
   // Footlights along the stage lip: a run of small warm scallops so the
   // riser face reads and the MC gets his uplight.
@@ -691,6 +706,129 @@ function buildStage(root: Group): MeshBasicMaterial {
   }
 
   return consoleMat;
+}
+
+/* ── THE BACK BAR'S BOTTLES ──────────────────────────────────────────────
+ *
+ * Twenty-four bottles used to be twenty-four Meshes, each carrying its own
+ * LatheGeometry AND its own MeshStandardMaterial: twenty-four draw calls
+ * and twenty-four material binds for the smallest objects in the room —
+ * spending the budget of a crowd scene on a shelf you could count in one
+ * glance. One bottle every 66 cm is not a bar, it's a display case.
+ *
+ * Instancing makes the COUNT nearly free, and that is what pays for a bar
+ * that looks stocked: four shelves instead of three, packed shoulder to
+ * shoulder, with a second rank behind showing through the gaps — hundreds
+ * of bottles in THREE draw calls, one per silhouette.
+ *
+ * Two more things ride along. The bottles are OPAQUE now: at 0.88 they were
+ * nominally see-through and paid for it twice over — sorted every frame and
+ * blended over each other — and three hundred of them overlapping would
+ * have turned the shelf to mush rather than glass. And the profile is cut
+ * down to six rings: a 4 cm bottle two metres behind a glass wall is worth
+ * a shoulder and a neck, not a moulded lip.
+ */
+
+/** Drink colours — the one place saturated colour touches glass. */
+const BOTTLE_TINTS = [0xc97a1e, 0x8a3a10, 0x4fb7ff, 0x7dff5a, 0xb06bff, 0xe8352a, 0xf2e9d4, 0xffd24a];
+/** Silhouettes: squat rum, tall spirit, bulb liqueur. Built UNIT-HEIGHT and
+ *  stretched per instance, which is exactly what varying `h` did before —
+ *  the radius stays put while the bottle grows. */
+const BOTTLE_R = 0.036;
+const BOTTLE_SEGMENTS = 7;
+function bottleProfile(kind: number): Vector2[] {
+  const r = BOTTLE_R;
+  const bodyTop = kind === 0 ? 0.62 : kind === 1 ? 0.5 : 0.42;
+  const neckR = r * (kind === 2 ? 0.24 : 0.3);
+  return [
+    new Vector2(0, 0),
+    new Vector2(r * 0.92, 0.01),
+    new Vector2(r, bodyTop),
+    new Vector2(r * (kind === 2 ? 0.9 : 0.66), bodyTop + 0.16),
+    new Vector2(neckR, 0.86),
+    new Vector2(neckR * 1.45, 1),
+    new Vector2(0, 1),
+  ];
+}
+
+/** Shelf heights, floor up. The fourth is new: the glass wall runs to 2.75
+ *  and the old top shelf left three quarters of a metre of it bare. */
+const SHELF_YS = [0.62, 1.18, 1.74, 2.3];
+/** Where each rank stands across the shelf's 26 cm depth, how tightly it is
+ *  packed, and how much light it gets. The back rank is half as dense and
+ *  darker: it exists to fill the gaps between the front rank's shoulders,
+ *  and anything more is triangles nobody will ever see. */
+const BOTTLE_RANKS = [
+  { x: -0.225, spacing: 0.115, offset: 0, shade: 1 },
+  { x: -0.105, spacing: 0.23, offset: 0.115, shade: 0.62 },
+];
+
+function buildBackBarBottles(
+  root: Group,
+  B: typeof CLUB.bar,
+  len: number,
+  zc: number,
+): void {
+  const shelfMat = new MeshStandardMaterial({ map: marbleTexture([3, 0.4]), metalness: 0.2, roughness: 0.25 });
+  for (const y of SHELF_YS) box(root, shelfMat, 0.26, 0.03, len - 0.3, B.backX - 0.16, y, zc);
+
+  // Lay every bottle out first — the instance count has to be known before
+  // the mesh exists — then deal them into one bucket per silhouette.
+  const buckets: { x: number; y: number; z: number; h: number; tint: Color }[][] = [[], [], []];
+  const z0 = B.z0 + 0.3;
+  const z1 = B.z1 - 0.3;
+  let n = 0;
+  SHELF_YS.forEach((y, shelf) => {
+    for (const rank of BOTTLE_RANKS) {
+      for (let z = z0 + rank.offset; z <= z1; z += rank.spacing) {
+        // Deterministic, not random: the club is rebuilt on every entry and
+        // a shelf that reshuffles itself when you walk out and back in is a
+        // thing you notice.
+        const i = n++;
+        const kind = (i + shelf) % 3;
+        const tint = new Color(BOTTLE_TINTS[(i * 3 + shelf * 5) % BOTTLE_TINTS.length]);
+        tint.multiplyScalar(rank.shade);
+        buckets[kind].push({
+          x: B.backX + rank.x,
+          y: y + 0.015,
+          z,
+          h: 0.24 + ((i + shelf) % 3) * 0.035,
+          tint,
+        });
+      }
+    }
+  });
+
+  const _m = new Matrix4();
+  buckets.forEach((bottles, kind) => {
+    if (!bottles.length) return;
+    const mat = new MeshStandardMaterial({
+      color: 0xffffff,
+      emissive: 0xffffff,
+      emissiveIntensity: 0.32,
+      roughness: 0.18,
+      metalness: 0.05,
+    });
+    // instanceColor reaches the fragment shader as vColor and multiplies the
+    // DIFFUSE. These are backlit glass, so most of their tint lives in the
+    // emissive — one line makes that per-instance too, and three hundred
+    // bottles glow three hundred colours off one material.
+    mat.onBeforeCompile = (shader) => {
+      shader.fragmentShader = shader.fragmentShader.replace(
+        'vec3 totalEmissiveRadiance = emissive;',
+        'vec3 totalEmissiveRadiance = emissive * vColor.rgb;',
+      );
+    };
+    const mesh = new InstancedMesh(new LatheGeometry(bottleProfile(kind), BOTTLE_SEGMENTS), mat, bottles.length);
+    mesh.name = `live-bar-bottles-${kind}`;
+    bottles.forEach((b, i) => {
+      mesh.setMatrixAt(i, _m.makeScale(1, b.h, 1).setPosition(b.x, b.y, b.z));
+      mesh.setColorAt(i, b.tint);
+    });
+    mesh.instanceMatrix.needsUpdate = true;
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+    root.add(mesh);
+  });
 }
 
 /* ── the bar: smoked oak, honed marble, backlit ribbed glass ────────────── */
@@ -763,49 +901,7 @@ function buildBar(root: Group): MeshStandardMaterial {
   box(root, railBrass, 0.04, 0.04, len + 0.44, B.backX - 0.02, 2.76, zc);
   box(root, railBrass, 0.04, 0.04, len + 0.44, B.backX - 0.02, 0.26, zc);
 
-  // Shelves + bottles. Profiles vary (squat rum, tall spirit, bulb liqueur);
-  // tints are the drinks' — the one place saturated colour touches glass.
-  const shelfMat = new MeshStandardMaterial({ map: marbleTexture([3, 0.4]), metalness: 0.2, roughness: 0.25 });
-  const bottleTints = [0xc97a1e, 0x8a3a10, 0x4fb7ff, 0x7dff5a, 0xb06bff, 0xe8352a, 0xf2e9d4, 0xffd24a];
-  const bottleProfile = (h: number, r: number, kind: number): Vector2[] => {
-    const bodyTop = h * (kind === 0 ? 0.62 : kind === 1 ? 0.5 : 0.42);
-    const neckR = r * (kind === 2 ? 0.24 : 0.3);
-    return [
-      new Vector2(0.001, 0),
-      new Vector2(r * 0.88, 0),
-      new Vector2(r, h * 0.06),
-      new Vector2(r, bodyTop),
-      new Vector2(r * (kind === 2 ? 0.9 : 0.66), h * (bodyTop / h + 0.16)),
-      new Vector2(neckR, h * 0.85),
-      new Vector2(neckR, h * 0.94),
-      new Vector2(neckR * 1.5, h * 0.95),
-      new Vector2(neckR * 1.5, h),
-      new Vector2(0.001, h),
-    ];
-  };
-  for (let shelf = 0; shelf < 3; shelf++) {
-    const y = 0.62 + shelf * 0.56;
-    box(root, shelfMat, 0.26, 0.03, len - 0.3, B.backX - 0.16, y, zc);
-    const count = 9 - shelf;
-    for (let i = 0; i < count; i++) {
-      const tint = bottleTints[(i * 3 + shelf * 5) % bottleTints.length];
-      const h = 0.24 + ((i + shelf) % 3) * 0.035;
-      const bottle = new Mesh(
-        new LatheGeometry(bottleProfile(h, 0.036, (i + shelf) % 3), 10),
-        new MeshStandardMaterial({
-          color: tint,
-          emissive: tint,
-          emissiveIntensity: 0.32,
-          transparent: true,
-          opacity: 0.88,
-          roughness: 0.18,
-          metalness: 0.05,
-        }),
-      );
-      bottle.position.set(B.backX - 0.16, y + 0.015, B.z0 + 0.55 + i * ((len - 1.1) / (count - 1)));
-      root.add(bottle);
-    }
-  }
+  buildBackBarBottles(root, B, len, zc);
 
   // Five brass pendants over the counter — cones on long stems, glowing.
   const pendantShade = brassGlowMat(1.15);
@@ -853,22 +949,203 @@ function buildBar(root: Group): MeshStandardMaterial {
     root.add(g);
   }
 
-  // A quiet little BAR sign in the deco manner, on the east wall's rail.
-  const barSign = signPlane(0.8, 0.26, 512, (s, sw, sh) => {
-    s.textAlign = 'center';
-    s.textBaseline = 'middle';
-    s.fillStyle = '#e8d9b0';
-    s.shadowColor = 'rgba(255,196,110,0.9)';
-    s.shadowBlur = 14;
-    s.font = `500 88px Georgia, serif`;
-    s.fillText('B A R', sw / 2, sh / 2 + 4);
-  });
-  barSign.name = 'live-bar-sign';
-  barSign.rotation.y = -Math.PI / 2;
-  barSign.position.set(CLUB.halfW - 0.1, 2.9, zc);
-  root.add(barSign);
+  // (No sign. A wall of bottles under four shelves of light is already the
+  // most legible thing in the room — spelling BAR over it was labelling a
+  // door "DOOR".)
 
   return glassMat;
+}
+
+/* ── THE MIRROR: a smoked pier glass into a recess behind the north wall ── */
+
+/** What ClubMirrorSystem drives: the pane's smoke, the figures' room, the
+ *  depth-haze and the recess key. Everything else about the mirror bakes. */
+export interface MirrorRefs {
+  /** The glass tint — near-opaque asleep, light smoke awake. */
+  pane: MeshBasicMaterial;
+  /** Where the system parents the mirrored rigs (inside the recess). */
+  figures: Group;
+  /** The translucent murk planes that swallow deep reflections. */
+  haze: Group;
+  /** The recess's own key — warm, and only paid for while the glass wakes. */
+  light: PointLight;
+}
+
+/** buildClub() → ClubMirrorSystem hand-off (same pattern as socialView:
+ *  the builder runs long before any system's init sees the refs). */
+export const mirrorRefs: { current: MirrorRefs | null } = { current: null };
+
+function buildMirror(root: Group): void {
+  const M = CLUB.mirror;
+  const wallZ = CLUB.minZ;
+  const x0 = M.x - M.w / 2;
+  const x1 = M.x + M.w / 2;
+  const yTop = M.baseY + M.h;
+  const cy = M.baseY + M.h / 2;
+
+  /* The RECESS — the room the reflections stand in: a dark shell as deep
+   * as the mirror can see, always there (it bakes; an empty black box
+   * costs nothing), so the sleeping glass has real darkness behind it. */
+  const depth = M.reflectRange + 0.5;
+  const shell = new MeshStandardMaterial({ color: 0x121016, roughness: 0.85, metalness: 0.15 });
+  const inX0 = M.x - 2.4;
+  const inX1 = Math.min(CLUB.halfW + 0.6, M.x + 2.4);
+  const inW = inX1 - inX0;
+  const inCx = (inX0 + inX1) / 2;
+  const inH = 3.1;
+  // Floor carries a whisper of the parquet's sheen — a floor, not a pit.
+  const rFloor = new Mesh(
+    new PlaneGeometry(inW, depth),
+    new MeshStandardMaterial({ color: 0x17141a, roughness: 0.45, metalness: 0.35 }),
+  );
+  rFloor.rotation.x = -Math.PI / 2;
+  rFloor.position.set(inCx, 0.002, wallZ - depth / 2);
+  root.add(rFloor);
+  const rCeil = new Mesh(new PlaneGeometry(inW, depth), shell);
+  rCeil.rotation.x = Math.PI / 2;
+  rCeil.position.set(inCx, inH, wallZ - depth / 2);
+  root.add(rCeil);
+  const rBack = new Mesh(new PlaneGeometry(inW, inH), shell);
+  rBack.position.set(inCx, inH / 2, wallZ - depth);
+  root.add(rBack);
+  for (const [sx, ry] of [
+    [inX0, Math.PI / 2],
+    [inX1, -Math.PI / 2],
+  ] as const) {
+    const side = new Mesh(new PlaneGeometry(depth, inH), shell);
+    side.position.set(sx, inH / 2, wallZ - depth / 2);
+    side.rotation.y = ry;
+    root.add(side);
+  }
+
+  // The figures' room + the murk — LIVE (the system toggles them awake).
+  const figures = new Group();
+  figures.name = 'live-mirror-figures';
+  figures.visible = false;
+  root.add(figures);
+  const haze = new Group();
+  haze.name = 'live-mirror-haze';
+  haze.visible = false;
+  // The murk starts BEYOND the reflection you came to look at: your own
+  // stands as deep as you are far, so haze hung at a metre just dims the
+  // one figure that matters. These sit past that and swallow the recess's
+  // back wall, where the far reflections trail off into nothing.
+  for (let i = 0; i < 3; i++) {
+    const murk = new Mesh(
+      new PlaneGeometry(inW, inH),
+      new MeshBasicMaterial({ color: 0x05060a, transparent: true, opacity: 0.28, depthWrite: false }),
+    );
+    murk.position.set(inCx, inH / 2, wallZ - 2.6 - i * 0.8);
+    haze.add(murk);
+  }
+  // THE ROOM BEHIND YOU, implied. A real mirror shows the hall over your
+  // shoulder; a recess this shallow can't hold one, and without something
+  // back there the glass reads as a hatch onto a black cupboard. A few
+  // deep warm embers at the candle/cove temperatures — the club's own
+  // light, too far off to resolve — sell the depth the geometry lacks,
+  // and they hide behind the murk planes rather than lighting anything.
+  const emberMat = new SpriteMaterial({
+    map: glowTexture(),
+    color: DECOR.cove,
+    transparent: true,
+    blending: AdditiveBlending,
+    depthWrite: false,
+    opacity: 0.4,
+  });
+  for (const [ex, ey, ez, s] of [
+    [-1.5, 1.85, 2.9, 0.75],
+    [1.35, 2.1, 3.35, 0.6],
+    [-0.35, 2.55, 3.6, 0.95],
+    [1.8, 1.35, 2.7, 0.5],
+    [-1.9, 1.15, 3.3, 0.42],
+  ] as const) {
+    const ember = new Sprite(emberMat);
+    ember.scale.setScalar(s);
+    ember.position.set(inCx + ex, ey, wallZ - ez);
+    haze.add(ember);
+  }
+  root.add(haze);
+  // The recess key hangs just BEHIND the glass, so it rakes the fronts of
+  // the reflections (which face the pane, and therefore you) rather than
+  // backlighting them into silhouettes.
+  const light = new PointLight(DECOR.face, 0, 6.5, 1.5);
+  light.position.set(M.x, 2.15, wallZ - 0.5);
+  light.name = 'live-mirror-light';
+  root.add(light);
+
+  /* The GLASS — one smoked pane at the wall plane. Asleep it is black
+   * glass; awake it thins to a tint over the recess. ('live-': its
+   * opacity animates, and the bake must not swallow it.) */
+  const pane = new MeshBasicMaterial({ color: 0x04050a, transparent: true, opacity: 0.93, depthWrite: false });
+  const glass = new Mesh(new PlaneGeometry(M.w, M.h), pane);
+  glass.name = 'live-mirror-pane';
+  glass.position.set(M.x, cy, wallZ + 0.012);
+  root.add(glass);
+  // A resting sheen so the black glass reads GLASS from across the hall —
+  // a faint cold gleam clipped to the pane, not a lit surface.
+  const sheen = new Mesh(
+    new PlaneGeometry(M.w * 0.86, M.h * 0.86),
+    new MeshBasicMaterial({
+      map: glowTexture(),
+      color: 0x3a4358,
+      transparent: true,
+      opacity: 0.16,
+      blending: AdditiveBlending,
+      depthWrite: false,
+    }),
+  );
+  sheen.position.set(M.x - M.w * 0.18, cy + M.h * 0.2, wallZ + 0.016);
+  root.add(sheen);
+
+  /* The FRAME — champagne brass over a bronze under-step, deco to match
+   * the pilasters; a chunky sill below, a rib fan crown above (the stage
+   * sunburst's little echo, so the two ends of the wall rhyme). Every
+   * face bar OVERLAPS both the glass edge and the wall opening's rim —
+   * a frame that covers neither is a picture taped to a hole. */
+  const brass = brassMat(0.3);
+  const bronze = bronzeMat();
+  const B = 0.14; // face bar width
+  // Bronze under-step: a sliver peeking around the brass, less proud.
+  box(root, bronze, M.w + 0.66, 0.1, 0.08, M.x, yTop + 0.16, wallZ + 0.04);
+  for (const sx of [x0 - 0.13, x1 + 0.13]) box(root, bronze, 0.1, M.h + 0.3, 0.08, sx, cy, wallZ + 0.04);
+  // Brass face frame (top bar rides the lintel, bottom bar the glass base).
+  box(root, brass, M.w + 0.5, B, 0.1, M.x, yTop + 0.05, wallZ + 0.07);
+  box(root, brass, M.w + 0.5, B, 0.1, M.x, M.baseY - 0.05, wallZ + 0.07);
+  for (const sx of [x0 - 0.02, x1 + 0.02]) box(root, brass, B, M.h + 0.34, 0.1, sx, cy, wallZ + 0.07);
+  // Corner blocks — the deco full stop on each mitre.
+  for (const sx of [x0 - 0.02, x1 + 0.02]) {
+    for (const sy of [M.baseY - 0.05, yTop + 0.05]) {
+      box(root, blackSteelMat(), B + 0.06, B + 0.06, 0.11, sx, sy, wallZ + 0.075);
+    }
+  }
+  // The sill — a proper brass shelf on a bronze plinth; the skirting run
+  // dies into it from either side.
+  box(root, brass, M.w + 0.56, 0.07, 0.22, M.x, 0.155, wallZ + 0.1);
+  box(root, bronze, M.w + 0.44, 0.16, 0.1, M.x, 0.08, wallZ + 0.05);
+  // The crown fan.
+  const crownY = yTop + 0.24;
+  for (let i = 0; i < 7; i++) {
+    const a = (i / 6) * Math.PI - Math.PI / 2;
+    const len = 0.3 + (i % 2) * 0.12;
+    const rib = new Mesh(new BoxGeometry(0.035, len, 0.025), brass);
+    rib.position.set(M.x + Math.sin(a) * (len / 2 + 0.12), crownY + Math.cos(a) * (len / 2 + 0.12), wallZ + 0.05);
+    rib.rotation.z = -a;
+    root.add(rib);
+  }
+  const hub = new Mesh(new CircleGeometry(0.12, 18, 0, Math.PI), brassGlowMat(0.7));
+  hub.position.set(M.x, crownY, wallZ + 0.06);
+  root.add(hub);
+
+  /* Tied-back velvet flanks — the drape line parts FOR the mirror. */
+  const drape = new MeshStandardMaterial({ map: velvetTexture([2, 1], 6), roughness: 0.96, metalness: 0 });
+  for (const side of [-1, 1] as const) {
+    const panel = new Mesh(new PlaneGeometry(1.3, 4.6), drape);
+    panel.position.set(M.x + side * (M.w / 2 + 0.82), 2.3, wallZ + 0.1);
+    panel.rotation.y = -side * 0.1;
+    root.add(panel);
+  }
+
+  mirrorRefs.current = { pane, figures, haze, light };
 }
 
 /* ── booths: velvet horseshoes, marble tables, candlelight ──────────────── */
@@ -890,21 +1167,37 @@ function buildBooths(root: Group, candleMat: SpriteMaterial): void {
     g.rotation.y = Math.PI / 2; // horseshoe opens east, into the room
 
     // Plinth + curved bench: a half-torus seat ring on a low base drum.
-    const plinth = new Mesh(new CylinderGeometry(1.16, 1.2, 0.14, 26, 1, false, 0, Math.PI), blackSteelMat());
+    // EVERY arc here covers the same half now — the drums and the torus
+    // rings used to be authored a quarter-turn apart, which left the seat
+    // hanging past the plinth with see-through gaps flanking each booth.
+    const plinth = new Mesh(new CylinderGeometry(1.16, 1.2, 0.14, 26, 1, false, Math.PI / 2, Math.PI), blackSteelMat());
     plinth.position.y = 0.07;
     g.add(plinth);
     const seat = new Mesh(new TorusGeometry(0.92, 0.2, 10, 26, Math.PI), seatVelvet);
     seat.rotation.x = -Math.PI / 2;
     seat.position.y = 0.42;
     g.add(seat);
+    // The seat ring's open tube mouths, closed with velvet bolsters.
+    for (const ex of [-0.92, 0.92]) {
+      const bolster = new Mesh(new SphereGeometry(0.2, 12, 10), seatVelvet);
+      bolster.position.set(ex, 0.42, 0);
+      g.add(bolster);
+    }
     // The channel-tufted back wall wraps the horseshoe, capped in brass.
-    const backWall = new Mesh(new CylinderGeometry(1.18, 1.18, 0.95, 26, 1, true, 0, Math.PI), backVelvet);
+    const backWall = new Mesh(new CylinderGeometry(1.18, 1.18, 0.95, 26, 1, true, Math.PI / 2, Math.PI), backVelvet);
     backWall.position.y = 0.85;
     g.add(backWall);
     const cap = new Mesh(new TorusGeometry(1.18, 0.028, 8, 26, Math.PI), brassMat(0.3));
     cap.rotation.x = -Math.PI / 2;
     cap.position.y = 1.33;
     g.add(cap);
+    // Bronze edge posts where the back wall ends at the mouth — a finished
+    // entry instead of a raw shell edge.
+    for (const ex of [-1.18, 1.18]) {
+      const post = new Mesh(new CylinderGeometry(0.035, 0.04, 0.95, 10), bronzeMat());
+      post.position.set(ex, 0.85, 0);
+      g.add(post);
+    }
 
     // Table: honed marble on a brass pedestal, dressed for the evening.
     const pedestal = new Mesh(new CylinderGeometry(0.045, 0.1, 0.72, 12), brassMat(0.3));
@@ -985,8 +1278,10 @@ function buildTerrace(root: Group): void {
   const rail = brassMat(0.26);
 
   for (const side of [-1, 1] as const) {
+    // The east wing stops at the arcade's wall — the back-right corner is
+    // a room now, so that gallery is the shorter of the two.
     const x0 = side < 0 ? -CLUB.halfW : T.gapHalfW;
-    const x1 = side < 0 ? -T.gapHalfW : CLUB.halfW;
+    const x1 = side < 0 ? -T.gapHalfW : CLUB.arcade.minX - 0.12;
     const cx = (x0 + x1) / 2;
     const wdt = x1 - x0;
     // Deck + face + brass nosing.
@@ -1036,9 +1331,16 @@ function buildVestibule(root: Group): void {
   const doorH = 2.5;
 
   // Three nested portal frames stepping outward — the deco doorway.
+  //
+  // The heads sit HIGH above the doors on purpose: the frames used to clear
+  // the leaf by 0.22 m and step 0.28 apart, which put the second crossbar
+  // at y ≈ 3.0 — straight across the middle of the fanlight, and standing
+  // 5 mm proud of it, so the sunburst was cut in half by a bronze bar. A
+  // 0.5 m tympanum over the doors gives the fanlight the field it needs,
+  // and the tighter 0.14 step keeps the outermost head under the cornice.
   for (let i = 0; i < 3; i++) {
     const w = doorW + 0.3 + i * 0.36;
-    const h = doorH + 0.22 + i * 0.28;
+    const h = doorH + 0.5 + i * 0.14;
     const t = 0.09 - i * 0.02;
     const mat = i === 0 ? brassMat(0.25) : i === 1 ? bronzeMat() : blackSteelMat();
     const z = SZ - 0.16 + i * 0.05;
@@ -1055,69 +1357,38 @@ function buildVestibule(root: Group): void {
     box(root, brassMat(0.3), 0.05, 0.34, 0.02, side * 0.16, 1.12, SZ - 0.14);
     box(root, brassMat(0.4), doorW / 2 - 0.1, 0.16, 0.02, (side * doorW) / 4, 0.12, SZ - 0.14);
   }
-  // The fanlight: a half-sunburst window over the doors, softly lit.
+  // THE FANLIGHT: a half-sunburst window over the doors, softly lit — a fan
+  // springing from the door head, ringed by its own arch bar so it reads as
+  // a window rather than a handful of loose spokes.
+  //
+  // It sits INSIDE the tympanum now: springing line just over the leaves,
+  // outer radius stopping short of the innermost frame's head. Nothing
+  // crosses it any more — the crossbar that used to bisect it has been
+  // lifted clear above, and the south wall's picture rail (which ran the
+  // full width of the hall, straight through the fan behind it) now dies
+  // into the portal on both sides like a moulding should.
   const fanMat = brassGlowMat(0.7);
+  const fanY = doorH + 0.06;
+  const rIn = 0.08;
+  const rOut = 0.33;
+  const fanZ = SZ - 0.13;
   for (let i = 0; i < 7; i++) {
     const a = (i / 6) * Math.PI - Math.PI / 2;
-    const spoke = new Mesh(new BoxGeometry(0.03, 0.62, 0.02), fanMat);
-    spoke.position.set(Math.sin(a) * 0.36, doorH + 0.36 + Math.cos(a) * 0.28, SZ - 0.13);
+    const mid = (rIn + rOut) / 2;
+    const spoke = new Mesh(new BoxGeometry(0.028, rOut - rIn, 0.02), fanMat);
+    spoke.position.set(Math.sin(a) * mid, fanY + Math.cos(a) * mid, fanZ);
     spoke.rotation.z = -a;
     root.add(spoke);
   }
+  // The arch over the fan, and the sill it springs from.
+  const arch = new Mesh(new TorusGeometry(rOut, 0.022, 8, 28, Math.PI), fanMat);
+  arch.position.set(0, fanY, fanZ);
+  root.add(arch);
+  box(root, brassMat(0.3), rOut * 2 + 0.06, 0.035, 0.025, 0, fanY, fanZ);
 
-  // The velvet rope: two brass stanchions and a lazy catenary swag — the
-  // little theatre of arrival, just inside the doors.
-  const post = (x: number): void => {
-    const g = new Group();
-    g.position.set(x, 0, SZ - 1.05);
-    const stem = new Mesh(new CylinderGeometry(0.02, 0.025, 0.95, 10), brassMat(0.25));
-    stem.position.y = 0.475;
-    g.add(stem);
-    const ball = new Mesh(new CylinderGeometry(0.045, 0.045, 0.05, 12), brassMat(0.2));
-    ball.position.y = 0.97;
-    g.add(ball);
-    const foot = new Mesh(new CylinderGeometry(0.13, 0.15, 0.03, 14), bronzeMat());
-    foot.position.y = 0.015;
-    g.add(foot);
-    root.add(g);
-  };
-  post(-0.85);
-  post(0.85);
-  const ropeMat = new MeshStandardMaterial({ color: DECOR.velvet, roughness: 0.9, metalness: 0.05 });
-  const SEGS = 9;
-  for (let i = 0; i < SEGS; i++) {
-    const t0 = i / SEGS;
-    const t1 = (i + 1) / SEGS;
-    const sag = (t: number): number => 0.95 - Math.sin(t * Math.PI) * 0.16;
-    const xa = -0.85 + t0 * 1.7;
-    const xb = -0.85 + t1 * 1.7;
-    const ya = sag(t0);
-    const yb = sag(t1);
-    const seg = new Mesh(new CylinderGeometry(0.018, 0.018, Math.hypot(xb - xa, yb - ya) + 0.01, 6), ropeMat);
-    seg.position.set((xa + xb) / 2, (ya + yb) / 2, SZ - 1.05);
-    seg.rotation.z = Math.atan2(xb - xa, yb - ya);
-    root.add(seg);
-  }
-
-  // House plaque beside the portal — no name on the door, just who it's for.
-  const plaque = signPlane(0.92, 0.5, 512, (g, sw, sh) => {
-    g.strokeStyle = 'rgba(201,168,106,0.85)';
-    g.lineWidth = 3;
-    g.strokeRect(8, 8, sw - 16, sh - 16);
-    g.textAlign = 'center';
-    g.fillStyle = '#e8d9b0';
-    g.font = `500 48px Georgia, serif`;
-    g.fillText('members & dancers', sw / 2, sh * 0.42);
-    g.fillStyle = css(PALETTE.magenta);
-    g.shadowColor = css(PALETTE.magenta);
-    g.shadowBlur = 12;
-    g.font = `700 34px 'Arial Black', system-ui, sans-serif`;
-    g.fillText('RAVE RAID', sw / 2, sh * 0.74);
-  });
-  plaque.name = 'live-plaque';
-  plaque.rotation.y = Math.PI;
-  plaque.position.set(-1.75, 1.6, SZ - 0.12);
-  root.add(plaque);
+  // The velvet rope and the members-&-dancers plaque used to stand here.
+  // The way in is a doorway, not a queue: nothing to sidestep, nothing to
+  // read on your way past.
 }
 
 /* ── THE STILL ROOM: the quiet decompression corner ─────────────────────── */
@@ -1157,33 +1428,60 @@ function buildStillRoom(root: Group, candleMat: SpriteMaterial): MeshStandardMat
   // Door dressing: bronze jambs + a hushed nameplate.
   for (const x of [Q.doorX0, Q.doorX1]) box(root, bronzeMat(), 0.08, 2.05, 0.1, x, 1.025, Q.maxZ);
   box(root, bronzeMat(), Q.doorX1 - Q.doorX0 + 0.08, 0.09, 0.1, (Q.doorX0 + Q.doorX1) / 2, 2.05, Q.maxZ);
-  const plate = signPlane(0.62, 0.16, 384, (g, sw, sh) => {
+  // The nameplate: the house face, two words, on its own backing bar so it
+  // reads from across the hall — the old serif whisper sat flush with the
+  // plaster and lost the fight with the lintel trim.
+  const plate = signPlane(0.96, 0.24, 512, (g, sw, sh) => {
+    g.fillStyle = 'rgba(13,10,18,0.85)';
+    g.beginPath();
+    g.roundRect(4, 4, sw - 8, sh - 8, 14);
+    g.fill();
+    g.strokeStyle = 'rgba(201,168,106,0.55)';
+    g.lineWidth = 2.5;
+    g.stroke();
     g.textAlign = 'center';
     g.textBaseline = 'middle';
-    g.fillStyle = 'rgba(232,217,176,0.9)';
-    g.font = `400 44px Georgia, serif`;
-    g.fillText('T H E   S T I L L   R O O M', sw / 2, sh / 2);
+    g.fillStyle = '#e8d9b0';
+    g.font = font(600, 64);
+    g.letterSpacing = '10px';
+    g.fillText('STILL ROOM', sw / 2, sh / 2 + 2);
+    g.letterSpacing = '0px';
   });
   plate.name = 'live-still-plate';
-  plate.position.set((Q.doorX0 + Q.doorX1) / 2, 2.2, Q.maxZ + 0.01);
+  plate.position.set((Q.doorX0 + Q.doorX1) / 2, 2.34, Q.maxZ + 0.06);
   root.add(plate);
 
   // Inside: a wide curved bench with deep cushions, a low table, a slow
   // lamp. Nothing performs in here — that's the point.
   const cx = (Q.minX + Q.maxX) / 2;
-  const cz = (Q.minZ + Q.maxZ) / 2 - 0.25;
+  // The bench hugs the deep side, but it used to hug it THROUGH the wall:
+  // its back reached z = −11.455 while the north shell's middle panel stands
+  // proud at −11.4, so the velvet was buried 55 mm into the plaster. Sit it
+  // far enough forward that the plinth (the widest ring at r = 1.4) clears.
+  const cz = (Q.minZ + Q.maxZ) / 2 - 0.1;
   const bench = new Group();
   bench.position.set(cx, 0, cz);
   bench.rotation.y = Math.PI / 2 + Math.PI; // horseshoe opens toward the door
   const seatMat = new MeshStandardMaterial({ map: velvetTexture([3, 1]), roughness: 0.97, metalness: 0 });
-  const plinth = new Mesh(new CylinderGeometry(1.35, 1.4, 0.13, 24, 1, false, 0, Math.PI), blackSteelMat());
+  // Same half for every arc (the booths' bug lived in here too): the bench
+  // hugs the room's deep side and genuinely opens toward the door.
+  const plinth = new Mesh(new CylinderGeometry(1.35, 1.4, 0.13, 24, 1, false, Math.PI, Math.PI), blackSteelMat());
   plinth.position.y = 0.065;
   bench.add(plinth);
   const seat = new Mesh(new TorusGeometry(1.1, 0.23, 10, 24, Math.PI), seatMat);
   seat.rotation.x = -Math.PI / 2;
+  seat.rotation.z = Math.PI / 2;
   seat.position.y = 0.4;
   bench.add(seat);
-  const backW = new Mesh(new CylinderGeometry(1.38, 1.38, 0.8, 24, 1, true, 0, Math.PI), new MeshStandardMaterial({
+  for (const [px, pz] of [
+    [0, -1.1],
+    [0, 1.1],
+  ] as const) {
+    const bolster = new Mesh(new SphereGeometry(0.23, 12, 10), seatMat);
+    bolster.position.set(px, 0.4, pz);
+    bench.add(bolster);
+  }
+  const backW = new Mesh(new CylinderGeometry(1.38, 1.38, 0.8, 24, 1, true, Math.PI, Math.PI), new MeshStandardMaterial({
     map: velvetTexture([3, 1], 11),
     roughness: 0.97,
     metalness: 0,
@@ -1191,6 +1489,15 @@ function buildStillRoom(root: Group, candleMat: SpriteMaterial): MeshStandardMat
   }));
   backW.position.y = 0.75;
   bench.add(backW);
+  // The brass cap along the top of the back — every velvet horseshoe in the
+  // booths is finished with one, and the still room's was the only bench
+  // left showing a raw shell edge. Same half as the wall it caps (the seat
+  // torus above uses this identical pair of rotations).
+  const backCap = new Mesh(new TorusGeometry(1.38, 0.03, 8, 24, Math.PI), brassMat(0.3));
+  backCap.rotation.x = -Math.PI / 2;
+  backCap.rotation.z = Math.PI / 2;
+  backCap.position.y = 1.15;
+  bench.add(backCap);
   root.add(bench);
 
   const table = new Mesh(new CylinderGeometry(0.34, 0.3, 0.36, 14), new MeshStandardMaterial({
@@ -1220,6 +1527,256 @@ function buildStillRoom(root: Group, candleMat: SpriteMaterial): MeshStandardMat
   root.add(lampGlowHolder);
 
   return lampMat;
+}
+
+/* ── THE ARCADE: SUPER OCTAGON's room, the still room's loud mirror ─────── */
+
+function buildArcade(root: Group): void {
+  const A = CLUB.arcade;
+  const H = 2.5;
+  const plaster = new MeshStandardMaterial({ map: plasterTexture([3, 1.4]), roughness: 0.95, metalness: 0.02 });
+
+  // Interior walls (west + NORTH split around the door), lintel, low cap.
+  // The room stands in the hall's back-right corner, so the shell covers
+  // its east and south sides and the door looks out over the floor.
+  const wWall = new Mesh(new PlaneGeometry(A.maxZ - A.minZ, H), plaster);
+  wWall.position.set(A.minX, H / 2, (A.minZ + A.maxZ) / 2);
+  wWall.rotation.y = Math.PI / 2;
+  (wWall.material as MeshStandardMaterial).side = DoubleSide;
+  root.add(wWall);
+  const north = (x0: number, x1: number): void => {
+    const m = new Mesh(new PlaneGeometry(x1 - x0, H), plaster);
+    m.position.set((x0 + x1) / 2, H / 2, A.minZ);
+    (m.material as MeshStandardMaterial).side = DoubleSide;
+    root.add(m);
+  };
+  north(A.minX, A.doorX0);
+  north(A.doorX1, A.maxX);
+  const lintel = new Mesh(new PlaneGeometry(A.doorX1 - A.doorX0, H - 2.05), plaster);
+  lintel.position.set((A.doorX0 + A.doorX1) / 2, (H + 2.05) / 2, A.minZ);
+  (lintel.material as MeshStandardMaterial).side = DoubleSide;
+  root.add(lintel);
+  const cap = new Mesh(new PlaneGeometry(A.maxX - A.minX, A.maxZ - A.minZ), new MeshStandardMaterial({
+    color: 0x191720,
+    roughness: 0.95,
+  }));
+  cap.rotation.x = Math.PI / 2;
+  cap.position.set((A.minX + A.maxX) / 2, H, (A.minZ + A.maxZ) / 2);
+  root.add(cap);
+  // Door dressing + nameplate, the still room's twin — but this door
+  // promises noise, so the plate glows the cabinet's magenta.
+  for (const x of [A.doorX0, A.doorX1]) box(root, bronzeMat(), 0.08, 2.05, 0.1, x, 1.025, A.minZ);
+  box(root, bronzeMat(), A.doorX1 - A.doorX0 + 0.08, 0.09, 0.1, (A.doorX0 + A.doorX1) / 2, 2.05, A.minZ);
+  const plate = signPlane(0.96, 0.24, 512, (g, sw, sh) => {
+    g.fillStyle = 'rgba(13,10,18,0.85)';
+    g.beginPath();
+    g.roundRect(4, 4, sw - 8, sh - 8, 14);
+    g.fill();
+    g.strokeStyle = 'rgba(255,42,213,0.5)';
+    g.lineWidth = 2.5;
+    g.stroke();
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.fillStyle = '#ffd9f6';
+    g.shadowColor = css(PALETTE.magenta);
+    g.shadowBlur = 10;
+    g.font = font(600, 58);
+    g.letterSpacing = '8px';
+    g.fillText('ARCADE', sw / 2, sh / 2 + 2);
+    g.letterSpacing = '0px';
+    g.shadowBlur = 0;
+  });
+  plate.name = 'live-arcade-plate';
+  plate.position.set((A.doorX0 + A.doorX1) / 2, 2.34, A.minZ - 0.06);
+  plate.rotation.y = Math.PI; // the nameplate reads from the floor side
+  root.add(plate);
+
+  // ── THE CABINET: SUPER OCTAGON, against the back wall, facing the door.
+  //
+  // ONE SILHOUETTE. The first cut stacked boxes — a marquee hovering over
+  // a gap, glowing magenta slabs bolted to the sides — and it read exactly
+  // like what it was. A real upright is a single sheet of ply cut to a
+  // profile: kick, control deck, screen slope, marquee, canopy, all one
+  // continuous edge. So this is that profile, extruded across the width;
+  // the headboard can't float because it isn't a separate object.
+  const cx = (A.minX + A.maxX) / 2;
+  const cz = A.maxZ - 0.45;
+  const CW = 0.66; // cabinet width
+  const cab = new Group();
+  cab.position.set(cx, 0, cz);
+  // Built facing +z, then turned to face the door across the room.
+  cab.rotation.y = Math.PI;
+  const shellMat = blackSteelMat();
+
+  // The side profile, drawn in (depth, height) — front is +depth. It gets
+  // extruded along the cabinet's width, so the shape's own faces become
+  // the two side panels and the extrusion wrap becomes front/top/back.
+  const P: [number, number][] = [
+    [-0.30, 0.0],   // back foot
+    [0.30, 0.0],    // front foot (kick plate)
+    [0.30, 0.90],   // front panel, up to the shelf
+    [0.315, 0.95],  // a shallow shelf where a control deck would be — this
+    [0.315, 0.99],  // cabinet is played with the lasers, so it's a ledge,
+    [0.12, 1.09],   // not a console: no stick, no buttons, nothing fake to
+    [0.12, 1.13],   // reach for and find isn't there.
+    [0.215, 1.20],  // the monitor bay leans out at the bottom...
+    [0.115, 1.78],  // ...and back in at the top, the way a CRT sits
+    [0.265, 1.86],  // the marquee shelf steps forward again
+    [0.265, 2.10],  // the marquee face
+    [0.30, 2.15],   // canopy lip over the lights
+    [-0.26, 2.19],  // the top, sloping gently back
+    [-0.30, 2.12],
+  ];
+  const profile = new Shape();
+  profile.moveTo(P[0][0], P[0][1]);
+  for (let i = 1; i < P.length; i++) profile.lineTo(P[i][0], P[i][1]);
+  profile.closePath();
+  const shell = new Mesh(
+    new ExtrudeGeometry(profile, { depth: CW, bevelEnabled: true, bevelSize: 0.008, bevelThickness: 0.008, bevelSegments: 1, steps: 1 }),
+    shellMat,
+  );
+  // Stand the profile up facing the door: local +depth → world +z.
+  shell.rotation.y = -Math.PI / 2;
+  shell.position.x = CW / 2;
+  cab.add(shell);
+
+  // Brass edge trim following the cabinet's front line — the venue's metal,
+  // where a real cabinet wears its T-molding. It replaces the neon siding:
+  // the shape reads on its own, so the light can stay in the marquee.
+  const trimMat = brassMat(0.3);
+  const edge = (d0: number, h0: number, d1: number, h1: number): void => {
+    const len = Math.hypot(d1 - d0, h1 - h0);
+    for (const sx of [-CW / 2 + 0.012, CW / 2 - 0.012]) {
+      const bar = new Mesh(new BoxGeometry(0.016, len, 0.016), trimMat);
+      bar.position.set(sx, (h0 + h1) / 2, (d0 + d1) / 2);
+      bar.rotation.x = -Math.atan2(d1 - d0, h1 - h0);
+      cab.add(bar);
+    }
+  };
+  edge(0.30, 0.06, 0.30, 0.88); // the front panel's two corners
+
+  // Marquee: the game's name, backlit, sitting ON the shelf the profile cut.
+  const marquee = signPlane(0.56, 0.2, 512, (g, sw, sh) => {
+    g.fillStyle = '#0d0a14';
+    g.fillRect(0, 0, sw, sh);
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.fillStyle = '#ffd9f6';
+    g.shadowColor = css(PALETTE.magenta);
+    g.shadowBlur = 16;
+    g.font = font(700, 64);
+    g.letterSpacing = '4px';
+    g.fillText('SUPER OCTAGON', sw / 2, sh / 2 + 2, sw - 24);
+    g.letterSpacing = '0px';
+    g.shadowBlur = 0;
+  });
+  marquee.name = 'live-octagon-marquee';
+  // Proud of the bevel — the extrusion's rounded edge pushes the shell's
+  // face out by bevelSize, and a sign flush to the drawn profile vanishes
+  // inside it.
+  marquee.position.set(0, 1.985, 0.279);
+  cab.add(marquee);
+  // The lamp under the canopy, washing the header from above.
+  const header = new Mesh(new BoxGeometry(0.5, 0.012, 0.012), brassGlowMat(1.8));
+  header.position.set(0, 2.135, 0.272);
+  cab.add(header);
+
+  // The CRT: a black bay recessed into the profile's monitor slope, and the
+  // live screen plane the lasers aim at. The slope is ~9.8° off vertical
+  // ((0.215,1.20) → (0.115,1.78)), so the glass matches it.
+  const tilt = Math.atan2(0.215 - 0.115, 1.78 - 1.20);
+  const screenCanvas = document.createElement('canvas');
+  screenCanvas.width = 384;
+  screenCanvas.height = 300;
+  const sg = screenCanvas.getContext('2d')!;
+  sg.fillStyle = '#08060e';
+  sg.fillRect(0, 0, 384, 300);
+  const screenTex = new CanvasTexture(screenCanvas);
+  screenTex.colorSpace = SRGBColorSpace;
+  screenTex.minFilter = LinearFilter;
+  // A surface, not a hole: the bezel takes light so the bay doesn't read as
+  // a black void with a picture hanging in it.
+  const bezel = new Mesh(
+    new PlaneGeometry(0.58, 0.57),
+    new MeshStandardMaterial({ color: 0x171320, roughness: 0.5, metalness: 0.35 }),
+  );
+  bezel.position.set(0, 1.49, 0.182);
+  bezel.rotation.x = -tilt;
+  cab.add(bezel);
+  const screen = new Mesh(new PlaneGeometry(0.52, 0.41), new MeshBasicMaterial({ map: screenTex }));
+  screen.name = 'live-octagon-screen';
+  screen.position.set(0, 1.505, 0.188);
+  screen.rotation.x = -tilt;
+  cab.add(screen);
+
+  // The ledge gets a brushed plate and nothing else. Fake hardware you
+  // can't touch is worse than no hardware: in a room where everything is
+  // reached with the lasers, a stick and a row of buttons only promise a
+  // control scheme that doesn't exist.
+  const ledgeTilt = Math.atan2(0.315 - 0.12, 1.09 - 0.99) - Math.PI / 2;
+  const ledgeMat = new MeshStandardMaterial({ color: 0x1a1720, roughness: 0.42, metalness: 0.65 });
+  const ledge = new Mesh(new PlaneGeometry(0.58, 0.2), ledgeMat);
+  ledge.position.set(0, 1.043, 0.222);
+  ledge.rotation.x = ledgeTilt;
+  cab.add(ledge);
+
+  // A coin door, because the eye looks for one on a cabinet this size.
+  const coinDoor = new Mesh(new PlaneGeometry(0.2, 0.13), new MeshStandardMaterial({ color: 0x241f2b, roughness: 0.6, metalness: 0.5 }));
+  coinDoor.position.set(0, 0.5, 0.302);
+  cab.add(coinDoor);
+  for (const sx of [-0.045, 0.045]) {
+    const slot = new Mesh(new BoxGeometry(0.006, 0.03, 0.004), trimMat);
+    slot.position.set(sx, 0.53, 0.305);
+    cab.add(slot);
+  }
+  root.add(cab);
+
+  // ── THE BOARD: the wall leaderboard beside the cabinet.
+  const boardCanvas = document.createElement('canvas');
+  boardCanvas.width = 512;
+  boardCanvas.height = 736;
+  const bg = boardCanvas.getContext('2d')!;
+  bg.fillStyle = '#0d0a14';
+  bg.fillRect(0, 0, 512, 736);
+  const boardTex = new CanvasTexture(boardCanvas);
+  boardTex.colorSpace = SRGBColorSpace;
+  boardTex.minFilter = LinearFilter;
+  const board = new Mesh(new PlaneGeometry(0.82, 1.18), new MeshBasicMaterial({ map: boardTex, transparent: true }));
+  board.name = 'live-octagon-board';
+  // Hung PROUD of the wall trim. At the old 0.03 standoff the board's plane
+  // landed on exactly x = 8.97 — which is also the front face of the east
+  // wall's dado rail, running the length of the hall at y = 1.0 and straight
+  // through the board's bottom edge. Two coplanar surfaces, so the rail
+  // shimmered through the last row of scores. A board on a wall stands off
+  // the mouldings and covers them; now it does.
+  board.position.set(A.maxX - 0.1, 1.55, (A.minZ + A.maxZ) / 2 + 0.5);
+  board.rotation.y = -Math.PI / 2;
+  root.add(board);
+
+  // A cove strip so the room reads arcade-warm from the hall — and the
+  // cabinet's own glow, the fifth (and last) real light in the venue: the
+  // room is a sealed box under its low cap, and plaster with no light is
+  // just black (FIRE FIGHT's cabinet carried its own marquee light for
+  // exactly this reason).
+  // Warm, not pink: a magenta bulb was the only light in this sealed room,
+  // so every steel and brass surface in it — the cabinet's buttons most of
+  // all — came out the colour of the bulb. The house's own warm light lets
+  // the metal read as metal and leaves magenta to the marquee and the game.
+  const cove = new Mesh(new BoxGeometry(A.maxX - A.minX - 0.4, 0.03, 0.03), brassGlowMat(1.5));
+  cove.position.set(cx, H - 0.12, A.maxZ - 0.08);
+  root.add(cove);
+  const glow = new PointLight(0xffcb96, 1.7, 5.5, 1.4);
+  glow.position.set(cx, 2.1, cz - 0.9);
+  root.add(glow);
+
+  registerArcade({
+    screen,
+    screenCanvas,
+    screenTex,
+    boardCanvas,
+    boardTex,
+    cabinetPos: new Vector3(cx, 0, cz),
+  });
 }
 
 /* ═════════════════════════════ THE FOYER ═════════════════════════════════
@@ -1347,32 +1904,8 @@ export function buildFoyer(scene: Scene): FoyerRefs {
   // A ring of light standing on the deck's north edge; its inner shimmer
   // breathes while the way is shut, flares while the relay is being rung,
   // and the room swap IS the passage.
-  // ── tonight's bill, as a holo card floating off the deck's east edge ──
-  const bill = signPlane(0.92, 1.14, 512, (g, sw, sh) => {
-    g.fillStyle = 'rgba(7,5,14,0.72)';
-    g.beginPath();
-    g.roundRect(6, 6, sw - 12, sh - 12, 22);
-    g.fill();
-    g.strokeStyle = 'rgba(79,183,255,0.8)';
-    g.lineWidth = 4;
-    g.stroke();
-    g.textAlign = 'center';
-    g.fillStyle = css(PALETTE.cyan);
-    g.shadowColor = css(PALETTE.cyan);
-    g.shadowBlur = 14;
-    g.font = `900 46px 'Arial Black', system-ui, sans-serif`;
-    g.fillText('TONIGHT', sw / 2, 92);
-    g.shadowBlur = 0;
-    g.fillStyle = 'rgba(232,236,242,0.88)';
-    g.font = `900 32px 'Arial Black', system-ui, sans-serif`;
-    ['OPENING SET', 'PEAK HOURS', 'AFTER HOURS'].forEach((line, i) => {
-      g.fillText(line, sw / 2, 220 + i * 100);
-    });
-  });
-  bill.name = 'live-bill';
-  bill.rotation.y = -0.7;
-  bill.position.set(2.9, 1.62, -1.3);
-  root.add(bill);
+  // (The TONIGHT bill that used to float off the east edge is gone — the
+  // tour map on the board already tells that story, better.)
 
   // ── light: a cool wash + one soft key — the board does the reading ────
   root.add(new HemisphereLight(0x8a90c8, 0x05040a, 0.6));

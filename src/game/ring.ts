@@ -15,7 +15,7 @@
  */
 
 import { Quaternion, Vector3 } from 'three';
-import { ringRadius } from '../config.js';
+import { RING, ringRadius } from '../config.js';
 
 const _q = new Quaternion();
 const UP = new Vector3(0, 1, 0);
@@ -55,6 +55,22 @@ export function seatLocal(
 /** The stage centre in my local frame: always (0, 0, −R). */
 export function stageLocal(seats: number, out: Vector3): Vector3 {
   return out.set(0, 0, -ringRadius(seats));
+}
+
+const _near = new Vector3();
+
+/**
+ * Is seat `seat` close enough to me to be worth the full show?
+ *
+ * Platforms do not move, so how far away a deck stands is a property of
+ * the RING, not of the frame — one distance test, whenever the ring is
+ * dealt. Every system that spends detail by distance asks THIS question,
+ * so a deck never half-dresses: the same seats that keep their dancer's
+ * jewellery keep their deck's blockfall and their strike's sparks.
+ */
+export function seatIsNear(mySeat: number, seat: number, seats: number): boolean {
+  seatLocal(mySeat, seat, seats, _near);
+  return _near.length() <= RING.detailRadius;
 }
 
 /**

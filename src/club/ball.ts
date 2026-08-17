@@ -15,6 +15,7 @@
  */
 
 import {
+  AdditiveBlending,
   CanvasTexture,
   CylinderGeometry,
   DoubleSide,
@@ -25,13 +26,16 @@ import {
   MeshStandardMaterial,
   PlaneGeometry,
   SphereGeometry,
+  Sprite,
+  SpriteMaterial,
   SRGBColorSpace,
   Vector3,
 } from 'three';
-import { PALETTE, hueToColor, seatHue } from '../config.js';
-import { glowSprite } from '../materials/glow.js';
+import { PALETTE, hueToColor } from '../config.js';
+import { glintTexture, glowSprite } from '../materials/glow.js';
 import { trackById } from '../audio/tracks.js';
 import { CLUB } from './config.js';
+import { font } from '../ui/fonts.js';
 
 export const BALL_TOUCH_RADIUS = 0.42;
 
@@ -59,6 +63,10 @@ export interface BallVisual {
   group: Group;
   /** Spin this. */
   ball: Mesh;
+  /** The GLIMMER: facet glints popping and dying across the ball's skin.
+   *  Call every frame — the sparks ride the sphere, so the spin carries
+   *  them round the room the way a real mirror ball throws its dots. */
+  twinkle(dt: number): void;
   /** The countdown/track/joins plate under the ball (yaw-billboard it). */
   plate: Mesh;
   /** Repaint the plate. */
@@ -72,7 +80,8 @@ export interface BallVisual {
     inReach: boolean;
   }): void;
   /** One orbiting pip per joined dancer, tinted their hue. */
-  setPips(idxs: number[]): void;
+  /** One pip per dancer touched in, each in the hue that dancer wears. */
+  setPips(hues: number[]): void;
   dispose(): void;
 }
 
@@ -104,6 +113,76 @@ export function buildBallVisual(): BallVisual {
   stem.position.y = 0.49;
   group.add(stem);
   group.add(glowSprite(0xffffff, 0.9, 0.4));
+
+  // THE GLIMMER — a handful of four-point lens glints living on the facet
+  // skin. Each one waits, then flares somewhere new: a fast bloom-and-die
+  // over a few tenths of a second, in white with the odd champagne or
+  // stage-cyan catch. Children of the BALL, not the group, so the spin
+  // carries every live spark around the room — the closest thing a painted
+  // mirror ball gets to actually throwing light.
+  const GLINT_TINTS = [0xffffff, 0xffffff, 0xffffff, 0xffd24a, PALETTE.cyan];
+  interface Glint {
+    sprite: Sprite;
+    /** Seconds until the next flare while dark; life left while lit. */
+    wait: number;
+    life: number;
+    /** Full lifespan of the current flare (for the envelope). */
+    span: number;
+    peak: number;
+  }
+  const glints: Glint[] = [];
+  for (let i = 0; i < 6; i++) {
+    const sprite = new Sprite(
+      new SpriteMaterial({
+        map: glintTexture(),
+        color: 0xffffff,
+        transparent: true,
+        blending: AdditiveBlending,
+        depthWrite: false,
+      }),
+    );
+    sprite.visible = false;
+    ball.add(sprite);
+    glints.push({ sprite, wait: 0.1 + Math.random() * 0.8, life: 0, span: 0, peak: 0 });
+  }
+
+  const twinkle = (dt: number): void => {
+    for (const g of glints) {
+      if (g.life > 0) {
+        g.life -= dt;
+        if (g.life <= 0) {
+          g.sprite.visible = false;
+          g.wait = 0.12 + Math.random() * 0.85;
+          continue;
+        }
+        // sin envelope: snap up, soften out — a catch of light, not a lamp.
+        const t = 1 - g.life / g.span;
+        const env = Math.sin(Math.min(1, t) * Math.PI);
+        g.sprite.scale.setScalar(g.peak * (0.35 + 0.65 * env));
+        (g.sprite.material as SpriteMaterial).opacity = env;
+        continue;
+      }
+      g.wait -= dt;
+      if (g.wait > 0) continue;
+      // Flare somewhere new on the sphere — biased to the upper half, where
+      // the room's light would actually be striking the facets.
+      const az = Math.random() * Math.PI * 2;
+      const el = Math.asin(Math.random() * 1.6 - 0.6);
+      const r = 0.247;
+      g.sprite.position.set(
+        Math.cos(el) * Math.sin(az) * r,
+        Math.sin(el) * r,
+        Math.cos(el) * Math.cos(az) * r,
+      );
+      (g.sprite.material as SpriteMaterial).color.setHex(
+        GLINT_TINTS[Math.floor(Math.random() * GLINT_TINTS.length)],
+      );
+      g.span = 0.22 + Math.random() * 0.3;
+      g.life = g.span;
+      g.peak = 0.09 + Math.random() * 0.1;
+      g.sprite.visible = true;
+    }
+  };
 
   // The plate.
   const canvas = document.createElement('canvas');
@@ -145,7 +224,7 @@ export function buildBallVisual(): BallVisual {
     g.textAlign = 'center';
     g.textBaseline = 'middle';
     // The clock — the headline.
-    g.font = "900 92px 'Arial Black', system-ui, sans-serif";
+    g.font = font(700, 92);
     g.fillStyle = seconds <= 10 ? '#ffd24a' : '#f4f6fb';
     if (seconds <= 5) {
       g.shadowColor = '#ffd24a';
@@ -155,15 +234,15 @@ export function buildBallVisual(): BallVisual {
     g.shadowBlur = 0;
 
     const track = trackById(trackId);
-    g.font = "900 30px 'Arial Black', system-ui, sans-serif";
+    g.font = font(700, 30);
     g.fillStyle = '#4fb7ff';
     g.fillText(`♪ ${track ? track.title : 'SHUFFLE'}`, 256, 140);
-    g.font = "700 24px 'Arial Black', system-ui, sans-serif";
+    g.font = font(600, 24);
     g.fillStyle = 'rgba(232,236,242,0.75)';
     g.fillText(`${callerName} calls`, 256, 176);
 
     // One short state line — the touch teaches the rest.
-    g.font = "800 26px 'Arial Black', system-ui, sans-serif";
+    g.font = font(700, 26);
     if (mine) {
       g.fillStyle = '#ff5040';
       g.fillText('touch to call it off', 256, 218);
@@ -176,7 +255,7 @@ export function buildBallVisual(): BallVisual {
     }
 
     if (joinNames.length) {
-      g.font = "700 22px 'Arial Black', system-ui, sans-serif";
+      g.font = font(600, 22);
       g.fillStyle = 'rgba(232,236,242,0.6)';
       const names = joinNames.slice(0, 6).join(' · ');
       const extra = joinNames.length > 6 ? ` +${joinNames.length - 6}` : '';
@@ -185,24 +264,25 @@ export function buildBallVisual(): BallVisual {
     tex.needsUpdate = true;
   };
 
-  const setPips: BallVisual['setPips'] = (idxs) => {
+  const setPips: BallVisual['setPips'] = (hues) => {
     pips.forEach((pip, i) => {
-      const idx = idxs[i];
-      if (idx === undefined) {
+      const hue = hues[i];
+      if (hue === undefined) {
         pip.visible = false;
         return;
       }
-      const a = (i / Math.max(1, idxs.length)) * Math.PI * 2;
+      const a = (i / Math.max(1, hues.length)) * Math.PI * 2;
       pip.position.set(Math.sin(a) * 0.34, 0.02, Math.cos(a) * 0.34);
-      (pip.material as MeshBasicMaterial).color.setHex(hueToColor(seatHue(idx), 0.62));
+      (pip.material as MeshBasicMaterial).color.setHex(hueToColor(hue, 0.62));
       pip.visible = true;
     });
-    pipHolder.visible = idxs.length > 0;
+    pipHolder.visible = hues.length > 0;
   };
 
   return {
     group,
     ball,
+    twinkle,
     plate,
     paint,
     setPips,

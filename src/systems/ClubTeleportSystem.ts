@@ -11,14 +11,26 @@
  *  - An isolated sideways flick (when not aiming) is a snap turn.
  *
  * Landing spots are restricted to the club's floor rectangles
- * (TELEPORT_AREAS — hall, bar aisle, terrace wings, still room); anywhere
- * else the marker burns hazard-red and release does nothing. The terrace
- * rides at +0.45 m: areas carry their own floor height and the rig lands at
- * it. Arcs can't cut through walls, the bar counter, or the stage face.
+ * (TELEPORT_AREAS — hall, bar aisle, terrace wings, still room, and the
+ * standable furniture: the booth tables and THE BAR ITSELF); anywhere else
+ * the marker burns hazard-red and release does nothing. The terrace rides
+ * at +0.45 m and the counter at +1.09: areas carry their own floor height
+ * and the rig lands at it. Arcs can't cut through walls or the stage face —
+ * or over the bar counter, until you're standing at counter height, which
+ * is how you get up on it and back down again.
  *
  * Active only while the club is the room (menu screens). The moment a set
- * books the floor, the rig is re-planted at the spawn facing the stage —
- * the raid's law is "my platform IS the world origin", and it still is.
+ * books the floor, every club offset is DROPPED and the rig returns to
+ * identity — the raid's law is "my platform IS the world origin", and the
+ * origin is the same physical spot of your room it was before you went
+ * social. Wandering the club never moves your platform: you walk back to
+ * the same real-world centre you set up on, facing the same way.
+ *
+ * A headset RECENTRE (the reference space's `reset` event) is honoured
+ * everywhere: in the club the rig folds the new origin in so you stay
+ * exactly where you stood, and everywhere else the rig snaps to identity —
+ * recentring always means "put me at my platform's centre, facing the
+ * board", never a weird spot at a weird angle.
  */
 
 import { createSystem, InputComponent } from '@iwsdk/core';
@@ -38,7 +50,7 @@ import type { XROrigin } from '@iwsdk/xr-input';
 import { OCTAGON_VERTICES, PALETTE } from '../config.js';
 import { octagonSlab } from '../arena/octagon.js';
 import * as sfx from '../audio/sfx.js';
-import { CLUB, DECOR, TELEPORT, TELEPORT_AREAS, WALL_SEGMENTS, type FloorArea } from '../club/config.js';
+import { DECOR, TELEPORT, TELEPORT_AREAS, crossesWall, floorYAt, type FloorArea } from '../club/config.js';
 import { match } from '../game/state.js';
 import { net } from '../net/session.js';
 
@@ -98,25 +110,13 @@ function areaAt(x: number, z: number): FloorArea | null {
   return null;
 }
 
-/** Do segments AB and CD properly cross? (Collinear/endpoint touches don't
- *  count — grazing a doorway edge shouldn't block the hop.) */
-function segmentsCross(
-  ax: number, az: number, bx: number, bz: number,
-  cx: number, cz: number, dx: number, dz: number,
-): boolean {
-  const o = (px: number, pz: number, qx: number, qz: number, rx: number, rz: number): number =>
-    (qx - px) * (rz - pz) - (qz - pz) * (rx - px);
-  const d1 = o(cx, cz, dx, dz, ax, az);
-  const d2 = o(cx, cz, dx, dz, bx, bz);
-  const d3 = o(ax, az, bx, bz, cx, cz);
-  const d4 = o(ax, az, bx, bz, dx, dz);
-  return ((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) && ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0));
-}
-
-/** Does the straight path (x0,z0)→(x1,z1) cross any solid wall? */
-function crossesWall(x0: number, z0: number, x1: number, z1: number): boolean {
-  return WALL_SEGMENTS.some(([ax, az, bx, bz]) => segmentsCross(x0, z0, x1, z1, ax, az, bx, bz));
-}
+/** Dev window on the moves that resolve without an arc — no thumbstick
+ *  exists off-device, so this is the only way to exercise them headlessly.
+ *  (`__gdr.move`.) */
+export const teleportView: {
+  stepBack?: () => void;
+  snapTurn?: (dir: -1 | 1) => void;
+} = {};
 
 export class ClubTeleportSystem extends createSystem({}) {
   private aimingHand: 'left' | 'right' | null = null;
@@ -134,8 +134,31 @@ export class ClubTeleportSystem extends createSystem({}) {
   /** Snap turn fires once per flick: armed again after the stick recentres. */
   private snapArmed = true;
   private wasClub = false;
+  /** The reference space we're watching for `reset` (headset recentre). */
+  private refSpace: XRReferenceSpace | null = null;
+  /** A recentre happened; fold it in on the next tick (see onRecenter). */
+  private recentered = false;
+  private recenterPose = { x: 0, z: 0, yaw: 0, y: 0 };
+
+  /**
+   * A headset recentre fires `reset` BETWEEN frames, before any pose uses
+   * the moved origin — so the head still holds where the player stands in
+   * the world RIGHT NOW. Bank that pose; the next update re-plants on it.
+   */
+  private onRecenter = (): void => {
+    this.player.head.getWorldPosition(_head);
+    this.player.head.getWorldQuaternion(_quat);
+    _dir.set(0, 0, -1).applyQuaternion(_quat);
+    this.recenterPose.x = _head.x;
+    this.recenterPose.z = _head.z;
+    this.recenterPose.yaw = Math.atan2(-_dir.x, -_dir.z);
+    this.recenterPose.y = this.player.position.y;
+    this.recentered = true;
+  };
 
   init(): void {
+    teleportView.stepBack = () => this.stepBack();
+    teleportView.snapTurn = (dir) => snapTurn(this.player, dir > 0 ? -TELEPORT.snapAngle : TELEPORT.snapAngle);
     // Arc line — a fat world-unit ribbon in club brass (hazard-red when the
     // landing is refused), LineBasicMaterial ignores width so Line2 it is.
     this.arcGeo = new LineGeometry();
@@ -190,28 +213,50 @@ export class ClubTeleportSystem extends createSystem({}) {
   }
 
   update(): void {
+    this.watchRecenter();
+
     // Movement belongs to the SOCIAL place only: the club floor, which is
     // open while a room is (hosting/joined) on a menu screen. The foyer is
     // a front desk, and the raid is your real feet.
     const menuRoom = match.screen === 'lobby' || match.screen === 'tour';
     const inClub = menuRoom && (net.phase === 'hosting' || net.phase === 'joined');
 
-    // Leaving the floor — a set booked it, or you left the room: re-plant
-    // the rig at the spawn, facing the stage. The raid's law is "my
-    // platform IS the world origin", and the foyer stands at the origin.
+    // A recentre moved the reference-space origin under our feet. In the
+    // club, re-plant the rig on the banked pose so you stay exactly where
+    // you stood (the recentre redefines your NEUTRAL, not your spot).
+    // Anywhere else the rig belongs at identity anyway — snap it there, so
+    // recentring lands you dead-centre on your platform facing the board.
+    if (this.recentered) {
+      this.recentered = false;
+      if (inClub) {
+        const p = this.recenterPose;
+        teleportPlayer(this.player, p.x, p.z, p.yaw, p.y);
+      } else {
+        this.player.position.set(0, 0, 0);
+        this.player.rotation.set(0, 0, 0);
+      }
+    }
+
+    // Leaving the floor — a set booked it, or you left the room: drop every
+    // club offset and return the rig to identity. The raid's law is "my
+    // platform IS the world origin", and identity puts that origin back on
+    // the SAME physical spot (and facing) it held before the social hang —
+    // your platform never moves house because you visited the bar.
     if (!inClub) {
       if (this.wasClub) {
         this.wasClub = false;
         this.hide();
-        teleportPlayer(this.player, CLUB.spawn.x, CLUB.spawn.z, 0, 0);
+        this.player.position.set(0, 0, 0);
+        this.player.rotation.set(0, 0, 0);
       }
       return;
     }
     this.wasClub = true;
 
-    // Not mid-aim? An isolated sideways flick is a snap turn (forward/back
-    // starts a teleport; sideways WHILE aiming steers facing, below).
-    if (!this.aimingHand && this.trySnapTurn()) return;
+    // Not mid-aim? A sideways flick is a snap turn and a BACKWARD flick is a
+    // step back; only forward opens the teleport arc. (Sideways WHILE aiming
+    // steers the landing's facing instead — see traceArc.)
+    if (!this.aimingHand && this.tryFlick()) return;
 
     let axes: { x: number; y: number } | null = null;
     if (this.aimingHand) {
@@ -290,12 +335,15 @@ export class ClubTeleportSystem extends createSystem({}) {
     if (!landed) this.landing.copy(_p);
     this.arcGeo.setPositions(buf);
 
-    // Valid only on real floor, with no wall between you and it.
+    // Valid only on real floor, with no wall between you and it. The hop is
+    // judged at the higher of the two ends: stepping UP onto the counter and
+    // stepping back DOWN off it are both hops made at counter height.
     this.player.head.getWorldPosition(_head);
+    const hopY = Math.max(floorYAt(_head.x, _head.z), this.landingArea?.y ?? 0);
     this.valid =
       landed &&
       this.landingArea !== null &&
-      !crossesWall(_head.x, _head.z, this.landing.x, this.landing.z);
+      !crossesWall(_head.x, _head.z, this.landing.x, this.landing.z, hopY);
 
     // Facing: thumbstick angle relative to where the controller points.
     const ctrlYaw = Math.atan2(-_dir.x, -_dir.z);
@@ -313,11 +361,15 @@ export class ClubTeleportSystem extends createSystem({}) {
   }
 
   /**
-   * An isolated left/right flick of either stick yaws the rig by snapAngle.
-   * One turn per flick: the stick must spring back below snapReset to
-   * re-arm, so holding it sideways doesn't spin you.
+   * The two flicks that resolve on the spot rather than opening an arc: a
+   * left/right push yaws the rig by snapAngle, a BACKWARD push shuffles you
+   * half a metre away from what you're looking at.
+   *
+   * One action per flick — the stick has to spring back below snapReset to
+   * re-arm — so holding it doesn't spin you or walk you across the room, and
+   * a diagonal can't fire both.
    */
-  private trySnapTurn(): boolean {
+  private tryFlick(): boolean {
     let sx = 0;
     let sy = 0;
     let mag = 0;
@@ -335,15 +387,73 @@ export class ClubTeleportSystem extends createSystem({}) {
       this.snapArmed = true;
       return false;
     }
+    if (!this.snapArmed) return false;
     // A clear sideways flick past the threshold — turn the way it's pushed
     // (stick right yaws you right: a NEGATIVE rotation about +y).
-    if (this.snapArmed && Math.abs(sx) >= TELEPORT.snapEngage && Math.abs(sx) > Math.abs(sy)) {
+    if (Math.abs(sx) >= TELEPORT.snapEngage && Math.abs(sx) > Math.abs(sy)) {
       this.snapArmed = false;
       snapTurn(this.player, sx > 0 ? -TELEPORT.snapAngle : TELEPORT.snapAngle);
       sfx.uiClick();
       return true;
     }
+    // …and a clear BACKWARD one steps back. (Forward is −y on a thumbstick,
+    // so back is positive.) Consumes the flick either way it lands: a push
+    // that finds a wall behind you must not fall through to the teleport
+    // arc, or backing into a corner would fire a blind hop instead.
+    if (sy >= TELEPORT.snapEngage && sy > Math.abs(sx)) {
+      this.snapArmed = false;
+      this.stepBack();
+      return true;
+    }
     return false;
+  }
+
+  /**
+   * Half a metre backwards, away from where the HEAD is looking — the body
+   * can be facing anywhere, but "back" means back from what you can see.
+   *
+   * Judged the way the arc's landing is judged — real floor under it, no wall
+   * crossed on the way — plus one rule the arc doesn't need: it must stay on
+   * YOUR level. Half a step back from the counter would otherwise put you up
+   * ON the counter, because that surface is standable and it is exactly 0.5 m
+   * behind you when you're leaning on it. A shuffle that lifts you a metre in
+   * the air is not a shuffle. Climbing is what the arc is for.
+   *
+   * Shorter steps are tried in turn so backing up against something stops you
+   * short instead of refusing outright.
+   */
+  private stepBack(): void {
+    this.player.head.getWorldPosition(_head);
+    this.player.head.getWorldQuaternion(_quat);
+    _dir.set(0, 0, -1).applyQuaternion(_quat);
+    const flat = Math.hypot(_dir.x, _dir.z);
+    if (flat < 1e-4) return; // staring at your boots or the ceiling
+    const bx = -_dir.x / flat;
+    const bz = -_dir.z / flat;
+    const fromY = floorYAt(_head.x, _head.z);
+    for (const step of TELEPORT.stepBack) {
+      const x = _head.x + bx * step;
+      const z = _head.z + bz * step;
+      const area = areaAt(x, z);
+      if (!area) continue;
+      if (Math.abs(area.y - fromY) > 0.05) continue; // your level, or nothing
+      if (crossesWall(_head.x, _head.z, x, z, Math.max(fromY, area.y))) continue;
+      teleportPlayer(this.player, x, z, Math.atan2(-_dir.x, -_dir.z), area.y);
+      sfx.uiClick();
+      return;
+    }
+  }
+
+  /**
+   * Keep a `reset` listener on the session's live reference space (it only
+   * exists once a session is up, and each new session mints a new one).
+   */
+  private watchRecenter(): void {
+    const space = this.renderer.xr.getReferenceSpace();
+    if (space === this.refSpace) return;
+    this.refSpace?.removeEventListener('reset', this.onRecenter);
+    this.refSpace = space;
+    space?.addEventListener('reset', this.onRecenter);
   }
 
   private hide(): void {

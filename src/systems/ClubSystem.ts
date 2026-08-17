@@ -29,7 +29,8 @@
  * and club and never clobbers the set's (DiscoSystem's) fog.
  *
  * THE STILL ROOM's law is enforced here: step through its door and the
- * club's music falls away to a murmur (setAmbientDuck), voices untouched.
+ * club's music drops to a muffled thud through the wall (setAmbientDuck
+ * takes the level down AND the top end off), voices untouched.
  */
 
 import { createSystem } from '@iwsdk/core';
@@ -63,7 +64,9 @@ export class ClubSystem extends createSystem({}) {
     if (!club || !foyer) return;
 
     const menuRoom = match.screen === 'lobby' || match.screen === 'tour';
-    const social = net.phase === 'hosting' || net.phase === 'joined';
+    // `holdFoyer`: the room is open but its host is still reading their
+    // code off the board. The doors stay shut until they walk through.
+    const social = (net.phase === 'hosting' || net.phase === 'joined') && !match.holdFoyer;
     const wantClub = menuRoom && social;
     const wantFoyer = menuRoom && !social;
 
@@ -117,8 +120,6 @@ export class ClubSystem extends createSystem({}) {
         ring.glowMat.emissiveIntensity = 1.05 + phase * 0.5 + pulse * 0.28;
       });
       club.chandelier.group.rotation.y += delta * 0.02; // stately drift
-      club.chandelier.moonMat.emissiveIntensity = 1.0 + pulse * 0.3;
-      club.chandelier.coronaMat.opacity = 0.42 + pulse * 0.2 + Math.sin(t * 0.7) * 0.06;
 
       // ── the floor's brass ghost-ring ──────────────────────────────────
       club.inlayMat.opacity = 0.34 + pulse * 0.3;
@@ -136,7 +137,10 @@ export class ClubSystem extends createSystem({}) {
       const Q = CLUB.quiet;
       const inside =
         match.headX >= Q.minX && match.headX <= Q.maxX && match.headZ >= Q.minZ && match.headZ <= Q.maxZ;
-      const target = inside ? 0.1 : 1;
+      // Properly quiet, not just turned down: at 0.1 the club was still in
+      // the room with you. The muffle rides this same number, so the low
+      // setting is a wall's worth of both.
+      const target = inside ? 0.03 : 1;
       if (target !== this.duckTarget) {
         this.duckTarget = target;
         setAmbientDuck(target);

@@ -287,16 +287,32 @@ export function runnerTexture(repeat: [number, number] = [1, 3]): CanvasTexture 
       g.stroke();
     }
     // Repeating sunburst fans up the middle.
-    for (const cy of [42, 128, 214]) {
+    //
+    // The fans are SPACED BY THE TILE, not by hand. Hand-placed at 42/128/214
+    // the third one reached y = 278 on a 256 tile: the carpet lost the top of
+    // every third fan to the seam, and since the motif was sliced rather than
+    // wrapped the missing part never came back on the next tile. Give each
+    // fan an equal slot and sit it in the middle of its own, and the run is
+    // both evenly spaced AND whole across the join — the same pattern, minus
+    // the haircut.
+    const FANS = 3;
+    const slot = 256 / FANS;
+    // Ray length, and the apex offset the motif is centred on. The rays
+    // spread ±60° off vertical (below), so the fan's half-height is
+    // 44·cos(30°) = 38.1 — comfortably inside the 42.7 each slot allows.
+    const REACH = 44;
+    const APEX = 26;
+    for (let k = 0; k < FANS; k++) {
+      const cy = k * slot + slot / 2 - APEX;
       for (let i = 0; i < 7; i++) {
         const a = -Math.PI / 2 + ((i - 3) * Math.PI) / 9;
         g.beginPath();
-        g.moveTo(128, cy + 26);
-        g.lineTo(128 + Math.sin(a) * 44, cy + 26 - Math.cos(a) * -44 * -1);
+        g.moveTo(128, cy + APEX);
+        g.lineTo(128 + Math.sin(a) * REACH, cy + APEX - Math.cos(a) * REACH);
         g.stroke();
       }
       g.beginPath();
-      g.arc(128, cy + 26, 8, 0, Math.PI * 2);
+      g.arc(128, cy + APEX, 8, 0, Math.PI * 2);
       g.stroke();
     }
     // Wear: soft dark tread down the centre.
