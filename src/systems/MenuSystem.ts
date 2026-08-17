@@ -97,6 +97,14 @@ const SOLO_LIST_W = 700;
 const SOLO_ROW_Y0 = 216;
 const SOLO_ROW_H = 42;
 const SOLO_ROW_PITCH = 47;
+/** How many song rows the shelf shows at once. The board is 1024px tall and
+ *  the rows start at 216 on a 47 pitch, so seventeen would run off the
+ *  bottom edge — which is exactly what happened when the box grew past
+ *  sixteen records: UNITY, V ONE and VFALL were painted into the void below
+ *  the panel, invisible and unclickable, and no amount of adding them to a
+ *  role could bring them back. Fifteen leaves the ▲▼ their corner. */
+const SOLO_VISIBLE = 15;
+const SOLO_PAGE_Y = 964;
 const SOLO_RIGHT_X = 1044;
 const SOLO_RIGHT_W = 576;
 const SOLO_WELL_Y = 292;
@@ -219,6 +227,9 @@ export class MenuSystem extends createSystem({}) {
   /** Which board the SOLO song page shows, and how far down it's scrolled. */
   private boardSource: 'world' | 'local' = 'world';
   private boardScroll = 0;
+  /** How far down the SONG shelf is scrolled — its own window, independent
+   *  of the leaderboard beside it. */
+  private songScroll = 0;
   private lastScoresDirty = -1;
   /** Thumbstick scroll needs a rest between steps or one flick runs the
    *  whole list past you. */
@@ -240,6 +251,10 @@ export class MenuSystem extends createSystem({}) {
     } catch {
       /* fine */
     }
+    // Open the shelf on the record you last played. A preference stored near
+    // the end of the alphabet — VFALL, say — would otherwise sit below the
+    // scroll window, and the shelf would open looking like nothing is cued.
+    this.revealCuedSong();
 
     this.board = new Panel(1.72, 1.06, W, H);
     this.board.group.position.set(0, 1.42, -1.6);
@@ -408,7 +423,16 @@ export class MenuSystem extends createSystem({}) {
       }
       if (flick !== 0 && this.stickCool <= 0) {
         this.stickCool = 0.16;
-        this.scrollBoard(flick);
+        // Two lists share this page. The stick drives whichever one you are
+        // POINTING at — the shelf on the left, the board on the right — so
+        // the thumb does the obvious thing while you're picking a record.
+        // Off the shelf entirely, the board keeps the stick as it always had.
+        const onShelf =
+          this.hitPx !== null &&
+          this.hitPx.x >= SOLO_LIST_X &&
+          this.hitPx.x <= SOLO_LIST_X + SOLO_LIST_W;
+        if (onShelf) this.scrollSongs(flick);
+        else this.scrollBoard(flick);
       } else if (flick === 0) {
         this.stickCool = 0;
       }
@@ -575,6 +599,10 @@ export class MenuSystem extends createSystem({}) {
     } else if (id === 'board-retry') {
       const cued = trackById(match.preferredTrack);
       if (cued) refreshWorldBoard(cued.id, match.difficulty);
+    } else if (id === 'songs-up') {
+      this.scrollSongs(-SOLO_VISIBLE);
+    } else if (id === 'songs-down') {
+      this.scrollSongs(SOLO_VISIBLE);
     } else if (id === 'board-up') {
       this.scrollBoard(-BOARD_VISIBLE);
     } else if (id === 'board-down') {
@@ -1386,8 +1414,12 @@ export class MenuSystem extends createSystem({}) {
       disabled: match.seats >= RING.maxSeats,
     });
 
-    // The songs (ghosts — drawSoloPanel paints the rows).
-    this.soloRows().forEach((row, i) => {
+    // The songs (ghosts — drawSoloPanel paints the rows). Only the rows
+    // inside the scroll window get a hit area: one painted off the bottom of
+    // the board is one you can never point at.
+    const songRows = this.soloRows();
+    const songTop = this.songTop(songRows.length);
+    songRows.slice(songTop, songTop + SOLO_VISIBLE).forEach((row, i) => {
       buttons.push({
         id: row.id,
         label: row.track?.title ?? 'SHUFFLE',
@@ -1398,6 +1430,31 @@ export class MenuSystem extends createSystem({}) {
         h: SOLO_ROW_H,
       });
     });
+    // The shelf's own ▲▼, mirroring the leaderboard's.
+    if (songRows.length > SOLO_VISIBLE) {
+      buttons.push({
+        id: 'songs-up',
+        label: '▲',
+        small: true,
+        px: 20,
+        disabled: songTop <= 0,
+        x: SOLO_LIST_X + SOLO_LIST_W - 104,
+        y: SOLO_PAGE_Y,
+        w: 44,
+        h: 40,
+      });
+      buttons.push({
+        id: 'songs-down',
+        label: '▼',
+        small: true,
+        px: 20,
+        disabled: songTop >= songRows.length - SOLO_VISIBLE,
+        x: SOLO_LIST_X + SOLO_LIST_W - 52,
+        y: SOLO_PAGE_Y,
+        w: 44,
+        h: 40,
+      });
+    }
 
     // DIFFICULTY: the act floor for the whole song — and the lens the
     // list's BEST column reads through.
@@ -1601,8 +1658,10 @@ export class MenuSystem extends createSystem({}) {
     g.fillText('BEST', SOLO_LIST_X + SOLO_LIST_W - 52, 202);
     g.letterSpacing = '0px';
 
-    // The rows.
-    this.soloRows().forEach((row, i) => {
+    // The rows — the scroll window only, painted from the top of the shelf.
+    const allRows = this.soloRows();
+    const rowTop = this.songTop(allRows.length);
+    allRows.slice(rowTop, rowTop + SOLO_VISIBLE).forEach((row, i) => {
       const y = SOLO_ROW_Y0 + i * SOLO_ROW_PITCH;
       const selected = (match.preferredTrack || '') === (row.track?.id ?? '');
       const hov = this.board.hoverOf(row.id);
@@ -1814,6 +1873,31 @@ export class MenuSystem extends createSystem({}) {
   /** Scroll offset, clamped to whatever the list actually holds. */
   private scrollTop(total: number): number {
     return Math.max(0, Math.min(this.boardScroll, total - BOARD_VISIBLE));
+  }
+
+  /** The song shelf's own scroll, same shape as the leaderboard's. */
+  private scrollSongs(by: number): void {
+    const total = this.soloRows().length;
+    const next = Math.max(0, Math.min(this.songScroll + by, Math.max(0, total - SOLO_VISIBLE)));
+    if (next === this.songScroll) return;
+    this.songScroll = next;
+    this.lastKey = '';
+  }
+
+  private songTop(total: number): number {
+    return Math.max(0, Math.min(this.songScroll, total - SOLO_VISIBLE));
+  }
+
+  /** Scroll the shelf so the cued record is inside the window. */
+  private revealCuedSong(): void {
+    const rows = this.soloRows();
+    const at = rows.findIndex((r) => (r.track?.id ?? '') === (match.preferredTrack || ''));
+    if (at < 0) return;
+    const max = Math.max(0, rows.length - SOLO_VISIBLE);
+    if (at < this.songScroll) this.songScroll = Math.min(at, max);
+    else if (at >= this.songScroll + SOLO_VISIBLE) {
+      this.songScroll = Math.min(at - SOLO_VISIBLE + 1, max);
+    }
   }
 
   private scrollBoard(by: number): void {

@@ -274,15 +274,17 @@ files**, not guessed — the whole game is quantized to them, so they had to be:
 | COMBAT | 135 | 12 phrases | −13.2 LUFS | quick raid |
 | LOOP | 150 | 17 phrases | −11.2 LUFS | quick raid |
 | DYNASTY | 155 | 10 phrases | −9.6 LUFS | tour: peak-hours finale |
-| INFECTION | 138 | 15 phrases | −10.9 LUFS | tour: after hours |
+| INFECTION | 138 | 15 phrases | −10.9 LUFS | quick raid |
 | SPREAD | 150 | 17 phrases | −13.1 LUFS | tour: after hours · skips 6 bars in |
 | BREAKCORE | 174 | 11 phrases | −8.3 LUFS | tour: the last night |
 | ASSEMBLE | 125 | 16 phrases | −7.5 LUFS | quick raid · drops on the slam |
 | SAKUPENED | 133.964 | 10 phrases | −8.1 LUFS | tour: opening night 2 |
 | UNITY | 117 | 17 phrases | −13.8 LUFS | quick raid · skips its ambient open |
 | MONEY | 78.395 | 6 phrases | −14.5 LUFS | tour: peak hours · no ducking |
-| SWAG | 91.974 | — | −15.7 LUFS | foyer loop |
-| ECLIPSE | 70 | — | −10.4 LUFS | the club's house record |
+| FUTURE VIBE | 93.984 | 6 phrases | −14.2 LUFS | club: second on the rotation · quick raid |
+| SWAG | 91.974 | — | −15.7 LUFS | foyer rotation |
+| ECLIPSE | 70 | — | −10.4 LUFS | foyer rotation |
+| CHILL | 125 | — | −8.9 LUFS | the club's house record — opens the rotation |
 
 - **Tempo** came from an onset-flux autocorrelation phase-locked across each
   whole track. Four land on exact integers (a DAW grid). Three genuinely sit a
