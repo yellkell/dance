@@ -321,16 +321,6 @@ export const TRACKS: Track[] = [
     roles: ['raid'],
   },
   {
-    id: 'futurevibe',
-    title: 'FUTURE VIBE',
-    url: futurevibeUrl,
-    bpm: 93.984,
-    downbeat: 0.9577,
-    seconds: 147.54,
-    lufs: -14.2,
-    roles: ['raid'],
-  },
-  {
     id: 'braineater',
     title: 'BRAIN EATER',
     url: braineaterUrl,
@@ -364,7 +354,27 @@ export const TRACKS: Track[] = [
     // The club's record now — CHILL holds the social floor whenever an
     // online room is up, and the chandelier phases to it. Never a raid
     // record: the club deserves a house sound no set ever borrows.
+    //
+    // It opens the club rotation rather than looping alone: FUTURE VIBE sits
+    // directly below and takes the decks when this one runs out. Order here
+    // IS the running order — tracksFor keeps the array's sequence and the
+    // rotation always starts at its first record.
     roles: ['club'],
+  },
+  {
+    id: 'futurevibe',
+    title: 'FUTURE VIBE',
+    url: futurevibeUrl,
+    bpm: 93.984,
+    downbeat: 0.9577,
+    seconds: 147.54,
+    lufs: -14.2,
+    // The club's SECOND record: CHILL plays through, then this takes over,
+    // and the two trade all night the way the foyer's pair do. Sitting after
+    // CHILL in this array is what puts it second. It keeps its raid seat too
+    // — a house record the floor can also book is fine; only CHILL is held
+    // back from the shelf.
+    roles: ['raid', 'club'],
   },
   {
     id: 'vfall',
