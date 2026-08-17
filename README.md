@@ -302,8 +302,9 @@ quantized to them, so they had to be:
 | ECLIPSE | 70 | — | −10.4 LUFS | foyer rotation |
 | CREDITS | 70 | — | −10.4 LUFS | the closing theme |
 
-(Set lengths are the single-time chart; EXPERT's double-time records —
-below — run twice the phrases across the same minutes of music.)
+(Set lengths are the single-time chart; EXPERT's double-time records — see
+**Picking a difficulty** below — run twice the phrases across the same
+minutes of music.)
 
 - **Tempo** came from an onset-flux autocorrelation phase-locked across each
   whole track, audited by `tools/octave-check` for lattice errors (DISCO
@@ -393,10 +394,12 @@ lattice). So on EXPERT, any record **under 100 BPM charts at 2×**: the
 clock runs on the eighths, landings hit the real half-bars, and the
 91–98 shelf (TARGET, FUTURE VIBE, V ONE, MORNING, MONEY) plays at an
 effective 182–196 — the songs the difficulty was quietly under-charging
-are now the ones that bite hardest. The song page and the GO RAVE seat
-wear a **×2** beside the tempo whenever it applies; the file itself plays
-untouched, only the grid the game counts on changes. No other difficulty
-is touched, and the tour never reaches EXPERT, so no authored night moves.
+are now the ones that bite hardest. Nothing announces it: the menus show
+each record's own measured tempo, because a badge beside the BPM explains
+an implementation to somebody picking a song, and the floor tells you
+anyway. The file itself plays untouched — only the grid the game counts
+on changes. No other difficulty is touched, and the tour never reaches
+EXPERT, so no authored night moves.
 
 **Adding a track**: drop the file in `src/assets/music/`, add a row to
 `TRACKS`, done. Roles decide where it plays. `npm run analyze -- <file…>` prints

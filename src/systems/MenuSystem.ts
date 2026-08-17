@@ -36,7 +36,7 @@
 
 import { createSystem, InputComponent } from '@iwsdk/core';
 import { Raycaster, Vector3, type Intersection, type Object3D } from 'three';
-import { DIFFICULTY, GRADE, RING, TOUR, isDoubleTime, seatHue } from '../config.js';
+import { DIFFICULTY, GRADE, RING, TOUR, seatHue } from '../config.js';
 import * as sfx from '../audio/sfx.js';
 import { setSfxVolume, sfxVolume } from '../audio/sfx.js';
 import { musicVolume, preload, setMusicVolume } from '../audio/music.js';
@@ -1546,9 +1546,7 @@ export class MenuSystem extends createSystem({}) {
       // The record and its tempo — what you're about to dance to, nothing
       // about who's filling the ring.
       sub: cued
-        ? `${cued.title} · ${cued.bpm.toFixed(cued.bpm % 1 ? 2 : 0)} BPM${
-            isDoubleTime(cued.bpm, match.difficulty) ? ' ×2' : ''
-          }`
+        ? `${cued.title} · ${cued.bpm.toFixed(cued.bpm % 1 ? 2 : 0)} BPM`
         : 'the seed picks the record',
       primary: true,
       disabled: net.phase === 'connecting',
@@ -1744,12 +1742,8 @@ export class MenuSystem extends createSystem({}) {
     g.textAlign = 'right';
     g.font = font(500, 21);
     g.fillStyle = UI.dim;
-    // EXPERT charts slow records in double time — the page says so right
-    // beside the tempo, because the chart you're about to dance is ×2.
     g.fillText(
-      `${cued.bpm.toFixed(cued.bpm % 1 ? 2 : 0)} BPM${
-        isDoubleTime(cued.bpm, match.difficulty) ? ' ×2' : ''
-      } · ${Math.round(cued.seconds / 6) / 10} min`,
+      `${cued.bpm.toFixed(cued.bpm % 1 ? 2 : 0)} BPM · ${Math.round(cued.seconds / 6) / 10} min`,
       wx + ww - 28,
       wy + 56,
     );

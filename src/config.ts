@@ -531,7 +531,13 @@ export const DIFFICULTY = {
    *  182–196 — a shade past BREAKCORE's 174, which is fair: these are the
    *  records the difficulty was quietly under-charging. The catalog's gap
    *  between 98 and 110 makes 100 a robust line, and EXPERT is unreachable
-   *  on the tour, so no authored night changes feel. */
+   *  on the tour, so no authored night changes feel.
+   *
+   *  Deliberately UNANNOUNCED. The menus wear the record's own measured
+   *  tempo and nothing else: a "×2" badge beside the BPM explained an
+   *  implementation to somebody choosing a song, and the floor already
+   *  tells you — a slow record on EXPERT simply comes at you like a fast
+   *  one, which is the whole point. */
   doubleTimeBelowBpm: 100,
 };
 
@@ -541,11 +547,6 @@ export const DIFFICULTY = {
  *  derives the identical grid. */
 export function chartBpm(trackBpm: number, difficulty: number): number {
   return difficulty >= 3 && trackBpm < DIFFICULTY.doubleTimeBelowBpm ? trackBpm * 2 : trackBpm;
-}
-
-/** Is this record charting in double time right now? (UI: the ×2 tag.) */
-export function isDoubleTime(trackBpm: number, difficulty: number): boolean {
-  return chartBpm(trackBpm, difficulty) !== trackBpm;
 }
 
 /* ────────────────────────────── THE GROOVE ───────────────────────────────

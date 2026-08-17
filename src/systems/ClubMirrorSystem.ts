@@ -69,6 +69,10 @@ const Y_FLIP = new Quaternion(0, 1, 0, 0);
 interface PoolEntry {
   rig: DancerRig;
   hue: number;
+  /** Is this reflection wearing THE CROWN? Tracked because the crown is
+   *  built lazily on first wear — after the build-time clip traverse — so
+   *  its materials need the pane's planes handed to them at that moment. */
+  crowned: boolean;
 }
 
 /** buildCoupe() hands back a Group with no disposer of its own; a mirrored
@@ -265,7 +269,7 @@ export class ClubMirrorSystem extends createSystem({}) {
       entry = undefined;
     }
     if (!entry) {
-      entry = { rig: buildDancer(hue), hue };
+      entry = { rig: buildDancer(hue), hue, crowned: false };
       // Clip every surface of this reflection at the pane (set before the
       // rig has ever been drawn, so no shader recompiles mid-approach).
       entry.rig.root.traverse((o) => {
@@ -278,7 +282,22 @@ export class ClubMirrorSystem extends createSystem({}) {
     }
     // THE CROWN reflects with its wearer — including your own (the mirror
     // is the one place you get to see yourself wearing it).
-    entry.rig.setCrown(net.crownIdx !== null && net.crownIdx === (idx === -1 ? net.myIdx : idx));
+    const wearsCrown = net.crownIdx !== null && net.crownIdx === (idx === -1 ? net.myIdx : idx);
+    if (wearsCrown !== entry.crowned) {
+      entry.crowned = wearsCrown;
+      entry.rig.setCrown(wearsCrown);
+      // First wear builds the crown — AFTER the clip traverse above — so
+      // hand its materials the pane's planes before their first draw, or a
+      // crowned reflection pressed to the glass would poke its coronet
+      // (and worse, its glow halo) out of the frame into the room.
+      if (wearsCrown) {
+        entry.rig.root.getObjectByName('crown')?.traverse((o) => {
+          const mat = (o as Mesh).material as Material | Material[] | undefined;
+          if (!mat) return;
+          for (const m of Array.isArray(mat) ? mat : [mat]) m.clippingPlanes = GLASS_CLIP;
+        });
+      }
+    }
     // Mirror across z = glassZ: positions reflect, yaw flips through the
     // plane, and the HANDS SWAP — the reflection's arm on your left is
     // fed by your right hand, or it reaches across its own chest.

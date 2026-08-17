@@ -38,7 +38,7 @@ import {
   SRGBColorSpace,
   Vector3,
 } from 'three';
-import { DIFFICULTY, RING, hueToColor, isDoubleTime } from '../config.js';
+import { DIFFICULTY, RING, hueToColor } from '../config.js';
 import * as sfx from '../audio/sfx.js';
 import { preload } from '../audio/music.js';
 import { pickRaidTrack, trackById, tracksFor } from '../audio/tracks.js';
@@ -743,11 +743,7 @@ export class ClubSocialSystem extends createSystem({}) {
       // The chevron says the row opens onto something, rather than
       // advancing one notch per press.
       label: `${this.songsOpen ? '◂' : '▸'}  ♪ ${cued ? cued.title : 'SHUFFLE'}`,
-      sub: cued
-        ? `${cued.bpm.toFixed(cued.bpm % 1 ? 2 : 0)} BPM${
-            isDoubleTime(cued.bpm, match.difficulty) ? ' ×2' : ''
-          }`
-        : undefined,
+      sub: cued ? `${cued.bpm.toFixed(cued.bpm % 1 ? 2 : 0)} BPM` : undefined,
       selected: this.songsOpen,
       x: 24,
       y: 652,
