@@ -439,10 +439,12 @@ export function beatLenOf(track: Track): number {
 /**
  * How much SET a track affords: game beat 0 sits `countInBeats` after the
  * first downbeat, and the last landing must leave a bar of room before the
- * file runs out.
+ * file runs out. `bpm` is the CHART tempo (EXPERT doubles slow records) —
+ * everything here is measured in chart beats, so a doubled clock affords
+ * twice the phrases across the same seconds of music.
  */
-export function trackPhrases(track: Track, countInBeats: number, beatsPerPhrase = 32): number {
-  const beatLen = beatLenOf(track);
+export function trackPhrases(track: Track, countInBeats: number, beatsPerPhrase = 32, bpm = track.bpm): number {
+  const beatLen = 60 / bpm;
   const zero = Math.max(track.downbeat, track.startAt ?? 0) + countInBeats * beatLen;
   const beats = (track.seconds - zero) / beatLen - beatsPerPhrase / 8; // tail guard
   return Math.max(2, Math.floor(beats / beatsPerPhrase));

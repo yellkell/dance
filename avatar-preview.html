@@ -66,6 +66,8 @@
 
       const params = new URLSearchParams(location.search);
       const still = params.get('still') === '1';
+      /** `?crown=1` crowns the whole row — clearance over every crest. */
+      const crowned = params.get('crown') === '1';
       const cam = params.get('cam') ?? '';
       /** `?cam=head` frames ONE dancer's head — the only way to judge visor,
        *  jewellery and crest work, which is invisible at catwalk range. */
@@ -110,6 +112,7 @@
         const base = seatHue(i * 4 + 1);
         const hue = base + (((i - styleVariant(base)) % 4) + 4) % 4 * STYLE_STEP;
         const rig = buildDancer(hue);
+        if (crowned) rig.setCrown(true);
         const x = (i - (N - 1) / 2) * SPACING;
         rig.root.position.set(x, 0, 0);
         scene.add(rig.root);

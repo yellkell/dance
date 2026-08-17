@@ -10,7 +10,7 @@
  * boundaries are fractions of the set) stretches to fit whatever is on.
  */
 
-import { MUSIC, RING, TOUR, countInBeatsFor } from '../config.js';
+import { MUSIC, RING, TOUR, chartBpm, countInBeatsFor } from '../config.js';
 import { pickRaidTrack, trackById, trackPhrases, type Track } from '../audio/tracks.js';
 import { submitWorldScore } from '../net/scores.js';
 import { profileName } from './profile.js';
@@ -27,12 +27,15 @@ import {
 
 const phraseBeats = MUSIC.beatsPerBar * MUSIC.barsPerPhrase;
 
-/** Apply a track to the match: tempo, set length, id. */
+/** Apply a track to the match: tempo, set length, id. The tempo mounted is
+ *  the CHART tempo — EXPERT runs slow records in double time — so
+ *  startRaid settles the difficulty before the track goes on. */
 function mountTrack(track: Track): void {
+  const bpm = chartBpm(track.bpm, match.difficulty);
   match.trackId = track.id;
-  match.bpm = track.bpm;
-  match.beatLen = 60 / track.bpm;
-  match.phrases = trackPhrases(track, countInBeatsFor(track.bpm), phraseBeats);
+  match.bpm = bpm;
+  match.beatLen = 60 / bpm;
+  match.phrases = trackPhrases(track, countInBeatsFor(bpm), phraseBeats, bpm);
   match.grooveStreak = 0;
 }
 

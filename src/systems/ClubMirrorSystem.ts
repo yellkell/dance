@@ -276,6 +276,9 @@ export class ClubMirrorSystem extends createSystem({}) {
       mirrorRefs.current!.figures.add(entry.rig.root);
       this.pool.set(idx, entry);
     }
+    // THE CROWN reflects with its wearer — including your own (the mirror
+    // is the one place you get to see yourself wearing it).
+    entry.rig.setCrown(net.crownIdx !== null && net.crownIdx === (idx === -1 ? net.myIdx : idx));
     // Mirror across z = glassZ: positions reflect, yaw flips through the
     // plane, and the HANDS SWAP — the reflection's arm on your left is
     // fed by your right hand, or it reaches across its own chest.

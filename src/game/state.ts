@@ -254,6 +254,20 @@ export function dancerAtSeat(seat: number): Dancer | undefined {
   return match.players.find((p) => p.seat === seat);
 }
 
+/** THE RANK LAW, as a comparator: the living above the fallen; the living
+ *  by score; the fallen by who lasted longest. RankSystem orders the board
+ *  with it, and the club uses it to name the night's winner (the crown). */
+export function standingOrder(a: Dancer, b: Dancer): number {
+  if (a.alive !== b.alive) return a.alive ? -1 : 1;
+  if (a.alive) return b.score - a.score || b.combo - a.combo || a.seat - b.seat;
+  return b.elimAtBeat - a.elimAtBeat || b.score - a.score || a.seat - b.seat;
+}
+
+/** Who owned the night — rank 1 under the law above. */
+export function nightWinner(): Dancer | undefined {
+  return [...match.players].sort(standingOrder)[0];
+}
+
 export function aliveCount(): number {
   return match.players.reduce((n, p) => n + (p.alive ? 1 : 0), 0);
 }

@@ -81,7 +81,17 @@ const SERVE_RETRY_MS = 900; // every glass out on the floor — bide, try again
  *   playing: Set<idx>,   // members currently away on the ring
  *   props: [{ holder: idx|null, mode, pos, quat, full, restedAt }],  // the glasses
  *   serveTimer,          // the dumbwaiter's clock (server-owned, like the ball's)
+ *   crown: idx|null,     // THE CROWN: the last set's winner, worn on the floor
+ *   lastSet: Set<idx>,   // who was dealt onto the most recent ring
+ *   crownSettled,        // has this set's winner been claimed yet?
  * }
+ *
+ * THE CROWN: when a set resolves, the first player home ('game-out' with a
+ * `winner` field — every client computed the identical podium, so first is
+ * as good as all) names the night's winner, and the whole room is told to
+ * crown that figure. It stays on across the floor until the wearer's NEXT
+ * game — the deal-in takes it off — or until they leave the room. A set a
+ * groupie won names nobody, and a mid-set bail carries no field at all.
  */
 const rooms = new Map();
 
@@ -139,6 +149,9 @@ function openRoom(ws, msg, isPublic) {
     playing: new Set(),
     props: freshProps(),
     serveTimer: null,
+    crown: null,
+    lastSet: new Set(),
+    crownSettled: true, // no set yet — nothing to claim
   };
   room.members.set(ws, { name: sanitizeName(msg.name), hue: sanitizeHue(msg.hue), idx: 0, seat: 0 });
   rooms.set(code, room);
@@ -180,6 +193,8 @@ function joinRoomByCode(ws, msg, code) {
     });
   }
   if (room.playing.size) send(ws, { t: 'game', players: [...room.playing].sort((a, b) => a - b) });
+  // ... the reigning winner, still wearing their crown ...
+  if (room.crown !== null) send(ws, { t: 'crown', idx: room.crown });
   // ... and the drinks as they stand: the pedestal, the floor, the air.
   send(ws, { t: 'props', props: snapshotProps(room) });
 }
@@ -303,6 +318,14 @@ function fireBall(code) {
   }
   room.playing = new Set(players.map(([, info]) => info.idx));
   broadcastGame(room);
+  // THE CROWN comes off at the door: the wearer's next game is starting.
+  // The set that just dealt is now the one whose winner may claim it.
+  room.lastSet = new Set(room.playing);
+  room.crownSettled = false;
+  if (room.crown !== null && room.playing.has(room.crown)) {
+    room.crown = null;
+    broadcast(room, { t: 'crown', idx: null });
+  }
   // Nobody carries a coupe onto the ring — held drinks drop to the floor.
   for (const [, info] of players) dropProps(room, info.idx);
   console.log(`[dance-raid] room ${code}: the ball fired — ${players.length} on a ${seats}-ring, ${room.members.size - players.length} hold the floor`);
@@ -332,6 +355,11 @@ function leaveRoom(ws) {
     console.log(`[dance-raid] room ${code}: host left, ${heir[1].name} inherits`);
   }
   if (info) {
+    // A crown walks out with its wearer — the room's heads go bare.
+    if (room.crown === info.idx) {
+      room.crown = null;
+      broadcast(room, { t: 'crown', idx: null });
+    }
     // Their drink drops where it last was; their touch on the ball goes
     // with them; a caller's exit cancels it.
     dropProps(room, info.idx);
@@ -514,7 +542,21 @@ wss.on('connection', (ws) => {
         const room = rooms.get(ws.room);
         const info = room?.members.get(ws);
         if (!room || !info) break;
-        if (room.playing.delete(info.idx)) broadcastGame(room);
+        const wasPlaying = room.playing.delete(info.idx);
+        if (wasPlaying) broadcastGame(room);
+        // THE CROWN's claim: only a player of THIS set may make it, only
+        // once per set, and only for someone that set actually dealt who
+        // is still in the room. `winner: null` (a groupie's night) settles
+        // the set with no crown; a bail sends no field and settles nothing.
+        if (wasPlaying && !room.crownSettled && 'winner' in msg) {
+          room.crownSettled = true;
+          const idx = typeof msg.winner === 'number' && Number.isFinite(msg.winner) ? msg.winner : null;
+          if (idx !== null && room.lastSet.has(idx) && memberByIdx(room, idx)) {
+            room.crown = idx;
+            broadcast(room, { t: 'crown', idx });
+            console.log(`[dance-raid] room ${ws.room}: ${memberByIdx(room, idx)[1].name} takes the crown`);
+          }
+        }
         break;
       }
 

@@ -77,6 +77,10 @@ export const net = {
   ball: null as BallState | null,
   /** Members currently away playing a set (the floor sees them out). */
   gamePlayers: new Set<number>(),
+  /** THE CROWN: member idx of the last club raid's winner, worn on their
+   *  figure across the floor until their NEXT game (or they leave the
+   *  room). null = bare heads. The relay owns it; clients only wear it. */
+  crownIdx: null as number | null,
   error: '',
   rttMs: 0,
   /** Bumped on any lobby change so menus know to repaint. */
@@ -172,6 +176,7 @@ function teardown(reason: string): void {
   net.myIdx = -1;
   net.ball = null;
   net.gamePlayers = new Set();
+  net.crownIdx = null;
   net.dirty++;
   seatByIdx.clear();
   stopVoiceCapture();
@@ -283,6 +288,14 @@ function handle(msg: Record<string, unknown>): void {
       // Who is away on the ring right now (empty = the floor is whole).
       const players = Array.isArray(msg.players) ? (msg.players as number[]) : [];
       net.gamePlayers = new Set(players.filter((n) => Number.isFinite(n)));
+      net.dirty++;
+      break;
+    }
+    case 'crown': {
+      // The relay crowned (or bared) a head. Guarded by type, not Number():
+      // a JSON null must read as "nobody", never as member 0.
+      const idx = msg.idx;
+      net.crownIdx = typeof idx === 'number' && Number.isFinite(idx) ? idx : null;
       net.dirty++;
       break;
     }
@@ -497,12 +510,19 @@ export function cancelBall(): void {
  * A finished (or bailed) set folds back onto the club floor, NOT out of the
  * room: phase returns to hosting/joined and the relay is told this player
  * is home — when the last one is, the floor can raise the next ball.
+ *
+ * `winnerIdx` is THE CROWN's claim, sent only when the set actually
+ * RESOLVED (walked out through the podium): the member idx of the night's
+ * winner, or null when a groupie took it. Every client on the ring
+ * computed the identical standings, so the relay believes the first
+ * player home. A mid-set bail passes undefined — it names nobody, and a
+ * player who finishes the record will.
  */
-export function backToClub(): void {
+export function backToClub(winnerIdx?: number | null): void {
   if (net.phase !== 'live') return;
   net.phase = net.isHost ? 'hosting' : 'joined';
   net.dirty++;
-  send({ t: 'game-out' });
+  send(winnerIdx === undefined ? { t: 'game-out' } : { t: 'game-out', winner: winnerIdx });
   remotePoses.clear();
   seatByIdx.clear();
 }

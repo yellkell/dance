@@ -64,6 +64,14 @@ disc 0.34 → 0.30): expert lives in density and combinations, not in
 slivers of safe ground. Online, the ball carries the caller's difficulty
 with the song pick, so the whole ring dances one chart.
 
+And EXPERT keeps one more law: **slow records chart in DOUBLE TIME**. The
+pressure curve is written in beats, so its real-time density scales with
+the record — a 91 BPM expert night used to throw half the landings per
+second of a 174 one, off a bar grid that walked past where those records'
+grooves actually live. Under 100 BPM the whole chart clock runs at 2×
+(grid on the eighths, landings on the real half-bars), so the slow shelf
+finally plays like the fast one. Expert only; the tour never reaches it.
+
 Getting HIT also knocks the rhythm out of your hands: the groove streak
 (the one-up-one-down hand combo and its tally) resets on every clip, so
 a clean grade and a deep groove are the same discipline.
@@ -215,16 +223,30 @@ hand-built pylon groups it replaced.
 
 The pub's third lesson, invented here: games are OPT-IN, and the invitation
 is physical. Anyone on the floor sends THE BALL up (SOCIAL panel; their
-♪ pick, difficulty and ring-size preference ride along) and a mirror ball hangs
-before them for sixty seconds — countdown plate, caller's name, one
-orbiting pip per dancer who has touched in. Touch to join, touch again to
-step out, caller's touch cancels. The RELAY owns the clock: at zero it
-deals the caller + touchers onto the ring and tells everyone else who left
-('game'); the floor NEVER closes — stay-behinds keep dancing (away
-players' voices sing from the stage), newcomers still join the room, and
-'game-out' brings each player home to the floor when their podium settles
-(auto-deposited after the reading). One ball or one live set at a time;
-a departing caller takes their ball with them.
+♪ pick, difficulty and ring-size preference ride along) and a mirror ball
+BOUNCES up from the boards — an under-damped spring to its hang height,
+announced by a rising magnetic pull — and hangs before them for sixty
+seconds, GLIMMERING (four-point lens glints popping and dying across the
+facets, carried round the room by the spin) — countdown plate, caller's
+name, one orbiting pip per dancer who has touched in. Touch to join, touch
+again to step out, caller's touch cancels. The RELAY owns the clock: at
+zero it deals the caller + touchers onto the ring and tells everyone else
+who left ('game'); the ball WHIRLS AWAY down to the boards for whoever
+stays to watch it go. The floor NEVER closes — stay-behinds keep dancing
+(away players' voices sing from the stage), newcomers still join the room,
+and 'game-out' brings each player home to the floor when their podium
+settles (auto-deposited after the reading). One ball or one live set at a
+time; a departing caller takes their ball with them.
+
+And a set called this way is WORTH something: the first player home from a
+resolved set names the night's winner (every headset computed the same
+podium, so first is as good as all), and the relay crowns them — a
+champagne-brass coronet floating and slowly turning over their figure,
+mirrored in the pier glass, 👑 on the SOCIAL panel. It stays on until
+their NEXT game takes it off at the door, a later winner takes it over, or
+they leave the room (the crown walks out with its wearer). A set a groupie
+wins crowns nobody, and a mid-set bail names nobody — whoever finishes the
+record does.
 
 Art direction — the opposite pole from the boozer: restrained Art Deco.
 Charcoal lime plaster, smoked oak, champagne brass, oxblood velvet, dark
@@ -250,8 +272,9 @@ tagged with the sender idx (16 kHz Int16 PCM, HRTF-panned at the receiver —
 the pub's exact recipe, because WebCodecs died on Quest and this didn't),
 and the ball's lifecycle (`ball-up`/`ball-join`/`ball-off`, the server-side
 sixty-second clock, `start` to the players only, `game` to the floor,
-`game-out` on the way home) so **rooms outlive their sets** and never close
-during one. A leaving host hands the room to the longest-standing member.
+`game-out` on the way home — carrying the winner's idx when the set
+resolved, answered by `crown` to the whole room) so **rooms outlive their
+sets** and never close during one. A leaving host hands the room to the longest-standing member.
 Blocking stays strictly local and keys on names, so it survives reconnects;
 BLOCK hides figure + tag and drops their frames at the door.
 
@@ -268,7 +291,8 @@ BLOCK hides figure + tag and drops their frames at the door.
   anchor, one physical dancefloor.
 - **Spectator drones**: eliminated dancers get a fly-camera and a horn to
   heckle with.
-- **Cosmetics**: skins for your raver, trails for your combo, crowns that
-  persist a night.
+- **Cosmetics**: skins for your raver, trails for your combo. (The crown
+  landed first: a club raid's winner wears it home until their next game —
+  see THE BALL above.)
 - **Seasonal goops**: new bosses = new gesture sets + new move weights over
   the same telegraph grammar.

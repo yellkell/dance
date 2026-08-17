@@ -100,6 +100,15 @@ export interface DancerRig {
   /** Solve the whole figure from head + hands. */
   pose(p: DancerPose): void;
   /**
+   * THE CROWN — champagne brass, floating just over the head, turning
+   * slowly. The club puts it on the last raid's winner and it stays on
+   * until their next game. Built lazily on first wear (almost every rig
+   * lives its whole life bareheaded), placed by pose(), and deliberately
+   * OUTSIDE the accent list: a crown is gold whatever colour the dancer
+   * wears, and it neither dims nor flashes with the suit.
+   */
+  setCrown(on: boolean): void;
+  /**
    * DETAIL. `false` hides the jewellery and the joint-fillers — the
    * millimetre work that only exists for close range — leaving the
    * silhouette, the lit panels, the sticks and the halos: the parts that
@@ -140,6 +149,13 @@ const ROLL_MAX = 0.6;
  * on show between collar and jaw leans a few degrees and holds its length. */
 const NECK_ROOT = HEAD_R * 0.35;
 const NECK_SINK = 0.055;
+/* THE CROWN floats this far over the head CENTRE — clear of all four hair
+ * crests at any nod (the horn stands nearly vertical under a full pitch,
+ * tip ~0.175 up) and well under the club's name tags at +0.38. Floating
+ * rather than worn because a circlet on the scalp would thread a different
+ * crest on every hue — and a hovering crown reads as "champion" across a
+ * whole dance floor, which is its entire job. */
+const CROWN_RISE = 0.19;
 
 /** Femur (and shin) while the figure stands — see legBone(). Sized just
  *  over half the standing hip→ankle span, so a dancer at rest STANDS UP
@@ -671,6 +687,45 @@ export function buildDancer(hue: number): DancerRig {
   const bootL = mkBoot();
   const bootR = mkBoot();
 
+  /* ── THE CROWN, built only when won ──
+   * Restrained Art Deco in the club's own champagne brass: a slim band, an
+   * alternating rise of eight diamond-cut points, a hot pip on each tall
+   * one, a soft gold halo. Its materials are its own (never accents): gold
+   * is gold on every dancer, and dispose()'s traverse releases them. */
+  let crown: Group | null = null;
+  const buildCrown = (): Group => {
+    const c = new Group();
+    c.name = 'crown';
+    const brass = new MeshStandardMaterial({
+      color: 0x4a3a18,
+      emissive: 0xd9a94a,
+      emissiveIntensity: 0.85,
+      metalness: 0.9,
+      roughness: 0.28,
+    });
+    const hot = new MeshBasicMaterial({ color: 0xffe9a8 });
+    const R = 0.052;
+    const band = M(torusGeo(R, 0.0055), brass);
+    band.quaternion.copy(X90);
+    c.add(band);
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2;
+      const tall = i % 2 === 0;
+      const point = M(segGeo(0.0012, 0.0062, 4), brass);
+      point.scale.set(1, tall ? 0.05 : 0.028, 1);
+      point.position.set(Math.sin(a) * R, 0.002, Math.cos(a) * R);
+      c.add(point);
+      if (tall) {
+        const tip = M(sphereGeo(8), hot);
+        tip.scale.setScalar(0.004);
+        tip.position.set(Math.sin(a) * R, 0.054, Math.cos(a) * R);
+        c.add(tip);
+      }
+    }
+    c.add(glowSprite(0xffd24a, 0.22, 0.38));
+    return c;
+  };
+
   /** Solve one arm: elbow pushed out-and-down, hand riding the solved tip. */
   const solveArm = (
     side: -1 | 1,
@@ -734,6 +789,14 @@ export function buildDancer(hue: number): DancerRig {
       p.yaw,
       clamp(p.roll, ROLL_MAX) * (1 - melt) + melt * 0.35,
     );
+    if (crown) {
+      // The crown HOVERS: it rides the head's position (melting sinks it
+      // with the skull) but never its nod or tilt — a floating halo stays
+      // level — and turns slowly on its own stately clock. Placed even
+      // while hidden, so putting it on is correct whatever the frame order.
+      crown.position.set(p.hx, hy + CROWN_RISE, p.hz);
+      crown.rotation.y = (performance.now() * 0.0006) % (Math.PI * 2);
+    }
 
     const cos = Math.cos(p.yaw);
     const sin = Math.sin(p.yaw);
@@ -817,6 +880,15 @@ export function buildDancer(hue: number): DancerRig {
     accents,
     baseColor: color,
     pose,
+    setCrown(on: boolean) {
+      if (on && !crown) {
+        crown = buildCrown();
+        crown.visible = false; // parked off-origin only once pose() places it
+        crown.position.set(0, -10, 0);
+        root.add(crown);
+      }
+      if (crown) crown.visible = on;
+    },
     setDetail(near: boolean) {
       if (near === detailed) return;
       detailed = near;

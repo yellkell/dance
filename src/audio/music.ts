@@ -33,6 +33,11 @@ export type SetState = 'off' | 'loading' | 'scheduled' | 'playing' | 'synth';
 
 export interface SetOptions {
   track: Track;
+  /** The CHART tempo the beat clock runs at. Defaults to the track's
+   *  measured tempo; EXPERT hands in the doubled clock for slow records
+   *  (see config.chartBpm) — the file plays untouched either way, only the
+   *  grid the game counts on changes. */
+  bpm?: number;
   /** Beats of count-in before game beat 0 (the "get ready" bars). */
   countInBeats: number;
   /** Set length in beats — the last landing lives before this. */
@@ -202,7 +207,7 @@ export function startSet(opts: SetOptions): void {
   const token = ++setToken;
   const track = opts.track;
   setTrack = track;
-  beatLen = beatLenOf(track);
+  beatLen = 60 / (opts.bpm ?? track.bpm);
   state = 'loading';
 
   const c = ctx();
@@ -240,7 +245,9 @@ export function startSet(opts: SetOptions): void {
     src.buffer = buf;
     src.connect(gain);
     if (opts.loop) {
-      const bar = beatLen * 4;
+      // The AUDIO loops on the record's own bars, whatever clock the chart
+      // runs — a doubled beat grid must never cut the music mid-bar.
+      const bar = beatLenOf(track) * 4;
       const bars = Math.floor((buf.duration - track.downbeat) / bar);
       if (bars >= 4) {
         src.loop = true;
@@ -268,9 +275,9 @@ export function startSet(opts: SetOptions): void {
 /** The synth takes the set at the same tempo and the same beat-zero rules. */
 function fallback(opts: SetOptions): void {
   const track = opts.track;
-  beatLen = beatLenOf(track);
+  beatLen = 60 / (opts.bpm ?? track.bpm);
   beatZero = synth.startSet({
-    bpm: track.bpm,
+    bpm: opts.bpm ?? track.bpm,
     countInBeats: opts.countInBeats,
     endBeat: opts.endBeat,
     seed: opts.seed,

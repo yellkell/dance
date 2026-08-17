@@ -48,7 +48,12 @@ everyone else.
   **You have no body of your own**: the local player sees only their
   controllers; the figure is for everyone else's view of you.
 - Last dancer standing (or the highest score when the set ends) **owns the
-  night**: podium, crown, confetti cannons.
+  night**: podium, crown, confetti cannons. When the set was called from
+  the club, the crown is REAL: the winner walks back onto the floor with a
+  champagne-brass **crown** turning slowly over their figure — everyone in
+  the room sees it (the mirror included), a 👑 leads their name on the
+  SOCIAL panel, and it stays on until their **next game** takes it off at
+  the door (or they leave the room, and it leaves with them).
 - Between sets, online rooms live in **THE CLUB** (it has no name — the
   sign over the stage is a moon, not a word). An Art Deco hall with a dance
   floor, a backlit bar, velvet booths, a raised terrace and a hushed STILL
@@ -56,9 +61,13 @@ everyone else.
   it, **talk** to your room (spatial voice), and mute/block anyone from the
   SOCIAL panel.
 - Raids are **called from the floor with THE BALL**: anyone sends a mirror
-  ball up (their song pick rides along), it hangs for sixty seconds, and
-  whoever **touches it** rides to the ring with them at zero — while the
-  rest of the room keeps the floor. When the set resolves, the players are
+  ball up (their song pick rides along) — and *up* means up: it **bounces**
+  from knee height to its hang on an under-damped spring, glimmers there
+  (lens glints popping and dying across the facets, riding the spin the
+  way a real mirror ball throws its dots), and hangs for sixty seconds.
+  Whoever **touches it** rides to the ring with them at zero — while the
+  rest of the room keeps the floor, watching the ball **whirl away down
+  to the boards** as it resolves. When the set ends, the players are
   deposited straight back among their friends.
 - The set itself happens inside **THE VOID** — an actual environment in the
   Beat-Saber-background bloodline, built in four depth layers so a black
@@ -261,38 +270,51 @@ else in the game needs the server: the whole tour is playable solo.
 
 ## The music
 
-Fifteen real tracks drive the game (`src/assets/music/`, registry in
-`src/audio/tracks.ts`). Every number in that registry was **measured from the
-files**, not guessed — the whole game is quantized to them, so they had to be:
+Twenty-four real records are in the box (`src/assets/music/`, registry in
+`src/audio/tracks.ts`) — twenty of them raid charts. Every number in that
+registry was **measured from the files**, not guessed — the whole game is
+quantized to them, so they had to be:
 
 | Track | BPM | Set length | Loudness | Where it plays |
 | --- | --- | --- | --- | --- |
-| MORNING | 96.665 | 5 phrases | −11.1 LUFS | tour: opening night · no ducking |
-| TARGET | 91 | 11 phrases | −9.5 LUFS | quick raid |
-| CAPTURE | 117 | 13 phrases | −15.0 LUFS | tour: first goop finale |
-| DISCO BALL | 73.33 | 4 phrases | −12.6 LUFS | tour: peak-hours opener — the night after the first goop falls · no ducking |
-| COMBAT | 135 | 12 phrases | −13.2 LUFS | quick raid |
-| LOOP | 150 | 17 phrases | −11.2 LUFS | quick raid |
-| DYNASTY | 155 | 10 phrases | −9.6 LUFS | tour: peak-hours finale |
-| INFECTION | 138 | 15 phrases | −10.9 LUFS | quick raid |
-| SPREAD | 150 | 17 phrases | −13.1 LUFS | tour: after hours · skips 6 bars in |
-| BREAKCORE | 174 | 11 phrases | −8.3 LUFS | tour: the last night |
-| ASSEMBLE | 125 | 16 phrases | −7.5 LUFS | quick raid · drops on the slam |
 | SAKUPENED | 133.964 | 10 phrases | −8.1 LUFS | tour: opening night 2 |
+| COMBAT | 135 | 12 phrases | −13.2 LUFS | quick raid |
+| DISCO BALL | 109.965 | 6 phrases | −12.6 LUFS | tour: peak-hours opener · its tour night never ducks |
+| LOOP | 150 | 17 phrases | −11.2 LUFS | quick raid |
+| CAPTURE | 117 | 13 phrases | −15.0 LUFS | tour: first goop finale |
+| MORNING | 96.665 | 5 phrases | −11.1 LUFS | tour: opening night · never asks a duck |
+| MONEY | 97.994 | 8 phrases | −14.5 LUFS | tour: peak hours · its tour night never ducks |
+| TARGET | 91 | 11 phrases | −9.5 LUFS | quick raid |
+| BREAKCORE | 174 | 11 phrases | −8.3 LUFS | tour: the last night |
+| DYNASTY | 155 | 10 phrases | −9.6 LUFS | tour: peak-hours finale |
+| SPREAD | 150 | 17 phrases | −13.1 LUFS | tour: after hours · skips its ambient open |
 | UNITY | 117 | 17 phrases | −13.8 LUFS | quick raid · skips its ambient open |
-| MONEY | 78.395 | 6 phrases | −14.5 LUFS | tour: peak hours · no ducking |
-| FUTURE VIBE | 93.984 | 6 phrases | −14.2 LUFS | club: second on the rotation · quick raid |
+| ASSEMBLE | 125 | 16 phrases | −7.5 LUFS | quick raid · drops on the slam |
+| INFECTION | 138 | 15 phrases | −10.9 LUFS | quick raid |
+| GIVE IT TO ME | 112 | 13 phrases | −14.2 LUFS | tour: after-hours opener |
+| V ONE | 95 | 8 phrases | −10.8 LUFS | quick raid |
+| FUSION | 122 | 5 phrases | −8.1 LUFS | quick raid |
+| BRAIN EATER | 149.959 | 7 phrases | −9.1 LUFS | quick raid |
+| VFALL | 165.015 | 10 phrases | −9.4 LUFS | quick raid |
+| FUTURE VIBE | 93.984 | 6 phrases | −14.2 LUFS | quick raid · second on the club rotation |
+| CHILL | 125.001 | — | −8.9 LUFS | the club's house record — opens the rotation |
 | SWAG | 91.974 | — | −15.7 LUFS | foyer rotation |
 | ECLIPSE | 70 | — | −10.4 LUFS | foyer rotation |
-| CHILL | 125 | — | −8.9 LUFS | the club's house record — opens the rotation |
+| CREDITS | 70 | — | −10.4 LUFS | the closing theme |
+
+(Set lengths are the single-time chart; EXPERT's double-time records —
+below — run twice the phrases across the same minutes of music.)
 
 - **Tempo** came from an onset-flux autocorrelation phase-locked across each
-  whole track. Four land on exact integers (a DAW grid). Three genuinely sit a
-  hair under — and it matters: locking SAKUPENED at a round 134 instead of
-  133.964 drifts off the kick by the last third of the song (grid retention
-  falls from 68% to 35%), so the fractions stay.
-- **Loudness** is EBU R128 integrated. The masters span **7.6 dB** — SWAG at
-  −15.7 against SAKUPENED at −8.1 — so every track is gain-matched to −14 LUFS
+  whole track, audited by `tools/octave-check` for lattice errors (DISCO
+  BALL first arrived as 73.33 — exactly 2/3 of its real 110 grid — and
+  VFALL as a third of its 165). Several land on exact integers (a DAW
+  grid); the rest genuinely sit a hair off — and it matters: locking
+  SAKUPENED at a round 134 instead of 133.964 drifts off the kick by the
+  last third of the song (grid retention falls from 68% to 35%), so the
+  fractions stay.
+- **Loudness** is EBU R128 integrated. The masters span **8.2 dB** — SWAG at
+  −15.7 against ASSEMBLE at −7.5 — so every track is gain-matched to −14 LUFS
   at playback and the mix runs through a limiter. Nothing is re-encoded; it's
   a gain node, and the files ship untouched.
 - **Downbeat** (seconds to bar 1 beat 1) is the one number a human ear might
@@ -362,6 +384,20 @@ duck donut twice as common, and — on the charts that carry it — THE SWEPT
 ROUTINE. Online, the ball carries the caller's difficulty with their song
 pick.
 
+**EXPERT DOUBLE TIME**: the whole pressure curve is written in beats, so
+its real-time density used to scale with the record — at act 4 a 91 BPM
+night threw barely half the landings per second of BREAKCORE's 174, and
+its bar grid walked past where the slow shelf's grooves actually live
+(those records ride the eighths; V ONE's onsets sit on a literal 190
+lattice). So on EXPERT, any record **under 100 BPM charts at 2×**: the
+clock runs on the eighths, landings hit the real half-bars, and the
+91–98 shelf (TARGET, FUTURE VIBE, V ONE, MORNING, MONEY) plays at an
+effective 182–196 — the songs the difficulty was quietly under-charging
+are now the ones that bite hardest. The song page and the GO RAVE seat
+wear a **×2** beside the tempo whenever it applies; the file itself plays
+untouched, only the grid the game counts on changes. No other difficulty
+is touched, and the tour never reaches EXPERT, so no authored night moves.
+
 **Adding a track**: drop the file in `src/assets/music/`, add a row to
 `TRACKS`, done. Roles decide where it plays. `npm run analyze -- <file…>` prints
 the BPM, downbeat and loudness row for you.
@@ -396,7 +432,8 @@ server/index.mjs       the room relay (seats/seed/poses + club poses,
                        voice fan-out, THE BALL's clock, rooms that
                        outlive their sets)
 tools/                 track analyzer · preview-shot · club-capture ·
-                       social-check (two-headset end-to-end)
+                       social-check (three-headset end-to-end) ·
+                       crown-check (the crown's relay protocol)
 avatar-preview.html    dev-only dancer catwalk (never shipped)
 ```
 

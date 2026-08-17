@@ -15,6 +15,7 @@
  */
 
 import {
+  AdditiveBlending,
   CanvasTexture,
   CylinderGeometry,
   DoubleSide,
@@ -25,11 +26,13 @@ import {
   MeshStandardMaterial,
   PlaneGeometry,
   SphereGeometry,
+  Sprite,
+  SpriteMaterial,
   SRGBColorSpace,
   Vector3,
 } from 'three';
 import { PALETTE, hueToColor } from '../config.js';
-import { glowSprite } from '../materials/glow.js';
+import { glintTexture, glowSprite } from '../materials/glow.js';
 import { trackById } from '../audio/tracks.js';
 import { CLUB } from './config.js';
 import { font } from '../ui/fonts.js';
@@ -60,6 +63,10 @@ export interface BallVisual {
   group: Group;
   /** Spin this. */
   ball: Mesh;
+  /** The GLIMMER: facet glints popping and dying across the ball's skin.
+   *  Call every frame — the sparks ride the sphere, so the spin carries
+   *  them round the room the way a real mirror ball throws its dots. */
+  twinkle(dt: number): void;
   /** The countdown/track/joins plate under the ball (yaw-billboard it). */
   plate: Mesh;
   /** Repaint the plate. */
@@ -106,6 +113,76 @@ export function buildBallVisual(): BallVisual {
   stem.position.y = 0.49;
   group.add(stem);
   group.add(glowSprite(0xffffff, 0.9, 0.4));
+
+  // THE GLIMMER — a handful of four-point lens glints living on the facet
+  // skin. Each one waits, then flares somewhere new: a fast bloom-and-die
+  // over a few tenths of a second, in white with the odd champagne or
+  // stage-cyan catch. Children of the BALL, not the group, so the spin
+  // carries every live spark around the room — the closest thing a painted
+  // mirror ball gets to actually throwing light.
+  const GLINT_TINTS = [0xffffff, 0xffffff, 0xffffff, 0xffd24a, PALETTE.cyan];
+  interface Glint {
+    sprite: Sprite;
+    /** Seconds until the next flare while dark; life left while lit. */
+    wait: number;
+    life: number;
+    /** Full lifespan of the current flare (for the envelope). */
+    span: number;
+    peak: number;
+  }
+  const glints: Glint[] = [];
+  for (let i = 0; i < 6; i++) {
+    const sprite = new Sprite(
+      new SpriteMaterial({
+        map: glintTexture(),
+        color: 0xffffff,
+        transparent: true,
+        blending: AdditiveBlending,
+        depthWrite: false,
+      }),
+    );
+    sprite.visible = false;
+    ball.add(sprite);
+    glints.push({ sprite, wait: 0.1 + Math.random() * 0.8, life: 0, span: 0, peak: 0 });
+  }
+
+  const twinkle = (dt: number): void => {
+    for (const g of glints) {
+      if (g.life > 0) {
+        g.life -= dt;
+        if (g.life <= 0) {
+          g.sprite.visible = false;
+          g.wait = 0.12 + Math.random() * 0.85;
+          continue;
+        }
+        // sin envelope: snap up, soften out — a catch of light, not a lamp.
+        const t = 1 - g.life / g.span;
+        const env = Math.sin(Math.min(1, t) * Math.PI);
+        g.sprite.scale.setScalar(g.peak * (0.35 + 0.65 * env));
+        (g.sprite.material as SpriteMaterial).opacity = env;
+        continue;
+      }
+      g.wait -= dt;
+      if (g.wait > 0) continue;
+      // Flare somewhere new on the sphere — biased to the upper half, where
+      // the room's light would actually be striking the facets.
+      const az = Math.random() * Math.PI * 2;
+      const el = Math.asin(Math.random() * 1.6 - 0.6);
+      const r = 0.247;
+      g.sprite.position.set(
+        Math.cos(el) * Math.sin(az) * r,
+        Math.sin(el) * r,
+        Math.cos(el) * Math.cos(az) * r,
+      );
+      (g.sprite.material as SpriteMaterial).color.setHex(
+        GLINT_TINTS[Math.floor(Math.random() * GLINT_TINTS.length)],
+      );
+      g.span = 0.22 + Math.random() * 0.3;
+      g.life = g.span;
+      g.peak = 0.09 + Math.random() * 0.1;
+      g.sprite.visible = true;
+    }
+  };
 
   // The plate.
   const canvas = document.createElement('canvas');
@@ -205,6 +282,7 @@ export function buildBallVisual(): BallVisual {
   return {
     group,
     ball,
+    twinkle,
     plate,
     paint,
     setPips,

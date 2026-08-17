@@ -16,7 +16,7 @@ import { createSystem, Quaternion, Vector3 } from '@iwsdk/core';
 import { Euler } from 'three';
 import { NET, PODIUM } from '../config.js';
 import { toLobby } from '../game/flow.js';
-import { match, me, type Screen } from '../game/state.js';
+import { match, me, nightWinner, type Screen } from '../game/state.js';
 import { backToClub, net, sendPose, sendScore } from '../net/session.js';
 
 const _v = new Vector3();
@@ -61,7 +61,17 @@ export class NetworkSystem extends createSystem({}) {
           elim: Number.isFinite(match.beat) ? match.beat : 0,
         });
       }
-      backToClub();
+      // THE CROWN's claim rides home with a RESOLVED set only (the walk
+      // out led through the podium): the winner's member idx — my own if
+      // the night was mine, null if a groupie took it. A bail names
+      // nobody; whoever finishes the record will.
+      let winner: number | null | undefined;
+      if (this.prevScreen === 'podium') {
+        const w = nightWinner();
+        winner =
+          w?.kind === 'local' ? net.myIdx : w?.kind === 'remote' ? (w.netId ?? null) : null;
+      }
+      backToClub(winner);
     }
     this.prevScreen = screen;
 

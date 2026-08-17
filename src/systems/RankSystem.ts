@@ -26,17 +26,13 @@ import { createSystem, Vector3 } from '@iwsdk/core';
 import { GRADE, PLATFORM, PODIUM, RANK, hueToColor } from '../config.js';
 import { arena } from '../arena/arena.js';
 import { toLobby, toTour } from '../game/flow.js';
-import { gradeOf, match, type Dancer } from '../game/state.js';
+import { gradeOf, match, standingOrder, type Dancer } from '../game/state.js';
 import { HoloBoard, type BoardRow } from '../ui/board.js';
 import { discoRig } from './DiscoSystem.js';
 import * as sfx from '../audio/sfx.js';
 
 function standing(): Dancer[] {
-  return [...match.players].sort((a, b) => {
-    if (a.alive !== b.alive) return a.alive ? -1 : 1;
-    if (a.alive) return b.score - a.score || b.combo - a.combo || a.seat - b.seat;
-    return b.elimAtBeat - a.elimAtBeat || b.score - a.score || a.seat - b.seat;
-  });
+  return [...match.players].sort(standingOrder);
 }
 
 function tierOf(d: Dancer | undefined): number {

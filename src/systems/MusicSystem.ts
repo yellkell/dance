@@ -42,16 +42,20 @@ export class MusicSystem extends createSystem({}) {
       stopAmbient(0.35);
       const track = trackById(match.trackId) ?? pickRaidTrack(match.seed);
       const total = match.phrases;
+      // match.bpm is the CHART clock mountTrack settled (EXPERT doubles
+      // slow records) — the set-list, the phrase count and this needle all
+      // count the same grid.
       startSet({
         track,
-        countInBeats: countInBeatsFor(track.bpm),
+        bpm: match.bpm,
+        countInBeats: countInBeatsFor(match.bpm),
         endBeat: total * phraseBeats(),
         seed: match.seed,
         actAt: (beat) => actOfBeat(beat, total, match.difficulty),
         beatZeroAt: Number.isFinite(match.beatZeroAt) ? match.beatZeroAt : undefined,
         loop: false,
       });
-      match.beatLen = 60 / track.bpm;
+      match.beatLen = 60 / match.bpm;
       match.playing = true;
     }
 

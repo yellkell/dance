@@ -519,7 +519,34 @@ export const DIFFICULTY = {
   /** The ceiling. Act 4 is EXPERT's back stretch: six moves a phrase with
    *  no rest between them, and the hardest combinations in the game. */
   maxAct: 4,
+  /** EXPERT DOUBLE TIME. The whole pressure curve is written in BEATS —
+   *  moves per phrase, rests, charges, cascade gaps — so its real-time
+   *  density scales with the record: at act 4 a 91 BPM night threw barely
+   *  half the landings per second of a 174 one, and its bar grid walked
+   *  right past where those records' grooves actually live (the slow shelf
+   *  is shuffles and struts whose onsets ride the eighths — V ONE's sit on
+   *  a literal 190 lattice). So on EXPERT, a record under this tempo runs
+   *  its whole chart clock at 2×: the grid rides the eighths, landings hit
+   *  the real half-bars (the 1 and the 3), and the 91–98 shelf charts at
+   *  182–196 — a shade past BREAKCORE's 174, which is fair: these are the
+   *  records the difficulty was quietly under-charging. The catalog's gap
+   *  between 98 and 110 makes 100 a robust line, and EXPERT is unreachable
+   *  on the tour, so no authored night changes feel. */
+  doubleTimeBelowBpm: 100,
 };
+
+/** The tempo a record CHARTS at — its measured tempo, except on EXPERT
+ *  under the double-time line, where the whole clock runs at 2×. Pure, so
+ *  every client in a room (same track, same difficulty off the ball)
+ *  derives the identical grid. */
+export function chartBpm(trackBpm: number, difficulty: number): number {
+  return difficulty >= 3 && trackBpm < DIFFICULTY.doubleTimeBelowBpm ? trackBpm * 2 : trackBpm;
+}
+
+/** Is this record charting in double time right now? (UI: the ×2 tag.) */
+export function isDoubleTime(trackBpm: number, difficulty: number): boolean {
+  return chartBpm(trackBpm, difficulty) !== trackBpm;
+}
 
 /* ────────────────────────────── THE GROOVE ───────────────────────────────
  * Dance like the groupies dance: ONE HAND UP, ONE HAND DOWN, and swap on

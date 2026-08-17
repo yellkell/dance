@@ -38,7 +38,7 @@ import {
   SRGBColorSpace,
   Vector3,
 } from 'three';
-import { DIFFICULTY, RING, hueToColor } from '../config.js';
+import { DIFFICULTY, RING, hueToColor, isDoubleTime } from '../config.js';
 import * as sfx from '../audio/sfx.js';
 import { preload } from '../audio/music.js';
 import { pickRaidTrack, trackById, tracksFor } from '../audio/tracks.js';
@@ -322,6 +322,9 @@ export class ClubSocialSystem extends createSystem({}) {
       p.rig.setDetail(
         (p.pose.hx - _cam.x) ** 2 + (p.pose.hz - _cam.z) ** 2 <= RING.detailRadius ** 2,
       );
+      // THE CROWN: the room's reigning winner wears it home. (setCrown
+      // no-ops for the bare-headed majority; pose() below places it.)
+      p.rig.setCrown(net.crownIdx === p.idx);
       p.rig.pose(p.pose);
       // Their voice speaks from their figure's head.
       _v.set(p.pose.hx, p.pose.hy, p.pose.hz);
@@ -703,7 +706,7 @@ export class ClubSocialSystem extends createSystem({}) {
     const inRoom = net.phase === 'hosting' || net.phase === 'joined';
     const key =
       members.map((m) => `${m.name}|${socialMuted(m.name) ? 1 : 0}${socialBlocked(m.name) ? 1 : 0}`).join(';') +
-      `#${this.hover ?? ''}#${on ? 1 : 0}#${mic ? 1 : 0}#${net.phase}#${cued?.id ?? ''}#${ballUp ? (mine ? 'B' : 'b') : ''}#${setOut ? net.gamePlayers.size : 0}#${more}#${match.difficulty}#${this.songsOpen ? 1 : 0}`;
+      `#${this.hover ?? ''}#${on ? 1 : 0}#${mic ? 1 : 0}#${net.phase}#${cued?.id ?? ''}#${ballUp ? (mine ? 'B' : 'b') : ''}#${setOut ? net.gamePlayers.size : 0}#${more}#${match.difficulty}#${this.songsOpen ? 1 : 0}#${net.crownIdx ?? ''}`;
     if (key === this.paintKey) return;
     this.paintKey = key;
 
@@ -740,7 +743,11 @@ export class ClubSocialSystem extends createSystem({}) {
       // The chevron says the row opens onto something, rather than
       // advancing one notch per press.
       label: `${this.songsOpen ? '◂' : '▸'}  ♪ ${cued ? cued.title : 'SHUFFLE'}`,
-      sub: cued ? `${cued.bpm.toFixed(cued.bpm % 1 ? 2 : 0)} BPM` : undefined,
+      sub: cued
+        ? `${cued.bpm.toFixed(cued.bpm % 1 ? 2 : 0)} BPM${
+            isDoubleTime(cued.bpm, match.difficulty) ? ' ×2' : ''
+          }`
+        : undefined,
       selected: this.songsOpen,
       x: 24,
       y: 652,
@@ -877,7 +884,8 @@ export class ClubSocialSystem extends createSystem({}) {
           g.fillStyle = hidden
             ? UI.faint
             : `#${hueToColor(memberHue(m), 0.62).toString(16).padStart(6, '0')}`;
-          const label = m.name.slice(0, 12);
+          // The reigning winner's row leads with the crown they're wearing.
+          const label = (net.crownIdx === m.idx ? '👑 ' : '') + m.name.slice(0, 12);
           g.fillText(label, 28, y);
           g.letterSpacing = '0px';
           if (hidden) {
