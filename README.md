@@ -232,8 +232,11 @@ There are **three places**, and where you are is what you're doing:
    club floor's whole console (the big board stays in the foyer; the club
    keeps no front desk): MUTE (silence) or BLOCK (silence + vanish)
    anyone, persisted by name, strictly local — the voice-chat master
-   switch, your ♪ song pick, the DIFFICULTY row (your pick rides the ball
-   you call), **SEND THE BALL UP**, and **LEAVE THE CLUB**. Step into
+   switch, **MUSIC** (hush the floor's record for your ears only, so a
+   room can talk; the record keeps spinning, so the lights, the ball and
+   everyone dancing keep their beat, and the hush is waiting for you the
+   next night), your ♪ song pick, the DIFFICULTY row (your pick rides the
+   ball you call), **SEND THE BALL UP**, and **LEAVE THE CLUB**. Step into
    **THE STILL ROOM** (north-west corner) and the music falls to a
    murmur; voices stay. Its loud mirror in the north-east corner is
    **THE ARCADE**: the **SUPER OCTAGON** cabinet — aim at the CRT with
@@ -468,7 +471,8 @@ tools/                 track analyzer · preview-shot · club-capture ·
                        social-check (three-headset end-to-end) ·
                        crown-check (the crown's relay protocol) ·
                        floor-clear (who a cleared floor ends the set for) ·
-                       glass-physics · glass-stack (towers and pyramids)
+                       glass-physics · glass-stack (towers and pyramids) ·
+                       music-switch (the floor's music toggle, end to end)
 avatar-preview.html    dev-only dancer catwalk (never shipped)
 ```
 

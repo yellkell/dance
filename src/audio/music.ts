@@ -89,6 +89,14 @@ let ambZero = 0;
 let ambToken = 0;
 let ambBase = 0;
 let ambDuck = 1;
+/** THE QUIET FLOOR — the club's own music switch (SOCIAL panel, right Ⓐ).
+ *  A mute here closes the room loop's FADER and nothing else: the record
+ *  keeps spinning, so ambientBeat() keeps publishing and the eclipse, the
+ *  ball, the DJ and every dancer on the floor keep their pulse. Everyone
+ *  else in the room can still hear it — this is a local preference, the
+ *  same law as MUTE and BLOCK — so a hushed headset must not stop the
+ *  party it is standing in. */
+let ambMuted = false;
 /** The still room's door, as a filter: the muffle stage the loop runs
  *  through so a duck sounds like a wall and not like a volume knob. */
 let ambMuffle: BiquadFilterNode | null = null;
@@ -333,6 +341,12 @@ export function stopSet(fade = 0.5): void {
  * plays through and the next takes the decks — the foyer's SWAG → ECLIPSE
  * trade. The published beat always belongs to whichever record is on.
  */
+/** What the room loop's fader should read: its mastered level, times the
+ *  still room's hush, times the music switch. */
+function ambLevel(): number {
+  return ambMuted ? 0 : ambBase * ambDuck;
+}
+
 export function startAmbient(tracks: Track | Track[], level = 0.55): void {
   const set = Array.isArray(tracks) ? tracks : [tracks];
   if (!set.length) return;
@@ -369,7 +383,9 @@ function spinAmbient(level: number, hops = 0): void {
     }
     const gain = c.createGain();
     ambBase = trackGain(track) * level;
-    gain.gain.value = ambBase * ambDuck;
+    // A record that comes on while the floor is hushed arrives silent —
+    // the fader is set before the needle drops, never faded down after.
+    gain.gain.value = ambLevel();
     // src → gain → muffle → the bus. Wide open out on the floor; closing
     // down to a thud when you step into the still room.
     const muffle = c.createBiquadFilter();
@@ -462,12 +478,35 @@ export function setAmbientDuck(mult: number): void {
   if (!c) return;
   if (ambGain) {
     ambGain.gain.cancelScheduledValues(c.currentTime);
-    ambGain.gain.setTargetAtTime(ambBase * ambDuck, c.currentTime, 0.35);
+    ambGain.gain.setTargetAtTime(ambLevel(), c.currentTime, 0.35);
   }
   if (ambMuffle) {
     ambMuffle.frequency.cancelScheduledValues(c.currentTime);
     ambMuffle.frequency.setTargetAtTime(duckCutoff(ambDuck), c.currentTime, 0.35);
   }
+}
+
+export function ambientMuted(): boolean {
+  return ambMuted;
+}
+
+/**
+ * Silence the room loop without taking it off the decks — the club's music
+ * switch. Cutting the record instead would take the room's PULSE with it
+ * (match.beat rides ambientBeat), freezing the eclipse, the ball and every
+ * dancer mid-groove; a room with the music off should look exactly like a
+ * room with the music on, because for everyone else it still is one.
+ *
+ * The fade is short enough to feel like a switch and long enough not to
+ * click — a hard gain step on a live buffer pops.
+ */
+export function setAmbientMuted(on: boolean): void {
+  if (on === ambMuted) return;
+  ambMuted = on;
+  const c = audioContext();
+  if (!c || !ambGain) return;
+  ambGain.gain.cancelScheduledValues(c.currentTime);
+  ambGain.gain.setTargetAtTime(ambLevel(), c.currentTime, 0.06);
 }
 
 /** The lobby loop's beat position — the club's idle pulse. */

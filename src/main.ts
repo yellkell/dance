@@ -147,7 +147,7 @@ World.create(container, {
 // without controllers — e.g. __gdr.startRaid({ seats: 8 }), or walk the
 // club with __gdr.net.host() + __gdr.rig(x, z, yaw).
 import { finishRaid, startRaid, toLobby, toTour } from './game/flow.js';
-import { ambientTrackId } from './audio/music.js';
+import { ambientMuted, ambientTrackId } from './audio/music.js';
 import { mutedSpeakerIds } from './club/voice.js';
 import { match } from './game/state.js';
 import { arena } from './arena/arena.js';
@@ -219,6 +219,9 @@ declare global {
       mutedVoices: typeof mutedSpeakerIds;
       /** Which record the room is spinning right now, by track id. */
       ambient: typeof ambientTrackId;
+      /** Is this headset listening to it? (The floor's MUSIC switch — the
+       *  record keeps spinning either way.) */
+      ambientMuted: typeof ambientMuted;
       /** The club moves that resolve without an arc (step back, snap turn). */
       move: typeof teleportView;
     };
@@ -253,6 +256,7 @@ window.__gdr = {
   intro: introView,
   mutedVoices: mutedSpeakerIds,
   ambient: ambientTrackId,
+  ambientMuted,
   move: teleportView,
   props: propsView,
   menu: new Proxy({} as typeof menuView & typeof socialView, {

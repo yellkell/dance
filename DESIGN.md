@@ -192,8 +192,11 @@ The law of the land is **three places — where you are is what you're doing**:
    foreshadowed (the dance floor's brass inlay is the raid ring's ghost —
    24 seat ticks and all). The club keeps NO front desk: the board stays
    in the foyer, and the floor's controls (song, difficulty, the ball,
-   voice, the door out) live on the SOCIAL panel at right Ⓐ — a console
-   you summon, not furniture blocking the stage.
+   voice, the music switch, the door out) live on the SOCIAL panel at
+   right Ⓐ — a console you summon, not furniture blocking the stage. The
+   music switch is a LOCAL hush, like MUTE and BLOCK: it closes your
+   fader, never the club's — the record plays on, so the eclipse, the ball
+   and every dancer keep the beat the rest of the room can still hear.
 3. **THE SET** (game place): the raid, wrapped in THE VOID — an actual
    environment sharing the foyer's language at arena scale. Both interiors
    pack away; the rig drops every club offset back to identity, so "my
