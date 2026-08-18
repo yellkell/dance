@@ -137,6 +137,9 @@ interface Glass {
   ring: { pos: Vector3; t: number }[];
   /** Age counter for recycling the oldest resting glass. */
   restedAt: number;
+  /** Clock of this glass's last tap — the ration that keeps a settling
+   *  tower from ringing a dozen times (PROP_PHYS.tapCooldown). */
+  tappedAt: number;
   /** The owner's streamed pose (world), and when it last arrived. */
   netPos: Vector3;
   netQuat: Quaternion;
@@ -234,6 +237,7 @@ export class ClubPropsSystem extends createSystem({}) {
         full: true,
         ring: [],
         restedAt: 0,
+        tappedAt: -Infinity,
         netPos: new Vector3(),
         netQuat: new Quaternion(),
         netAt: 0,
@@ -257,7 +261,7 @@ export class ClubPropsSystem extends createSystem({}) {
           grounded: g.grounded,
           pos: [p.x, p.y, p.z] as [number, number, number],
           vel: [g.vel.x, g.vel.y, g.vel.z] as [number, number, number],
-          clearance: p.y + drop - this.restingYAt(p.x, p.z),
+          clearance: p.y + drop - this.supportAt(p.x, p.z, g, p.y),
           /** World-Y of the glass's own up axis: 1 standing, 0 on its side. */
           upright: _up.y,
         };
@@ -542,12 +546,83 @@ export class ClubPropsSystem extends createSystem({}) {
 
   /* ── flight, landing, rest ────────────────────────────────────────────── */
 
+  /** The ARCHITECTURE under a point: floor, table, ledge. Knows nothing
+   *  about glasses — supportAt() layers those on top. */
   private restingYAt(x: number, z: number): number {
     let y = floorYAt(x, z);
     for (const s of PROP_SURFACES) {
       if (x >= s.minX && x <= s.maxX && z >= s.minZ && z <= s.maxZ && s.y > y) y = s.y;
     }
     return y;
+  }
+
+  /**
+   * THE SURFACE UNDER A GLASS — the room's, or another glass's RIM.
+   *
+   * This is the whole stacking feature in one function. A resting coupe
+   * that is standing upright presents its rim as a disc you may put a foot
+   * on; anything whose base centre overlaps that disc (stackReach) is
+   * carried at rim height. The upper glass of a pyramid overlaps two rims
+   * at once and is carried by whichever is highest — which, on a level
+   * pair, is both.
+   *
+   * `originY` is the asking glass's own origin: a shelf has to sit
+   * meaningfully BELOW it (stackLevelEps), which is what stops two glasses
+   * side by side from each claiming to hold the other up, and makes cycles
+   * impossible rather than merely unlikely.
+   *
+   * Pure and deterministic — same positions, same answer on every client.
+   */
+  private supportAt(x: number, z: number, exclude: Glass | null, originY: number): number {
+    let y = this.restingYAt(x, z);
+    for (const other of this.glasses) {
+      if (other === exclude || other.mode !== 'rest') continue;
+      const oRoot = other.refs.root;
+      if (oRoot.position.y > originY - PROP_PHYS.stackLevelEps) continue; // not below me
+      _up.set(0, 1, 0).applyQuaternion(oRoot.quaternion);
+      if (_up.y < PROP_PHYS.stackUprightMin) continue; // lying down: scenery, not a shelf
+      const rimY = oRoot.position.y + PROP_PHYS.rimY;
+      if (rimY <= y) continue; // something better already carries this spot
+      if (Math.hypot(x - oRoot.position.x, z - oRoot.position.z) > PROP_PHYS.stackReach) continue;
+      y = rimY;
+    }
+    return y;
+  }
+
+  /**
+   * Is `glass` STANDING ON `shelf` — its foot on that glass's rim?
+   *
+   * The precise question, because the cheap proxy for it (are they at
+   * similar heights?) is wrong in both directions: two glasses thrown at
+   * each other arrive a hand's width apart in height and are absolutely
+   * colliding, while a tall stack's levels are far apart and absolutely
+   * are not. Ask about the contact itself — upright shelf, foot inside
+   * the rim disc, base sitting at rim height — and both cases answer
+   * correctly.
+   */
+  private isStandingOn(glass: Glass, shelf: Glass): boolean {
+    const a = glass.refs.root;
+    const b = shelf.refs.root;
+    _up.set(0, 1, 0).applyQuaternion(b.quaternion);
+    if (_up.y < PROP_PHYS.stackUprightMin) return false;
+    if (Math.hypot(a.position.x - b.position.x, a.position.z - b.position.z) > PROP_PHYS.stackReach) return false;
+    const footY = a.position.y + this.bottomOffset(glass);
+    return Math.abs(footY - (b.position.y + PROP_PHYS.rimY)) < PROP_PHYS.stackSameLevel;
+  }
+
+  /** Are these two in a stack — either one standing on the other? Neither
+   *  may shove the other: the shelf holds it up, it does not push it off. */
+  private stacked(a: Glass, b: Glass): boolean {
+    return this.isStandingOn(a, b) || this.isStandingOn(b, a);
+  }
+
+  /** Ring the glass — but only for a real knock, and never twice in a
+   *  breath from the same glass (see PROP_PHYS.tapMinSpeed/tapCooldown). */
+  private tap(glass: Glass, speed: number, hard: boolean): void {
+    if (speed < PROP_PHYS.tapMinSpeed) return;
+    if (this.clock - glass.tappedAt < PROP_PHYS.tapCooldown) return;
+    glass.tappedAt = this.clock;
+    sfx.glassTap(hard);
   }
 
   /** How far this glass's lowest point sits below its origin right now. */
@@ -632,7 +707,9 @@ export class ClubPropsSystem extends createSystem({}) {
     // The ground (or whatever surface is under it). The contact height is
     // the glass's OWN lowest point, not its origin: the origin sits at the
     // base, so a tilted coupe would bury its stem and bowl in the floor.
-    const surfaceY = this.restingYAt(root.position.x, root.position.z);
+    // The surface under it — the room's, or another glass's rim, which is
+    // what lets a thrown coupe land ON a tower instead of through it.
+    const surfaceY = this.supportAt(root.position.x, root.position.z, glass, root.position.y);
     const restY = surfaceY - this.bottomOffset(glass);
     if (root.position.y <= restY && (glass.grounded || _prev.y >= restY - 0.02)) {
       root.position.y = restY;
@@ -644,7 +721,7 @@ export class ClubPropsSystem extends createSystem({}) {
         glass.vel.x *= 0.7;
         glass.vel.z *= 0.7;
         glass.spin *= 0.6;
-        sfx.glassTap(vy > 1.2);
+        this.tap(glass, vy, vy > 1.2);
       } else if (horiz > PROP_PHYS.slideStop) {
         // Too slow to bounce but still travelling: SKID. This is what
         // `slideFriction` was always for — a glass that lands on a bar top
@@ -653,10 +730,10 @@ export class ClubPropsSystem extends createSystem({}) {
           glass.grounded = true;
           glass.vel.y = 0;
           glass.spin *= 0.4;
-          sfx.glassTap(vy > 1.2);
+          this.tap(glass, vy, vy > 1.2);
         }
       } else {
-        this.settle(glass);
+        this.settle(glass, Math.max(vy, horiz));
       }
     } else if (glass.grounded) {
       // The floor went out from under a skidding glass — off a table edge,
@@ -671,8 +748,11 @@ export class ClubPropsSystem extends createSystem({}) {
     }
   }
 
-  /** Done moving: park it, free it, and tell the room where it ended up. */
-  private settle(glass: Glass): void {
+  /** Done moving: park it, free it, and tell the room where it ended up.
+   *  `impact` is how hard it arrived — a glass placed on a tower touches
+   *  down at nearly nothing and settles SILENTLY, which is the difference
+   *  between building a stack and setting off a wind chime. */
+  private settle(glass: Glass, impact = 0): void {
     const root = glass.refs.root;
     glass.mode = 'rest';
     glass.owner = null;
@@ -680,7 +760,7 @@ export class ClubPropsSystem extends createSystem({}) {
     glass.restedAt = this.clock;
     glass.vel.set(0, 0, 0);
     glass.spin = 0;
-    sfx.glassTap(false);
+    this.tap(glass, impact, false);
     // The pose sticks room-wide — and frees the glass for anyone.
     sendPropRest(
       glass.id,
@@ -712,6 +792,12 @@ export class ClubPropsSystem extends createSystem({}) {
       _v.copy(_c1).sub(_c2);
       const d = _v.length();
       if (d >= minGap || d < 1e-5) continue;
+      // STACKED, not colliding: a glass standing on this one's rim shares
+      // its axis, so the bowls overlap by design. Shoving there is exactly
+      // the force that used to take towers apart — the shelf holds it up,
+      // it does not push it off. (Everything else still collides, whatever
+      // heights the two happen to be passing through.)
+      if (this.stacked(glass, other)) continue;
       _v.divideScalar(d); // contact normal, pointing at me
 
       // Closing speed along the normal (the other's velocity counts only
@@ -737,7 +823,7 @@ export class ClubPropsSystem extends createSystem({}) {
           }
         }
         glass.grounded = false; // a knock lifts it back into the air
-        sfx.glassTap(Math.abs(rel) > 0.8);
+        this.tap(glass, Math.abs(rel), Math.abs(rel) > 0.8);
       }
     }
   }
@@ -764,21 +850,34 @@ export class ClubPropsSystem extends createSystem({}) {
     _q.identity();
     root.quaternion.slerp(_q, k);
     // Keep glasses from sharing a coaster: gently push apart resting pairs —
-    // but never push one off the shelf it's standing on. Every client runs
-    // this for every resting glass, so it has to stay a pure, identical
-    // nudge; shoving a glass into thin air here would have each client
-    // separately decide it was falling.
-    const surfaceY = this.restingYAt(root.position.x, root.position.z);
+    // but ONLY ones on the same level, and never off the shelf they stand
+    // on. Every client runs this for every resting glass, so it has to stay
+    // a pure, identical nudge; shoving a glass into thin air here would
+    // have each client separately decide it was falling.
+    //
+    // THE STATIC FRICTION. A glass standing on another glass's rim is not
+    // nudged at all — that is the whole trick. A solver would hold a rim on
+    // a rim with friction; we have no solver, so a stacked glass simply
+    // does not slide: where you set it down is where it stays until
+    // something moves it. The level test is what tells the two cases apart.
+    const surfaceY = this.supportAt(root.position.x, root.position.z, glass, root.position.y);
     for (const other of this.glasses) {
       if (other === glass || other.mode !== 'rest') continue;
-      _v.copy(root.position).sub(other.refs.root.position);
+      const oRoot = other.refs.root;
+      // Never nudge a stacked pair apart, and never nudge across shelves —
+      // two glasses on different levels are not sharing a coaster.
+      if (this.stacked(glass, other)) continue;
+      if (Math.abs(root.position.y - oRoot.position.y) > PROP_PHYS.stackSameLevel) continue;
+      _v.copy(root.position).sub(oRoot.position);
       _v.y = 0;
       const d = _v.length();
       if (d > 0.001 && d < 0.09) {
         _v.setLength((0.09 - d) * 0.5);
         const toX = root.position.x + _v.x;
         const toZ = root.position.z + _v.z;
-        if (this.restingYAt(toX, toZ) >= surfaceY - 0.001) {
+        // Only step somewhere still carried — a nudge must never walk a
+        // glass off its own shelf (or off the rim it is standing on).
+        if (this.supportAt(toX, toZ, glass, root.position.y) >= surfaceY - 0.001) {
           root.position.x = toX;
           root.position.z = toZ;
         }
@@ -789,7 +888,18 @@ export class ClubPropsSystem extends createSystem({}) {
     // whole bowl-radius higher than one standing on its foot — so the
     // height has to follow the tilt as it comes up, or the glass rights
     // itself straight down through the table.
-    root.position.y = this.restingYAt(root.position.x, root.position.z) - this.bottomOffset(glass);
+    const seatY =
+      this.supportAt(root.position.x, root.position.z, glass, root.position.y) - this.bottomOffset(glass);
+    // THE SHELF WENT AWAY. Lift the glass a tower was standing on and the
+    // one above is suddenly resting on nothing — so it falls, and the tower
+    // comes down the way a tower should. (Claiming it is the same idiom a
+    // struck glass uses; the relay hands the grab to exactly one client.)
+    if (root.position.y > seatY + PROP_PHYS.stackFallGap) {
+      this.claimStruck(glass);
+      glass.grounded = false;
+      return;
+    }
+    root.position.y = seatY;
   }
 
   /* ── the wire: the room's glasses, kept true ──────────────────────────── */

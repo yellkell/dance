@@ -240,7 +240,13 @@ There are **three places**, and where you are is what you're doing:
    the laser, trigger to shoot the octagons, streaks build a ×4
    multiplier, three through the glass ends the night — with a wall
    leaderboard riding the same world scores collection as the songs
-   (pseudo-chart `superoctagon`). At the bar, **THE DUMBWAITER** serves:
+   (pseudo-chart `superoctagon`). **Glasses stack** — freely, with no sockets and no snap: a coupe's rim is
+   a surface, so set one down on another and it rests there, and a glass
+   standing on a glass is stuck to it (the static friction a physics engine
+   would have given us). Build a three-high tower, or a champagne pyramid
+   with one coupe bridging two below; lift the bottom one and the whole
+   thing comes down. `node tools/glass-stack.mjs` builds both shapes and
+   checks they hold. At the bar, **THE DUMBWAITER** serves:
    a brass square rises with a cocktail; aim at it (or any resting
    glass) and squeeze to take it — five-frame throw velocity, per-wall
    bounce heights, glasses that settle upright, and a sip near your face
@@ -461,7 +467,8 @@ server/index.mjs       the room relay (seats/seed/poses + club poses,
 tools/                 track analyzer · preview-shot · club-capture ·
                        social-check (three-headset end-to-end) ·
                        crown-check (the crown's relay protocol) ·
-                       floor-clear (who a cleared floor ends the set for)
+                       floor-clear (who a cleared floor ends the set for) ·
+                       glass-physics · glass-stack (towers and pyramids)
 avatar-preview.html    dev-only dancer catwalk (never shipped)
 ```
 
