@@ -39,6 +39,10 @@ export const CLUB = {
   /** Main ceiling slab; the dome over the dance floor steps up to domeH. */
   ceilH: 3.4,
   domeH: 5.1,
+  /** The corner rooms (still room, arcade) cap at door height — lower,
+   *  closer volumes. Shared here because the BALL's cable needs to agree
+   *  with the architecture about where the ceiling is. */
+  roomCeilH: 2.5,
 
   /** The dance floor: a circle the raid ring roughly re-occupies —
    *  the club and the game share a centre of gravity. */

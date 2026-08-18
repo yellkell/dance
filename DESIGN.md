@@ -229,21 +229,26 @@ hand-built pylon groups it replaced.
 ### THE BALL (how a raid is called)
 
 The pub's third lesson, invented here: games are OPT-IN, and the invitation
-is physical. Anyone on the floor sends THE BALL up (SOCIAL panel; their
+is physical. Anyone on the floor calls THE BALL (SOCIAL panel; their
 ♪ pick, difficulty and ring-size preference ride along) and a mirror ball
-BOUNCES up from the boards — an under-damped spring to its hang height,
-announced by a rising magnetic pull — and hangs before them for sixty
-seconds, GLIMMERING (four-point lens glints popping and dying across the
-facets, carried round the room by the spin) — countdown plate, caller's
-name, one orbiting pip per dancer who has touched in. Touch to join, touch
-again to step out, caller's touch cancels. The RELAY owns the clock: at
-zero it deals the caller + touchers onto the ring and tells everyone else
-who left ('game'); the ball WHIRLS AWAY down to the boards for whoever
-stays to watch it go. The floor NEVER closes — stay-behinds keep dancing
-(away players' voices sing from the stage), newcomers still join the room,
-and 'game-out' brings each player home to the floor when their podium
-settles (auto-deposited after the reading). One ball or one live set at a
-time; a departing caller takes their ball with them.
+is WINCHED DOWN out of the ceiling — the cable anchors to whatever is
+overhead (the main slab, the dome's first tread, a corner room's low cap,
+or the eclipse itself: inside the fixture's footprint the ball hangs off
+its underside and never threads the rings) — overshooting its stop on an
+under-damped spring and bouncing to rest, announced by the drop's whoosh.
+It hangs before them for sixty seconds, GLIMMERING (four-point lens glints
+popping and dying across the facets, carried round the room by the spin),
+the cable visibly holding it to the ceiling the whole way — countdown
+plate, caller's name, one orbiting pip per dancer who has touched in.
+Touch to join, touch again to step out, caller's touch cancels. The RELAY
+owns the clock: at zero it deals the caller + touchers onto the ring and
+tells everyone else who left ('game'); the ball is HOISTED back up into
+the dark, to the recall's rising pull, for whoever stays to watch it go.
+The floor NEVER closes — stay-behinds keep dancing (away players' voices
+sing from the stage), newcomers still join the room, and 'game-out' brings
+each player home to the floor when their podium settles (auto-deposited
+after the reading). One ball or one live set at a time; a departing caller
+takes their ball with them.
 
 And a set called this way is WORTH something: the first player home from a
 resolved set names the night's winner (every headset computed the same
