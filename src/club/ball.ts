@@ -279,7 +279,10 @@ export function buildBallVisual(): BallVisual {
     g.fillText(`♪ ${track ? track.title : 'SHUFFLE'}`, 256, 140);
     g.font = font(600, 24);
     g.fillStyle = 'rgba(232,236,242,0.75)';
-    g.fillText(`${callerName} calls`, 256, 176);
+    // "hosts", not "calls": whoever sends the ball up is running that set,
+    // and the floor reads the line as an invitation to someone's night —
+    // the wire still calls them the caller, because that is what they did.
+    g.fillText(`${callerName} hosts`, 256, 176);
 
     // One short state line — the touch teaches the rest.
     g.font = font(700, 26);
