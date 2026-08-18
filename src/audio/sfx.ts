@@ -548,6 +548,20 @@ export function hitTaken(): void {
   whooshNoise(0.12, 0.12, 380, 140);
 }
 
+/** PERFECT! — the last-instant dodge's payoff, and hitTaken's opposite
+ *  pole by construction: ALL TONE, no clank, no noise. It fires right
+ *  beside a landing's crash, and anything percussive there reads as
+ *  taking the hit (the old glass clink — a struck plate — did exactly
+ *  that). So: a quick rising fifth with a sparkle climbing off the top —
+ *  the kit's reward vocabulary (the recall's rise, the routine's C-major
+ *  ticks, an octave above them), pitched over the mix and gone in a
+ *  third of a second. Rising = good; falling and banging = hit. */
+export function perfectChime(): void {
+  tone({ freq: 1046.5, type: 'triangle', dur: 0.07, gain: 0.15 }); // C6, the pickup
+  tone({ freq: 1568, type: 'triangle', dur: 0.2, gain: 0.19, delay: 0.06 }); // G6 — the lift
+  tone({ freq: 2093, to: 3136, type: 'sine', dur: 0.18, gain: 0.06, delay: 0.08 }); // the sparkle off the top
+}
+
 /** Iron on iron: your orbiting ball parries theirs — hammer on anvil. */
 export function deflect(): void {
   clank(1240, 0.22, 0.45);
