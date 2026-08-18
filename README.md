@@ -460,7 +460,8 @@ src/
   club/                the club: venue + void foyer build, layout,
                        materials, the ball, voice (capture + spatial
                        playback), mute/block store, static-merge helper
-  game/                state, flow, ring math, rng, avatars
+  game/                state, flow, ring math, rng, avatars + their
+                       shared pose-motion layer (springy hands)
   systems/             Music, Choreo, Player, Avatar, Rank, Goopliath,
                        Disco, Hud, Menu, Network, Arena,
                        Club, ClubTeleport, ClubSocial, ClubBall
@@ -474,8 +475,10 @@ tools/                 track analyzer · preview-shot · club-capture ·
                        floor-clear (who a cleared floor ends the set for) ·
                        glass-physics · glass-stack (towers and pyramids) ·
                        music-switch (the floor's music toggle, end to end) ·
-                       goop-cohesion (the DJ stays ONE PIECE, field-checked
-                       through the whole show)
+                       goop-cohesion (the goop stays ONE PIECE, field-checked
+                       through the whole show) · arm-motion (the figures'
+                       hand springs, elbow poles and stick grips, checked
+                       live)
 avatar-preview.html    dev-only dancer catwalk (never shipped)
 ```
 

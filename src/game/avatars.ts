@@ -13,9 +13,13 @@
  *
  * The rig is driven entirely from a HEAD position and two HAND targets —
  * exactly what VR actually knows about a person. Everything else is solved:
- * the hips hang under the head, two-bone arms bend at solved elbows,
- * two-bone legs bend at solved KNEES (so crouching folds the figure instead
- * of telescoping it), and elimination melts the whole thing floorward.
+ * the hips hang under the head, two-bone arms bend at elbows whose pole
+ * ADAPTS to the reach (a crossed hand folds its elbow down instead of
+ * chicken-winging through the chest; a long thrust rolls it under the arm),
+ * the glowsticks ride the forearm as POINTERS and twist with the body's
+ * yaw, two-bone legs bend at solved KNEES (so crouching folds the figure
+ * instead of telescoping it), and elimination melts the whole thing
+ * floorward.
  *
  * YOU have no figure. The local player never sees their own body — your
  * platform shows only your controllers; the elegance is for everyone else's
@@ -608,6 +612,13 @@ export function buildDancer(hue: number): DancerRig {
   const elbowR = detail(M(sphereGeo(8), lit));
   elbowL.scale.setScalar(0.024);
   elbowR.scale.setScalar(0.024);
+  // Named so headless probes (tools/arm-motion.mjs) can read the solve.
+  elbowL.name = 'elbow-l';
+  elbowR.name = 'elbow-r';
+  foreL.name = 'fore-l';
+  foreR.name = 'fore-r';
+  capL.name = 'shoulder-l';
+  capR.name = 'shoulder-r';
   root.add(elbowL, elbowR);
 
   /* ── hands: faceted gauntlet mitt + neon cuff + glowstick blade ── */
@@ -638,6 +649,8 @@ export function buildDancer(hue: number): DancerRig {
   };
   const handL = mkHand();
   const handR = mkHand();
+  handL.name = 'hand-l';
+  handR.name = 'hand-r';
 
   /* ── legs: hip → KNEE → ankle, with a piped seam down the shin ──
    * Two bones, not one: the old single taper telescoped on every crouch,
@@ -740,7 +753,7 @@ export function buildDancer(hue: number): DancerRig {
     return c;
   };
 
-  /** Solve one arm: elbow pushed out-and-down, hand riding the solved tip. */
+  /** Solve one arm: elbow at an adaptive pole, hand riding the solved tip. */
   const solveArm = (
     side: -1 | 1,
     shoulder: Vector3,
@@ -753,22 +766,41 @@ export function buildDancer(hue: number): DancerRig {
     elbow: Mesh,
   ): void => {
     _target.set(hx, hy, hz);
-    // The natural bend of an arm holding something up: out to the side of
-    // THE BODY it belongs to — the body's own right axis, not the world's
-    // +x — and biased downward. Hinting along world x splayed the elbows
-    // toward a fixed compass point, so any dancer not facing −z bent their
-    // arms across their own chest; a figure turned all the way round (a
-    // mirror reflection, half the club floor) got them backwards.
-    _hint.copy(_right).multiplyScalar(side);
-    _hint.y = -0.7;
+    // THE ELBOW POLE. The natural bend for a hand working at its own side
+    // is out from THE BODY it belongs to — the body's own right axis, not
+    // the world's +x (a fixed compass hint bent every turned dancer's arms
+    // across their chest, and a mirror reflection got them backwards) —
+    // and biased downward. But one hint cannot serve a whole dance
+    // vocabulary: a hand CROSSED past the midline with its elbow still
+    // pushed hard outward is a chicken wing with the upper arm sawing
+    // through the chest, and a long forward thrust wants the elbow rolled
+    // under the arm, not flared beside it. So the pole adapts,
+    // continuously, from where the hand actually is in the body's frame:
+    // crossing folds the elbow down-and-forward, reaching rolls it under.
+    const relOut = ((hx - shoulder.x) * _right.x + (hz - shoulder.z) * _right.z) * side;
+    const relFwd = (hx - shoulder.x) * _fwd.x + (hz - shoulder.z) * _fwd.z;
+    const cross = Math.min(1, Math.max(0, (0.06 - relOut) / 0.3));
+    const punch = Math.min(1, Math.max(0, (relFwd - 0.18) / 0.35));
+    const out = side * (1 - 0.9 * cross) * (1 - 0.6 * punch);
+    const fw = 0.35 * cross + 0.18 * punch;
+    _hint.set(_right.x * out + _fwd.x * fw, -(0.7 + 0.15 * punch), _right.z * out + _fwd.z * fw);
     _hint.normalize();
     twoBone(shoulder, _target, UPPER_ARM, FOREARM, _hint, _solved, _tip);
     align(upper, shoulder, _solved);
-    align(fore, _solved, _tip);
+    align(fore, _solved, _tip); // leaves _dir = the forearm's own direction
     elbow.position.copy(_solved);
     hand.position.copy(_tip);
-    // The glowstick leans with the forearm, flared slightly outward.
-    hand.quaternion.setFromUnitVectors(UP, _dir.set(side * 0.35, 1, -0.15).normalize());
+    // THE STICK IS A POINTER. It rides the forearm's line with an upward
+    // bias (a loose grip stands the stick up as the arm rises) and a
+    // slight outward flare, and the fist twists with the body's yaw — so
+    // a thrust aims the blade at what it is thrusting at, a raised stick
+    // is a torch, a resting one hangs easy, and a dancer facing you no
+    // longer grips their sticks in the same world direction as one facing
+    // away. (The old constant quaternion pointed every stick on the floor
+    // at the same patch of sky forever, whatever the arm was doing.)
+    _hint.set(_dir.x + _right.x * side * 0.18, _dir.y + 0.8, _dir.z + _right.z * side * 0.18);
+    _hint.normalize();
+    hand.quaternion.setFromUnitVectors(UP, _hint).multiply(_yawQ);
   };
 
   const shoulderL = new Vector3();

@@ -24,6 +24,7 @@ import { platformRoot } from '../arena/arena.js';
 import { choreoView } from './ChoreoSystem.js';
 import type { Zone } from '../choreo/setlist.js';
 import { buildDancer, type DancerPose, type DancerRig } from '../game/avatars.js';
+import { PoseMotion, type MotionTuning } from '../game/poseMotion.js';
 import { roll } from '../game/rng.js';
 import { seatBearing, seatIsNear } from '../game/ring.js';
 import { liveSpots, match, type Dancer, showBeat } from '../game/state.js';
@@ -34,8 +35,11 @@ interface Puppet {
   rig: DancerRig;
   seat: number;
   phase: number;
-  /** The live pose, eased toward targets every frame. */
+  /** The RENDERED pose — the motion layer carries it toward `tgt`. */
   pose: DancerPose;
+  /** The driven target pose (bot choreography, or the remote wire). */
+  tgt: DancerPose;
+  motion: PoseMotion;
   /** Dance/dodge destination on the deck. */
   tx: number;
   tz: number;
@@ -49,6 +53,16 @@ const CLAMP_X = OCTAGON_HALF_WIDTH - 0.18;
 const CLAMP_Z = OCTAGON_HALF_DEPTH - 0.15;
 const STAND_HEAD = 1.56;
 const DUCK_HEAD = 1.02;
+
+/** Bots: heads chase fast enough to be transparent under driveBot's own
+ *  channel eases; hands run underdamped springs, so the stick punched on
+ *  the beat whips through its top and settles — dancers, not metronomes. */
+const BOT_MOTION: MotionTuning = { headRate: 20, handHz: 3.0, zeta: 0.68 };
+/** Remote humans: critically damped — velocity-continuous tracking of the
+ *  10 Hz wire that never invents bounce. The old snap-to-latest-sample
+ *  lerp turned every real swing into a scalloped arc with a corner at
+ *  each packet; a spring carries speed THROUGH the packets. */
+const REMOTE_MOTION: MotionTuning = { headRate: 14, handHz: 3.4, zeta: 1 };
 
 export class AvatarSystem extends createSystem({}) {
   private generation = -1;
@@ -68,16 +82,19 @@ export class AvatarSystem extends createSystem({}) {
       // jewellery, its falling blocks and its strike sparks together.
       rig.setDetail(seatIsNear(match.mySeat, d.seat, match.seats));
       parent.add(rig.root);
+      const neutral = (): DancerPose => ({
+        hx: 0, hy: STAND_HEAD, hz: 0, yaw: 0, pitch: 0, roll: 0,
+        lx: -0.3, ly: 1.0, lz: -0.1,
+        rx: 0.3, ry: 1.0, rz: -0.1,
+        slump: 0,
+      });
       this.puppets.push({
         rig,
         seat: d.seat,
         phase: (d.seat * 1.7) % (Math.PI * 2),
-        pose: {
-          hx: 0, hy: STAND_HEAD, hz: 0, yaw: 0, pitch: 0, roll: 0,
-          lx: -0.3, ly: 1.0, lz: -0.1,
-          rx: 0.3, ry: 1.0, rz: -0.1,
-          slump: 0,
-        },
+        pose: neutral(),
+        tgt: neutral(),
+        motion: new PoseMotion(),
         tx: 0,
         tz: 0,
         duck: false,
@@ -105,9 +122,12 @@ export class AvatarSystem extends createSystem({}) {
       p.flash = Math.max(0, p.flash - delta);
 
       // Melt on elimination (and reform if a new match revives the rig).
+      // Eased here on its own clock; the motion layer's chase is a no-op
+      // because pose and target agree.
       const slumpTarget = d.alive ? 0 : 1;
       p.slump += (slumpTarget - p.slump) * Math.min(1, delta * 2.5);
       p.pose.slump = p.slump;
+      p.tgt.slump = p.slump;
 
       // One drive for the whole rig, scaled by each material's authored
       // gain — the suit stays cooler than its own neon trim in every state.
@@ -124,10 +144,11 @@ export class AvatarSystem extends createSystem({}) {
       }
 
       if (d.kind === 'remote') {
-        this.driveRemote(p, delta);
+        this.driveRemote(p);
       } else {
         this.driveBot(p, d, beat, delta);
       }
+      p.motion.step(p.pose, p.tgt, delta, d.kind === 'remote' ? REMOTE_MOTION : BOT_MOTION);
 
       // Where this dancer stands on their own deck — zone judges read it.
       liveSpots.set(p.seat, { x: p.pose.hx, z: p.pose.hz });
@@ -136,27 +157,31 @@ export class AvatarSystem extends createSystem({}) {
     }
   }
 
-  private driveRemote(p: Puppet, delta: number): void {
+  private driveRemote(p: Puppet): void {
     const pose = remotePoses.get(p.seat);
     if (!pose) return;
-    const k = Math.min(1, delta * 14);
-    const t = p.pose;
-    t.hx += (pose.hx - t.hx) * k;
-    t.hy += (pose.hy - t.hy) * k;
-    t.hz += (pose.hz - t.hz) * k;
-    t.yaw += (pose.hyaw - t.yaw) * k;
-    t.pitch += (pose.hpitch - t.pitch) * k;
-    t.roll += (pose.hroll - t.roll) * k;
-    t.lx += (pose.lx - t.lx) * k;
-    t.ly += (pose.ly - t.ly) * k;
-    t.lz += (pose.lz - t.lz) * k;
-    t.rx += (pose.rx - t.rx) * k;
-    t.ry += (pose.ry - t.ry) * k;
-    t.rz += (pose.rz - t.rz) * k;
+    // The wire IS the target; the motion layer does the smoothing (and
+    // sanitising — a bad sample can no longer poison the figure).
+    const t = p.tgt;
+    t.hx = pose.hx;
+    t.hy = pose.hy;
+    t.hz = pose.hz;
+    t.yaw = pose.hyaw;
+    t.pitch = pose.hpitch;
+    t.roll = pose.hroll;
+    t.lx = pose.lx;
+    t.ly = pose.ly;
+    t.lz = pose.lz;
+    t.rx = pose.rx;
+    t.ry = pose.ry;
+    t.rz = pose.rz;
   }
 
   private driveBot(p: Puppet, d: Dancer, beat: number, delta: number): void {
-    const t = p.pose;
+    // Bot choreography drives the TARGET pose; its own per-channel eases
+    // below stay (they are the authored feel), and the motion layer adds
+    // the hand springs on top.
+    const t = p.tgt;
 
     // What's coming for this seat? Mirror the judgement roll so the body
     // language always matches the outcome.

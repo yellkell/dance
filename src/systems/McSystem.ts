@@ -42,6 +42,7 @@ import { MC, RING, hueToColor, ringRadius } from '../config.js';
 import { arena } from '../arena/arena.js';
 import { CLUB as CLUB_LAYOUT } from '../club/config.js';
 import { ACCENT_REST, buildDancer, type DancerPose, type DancerRig } from '../game/avatars.js';
+import { PoseMotion } from '../game/poseMotion.js';
 import { match, type GestureCue, showBeat } from '../game/state.js';
 import { net } from '../net/session.js';
 
@@ -78,11 +79,15 @@ const DECK_SPOT = { x: 0, y: CLUB_LAYOUT.stage.h, z: CLUB_LAYOUT.stage.z + 0.5, 
 
 export class McSystem extends createSystem({}) {
   private rig: DancerRig | null = null;
-  /** The RENDERED pose — everything below writes `tgt` and this eases
-   *  toward it, so idle → wind-up → strike is one continuous motion and
-   *  the figure never teleports between choreography states. */
+  /** The RENDERED pose — everything below writes `tgt` and the motion
+   *  layer carries this toward it, so idle → wind-up → strike is one
+   *  continuous motion and the figure never teleports between
+   *  choreography states. His hands run underdamped springs: a thrown
+   *  stick whips past its mark and settles, so every mime lands with
+   *  follow-through instead of decelerating politely into the hit. */
   private pose: DancerPose = freshPose();
   private tgt: DancerPose = freshPose();
+  private motion = new PoseMotion();
   private scale = MC.scale;
   private menuClock = 0;
   private generation = -1;
@@ -106,30 +111,10 @@ export class McSystem extends createSystem({}) {
     // and state carried across generations carries its accidents with it.
     this.pose = freshPose();
     this.tgt = freshPose();
+    this.motion.snap(this.pose, this.tgt);
     this.mime = null;
     this.warn = 0;
     this.eaten = false;
-  }
-
-  /** Ease the rendered pose toward the target — the seam between every
-   *  choreography state. `rate` is per-second exponential chase. */
-  private easeTo(delta: number, rate: number): void {
-    const k = 1 - Math.exp(-rate * delta);
-    const c = this.pose;
-    const t = this.tgt;
-    c.hx += (t.hx - c.hx) * k;
-    c.hy += (t.hy - c.hy) * k;
-    c.hz += (t.hz - c.hz) * k;
-    c.yaw += (t.yaw - c.yaw) * k;
-    c.pitch += (t.pitch - c.pitch) * k;
-    c.roll += (t.roll - c.roll) * k;
-    c.lx += (t.lx - c.lx) * k;
-    c.ly += (t.ly - c.ly) * k;
-    c.lz += (t.lz - c.lz) * k;
-    c.rx += (t.rx - c.rx) * k;
-    c.ry += (t.ry - c.ry) * k;
-    c.rz += (t.rz - c.rz) * k;
-    c.slump += (t.slump - c.slump) * k;
   }
 
   /** Face the origin (the local player) from wherever he stands — the rig's
@@ -180,7 +165,7 @@ export class McSystem extends createSystem({}) {
       this.idleGroove(this.menuClock * 1.9); // ~114 BPM sway, clock of his own
       this.warn += (0 - this.warn) * Math.min(1, delta * 6);
       this.applyAccents(this.warn);
-      this.easeTo(delta, 5);
+      this.motion.step(this.pose, this.tgt, delta, { headRate: 5, handHz: 2.6, zeta: 0.7 });
       rig.pose(this.pose);
       return;
     }
@@ -216,7 +201,8 @@ export class McSystem extends createSystem({}) {
         p.roll = tremble * 3;
         rig.root.scale.set(this.scale * (1 + t * 0.25), this.scale * (1 - t * 0.55), this.scale * (1 + t * 0.25));
         this.applyAccents(1); // full alarm
-        this.easeTo(delta, 14);
+        // Stiff, springy panic — the tremble rings through his hands.
+        this.motion.step(this.pose, this.tgt, delta, { headRate: 14, handHz: 6, zeta: 0.65 });
         rig.pose(this.pose);
         return;
       }
@@ -251,8 +237,15 @@ export class McSystem extends createSystem({}) {
     this.warn += (warnTarget - this.warn) * Math.min(1, delta * 8);
     this.applyAccents(this.warn);
 
-    // Wind-ups chase briskly; the strike snap is fast but still a MOTION.
-    this.easeTo(delta, striking ? 16 : 9);
+    // Wind-ups chase briskly; the strike stiffens the hand springs so the
+    // snap arrives HOT — underdamped, it carries through the mark and
+    // settles, which is what a hit looks like (the old single-rate ease
+    // was fastest leaving and dead on arrival, the reverse of a strike).
+    this.motion.step(this.pose, this.tgt, delta, {
+      headRate: striking ? 16 : 9,
+      handHz: striking ? 5.5 : 3.2,
+      zeta: 0.62,
+    });
     rig.pose(this.pose);
   }
 
