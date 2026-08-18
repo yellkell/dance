@@ -69,8 +69,15 @@ pressure curve is written in beats, so its real-time density scales with
 the record — a 91 BPM expert night used to throw half the landings per
 second of a 174 one, off a bar grid that walked past where those records'
 grooves actually live. Under 100 BPM the whole chart clock runs at 2×
-(grid on the eighths, landings on the real half-bars), so the slow shelf
-finally plays like the fast one. Expert only; the tour never reaches it.
+(grid on the eighths, landings on the real half-bars) — but the clock is
+for the GRID, not the pressure: the chart is served at the 135–150
+shelf's measured pace (fewer bookings per half-length phrase, rests that
+blend legal bar lines to the fast shelf's spacing, cascades stretched to
+three real beats so every volley still lands on a beat). A doubled clock
+serving the standard tables threw a third more landings a second than
+any record in the box; served at the visitor's pace, the slow shelf
+measures inside the fast shelf's own band. Expert only; the tour never
+reaches it.
 
 Getting HIT also knocks the rhythm out of your hands: the groove streak
 (the one-up-one-down hand combo and its tally) resets on every clip, so

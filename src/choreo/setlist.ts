@@ -165,7 +165,12 @@ function twinSide(rng: () => number, at: number | undefined): 1 | -1 {
  *  `sweptRoutines` is the chart-wide coin for THE SWEPT ROUTINE — rolled
  *  once per song, so some expert nights carry it and some never do.
  *  `park` is where the LAST move left a dancer who played it right (see
- *  THE FLOOR MANAGER); the twins aim their opening volley at it. */
+ *  THE FLOOR MANAGER); the twins aim their opening volley at it.
+ *  `doubleTime` stretches the two cascade gaps that aren't nailed to the
+ *  bar line (seesaw floods, routine steps) back to the real seconds the
+ *  fast shelf serves them at — the bar-locked cascades (twin returns,
+ *  nova chains, the donut's one-two) have no legal middle value on a
+ *  doubled grid and stay put. */
 function buildLandings(
   kind: MoveKind,
   landBeat: number,
@@ -173,6 +178,7 @@ function buildLandings(
   rng: () => number,
   sweptRoutines = false,
   park: Park = null,
+  doubleTime = false,
 ): Landing[] {
   const landings: Landing[] = [];
   if (kind === 'beam') {
@@ -222,9 +228,10 @@ function buildLandings(
       let side: 1 | -1 = twinSide(rng, park?.x);
       lane(side * inner);
       lane(side * outer);
+      const ret = doubleTime ? CHOREO.doubleTimePace.twinReturnBeats : CHOREO.twinReturnBeats;
       for (let v = 1; v < CHOREO.twinChainMax && rng() < keep[v]; v++) {
         side = -side as 1 | -1;
-        const at = landBeat + v * CHOREO.twinReturnBeats;
+        const at = landBeat + v * ret;
         laneAt(at, side * inner);
         laneAt(at, side * outer);
       }
@@ -245,7 +252,7 @@ function buildLandings(
       });
     }
     landings.push({
-      beat: landBeat + (opens ? CHOREO.donutFollowBeats : 0),
+      beat: landBeat + (opens ? (doubleTime ? CHOREO.doubleTimePace.donutFollowBeats : CHOREO.donutFollowBeats) : 0),
       zone: { kind: 'donut', innerR },
     });
   } else if (kind === 'cross') {
@@ -293,10 +300,11 @@ function buildLandings(
       // battery fires from the OTHER rail, so every volley announces itself
       // as a new machine rather than a repeat of the last one.
       const keep = twinKeep(act);
+      const ret = doubleTime ? CHOREO.doubleTimePace.twinReturnBeats : CHOREO.twinReturnBeats;
       for (let v = 1; v < CHOREO.twinChainMax && rng() < keep[v]; v++) {
         side = -side as 1 | -1;
         from = from === 1 ? -1 : 1;
-        pair(landBeat + v * CHOREO.twinReturnBeats, side, from);
+        pair(landBeat + v * ret, side, from);
       }
       return landings;
     }
@@ -329,8 +337,9 @@ function buildLandings(
     // arrives under the sweep's blade — stand in the taught corner AND
     // duck on each tick. The memory test and the limbo, one body.
     const swept = sweptRoutines && act >= 4;
+    const stepBeats = doubleTime ? CHOREO.doubleTimePace.routineStepBeats : CHOREO.routineStepBeats;
     routine.forEach((corner, step) => {
-      const beat = landBeat + step * CHOREO.routineStepBeats;
+      const beat = landBeat + step * stepBeats;
       landings.push({ beat, zone: { kind: 'quad', corner, step, routine } });
       if (swept) landings.push({ beat, zone: { kind: 'sweep' } });
     });
@@ -395,7 +404,8 @@ function buildLandings(
   } else if (kind === 'seesaw' || kind === 'surge') {
     const axis: 0 | 1 = kind === 'surge' ? 1 : 0;
     const stages = 2 + Math.min(act, kind === 'surge' ? 2 : 3);
-    const gap = CHOREO.seesawGapBeats[Math.min(act, CHOREO.seesawGapBeats.length - 1)];
+    const gaps = doubleTime ? CHOREO.doubleTimePace.seesawGapBeats : CHOREO.seesawGapBeats;
+    const gap = gaps[Math.min(act, gaps.length - 1)];
     let side: 1 | -1 = rng() < 0.5 ? 1 : -1;
     for (let i = 0; i < stages; i++) {
       landings.push({ beat: landBeat + i * gap, zone: { kind: 'half', side, axis } });
@@ -413,8 +423,9 @@ function buildLandings(
       act >= 4 ? CHOREO.novaHalfAngleExpert : act >= 3 ? CHOREO.novaHalfAngleLate : CHOREO.novaHalfAngle;
     let bearing = rng() * Math.PI * 2;
     const turn = (rng() < 0.5 ? 1 : -1) * CHOREO.novaChainTurn;
+    const chain = doubleTime ? CHOREO.doubleTimePace.novaChainBeats : CHOREO.novaChainBeats;
     for (let i = 0; i < slices; i++) {
-      landings.push({ beat: landBeat + i * CHOREO.novaChainBeats, zone: { kind: 'nova', bearing, halfAngle } });
+      landings.push({ beat: landBeat + i * chain, zone: { kind: 'nova', bearing, halfAngle } });
       bearing += turn;
     }
   }
@@ -628,16 +639,22 @@ function buildAimed(
 }
 
 /**
- * The full raid set. Pure function of (seed, phrases, banned, difficulty)
- * — every client, and every rewatch of the same seed, gets the identical
- * show. `banned` comes from the record on the decks (tracks.ts): some
- * songs simply never call certain moves.
+ * The full raid set. Pure function of (seed, phrases, banned, difficulty,
+ * doubleTime) — every client, and every rewatch of the same seed, gets the
+ * identical show. `banned` comes from the record on the decks (tracks.ts):
+ * some songs simply never call certain moves. `doubleTime` marks a chart
+ * whose clock EXPERT doubled (config.chartBpm): the grid stays doubled —
+ * that is what keeps landings on the music — but the chart is SERVED at
+ * the fast shelf's pace (CHOREO.doubleTimePace) instead of the standard
+ * tables, because standard tables on a ~190 clock threw a third more
+ * landings a second than any record the difficulty actually ships.
  */
 export function generateSetlist(
   seed: number,
   phrases: number,
   banned: readonly MoveKind[] = [],
   difficulty = 1,
+  doubleTime = false,
 ): SetMove[] {
   const rng = mulberry32(mix(seed, 0xc03e0));
   const moves: SetMove[] = [];
@@ -662,9 +679,13 @@ export function generateSetlist(
     // nothing left in it. Never let a phrase begin before its own downbeat.
     cursor = Math.max(cursor, phrase * phraseBeats);
     const act = actOfPhrase(phrase, phrases, difficulty);
-    const want = CHOREO.movesPerPhrase[Math.min(act, CHOREO.movesPerPhrase.length - 1)];
+    // A double-time chart keeps the doubled GRID but borrows the fast
+    // shelf's SERVICE — its phrases hold half the seconds, so the standard
+    // quota and rests would land a third more often than any shipped chart.
+    const pace = doubleTime ? CHOREO.doubleTimePace : CHOREO;
+    const want = pace.movesPerPhrase[Math.min(act, pace.movesPerPhrase.length - 1)];
     const phraseEnd = (phrase + 1) * phraseBeats;
-    const rest = CHOREO.restBeats[Math.min(act, CHOREO.restBeats.length - 1)];
+    const rest = pace.restBeats[Math.min(act, pace.restBeats.length - 1)];
     const finalPhrase = phrase === phrases - 1;
     // The last quota includes THE CLOSER below, whose four-beat wind-up owns
     // the final bar. No rest is kept in front of it: a clear bar before the
@@ -679,14 +700,14 @@ export function generateSetlist(
     // booking moves, so a phrase can never hand the floor a long stretch of
     // nothing to do. `cursor` climbs by at least a move's charge every pass,
     // so the extra condition always terminates.
-    const maxSilent = CHOREO.maxSilentBeats[Math.min(act, CHOREO.maxSilentBeats.length - 1)];
+    const maxSilent = pace.maxSilentBeats[Math.min(act, pace.maxSilentBeats.length - 1)];
 
     for (let m = 0; m < ordinaryMoves || moveEnd - cursor > maxSilent; m++) {
       let kind = pickKind(rng, act, last, banned);
       let charge = MOVES[kind].chargeBeats;
       // Land on the next bar downbeat that the telegraph fits in front of.
       let landBeat = Math.ceil((cursor + charge) / barBeats) * barBeats;
-      let landings = buildLandings(kind, landBeat, act, rng, sweptRoutines, park);
+      let landings = buildLandings(kind, landBeat, act, rng, sweptRoutines, park, doubleTime);
       // THE FLOOR MANAGER: a move whose danger never touches the ground
       // the last move parked you on asks for nothing — roll another shape
       // (same seeded stream, so every client re-rolls identically). A WHOLE
@@ -701,7 +722,7 @@ export function generateSetlist(
         kind = pickKind(rng, act, last, banned);
         charge = MOVES[kind].chargeBeats;
         landBeat = Math.ceil((cursor + charge) / barBeats) * barBeats;
-        landings = buildLandings(kind, landBeat, act, rng, sweptRoutines, park);
+        landings = buildLandings(kind, landBeat, act, rng, sweptRoutines, park, doubleTime);
       }
       if (!evictsPark(landings, park) || landings[landings.length - 1].beat > moveEnd) {
         // TWELVE SHAPES AND NOT ONE OF THEM FITS. This used to abandon the
