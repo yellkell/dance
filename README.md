@@ -402,15 +402,20 @@ its bar grid walked past where the slow shelf's grooves actually live
 (those records ride the eighths; V ONE's onsets sit on a literal 190
 lattice). So on EXPERT, any record **under 100 BPM runs its chart clock
 at 2×** — the grid rides the eighths, landings hit the real half-bars —
-but the clock doubles for the *grid's* sake only: the chart is **served
-at the 122–135 shelf's pace** (`CHOREO.doubleTimePace` — a doubled clock
-serving the standard tables threw half again more landings a second than
-that shelf, and a first retune that chased 135–150 still ran hot on the
-floor). Measured across ten seeds a record, the 91–98 shelf (TARGET,
-FUTURE VIBE, V ONE, MORNING, MONEY) now serves 0.60–0.64 landings a
-second — 0.71–0.78 in the back stretch — interleaved with the 0.57–0.64
-/ 0.70–0.76 band FUSION, ASSEMBLE, SAKUPENED and COMBAT actually measure
-at. Nothing announces it: the menus show each record's own
+but the clock doubles for the *grid's* sake only: everything the dancer
+experiences is converted to the **110–117 shelf's real seconds**
+(`CHOREO.doubleTimePace` — two earlier passes paced only the landing
+cadence, at 135–150 and then 122–135, and both still *felt* fast because
+the reads stayed on the doubled clock: a beam was filling in under a
+second). Now the charges stretch too — a beam fills ~1.6 s, a gate
+~2.2 s, the routine teaches over ~4 s, the wave marches on the record's
+own beats, exactly what DISCO BALL and GIVE IT TO ME serve — along with
+the cascades, the perfect-probe window, the routine's bell lead and the
+blockfall descent, all measured in the *record's* beats. Ten seeds a
+record, the 91–98 shelf now serves 0.48–0.53 landings a second
+(0.55–0.63 in the back stretch) against the 110–117 shelf's measured
+0.50–0.56 / 0.60–0.67 — sitting at that band's soft edge, deliberately:
+perked up, feel intact. Nothing announces it: the menus show each record's own
 measured tempo, because a badge beside the BPM explains an
 implementation to somebody picking a song, and the floor tells you
 anyway. The file itself plays untouched — only the grid the game counts

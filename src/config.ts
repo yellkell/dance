@@ -208,15 +208,6 @@ export const GOOP = {
  *           VERTICAL TWIN — two shoulder to shoulder taking a whole half,
  *           with the same RETURN a bar later on the other half. Two at the
  *           back then two at the front, and the deck travels that way.
- *  wire   : the trip web — a shin-high lattice of laser wire cutting the
- *           deck into a 4×4 grid. Base form: no safe ground drawn, because
- *           there isn't any — HOLD STILL until it clears (the one dodge
- *           that is stillness, so the base web never paints the floor).
- *           From act 2, cells of the grid arrive FILLED: columns of danger
- *           floor-to-eye that you must vacate BEFORE you freeze — filled
- *           squares are painted, because paint always means move. On the
- *           discharge the whole lattice sweeps upward to eye level: the
- *           hitbox you were always inside, made honest.
  */
 export type MoveKind =
   | 'beam'
@@ -352,9 +343,13 @@ export const CHOREO = {
    *  crossing in an X — the safe ground is the four pockets between the
    *  arms, so the dodge reads radial (out of the cross, not off a line).
    *  The arms run THINNER than a straight beam: two full-width strips on
-   *  the diagonals left pockets too tight to trust. */
+   *  the diagonals left pockets too tight to trust — and 0.17 still
+   *  wasn't room enough. At 0.14 the side pockets hold ~0.18 m of true
+   *  clearance each way (judge margin included) and the shallower
+   *  front/back pockets ~0.14 m, up from ~0.15/~0.11: pockets you can
+   *  stand in with your shoulders, not thread with your spine. */
   beamXChance: [0, 0, 0.24, 0.28, 0.32],
-  beamXHalfW: 0.17,
+  beamXHalfW: 0.14,
   /** THE WAVE: beams marching across the deck in order, one landing per
    *  step, with the far quarter left dark — the EXIT. EVERY wave turns:
    *  the march wheels at the exit (its first return strike is that very
@@ -501,47 +496,67 @@ export const CHOREO = {
    *  actually lives (DIFFICULTY.doubleTimeBelowBpm) — but the doubled clock
    *  serving the STANDARD tables threw ~0.9 landings a second, half again
    *  the 122–135 shelf's measured 0.57–0.64, and that mid shelf is the
-   *  pocket these charts should live in (the first pass aimed at 135–150
-   *  and still ran hot on the floor). So a doubled chart keeps the grid
-   *  and borrows the mid shelf's service: a smaller quota for its
-   *  half-length phrases, rests counted in whole chart bars, a roomier
-   *  dead-air ceiling, and the two cascade gaps that aren't nailed to the
-   *  bar line (seesaw floods, routine steps) stretched back to the
-   *  seconds that shelf serves them at.
+   *  pocket these charts should live in (the first pass aimed at 135–150,
+   *  the second at 122–135, and both still ran hot on the floor — the
+   *  sweet spot the floor kept asking for is the 110–117 shelf: perked
+   *  up, feel intact). So a doubled chart keeps the grid and borrows that
+   *  shelf's EVERYTHING — not just the landing cadence but the reads and
+   *  the cascades, all converted to the same real seconds: charges from
+   *  its own table below (a beam fills ~1.6 s, a gate ~2.2 s, the routine
+   *  teaches over ~4 s, exactly what those records serve), a smaller
+   *  quota for the half-length phrases, a roomier dead-air ceiling, wave
+   *  marches on the record's own beats, and every cascade gap stretched
+   *  to the shelf's spacing.
    *
-   *  The bar-locked cascades — twin returns, nova chains, the donut's
-   *  one-two — stretch too, from a chart bar to SIX chart beats: on a
-   *  doubled grid that is three REAL beats, so every volley still lands
-   *  on a beat of the record (the seesaw's license, one rung below the
-   *  bar), and a rally runs at the mid shelf's ~1.9 s per answer
-   *  instead of hammering every half-bar. These volleys dominate the
+   *  The cascades stretch to the shelf's spacing. Twin volleys answer at
+   *  SEVEN chart beats (~2.2 s — the shelf's own bar; every other volley
+   *  sits an eighth off the beat, which on these shuffles and struts is
+   *  exactly where the groove's ghosts live). Nova chains and the donut's
+   *  one-two take EIGHT — the record's own real bar, so the big booms
+   *  keep the strongest landings there are. These volleys dominate the
    *  measured density, which is why the quota knobs alone couldn't buy
    *  the band back. All numbers are CHART beats (the record's eighths);
    *  only doubled charts ever read them, and ChoreoSystem's staged
    *  telegraph windows read the spacing off the landings themselves, so
    *  the gates follow whichever table built the move. */
   /* Tuned against the shelf's measured serve (ten seeds a record):
-   *  122–135 on EXPERT throws 0.57–0.64 landings/s (0.70–0.76 in the back
-   *  stretch) at 11–12.5 moves a minute; under this table every doubled
-   *  record measures 0.60–0.64 overall and 0.71–0.78 in the back stretch
-   *  at ~12 moves a minute — interleaved with the reference records
-   *  themselves. (The naive doubled chart threw 0.85–0.94; the first
-   *  retune chased 135–150 and still ran hot at 0.64–0.69 / 0.76–0.88.)
-   *  Only acts 3 and 4 are reachable (double time is EXPERT's); the lower
-   *  rows just keep the arrays' shape coherent. The shape of the serve:
-   *  rest 6 holds the front stretch to three-chart-bar gaps, rest 2 holds
-   *  the back to two, the quota stays at the floor, and the wide act-4
-   *  ceiling keeps the generator from backfilling the tail — the back
-   *  stretch keeps its heat in the cascades, not in extra bookings. */
+   *  110–117 on EXPERT throws 0.50–0.56 landings/s (0.60–0.67 in the back
+   *  stretch) at ~10.5 moves a minute — the target band for everything
+   *  below. Only acts 3 and 4 are reachable (double time is EXPERT's);
+   *  the lower rows just keep the arrays' shape coherent.
+   *
+   *  `chargeBeats` is the read table — the part the earlier passes left
+   *  on the doubled clock, which is why the shelf still FELT fast at the
+   *  right cadence: a beam was filling in under a second. Each charge is
+   *  the standard read × the clock ratio, so in seconds every telegraph
+   *  fills exactly as long as it does on a 112 record — and the MC's
+   *  wind-up, the charge drone and the telegraph windows all follow the
+   *  chart's own telegraphBeat rather than the standard table. */
   doubleTimePace: {
     movesPerPhrase: [2, 3, 3, 3, 3],
-    restBeats: [8, 8, 4, 6, 2],
-    maxSilentBeats: [16, 14, 12, 12, 14],
+    restBeats: [8, 8, 4, 5, 0],
+    maxSilentBeats: [16, 14, 12, 14, 14],
+    chargeBeats: {
+      beam: 5,
+      sweep: 7,
+      seesaw: 7,
+      surge: 7,
+      gate: 7,
+      nova: 8,
+      cross: 7,
+      donut: 7,
+      routine: 13,
+      duckdonut: 10,
+      wave: 5,
+    } as Record<MoveKind, number>,
     seesawGapBeats: [4, 4, 3, 3, 3],
-    routineStepBeats: 4,
-    twinReturnBeats: 6,
-    novaChainBeats: 6,
-    donutFollowBeats: 6,
+    waveStepBeats: [4, 4, 2, 2, 2],
+    waveTurnExtraBeats: 2,
+    routineStepBeats: 5,
+    routineDropBeats: 3,
+    twinReturnBeats: 7,
+    novaChainBeats: 8,
+    donutFollowBeats: 8,
   },
 };
 

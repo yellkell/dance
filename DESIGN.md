@@ -70,15 +70,14 @@ the record — a 91 BPM expert night used to throw half the landings per
 second of a 174 one, off a bar grid that walked past where those records'
 grooves actually live. Under 100 BPM the whole chart clock runs at 2×
 (grid on the eighths, landings on the real half-bars) — but the clock is
-for the GRID, not the pressure: the chart is served at the 122–135
-shelf's measured pace (fewer bookings per half-length phrase, rests
-counted in whole chart bars, cascades stretched to three real beats so
-every volley still lands on a beat). A doubled clock serving the
-standard tables threw half again more landings a second than that
-shelf — and a first retune aimed at 135–150 still ran hot on the floor;
-served at the visitor's pace, the slow shelf now measures interleaved
-with the mid shelf's own records. Expert only; the tour never reaches
-it.
+for the GRID alone. Everything the dancer experiences is converted back
+to the 110–117 shelf's real seconds: the charges (the part two earlier
+pace passes left on the doubled clock, which is why the shelf kept
+feeling fast at the right cadence), the cascades, the wave's march, the
+perfect window, the routine's bell — the sweet spot the floor asked for:
+perked up from 95, nowhere near ruined. Measured, the doubled shelf now
+sits at the soft edge of that shelf's own band. Expert only; the tour
+never reaches it.
 
 Getting HIT also knocks the rhythm out of your hands: the groove streak
 (the one-up-one-down hand combo and its tally) resets on every clip, so

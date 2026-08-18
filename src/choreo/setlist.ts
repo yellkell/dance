@@ -132,6 +132,15 @@ function pickKind(
   return pool[0]?.[0] ?? 'beam';
 }
 
+/** A move's read length on this chart: the standard table, or — on a
+ *  double-time chart — the visitor's charges, which convert the same read
+ *  into the doubled clock's beats so it fills over the same real seconds
+ *  a 110–117 record gives it. Exported for ChoreoSystem (the swept
+ *  routine's staggered blades run the sweep's own fuse). */
+export function chartChargeBeats(kind: MoveKind, doubleTime: boolean): number {
+  return doubleTime ? CHOREO.doubleTimePace.chargeBeats[kind] : MOVES[kind].chargeBeats;
+}
+
 /** THE BOUNCE's two odds, indexed by volley: [_, does it answer, does it
  *  come back across]. Volley 2 is a shove; volley 3 is the rally. From
  *  `twinAlwaysFromAct` up both are certainties, so a double laser on the
@@ -357,12 +366,14 @@ function buildLandings(
     // breather is the read), and the new exit is the far side where the
     // whole thing began. Across, and all the way back.
     const axis: 0 | 1 = rng() < 0.5 ? 1 : 0;
-    const step = CHOREO.waveStepBeats[Math.min(act, CHOREO.waveStepBeats.length - 1)];
+    const steps = doubleTime ? CHOREO.doubleTimePace.waveStepBeats : CHOREO.waveStepBeats;
+    const step = steps[Math.min(act, steps.length - 1)];
+    const turnExtra = doubleTime ? CHOREO.doubleTimePace.waveTurnExtraBeats : CHOREO.waveTurnExtraBeats;
     const stops = axis ? CHOREO.waveRailZ : CHOREO.waveLaneX;
     const ordered = rng() < 0.5 ? [...stops] : [...stops].reverse();
     const at: number[] = ordered.slice(0, -1); // out over three; exit = ordered[3]
     const beats: number[] = at.map((_, i) => landBeat + i * step);
-    const turnAt = beats[beats.length - 1] + step * 2 + CHOREO.waveTurnExtraBeats;
+    const turnAt = beats[beats.length - 1] + step * 2 + turnExtra;
     [ordered[3], ordered[2], ordered[1]].forEach((stop, i) => {
       at.push(stop);
       beats.push(turnAt + i * step);
@@ -586,7 +597,8 @@ export function parkOf(kind: MoveKind, landings: readonly Landing[], prev: Park)
  *  rolled will fit the room that's left. All three charge in at most one
  *  bar; keep the reservation beside the vocabulary. */
 const CLOSER_KINDS: readonly MoveKind[] = ['gate', 'beam', 'sweep'];
-const CLOSER_CHARGE_BEATS = Math.max(...CLOSER_KINDS.map((kind) => MOVES[kind].chargeBeats));
+const closerChargeBeats = (doubleTime: boolean): number =>
+  Math.max(...CLOSER_KINDS.map((kind) => chartChargeBeats(kind, doubleTime)));
 
 function buildAimed(
   landBeat: number,
@@ -693,7 +705,7 @@ export function generateSetlist(
     // ever felt, and the finale reads better arriving on the heels of the
     // move before it.
     const restHere = finalPhrase ? 0 : rest;
-    const moveEnd = finalPhrase ? phraseEnd - CLOSER_CHARGE_BEATS : phraseEnd;
+    const moveEnd = finalPhrase ? phraseEnd - closerChargeBeats(doubleTime) : phraseEnd;
     const ordinaryMoves = finalPhrase ? Math.max(0, want - 1) : want;
     // THE DEAD AIR CEILING: the quota is a FLOOR. While this phrase still
     // holds more than `maxSilent` beats of unclaimed music the loop keeps
@@ -704,7 +716,7 @@ export function generateSetlist(
 
     for (let m = 0; m < ordinaryMoves || moveEnd - cursor > maxSilent; m++) {
       let kind = pickKind(rng, act, last, banned);
-      let charge = MOVES[kind].chargeBeats;
+      let charge = chartChargeBeats(kind, doubleTime);
       // Land on the next bar downbeat that the telegraph fits in front of.
       let landBeat = Math.ceil((cursor + charge) / barBeats) * barBeats;
       let landings = buildLandings(kind, landBeat, act, rng, sweptRoutines, park, doubleTime);
@@ -720,7 +732,7 @@ export function generateSetlist(
         attempt++
       ) {
         kind = pickKind(rng, act, last, banned);
-        charge = MOVES[kind].chargeBeats;
+        charge = chartChargeBeats(kind, doubleTime);
         landBeat = Math.ceil((cursor + charge) / barBeats) * barBeats;
         landings = buildLandings(kind, landBeat, act, rng, sweptRoutines, park, doubleTime);
       }
@@ -732,14 +744,14 @@ export function generateSetlist(
         // impact, drawn from the closer's vocabulary, short enough to fit
         // any room a bar can hold and aimed through the park so it always
         // asks for a dodge. Only genuinely empty ground ends the phrase now.
-        const standBeat = Math.ceil((cursor + CLOSER_CHARGE_BEATS) / barBeats) * barBeats;
+        const standBeat = Math.ceil((cursor + closerChargeBeats(doubleTime)) / barBeats) * barBeats;
         if (standBeat > moveEnd) break;
         const stand = buildAimed(standBeat, act, banned, last, park, rng);
         if (!stand) break; // a record that bans the whole vocabulary
         moves.push({
           index: index++,
           kind: stand.kind,
-          telegraphBeat: standBeat - MOVES[stand.kind].chargeBeats,
+          telegraphBeat: standBeat - chartChargeBeats(stand.kind, doubleTime),
           landBeat: standBeat,
           landings: stand.landings,
           act,
@@ -768,7 +780,7 @@ export function generateSetlist(
       moves.push({
         index: index++,
         kind: closer.kind,
-        telegraphBeat: landBeat - MOVES[closer.kind].chargeBeats,
+        telegraphBeat: landBeat - chartChargeBeats(closer.kind, doubleTime),
         landBeat,
         landings: closer.landings,
         act,

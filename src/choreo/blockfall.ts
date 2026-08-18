@@ -89,9 +89,17 @@ export class RoutineBlockfall {
    * `seed`+ids keep every client's shapes/spins identical — the fall is
    * part of the show, and the show is deterministic.
    */
-  constructor(parent: Object3D, safeCorner: number, dueBeat: number, seed: number, moveIdx: number, step: number) {
+  constructor(
+    parent: Object3D,
+    safeCorner: number,
+    dueBeat: number,
+    seed: number,
+    moveIdx: number,
+    step: number,
+    dropBeats = CHOREO.routineDropBeats,
+  ) {
     this.due = dueBeat;
-    this.dropStart = dueBeat - CHOREO.routineDropBeats;
+    this.dropStart = dueBeat - dropBeats;
     this.root.visible = false;
     parent.add(this.root);
 
