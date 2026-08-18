@@ -16,7 +16,7 @@
  */
 
 import { createSystem } from '@iwsdk/core';
-import { BOTS, CHOREO, GRADE, MOVES, SCORE, type MoveKind } from '../config.js';
+import { BOTS, CHOREO, GRADE, MOVES, SCORE, chartBpm, type MoveKind } from '../config.js';
 import * as sfx from '../audio/sfx.js';
 import { trackById } from '../audio/tracks.js';
 import { platformRoot } from '../arena/arena.js';
@@ -344,7 +344,11 @@ export class ChoreoSystem extends createSystem({}) {
     // hold on an authored campaign night.
     const record = trackById(match.trackId);
     const banned = [...(record?.banned ?? []), ...(match.tour ? (record?.tourBanned ?? []) : [])];
-    this.setlist = generateSetlist(match.seed, match.phrases, banned, match.difficulty);
+    // Recomputed from the same shared inputs every client holds (track +
+    // difficulty), so a room's charts agree on the pace as surely as they
+    // agree on the seed.
+    const doubleTime = record !== undefined && chartBpm(record.bpm, match.difficulty) !== record.bpm;
+    this.setlist = generateSetlist(match.seed, match.phrases, banned, match.difficulty, doubleTime);
   }
 
   update(delta: number): void {
@@ -511,21 +515,32 @@ export class ChoreoSystem extends createSystem({}) {
         // one shape to read at a time, always. THE WAVE is the deliberate
         // exception: every stop telegraphs on its own staggered fuse, so
         // the deck reads as a march building 1-2-3-4.
+        //
+        // "As the last one goes off" is read from the MOVE ITSELF — the
+        // latest landing strictly before this one — rather than rebuilt
+        // from the pacing constants, so it stays true whichever table
+        // spaced the cascade (a double-time chart stretches these gaps;
+        // see CHOREO.doubleTimePace).
+        const prevFire = (beat: number): number => {
+          let best = -Infinity;
+          for (const l of move.landings) if (l.beat < beat && l.beat > best) best = l.beat;
+          return Number.isFinite(best) ? best : move.telegraphBeat;
+        };
         const tgStartBeat =
           move.kind === 'wave'
             ? landing.beat - MOVES.wave.chargeBeats
             : move.kind === 'routine' && landing.zone.kind === 'sweep'
               ? landing.beat - MOVES.sweep.chargeBeats // the swept routine: one blade per tick, staggered
               : landing.zone.kind === 'nova' && landingIdx > 0
-                ? landing.beat - CHOREO.novaChainBeats
+                ? prevFire(landing.beat)
                 : landing.zone.kind === 'donut' && landingIdx > 0
-                  ? landing.beat - CHOREO.donutFollowBeats
+                  ? prevFire(landing.beat)
                   : // THE TWIN'S RETURN (beam or crossfire): the answering pair
                     // holds off the floor until the first pair actually fires,
                     // so you never read four strips at once — one shape, the
                     // crossing, then the next shape.
                     (move.kind === 'beam' || move.kind === 'cross') && landing.beat > move.landBeat
-                    ? landing.beat - CHOREO.twinReturnBeats
+                    ? prevFire(landing.beat)
                     : move.telegraphBeat;
         // THE ROUTINE's danger is DOWN blocks descending from above — one
         // per doomed quarter, beat-locked so the landing is the downbeat.

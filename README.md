@@ -390,13 +390,18 @@ its real-time density used to scale with the record — at act 4 a 91 BPM
 night threw barely half the landings per second of BREAKCORE's 174, and
 its bar grid walked past where the slow shelf's grooves actually live
 (those records ride the eighths; V ONE's onsets sit on a literal 190
-lattice). So on EXPERT, any record **under 100 BPM charts at 2×**: the
-clock runs on the eighths, landings hit the real half-bars, and the
-91–98 shelf (TARGET, FUTURE VIBE, V ONE, MORNING, MONEY) plays at an
-effective 182–196 — the songs the difficulty was quietly under-charging
-are now the ones that bite hardest. Nothing announces it: the menus show
-each record's own measured tempo, because a badge beside the BPM explains
-an implementation to somebody picking a song, and the floor tells you
+lattice). So on EXPERT, any record **under 100 BPM runs its chart clock
+at 2×** — the grid rides the eighths, landings hit the real half-bars —
+but the clock doubles for the *grid's* sake only: the chart is **served
+at the 135–150 shelf's pace** (`CHOREO.doubleTimePace` — a doubled clock
+serving the standard tables threw a third more landings a second than
+any record in the box, and played like it). Measured across ten seeds a
+record, the 91–98 shelf (TARGET, FUTURE VIBE, V ONE, MORNING, MONEY) now
+serves 0.64–0.69 landings a second — 0.76–0.88 in the back stretch —
+squarely inside the 0.63–0.73 / 0.77–0.88 band the 135–155 records are
+loved at. Nothing announces it: the menus show each record's own
+measured tempo, because a badge beside the BPM explains an
+implementation to somebody picking a song, and the floor tells you
 anyway. The file itself plays untouched — only the grid the game counts
 on changes. No other difficulty is touched, and the tour never reaches
 EXPERT, so no authored night moves.

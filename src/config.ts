@@ -496,6 +496,50 @@ export const CHOREO = {
    *  runs a little longer — the next phrase's opening telegraph still has to
    *  clear its own downbeat. Three bars here reads as about four out there. */
   maxSilentBeats: [12, 10, 8, 8, 8],
+  /** THE VISITOR'S PACE — how a DOUBLE-TIME chart is served. EXPERT runs a
+   *  slow record on a doubled clock so landings sit where its groove
+   *  actually lives (DIFFICULTY.doubleTimeBelowBpm) — but the doubled clock
+   *  serving the STANDARD tables threw ~0.9 landings a second, a third
+   *  past the 135–155 shelf's measured 0.63–0.73, and that shelf is the
+   *  feel expert is loved at. So a doubled chart keeps the grid and
+   *  borrows the fast shelf's service: a smaller quota for its half-length
+   *  phrases, rests that mix one- and two-bar gaps instead of hammering
+   *  every bar, a roomier dead-air ceiling, and the two cascade gaps that
+   *  aren't nailed to the bar line (seesaw floods, routine steps)
+   *  stretched back to the seconds the fast shelf serves them at.
+   *
+   *  The bar-locked cascades — twin returns, nova chains, the donut's
+   *  one-two — stretch too, from a chart bar to SIX chart beats: on a
+   *  doubled grid that is three REAL beats, so every volley still lands
+   *  on a beat of the record (the seesaw's license, one rung below the
+   *  bar), and a rally runs at the fast shelf's ~1.9 s per answer
+   *  instead of hammering every half-bar. These volleys dominate the
+   *  measured density, which is why the quota knobs alone couldn't buy
+   *  the band back. All numbers are CHART beats (the record's eighths);
+   *  only doubled charts ever read them, and ChoreoSystem's staged
+   *  telegraph windows read the spacing off the landings themselves, so
+   *  the gates follow whichever table built the move. */
+  /* Tuned against the shelf's measured serve (ten seeds a record):
+   *  135–155 on EXPERT throws 0.63–0.73 landings/s (0.77–0.88 in the back
+   *  stretch) at ~12 moves a minute; under this table every doubled record
+   *  measures 0.64–0.69 overall and 0.76–0.88 in the back stretch at
+   *  ~13 moves a minute. The naive doubled chart threw 0.85–0.94.
+   *  Only acts 3 and 4 are reachable (double time is EXPERT's); the lower
+   *  rows just keep the arrays' shape coherent. The odd rests are the
+   *  tuning that matters: on a bar-quantized grid a rest of 5 mixes two-
+   *  and three-bar gaps through the front stretch, and a rest of 1 mixes
+   *  one- and two-bar gaps through the back — the blend is what averages
+   *  out to the fast shelf's spacing between two legal bar lines. */
+  doubleTimePace: {
+    movesPerPhrase: [2, 3, 3, 3, 4],
+    restBeats: [8, 8, 4, 5, 1],
+    maxSilentBeats: [16, 14, 12, 12, 10],
+    seesawGapBeats: [4, 4, 3, 3, 3],
+    routineStepBeats: 4,
+    twinReturnBeats: 6,
+    novaChainBeats: 6,
+    donutFollowBeats: 6,
+  },
 };
 
 /**
@@ -526,12 +570,14 @@ export const DIFFICULTY = {
    *  right past where those records' grooves actually live (the slow shelf
    *  is shuffles and struts whose onsets ride the eighths — V ONE's sit on
    *  a literal 190 lattice). So on EXPERT, a record under this tempo runs
-   *  its whole chart clock at 2×: the grid rides the eighths, landings hit
-   *  the real half-bars (the 1 and the 3), and the 91–98 shelf charts at
-   *  182–196 — a shade past BREAKCORE's 174, which is fair: these are the
-   *  records the difficulty was quietly under-charging. The catalog's gap
-   *  between 98 and 110 makes 100 a robust line, and EXPERT is unreachable
-   *  on the tour, so no authored night changes feel.
+   *  its whole chart clock at 2×: the grid rides the eighths and landings
+   *  hit the real half-bars (the 1 and the 3). The CLOCK doubles for the
+   *  grid's sake only — the chart is SERVED at the fast shelf's measured
+   *  pace (CHOREO.doubleTimePace), because a doubled clock serving the
+   *  standard tables charted 182–196 and played like it, a third past any
+   *  record the difficulty ships. The catalog's gap between 98 and 110
+   *  makes 100 a robust line, and EXPERT is unreachable on the tour, so
+   *  no authored night changes feel.
    *
    *  Deliberately UNANNOUNCED. The menus wear the record's own measured
    *  tempo and nothing else: a "×2" badge beside the BPM explained an
