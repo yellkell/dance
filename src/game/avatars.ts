@@ -587,8 +587,10 @@ export function buildDancer(hue: number): DancerRig {
   collar.scale.set(TORSO_X, TORSO_Z, 1);
   belt.scale.set(TORSO_X, TORSO_Z, 1);
   root.add(collar, choker, belt);
-  const clavL = detail(seg(0.015, 0.021, suit));
-  const clavR = detail(seg(0.015, 0.021, suit));
+  // Slim bones, fat end buried in the chest: at 0.021 the notch end rose
+  // over the collar ring and chopped its front arc into bright/dark stripes.
+  const clavL = detail(seg(0.014, 0.016, suit));
+  const clavR = detail(seg(0.014, 0.016, suit));
   root.add(clavL, clavR);
   const capL = M(sphereGeo(8), lit);
   const capR = M(sphereGeo(8), lit);
@@ -656,6 +658,18 @@ export function buildDancer(hue: number): DancerRig {
   };
   const legL = mkLeg();
   const legR = mkLeg();
+  // Hip balls — the shoulder caps' trick at the other end of the torso.
+  // The thighs root at HIP_W, outside the basque hem, and a bare capsule
+  // top out there reads as a leg HUNG on the body rather than joined to
+  // it. A ball at each hip point sockets the thigh whatever the leg is
+  // doing, and its upper-inner quarter merges into the basque flare so
+  // skirt -> hip -> thigh is one continuous line. Suit-coloured like the
+  // knee: it belongs to the leg chain, not the lit midriff.
+  const hipCapL = M(sphereGeo(8), suit);
+  const hipCapR = M(sphereGeo(8), suit);
+  hipCapL.scale.set(0.052, 0.046, 0.052);
+  hipCapR.scale.set(0.052, 0.046, 0.052);
+  root.add(hipCapL, hipCapR);
 
   /* ── boots: shaft + raked toe + chunky heel on a neon sole ── */
   const mkBoot = (): Group => {
@@ -837,8 +851,12 @@ export function buildDancer(hue: number): DancerRig {
     belt.quaternion.copy(basque.quaternion).multiply(X90);
 
     // Clavicle V from the sternum notch out to each shoulder; caps pin the
-    // arms to the torso at any pose angle.
-    _c.set(_b.x - sin * 0.045, shY - 0.02, _b.z - cos * 0.045);
+    // arms to the torso at any pose angle. The notch sits LOW — a real
+    // sternal notch is a few centimetres under the shoulder line — so the
+    // bars rise to the shoulders entirely beneath the collar ring instead
+    // of sawing through its front arc, and the V points at the sternum
+    // seam it nearly touches.
+    _c.set(_b.x - sin * 0.042, shY - 0.044, _b.z - cos * 0.042);
     align(clavL, _c, shoulderL);
     align(clavR, _c, shoulderR);
     capL.position.copy(shoulderL);
@@ -868,6 +886,9 @@ export function buildDancer(hue: number): DancerRig {
       const boot = side < 0 ? bootL : bootR;
       boot.position.copy(_tip);
       boot.rotation.y = p.yaw;
+      const hipCap = side < 0 ? hipCapL : hipCapR;
+      hipCap.position.copy(hip);
+      hipCap.rotation.y = p.yaw; // squashed spheres have a front
     }
   };
 
