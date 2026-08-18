@@ -12,7 +12,8 @@
  *   identically, the remote humans by their own report (never guessed here).
  *
  * Also owns the score/combo/miss-chain bookkeeping and the end of the set
- * (song out, or one dancer left standing).
+ * (song out; or one dancer left standing, which decides a tour night or a
+ * club ring but never cuts a solo record short).
  */
 
 import { createSystem } from '@iwsdk/core';
@@ -466,7 +467,17 @@ export class ChoreoSystem extends createSystem({}) {
       // flair finish, then the result arrives — never two bars of empty
       // groove after an ending that has already happened.
       const songOver = beat >= setEndBeat() + barBeats();
-      const floorCleared = match.seats > 1 && aliveCount() <= 1 && beat > 0;
+      // THE FLOOR CLEARED — last dancer standing, so the night is decided.
+      // It ends the record on THE TOUR and on a club ring, where outlasting
+      // the room IS the win and everyone is waiting on the result.
+      //
+      // SOLO FREE PLAY is the exception: you went to the shelf and picked
+      // that record to dance it, and the groupies falling early is their
+      // business, not a reason to take the rest of your song away — with it
+      // went the back half of the chart, the last stretch of your grade and
+      // any run at the board. The set plays out; you dance it alone.
+      const decided = match.online || match.tour !== null;
+      const floorCleared = decided && match.seats > 1 && aliveCount() <= 1 && beat > 0;
       // GAME OVER: the chain took you out. On your own that's the end of
       // the record — go and read the letter, don't watch bots finish it.
       // With friends on the ring the set plays on and you spectate: their

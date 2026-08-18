@@ -96,7 +96,12 @@ just guarantees the chart itself never contains a "stand still and win"
 step. The nova parks you somewhere unknowable (its wedge rotates per
 seat), so the move after a nova is unconstrained.
 
-Ends at the final downbeat — or the moment one dancer remains.
+Ends at the final downbeat — or, on THE TOUR and on a club ring, the
+moment one dancer remains: outlasting the room is the win there, and
+nobody should be kept waiting once it's decided. SOLO FREE PLAY always
+dances the whole record: you picked that song off the shelf, and the
+groupies falling early is their business, not a reason to lose the back
+half of your chart, your grade and your run at the board.
 
 ## Scoring
 
