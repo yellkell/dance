@@ -36,7 +36,7 @@ import {
   sweepTelegraph,
   type Telegraph,
 } from '../choreo/telegraphs.js';
-import { generateSetlist, type SetMove, type Zone } from '../choreo/setlist.js';
+import { chartChargeBeats, generateSetlist, type SetMove, type Zone } from '../choreo/setlist.js';
 import { grooveView } from './PlayerSystem.js';
 import { finishRaid } from '../game/flow.js';
 import { roll } from '../game/rng.js';
@@ -164,6 +164,10 @@ export class ChoreoSystem extends createSystem({}) {
   private cuedSteps = new Set<string>();
   private cuedTicks = new Set<string>();
   private ended = false;
+  /** Is this chart running EXPERT double time? Decides which pace tables
+   *  the windows below read (set in rebuild, from the same shared inputs
+   *  every client holds). */
+  private doubleTime = false;
 
   init(): void {
     this.strikesRoot();
@@ -348,8 +352,8 @@ export class ChoreoSystem extends createSystem({}) {
     // Recomputed from the same shared inputs every client holds (track +
     // difficulty), so a room's charts agree on the pace as surely as they
     // agree on the seed.
-    const doubleTime = record !== undefined && chartBpm(record.bpm, match.difficulty) !== record.bpm;
-    this.setlist = generateSetlist(match.seed, match.phrases, banned, match.difficulty, doubleTime);
+    this.doubleTime = record !== undefined && chartBpm(record.bpm, match.difficulty) !== record.bpm;
+    this.setlist = generateSetlist(match.seed, match.phrases, banned, match.difficulty, this.doubleTime);
   }
 
   update(delta: number): void {
@@ -403,10 +407,11 @@ export class ChoreoSystem extends createSystem({}) {
     // — every later landing gets its own quick strike cued a couple of beats
     // out, so the boss's body telegraphs the WHOLE cascade, not just its
     // opening. (Keyed per landing, not per seat — one giant, one swing.)
+    const beatScale = this.doubleTime ? 2 : 1; // windows in the RECORD's beats
     for (const z of this.zones) {
       if (z.resolved || z.landingIdx === 0) continue;
       const lead = z.dueBeat - beat;
-      if (lead > 2 || lead <= 0) continue;
+      if (lead > 2 * beatScale || lead <= 0) continue;
       const key = `${z.moveIdx}:${z.landingIdx}`;
       if (this.cuedSteps.has(key)) continue;
       this.cuedSteps.add(key);
@@ -418,7 +423,7 @@ export class ChoreoSystem extends createSystem({}) {
     // cue there is, so it fires for the whole ring at once (one landing,
     // one call) regardless of how many decks are still dancing.
     for (const z of this.zones) {
-      if (z.resolved || z.zone.kind !== 'quad' || beat < z.dueBeat - 1) continue;
+      if (z.resolved || z.zone.kind !== 'quad' || beat < z.dueBeat - beatScale) continue;
       const key = `${z.moveIdx}:${z.landingIdx}`;
       if (this.cuedTicks.has(key)) continue;
       this.cuedTicks.add(key);
@@ -441,8 +446,12 @@ export class ChoreoSystem extends createSystem({}) {
         // at once reads as noise, two reads as "THIS side now, THAT next".
         if (z.zone.kind === 'half') z.tg.group.visible = z.dueBeat - beat < 4.2;
       }
-      // The perfect probe: were you still in the fire one beat out?
-      if (!z.probed && z.seat === match.mySeat && beat >= z.dueBeat - SCORE.perfectProbeBeats) {
+      // The perfect probe: were you still in the fire one beat out? "One
+      // beat" means one beat OF THE RECORD — on a doubled grid that is
+      // two chart beats, or a slow song's perfects would need twice the
+      // reflexes of a fast one's.
+      const probeBeats = this.doubleTime ? SCORE.perfectProbeBeats * 2 : SCORE.perfectProbeBeats;
+      if (!z.probed && z.seat === match.mySeat && beat >= z.dueBeat - probeBeats) {
         z.probed = true;
         z.wasInside = this.touchesLocal(z);
       }
@@ -497,13 +506,18 @@ export class ChoreoSystem extends createSystem({}) {
    *  the GOOPLIATH's wind-up gesture on the stage. */
   private begin(move: SetMove): void {
     const first = move.landings[0];
+    // The wind-up is whatever the CHART says it is — a double-time move
+    // stretches its read (see doubleTimePace.chargeBeats), and the MC's
+    // gesture and the charge drone must span that same window, so both
+    // are read off the move rather than the standard table.
+    const chargeBeats = move.landBeat - move.telegraphBeat;
     match.gestures.push({
       kind: move.kind,
-      chargeBeats: MOVES[move.kind].chargeBeats,
+      chargeBeats,
       ...(first ? cueDirection(move.kind, first.zone, move.index, 0) : {}),
       dueBeat: first?.beat,
     });
-    sfx.gooCharge(MOVES[move.kind].chargeBeats * match.beatLen * 0.9);
+    sfx.gooCharge(chargeBeats * match.beatLen * 0.9);
 
     for (const dancer of match.players) {
       if (!dancer.alive) continue;
@@ -539,9 +553,9 @@ export class ChoreoSystem extends createSystem({}) {
         };
         const tgStartBeat =
           move.kind === 'wave'
-            ? landing.beat - MOVES.wave.chargeBeats
+            ? landing.beat - chargeBeats // each stop runs the wave's own fuse, staggered
             : move.kind === 'routine' && landing.zone.kind === 'sweep'
-              ? landing.beat - MOVES.sweep.chargeBeats // the swept routine: one blade per tick, staggered
+              ? landing.beat - chartChargeBeats('sweep', this.doubleTime) // the swept routine: one blade per tick, staggered
               : landing.zone.kind === 'nova' && landingIdx > 0
                 ? prevFire(landing.beat)
                 : landing.zone.kind === 'donut' && landingIdx > 0
@@ -559,7 +573,15 @@ export class ChoreoSystem extends createSystem({}) {
         // the far ring reads its quarter marks and skips the masonry.
         const blocks =
           landing.zone.kind === 'quad' && near
-            ? new RoutineBlockfall(parent, landing.zone.corner, landing.beat, match.seed, move.index, landing.zone.step)
+            ? new RoutineBlockfall(
+                parent,
+                landing.zone.corner,
+                landing.beat,
+                match.seed,
+                move.index,
+                landing.zone.step,
+                this.doubleTime ? CHOREO.doubleTimePace.routineDropBeats : CHOREO.routineDropBeats,
+              )
             : undefined;
         this.zones.push({
           moveIdx: move.index,
@@ -761,7 +783,7 @@ export class ChoreoSystem extends createSystem({}) {
           sfx.floodCrash();
           break;
         case 'gate':
-          sfx.slamImpact();
+          sfx.gateSlam();
           break;
         case 'nova':
           sfx.novaBoom();

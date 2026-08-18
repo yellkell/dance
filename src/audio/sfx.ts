@@ -914,6 +914,21 @@ export function gooSlam(): void {
   tone({ freq: 140, to: 44, type: 'sine', dur: 0.22, gain: 0.22, delay: 0.005 }); // low thud
 }
 
+/** THE GATE slamming shut — the whole deck flooding at once EXCEPT the
+ *  gap. It used to borrow slamImpact, the boxing titan's metal fist — the
+ *  one landing whose sound spoke a different language from its own visual
+ *  (walls of goo-light). Now it's the flood family's biggest voice: two
+ *  wave fronts breaking together, deeper and wider than the seesaw's
+ *  half-flood, with the DOORWAY itself singing through it — a thin bright
+ *  column of air where the gap stands. */
+export function gateSlam(): void {
+  whooshNoise(0.4, 0.3, 200, 1300); // the near wall arriving
+  whooshNoise(0.4, 0.24, 260, 1500, 0.03); // the far wall a breath behind
+  noiseHit(0.3, 0.36, 800, 80, 2.4); // both fronts breaking at once
+  tone({ freq: 62, to: 26, type: 'sine', dur: 0.5, gain: 0.36 }); // the deck answering
+  tone({ freq: 1180, to: 880, type: 'sine', dur: 0.28, gain: 0.05, delay: 0.05 }); // the gap, singing
+}
+
 /** Half the deck flooding at once — a wave front breaking over the line.
  *  (Seesaw and surge landings: they used to borrow the slam's thud.) */
 export function floodCrash(): void {
