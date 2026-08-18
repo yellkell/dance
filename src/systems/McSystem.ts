@@ -102,6 +102,10 @@ export class McSystem extends createSystem({}) {
       this.baseColor = hueToColor(MC.hue, 0.6);
       this.scene.add(this.rig.root);
     }
+    // A fresh night starts from the neutral stance — an eased pose is state,
+    // and state carried across generations carries its accidents with it.
+    this.pose = freshPose();
+    this.tgt = freshPose();
     this.mime = null;
     this.warn = 0;
     this.eaten = false;
@@ -160,8 +164,11 @@ export class McSystem extends createSystem({}) {
     this.scale += (wantScale - this.scale) * Math.min(1, delta * 6);
     rig.root.scale.setScalar(this.scale);
 
+    // The house clock never stops — the green room grooves on it, and it
+    // covers the stage's dead air (see the guard below).
+    this.menuClock += delta;
+
     if (menuRoom) {
-      this.menuClock += delta;
       this.eaten = false;
       this.mime = null;
       // Foyer: beside the board, the live-service hero. Club floor open
@@ -229,7 +236,14 @@ export class McSystem extends createSystem({}) {
       // The groove pumps to the RECORD — on a double-time chart the raw
       // beat runs the record's eighths, and a DJ pumping his arms at 190
       // over a 95 BPM strut looked exactly as wrong as it sounds.
-      this.idleGroove(showBeat());
+      //
+      // And NEVER to dead air: between startRaid and the record cueing,
+      // match.beat is −Infinity, and sin(−Infinity) is NaN. One such frame
+      // used to poison the eased pose PERMANENTLY — cos(NaN) took the
+      // shoulders, the shoulders took every limb, and easeTo can never
+      // recover (c += (NaN − c)·k is NaN forever) — so the DJ played every
+      // MC night invisible. Pre-cue he grooves on the house clock instead.
+      this.idleGroove(Number.isFinite(match.beat) ? showBeat() : this.menuClock * 1.9);
     }
 
     // WARN burn while charging, seat-cyan otherwise.
