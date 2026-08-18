@@ -97,6 +97,10 @@ export interface MatchState {
    *  choice. */
   difficulty: number;
   bpm: number;
+  /** Is this chart running EXPERT DOUBLE TIME? match.bpm is then 2× the
+   *  record and match.beat counts the record's eighths. The danger keeps
+   *  that clock; the SHOW dances to showBeat() below. */
+  doubleTime: boolean;
   /** Total phrases in the current set — derived from the track's length. */
   phrases: number;
   /** Online only: AudioContext-clock time for beat 0 handed down by the
@@ -180,6 +184,7 @@ export const match: MatchState = {
   preferredTrack: '',
   difficulty: 1,
   bpm: MUSIC.fallbackBpm,
+  doubleTime: false,
   phrases: 8,
   beatZeroAt: NaN,
   players: [],
@@ -298,6 +303,18 @@ export function gradeOf(d: Dancer): string {
 export function dodgeRate(d: Dancer): number {
   const faced = d.dodges + d.hits;
   return faced === 0 ? 0 : d.dodges / faced;
+}
+
+/** The beat of the RECORD itself — the clock the SHOW dances to. On an
+ *  EXPERT double-time chart, match.beat runs at 2× the record (the chart
+ *  grid rides the eighths) and the danger keeps that clock — but the MC's
+ *  groove, the groupies' bob, the light rig, the count-in card and the
+ *  player's own groove judge all pump to the record's real pulse, or a
+ *  95 BPM strut would get a 190 BPM show and a DJ with a fork in a
+ *  socket. Continuous, and negative through the count-in, exactly like
+ *  match.beat. */
+export function showBeat(): number {
+  return match.doubleTime ? match.beat / 2 : match.beat;
 }
 
 export function pushFlair(text: string, tone: Flair['tone']): void {

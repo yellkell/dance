@@ -17,7 +17,7 @@
  */
 
 import { createSystem } from '@iwsdk/core';
-import { BOTS, CHOREO, GRADE, MOVES, SCORE, chartBpm, type MoveKind } from '../config.js';
+import { BOTS, CHOREO, GRADE, MOVES, SCORE, type MoveKind } from '../config.js';
 import * as sfx from '../audio/sfx.js';
 import { trackById } from '../audio/tracks.js';
 import { platformRoot } from '../arena/arena.js';
@@ -349,10 +349,10 @@ export class ChoreoSystem extends createSystem({}) {
     // hold on an authored campaign night.
     const record = trackById(match.trackId);
     const banned = [...(record?.banned ?? []), ...(match.tour ? (record?.tourBanned ?? []) : [])];
-    // Recomputed from the same shared inputs every client holds (track +
-    // difficulty), so a room's charts agree on the pace as surely as they
-    // agree on the seed.
-    this.doubleTime = record !== undefined && chartBpm(record.bpm, match.difficulty) !== record.bpm;
+    // mountTrack settled the chart's clock (and match.doubleTime with it)
+    // from the same shared inputs every client holds, so a room's charts
+    // agree on the pace as surely as they agree on the seed.
+    this.doubleTime = match.doubleTime;
     this.setlist = generateSetlist(match.seed, match.phrases, banned, match.difficulty, this.doubleTime);
   }
 

@@ -48,7 +48,7 @@ import {
 import { CHOREO, GROOVE, hueToColor } from '../config.js';
 import { glintTexture, glowSprite } from '../materials/glow.js';
 import { danceHue } from '../game/profile.js';
-import { match, me } from '../game/state.js';
+import { match, me, showBeat } from '../game/state.js';
 import { net } from '../net/session.js';
 
 const _head = new Vector3();
@@ -467,9 +467,14 @@ export class PlayerSystem extends createSystem({}) {
     // doesn't machine-gun fake swaps.
     const diff = ly - ry;
     const side = diff > GROOVE.split ? 1 : diff < -GROOVE.split ? -1 : 0;
+    // The groove is "dance like the groupies", and the groupies dance to
+    // the RECORD — so its windows count the record's beats (showBeat). On
+    // a doubled chart the raw clock would demand a swap every 0.8 s to
+    // hold the streak of a 95 BPM strut, twice the dance the song asks.
+    const gb = showBeat();
     if (side === 0 || side === this.grooveSide) {
       // Held too long without a swap → the groove lets go, tally and all.
-      if (this.streak > 0 && match.beat - this.lastFlipBeat > GROOVE.maxBeats) {
+      if (this.streak > 0 && gb - this.lastFlipBeat > GROOVE.maxBeats) {
         this.streak = 0;
         match.grooveStreak = 0;
         match.grooveScore = 0;
@@ -484,16 +489,16 @@ export class PlayerSystem extends createSystem({}) {
     // dancing on the beat earns, and no more.
     const first = this.grooveSide === 0;
     this.grooveSide = side;
-    this.lastFlipBeat = match.beat;
+    this.lastFlipBeat = gb;
     if (first) {
-      this.lastRewardBeat = match.beat; // the opening pose sets the metronome
+      this.lastRewardBeat = gb; // the opening pose sets the metronome
       return;
     }
 
-    const paidGap = match.beat - this.lastRewardBeat;
+    const paidGap = gb - this.lastRewardBeat;
     if (paidGap < GROOVE.minBeats) return; // faster than the music — absorbed
 
-    this.lastRewardBeat = match.beat;
+    this.lastRewardBeat = gb;
     this.streak = Math.min(GROOVE.streakCap, this.streak + 1);
     // The counter runs to 999; the payout curve flattens at payCap.
     const award = Math.round(GROOVE.base + Math.min(this.streak, GROOVE.payCap) * GROOVE.perStreak);

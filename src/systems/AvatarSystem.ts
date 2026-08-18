@@ -26,7 +26,7 @@ import type { Zone } from '../choreo/setlist.js';
 import { buildDancer, type DancerPose, type DancerRig } from '../game/avatars.js';
 import { roll } from '../game/rng.js';
 import { seatBearing, seatIsNear } from '../game/ring.js';
-import { liveSpots, match, type Dancer } from '../game/state.js';
+import { liveSpots, match, type Dancer, showBeat } from '../game/state.js';
 import { remotePoses } from '../net/poses.js';
 
 
@@ -90,7 +90,10 @@ export class AvatarSystem extends createSystem({}) {
 
   update(delta: number): void {
     if (this.generation !== match.generation) this.rebuild();
-    const beat = Number.isFinite(match.beat) ? match.beat : 0;
+    // The groupies DANCE to the record (showBeat), whatever clock the
+    // danger runs — a doubled chart had them bobbing at 190 on a 95 BPM
+    // strut. Their dodge targets still come from the zones' chart beats.
+    const beat = Number.isFinite(match.beat) ? showBeat() : 0;
 
     for (const p of this.puppets) {
       const d = match.players.find((x) => x.seat === p.seat);

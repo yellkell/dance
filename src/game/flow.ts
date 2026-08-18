@@ -34,6 +34,7 @@ function mountTrack(track: Track): void {
   const bpm = chartBpm(track.bpm, match.difficulty);
   match.trackId = track.id;
   match.bpm = bpm;
+  match.doubleTime = bpm !== track.bpm;
   match.beatLen = 60 / bpm;
   match.phrases = trackPhrases(track, countInBeatsFor(bpm), phraseBeats, bpm);
   match.grooveStreak = 0;
@@ -160,6 +161,7 @@ export function toTour(): void {
   match.screen = 'tour';
   match.playing = false;
   match.beat = -Infinity;
+  match.doubleTime = false; // the foyer's records run their own clocks
   restorePickedDifficulty();
   match.generation++;
 }
@@ -169,6 +171,7 @@ export function toLobby(): void {
   match.screen = 'lobby';
   match.playing = false;
   match.beat = -Infinity;
+  match.doubleTime = false; // the house records run their own clocks
   match.tour = null;
   match.credits = false; // walking out to the foyer ends the roll
   restorePickedDifficulty();

@@ -42,7 +42,7 @@ import { MC, RING, hueToColor, ringRadius } from '../config.js';
 import { arena } from '../arena/arena.js';
 import { CLUB as CLUB_LAYOUT } from '../club/config.js';
 import { ACCENT_REST, buildDancer, type DancerPose, type DancerRig } from '../game/avatars.js';
-import { match, type GestureCue } from '../game/state.js';
+import { match, type GestureCue, showBeat } from '../game/state.js';
 import { net } from '../net/session.js';
 
 /** The eat window (song beats, negative = count-in) — mirrors GoopliathSystem. */
@@ -226,7 +226,10 @@ export class McSystem extends createSystem({}) {
       striking = beat > this.mime.dueBeat - 0.9;
       this.performMime(this.mime, beat);
     } else {
-      this.idleGroove(beat);
+      // The groove pumps to the RECORD — on a double-time chart the raw
+      // beat runs the record's eighths, and a DJ pumping his arms at 190
+      // over a 95 BPM strut looked exactly as wrong as it sounds.
+      this.idleGroove(showBeat());
     }
 
     // WARN burn while charging, seat-cyan otherwise.
