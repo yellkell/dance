@@ -397,13 +397,14 @@ its bar grid walked past where the slow shelf's grooves actually live
 lattice). So on EXPERT, any record **under 100 BPM runs its chart clock
 at 2×** — the grid rides the eighths, landings hit the real half-bars —
 but the clock doubles for the *grid's* sake only: the chart is **served
-at the 135–150 shelf's pace** (`CHOREO.doubleTimePace` — a doubled clock
-serving the standard tables threw a third more landings a second than
-any record in the box, and played like it). Measured across ten seeds a
-record, the 91–98 shelf (TARGET, FUTURE VIBE, V ONE, MORNING, MONEY) now
-serves 0.64–0.69 landings a second — 0.76–0.88 in the back stretch —
-squarely inside the 0.63–0.73 / 0.77–0.88 band the 135–155 records are
-loved at. Nothing announces it: the menus show each record's own
+at the 122–135 shelf's pace** (`CHOREO.doubleTimePace` — a doubled clock
+serving the standard tables threw half again more landings a second than
+that shelf, and a first retune that chased 135–150 still ran hot on the
+floor). Measured across ten seeds a record, the 91–98 shelf (TARGET,
+FUTURE VIBE, V ONE, MORNING, MONEY) now serves 0.60–0.64 landings a
+second — 0.71–0.78 in the back stretch — interleaved with the 0.57–0.64
+/ 0.70–0.76 band FUSION, ASSEMBLE, SAKUPENED and COMBAT actually measure
+at. Nothing announces it: the menus show each record's own
 measured tempo, because a badge beside the BPM explains an
 implementation to somebody picking a song, and the floor tells you
 anyway. The file itself plays untouched — only the grid the game counts

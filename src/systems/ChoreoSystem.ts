@@ -843,7 +843,10 @@ export class ChoreoSystem extends createSystem({}) {
 
     if (d.kind === 'local' && perfect) {
       pushFlair('PERFECT!', 'perfect');
-      sfx.glassClink();
+      // Its own chime — all tone, rising. The glass clink it used to
+      // borrow from the bar is a struck plate, and beside the landing's
+      // crash it read as being clipped, not as skimming the fire.
+      sfx.perfectChime();
     }
     void mult;
   }

@@ -499,20 +499,21 @@ export const CHOREO = {
   /** THE VISITOR'S PACE — how a DOUBLE-TIME chart is served. EXPERT runs a
    *  slow record on a doubled clock so landings sit where its groove
    *  actually lives (DIFFICULTY.doubleTimeBelowBpm) — but the doubled clock
-   *  serving the STANDARD tables threw ~0.9 landings a second, a third
-   *  past the 135–155 shelf's measured 0.63–0.73, and that shelf is the
-   *  feel expert is loved at. So a doubled chart keeps the grid and
-   *  borrows the fast shelf's service: a smaller quota for its half-length
-   *  phrases, rests that mix one- and two-bar gaps instead of hammering
-   *  every bar, a roomier dead-air ceiling, and the two cascade gaps that
-   *  aren't nailed to the bar line (seesaw floods, routine steps)
-   *  stretched back to the seconds the fast shelf serves them at.
+   *  serving the STANDARD tables threw ~0.9 landings a second, half again
+   *  the 122–135 shelf's measured 0.57–0.64, and that mid shelf is the
+   *  pocket these charts should live in (the first pass aimed at 135–150
+   *  and still ran hot on the floor). So a doubled chart keeps the grid
+   *  and borrows the mid shelf's service: a smaller quota for its
+   *  half-length phrases, rests counted in whole chart bars, a roomier
+   *  dead-air ceiling, and the two cascade gaps that aren't nailed to the
+   *  bar line (seesaw floods, routine steps) stretched back to the
+   *  seconds that shelf serves them at.
    *
    *  The bar-locked cascades — twin returns, nova chains, the donut's
    *  one-two — stretch too, from a chart bar to SIX chart beats: on a
    *  doubled grid that is three REAL beats, so every volley still lands
    *  on a beat of the record (the seesaw's license, one rung below the
-   *  bar), and a rally runs at the fast shelf's ~1.9 s per answer
+   *  bar), and a rally runs at the mid shelf's ~1.9 s per answer
    *  instead of hammering every half-bar. These volleys dominate the
    *  measured density, which is why the quota knobs alone couldn't buy
    *  the band back. All numbers are CHART beats (the record's eighths);
@@ -520,20 +521,22 @@ export const CHOREO = {
    *  telegraph windows read the spacing off the landings themselves, so
    *  the gates follow whichever table built the move. */
   /* Tuned against the shelf's measured serve (ten seeds a record):
-   *  135–155 on EXPERT throws 0.63–0.73 landings/s (0.77–0.88 in the back
-   *  stretch) at ~12 moves a minute; under this table every doubled record
-   *  measures 0.64–0.69 overall and 0.76–0.88 in the back stretch at
-   *  ~13 moves a minute. The naive doubled chart threw 0.85–0.94.
+   *  122–135 on EXPERT throws 0.57–0.64 landings/s (0.70–0.76 in the back
+   *  stretch) at 11–12.5 moves a minute; under this table every doubled
+   *  record measures 0.60–0.64 overall and 0.71–0.78 in the back stretch
+   *  at ~12 moves a minute — interleaved with the reference records
+   *  themselves. (The naive doubled chart threw 0.85–0.94; the first
+   *  retune chased 135–150 and still ran hot at 0.64–0.69 / 0.76–0.88.)
    *  Only acts 3 and 4 are reachable (double time is EXPERT's); the lower
-   *  rows just keep the arrays' shape coherent. The odd rests are the
-   *  tuning that matters: on a bar-quantized grid a rest of 5 mixes two-
-   *  and three-bar gaps through the front stretch, and a rest of 1 mixes
-   *  one- and two-bar gaps through the back — the blend is what averages
-   *  out to the fast shelf's spacing between two legal bar lines. */
+   *  rows just keep the arrays' shape coherent. The shape of the serve:
+   *  rest 6 holds the front stretch to three-chart-bar gaps, rest 2 holds
+   *  the back to two, the quota stays at the floor, and the wide act-4
+   *  ceiling keeps the generator from backfilling the tail — the back
+   *  stretch keeps its heat in the cascades, not in extra bookings. */
   doubleTimePace: {
-    movesPerPhrase: [2, 3, 3, 3, 4],
-    restBeats: [8, 8, 4, 5, 1],
-    maxSilentBeats: [16, 14, 12, 12, 10],
+    movesPerPhrase: [2, 3, 3, 3, 3],
+    restBeats: [8, 8, 4, 6, 2],
+    maxSilentBeats: [16, 14, 12, 12, 14],
     seesawGapBeats: [4, 4, 3, 3, 3],
     routineStepBeats: 4,
     twinReturnBeats: 6,
