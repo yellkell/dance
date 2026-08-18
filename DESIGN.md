@@ -74,8 +74,12 @@ for the GRID alone. Everything the dancer experiences is converted back
 to the 110–117 shelf's real seconds: the charges (the part two earlier
 pace passes left on the doubled clock, which is why the shelf kept
 feeling fast at the right cadence), the cascades, the wave's march, the
-perfect window, the routine's bell — the sweet spot the floor asked for:
-perked up from 95, nowhere near ruined. Measured, the doubled shelf now
+perfect window, the routine's bell — and the SHOW dances to the record
+outright (showBeat): the MC's groove, the groupies' bob, the light rig,
+the count-in and the groove judge all pump at the song's own pulse,
+because a 95 BPM strut with a 190 BPM DJ read exactly as wrong as it
+sounds. Only the danger keeps the doubled clock. The sweet spot the
+floor asked for: perked up from 95, nowhere near ruined. Measured, the doubled shelf now
 sits at the soft edge of that shelf's own band. Expert only; the tour
 never reaches it.
 

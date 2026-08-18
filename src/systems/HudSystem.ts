@@ -41,7 +41,7 @@ import {
 import { GRADE, GROOVE, SCORE, TOUR } from '../config.js';
 import { trackById } from '../audio/tracks.js';
 import { danceHue } from '../game/profile.js';
-import { dodgeRate, gradeOf, match, me } from '../game/state.js';
+import { dodgeRate, gradeOf, match, me, showBeat } from '../game/state.js';
 import { font } from '../ui/fonts.js';
 
 const SET_COLORS = ['#8cff70', '#ff6ee0', '#ffd24a'];
@@ -225,7 +225,10 @@ export class HudSystem extends createSystem({}) {
     const d = me();
     const beat = match.beat;
     const countdown = match.screen === 'countdown' && Number.isFinite(beat) && beat < 0;
-    const count = countdown ? Math.ceil(-beat) : 0;
+    // The count-in counts the RECORD's beats — a doubled chart's count of
+    // eight eighths ticked past like a stopwatch; four real beats is a
+    // count-in you can nod to.
+    const count = countdown ? Math.ceil(-showBeat()) : 0;
     const key = [
       match.screen,
       count,

@@ -22,7 +22,7 @@ import { DiscoRig } from '../arena/disco.js';
 import { SetEnvironment } from '../arena/environment.js';
 import { VOID_BG } from '../arena/voidkit.js';
 import { actOfBeat } from '../choreo/setlist.js';
-import { match } from '../game/state.js';
+import { match, showBeat } from '../game/state.js';
 import { choreoView } from './ChoreoSystem.js';
 
 let rig: DiscoRig | null = null;
@@ -60,8 +60,10 @@ export class DiscoSystem extends createSystem({}) {
     const live = match.playing && match.screen === 'raid';
     const onBeat = Number.isFinite(match.beat);
     let energy = live ? 1 : match.screen === 'countdown' ? 0.6 : onBeat ? 0.45 : 0.25;
-    const beat = onBeat ? match.beat : performance.now() / 1000 / match.beatLen / 4;
-    const act = match.screen === 'raid' ? actOfBeat(beat, match.phrases) : 0;
+    // The rig dances to the RECORD (showBeat); the ACT — an escalation
+    // boundary in chart phrases — keeps the chart's own clock.
+    const beat = onBeat ? showBeat() : performance.now() / 1000 / match.beatLen / 4;
+    const act = match.screen === 'raid' && onBeat ? actOfBeat(match.beat, match.phrases) : 0;
 
     // THE DUCK: while a telegraph charges on MY deck the disco stands back —
     // lasers, shafts and the whole void drop away so the hazard shapes own

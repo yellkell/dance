@@ -411,7 +411,10 @@ second). Now the charges stretch too — a beam fills ~1.6 s, a gate
 ~2.2 s, the routine teaches over ~4 s, the wave marches on the record's
 own beats, exactly what DISCO BALL and GIVE IT TO ME serve — along with
 the cascades, the perfect-probe window, the routine's bell lead and the
-blockfall descent, all measured in the *record's* beats. Ten seeds a
+blockfall descent, all measured in the *record's* beats — and the SHOW
+dances to the record too: the MC's groove, the groupies' bob, the light
+rig, the count-in card and your own groove judge all pump at the song's
+real pulse (`showBeat()`), while only the danger keeps the doubled clock. Ten seeds a
 record, the 91–98 shelf now serves 0.48–0.53 landings a second
 (0.55–0.63 in the back stretch) against the 110–117 shelf's measured
 0.50–0.56 / 0.60–0.67 — sitting at that band's soft edge, deliberately:
