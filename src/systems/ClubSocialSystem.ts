@@ -69,6 +69,7 @@ import {
   voiceEnabled,
 } from '../club/voice.js';
 import { buildDancer, type DancerPose, type DancerRig } from '../game/avatars.js';
+import { PoseMotion, type MotionTuning } from '../game/poseMotion.js';
 import { match } from '../game/state.js';
 import { clubPoses, remotePoses, type RemotePose } from '../net/poses.js';
 import {
@@ -89,6 +90,11 @@ import { PointerRay } from '../ui/pointer.js';
 const TRACK_KEY = 'gdr-track';
 const DIFF_KEY = 'gdr-diff';
 
+/** Club figures track the wire critically damped — real people's motion
+ *  carries its own character; the spring's job is continuity, not bounce.
+ *  Head rate is the club's authored smoothing. */
+const CLUB_MOTION: MotionTuning = { headRate: CLUB_NET.smoothing, handHz: 3.4, zeta: 1 };
+
 const _v = new Vector3();
 const _q = new Quaternion();
 const _cam = new Vector3();
@@ -108,6 +114,10 @@ interface ClubPuppet {
   tag: Mesh;
   tagMat: MeshBasicMaterial;
   pose: DancerPose;
+  /** The latest wire sample; the motion layer tracks it with critically
+   *  damped hand springs (velocity-continuous over a 10 Hz stream). */
+  tgt: DancerPose;
+  motion: PoseMotion;
   /** False until their first club pose arrives — no gliding in from spawn. */
   live: boolean;
 }
@@ -268,7 +278,6 @@ export class ClubSocialSystem extends createSystem({}) {
     }
 
     // ── the crowd ───────────────────────────────────────────────────────
-    const ease = 1 - Math.exp(-CLUB_NET.smoothing * delta);
     for (const p of this.puppets.values()) {
       const hidden = socialBlocked(p.name);
       // THE TWO ROOMS. A set and the club floor are different places, and
@@ -316,9 +325,11 @@ export class ClubSocialSystem extends createSystem({}) {
       if (netPose && !p.live) {
         // First sighting: appear where they actually stand, no glide-in.
         p.live = true;
-        this.applyPose(p, netPose, 1);
+        this.wireTarget(p, netPose);
+        p.motion.snap(p.pose, p.tgt);
       } else if (netPose) {
-        this.applyPose(p, netPose, ease);
+        this.wireTarget(p, netPose);
+        p.motion.step(p.pose, p.tgt, delta, CLUB_MOTION);
       }
       p.rig.root.visible = p.live && !hidden;
       p.tag.visible = p.live && !hidden;
@@ -425,27 +436,33 @@ export class ClubSocialSystem extends createSystem({}) {
         lx: -0.3, ly: 1.0, lz: 3.7, rx: 0.3, ry: 1.0, rz: 3.7,
         slump: 0,
       };
-      this.puppets.set(idx, { idx, name, hue, rig, tag, tagMat, pose, live: false });
+      this.puppets.set(idx, {
+        idx, name, hue, rig, tag, tagMat, pose,
+        tgt: { ...pose }, motion: new PoseMotion(), live: false,
+      });
       // The mirror watches the same pose object the puppet dances with.
       clubFloorFigures.set(idx, { pose, hue, shown: false });
     }
     this.paintKey = ''; // roster changed → repaint the panel
   }
 
-  private applyPose(p: ClubPuppet, s: RemotePose, k: number): void {
-    const t = p.pose;
-    t.hx += (s.hx - t.hx) * k;
-    t.hy += (s.hy - t.hy) * k;
-    t.hz += (s.hz - t.hz) * k;
-    t.yaw += (s.hyaw - t.yaw) * k;
-    t.pitch += (s.hpitch - t.pitch) * k;
-    t.roll += (s.hroll - t.roll) * k;
-    t.lx += (s.lx - t.lx) * k;
-    t.ly += (s.ly - t.ly) * k;
-    t.lz += (s.lz - t.lz) * k;
-    t.rx += (s.rx - t.rx) * k;
-    t.ry += (s.ry - t.ry) * k;
-    t.rz += (s.rz - t.rz) * k;
+  /** Copy the latest wire sample into the puppet's target pose; the motion
+   *  layer does the smoothing (and the sanitising — a bad sample can no
+   *  longer poison a figure). */
+  private wireTarget(p: ClubPuppet, s: RemotePose): void {
+    const t = p.tgt;
+    t.hx = s.hx;
+    t.hy = s.hy;
+    t.hz = s.hz;
+    t.yaw = s.hyaw;
+    t.pitch = s.hpitch;
+    t.roll = s.hroll;
+    t.lx = s.lx;
+    t.ly = s.ly;
+    t.lz = s.lz;
+    t.rx = s.rx;
+    t.ry = s.ry;
+    t.rz = s.rz;
   }
 
   private pumpClubPose(): void {

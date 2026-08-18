@@ -168,6 +168,62 @@ cross = beam, backfist spin = sweep, clap = seesaw, spin-kick = surge,
 uppercut = nova. Raymarch budget drops while a limb is extended (the exact
 frame-spike moment), exactly as in FIRE FIGHT.
 
+And one law the dancefloor added: **ONE PIECE.** The body is a smooth-min
+over ~20 blobs, and that surface genuinely severs once a limb segment's gap
+passes half the blend width — the boxing guards never stretched that far,
+but the dance vocabulary (point-up, rave-Y, vogue) threw fists a full body
+away from their elbows and the star spent half of every bar as beads
+floating in formation. Two sim-level mechanisms keep him whole now, both in
+`goopliath/sim.ts`: THE SWELL (elbows, knees and shoulders auto-fatten as
+their chain segments stretch — the strike animation's hand-tuned trick,
+derived from live geometry and applied to every pose) and THE LEASH (each
+limb is a chain with a maximum bridgeable stretch, enforced on the pose
+targets and again on the live blobs, so overshoot and inertia whip the
+whole arm along as one rope; a fist parked on the hip or slung across the
+belly is already home and stays where the pose put it). The KO puddle is
+exempt — a doormat is deliberately apart. `node tools/goop-cohesion.mjs`
+drives the real creature through every stance pair, every gesture at and
+beyond the game's reach, the melt and a stance-swap torture loop, and
+field-checks the bridge graph every frame: before, the show was one piece
+on ~55% of frames; now 100%, with every bridge deep enough to survive the
+agitation wobble.
+
+## The figures' arms (the humanoid motion layer)
+
+Every humanoid — the MC, the groupies, remote humans on the ring and the
+club floor, the mirror's reflections — is the one rig in `game/avatars.ts`
+driven by a head and two hands. How those hands MOVE is now one shared
+layer, `game/poseMotion.ts`, instead of a per-system lerp:
+
+- **Hands are damped springs with real velocity.** The MC and the bots run
+  underdamped: a stick thrown on the beat whips PAST its mark and settles —
+  follow-through, where the old exponential ease was fastest leaving and
+  dead on arrival (the exact reverse of a strike; the MC's mimes stiffen
+  their springs through the hit). Remote humans run critically damped: real
+  motion carries its own character, so their spring's only job is
+  velocity-continuous tracking of the 10 Hz wire — no more scalloped arcs
+  with a corner at every packet, and never an invented bounce.
+- **Heads chase exponentially** (an overshooting head reads drunk, not
+  springy), with yaw taken the short way round across ±π.
+- **Poison can't stick.** A NaN or ±Infinity in a target channel is
+  ignored and a poisoned pose heals on the next step. This is armour
+  bought with blood: `sin(−Infinity)` off a pre-cue show beat fed one NaN
+  frame into the MC's eased pose, and since `c += (NaN − c)·k` is NaN
+  forever, **the DJ had been invisible on every night he headlined** — a
+  "visible" root whose every limb had stopped rendering.
+
+The rig's own arm solve grew up with it: the elbow's pole vector adapts to
+where the hand actually is (a hand crossed past the midline folds its elbow
+down-and-forward instead of chicken-winging through the chest; a long
+forward thrust rolls it under the arm), and the glowstick is a POINTER —
+riding the forearm's line with an upward bias and turning with the body's
+yaw — so a thrust aims its blade, a raised stick stands like a torch, a
+resting one hangs easy, and the MC's mime language (lanes, doorposts, the
+sweep's blade) finally reads in the sticks themselves, not just the reach.
+`node tools/arm-motion.mjs` checks all of it live: poison immunity, real
+overshoot that settles, tracking with zero bounce, the yaw wrap, the elbow
+tuck, and the stick's three grips.
+
 ## THE CLUB, THE VOID, and the three places
 
 FIRE FIGHT's pub proved a third thing worth stealing whole: **a social room
