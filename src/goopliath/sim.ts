@@ -12,6 +12,22 @@
  *  - DENTS: negative blobs carved at punch impacts; they decay in half a
  *    second as the gel flows back into the crater.
  *
+ * And one law above all of them — ONE PIECE. The smooth-min surface can only
+ * bridge blobs whose gap is a fraction of the blend width; past that a limb
+ * stops being a rope of gel and becomes beads floating in formation. Two
+ * mechanisms keep the body whole however far a pose or a strike throws it:
+ *
+ *  - THE SWELL: connector joints (elbows, knees, shoulders) fatten as their
+ *    chain segments stretch, so a reaching arm thickens into one rope — the
+ *    same trick the strike animation always hand-tuned, now derived from the
+ *    actual geometry and applied to every pose the body is ever asked for.
+ *  - THE LEASH: each limb is a chain with a maximum stretch. Segments can
+ *    compress freely (gel squashes), but past the bridgeable gap the joint is
+ *    dragged along — on the pose targets (so the springs chase a body that is
+ *    already one piece) and on the live blobs (so overshoot, inertia and
+ *    impacts whip the whole arm instead of leaving it behind). A limb resting
+ *    against the trunk is already home and is left where it lies.
+ *
  * Everything is in CREATURE-LOCAL metres (origin at the floor under the
  * creature, +Y up, facing +Z). The renderer reads `blobData()` straight into
  * shader uniforms; hit detection reads `fieldAt` — one signed-distance field,
@@ -91,6 +107,73 @@ function smin(a: number, b: number, k: number): number {
   return b + (a - b) * h - k * h * (1 - h);
 }
 
+/* ─────────────────────────────── cohesion ────────────────────────────────
+ * The smooth-min genuinely severs two spheres once the gap between their
+ * surfaces passes blend/2 — and the agitation wobble (which is never zero
+ * while he dances) carves into a bridge thinner than that long before.
+ * BRIDGE is the widest gap the body is allowed to carry, as a fraction of
+ * the live blend width: tight enough that every sanctioned bridge keeps
+ * enough field depth (~blend/4 − gap/2) to survive the wobble's carve.
+ */
+const BRIDGE = 0.15;
+
+/** Position-projection sweeps per leash pass — two is enough for a rope
+ *  this short, and the springs tidy the rest next step. */
+const COHESION_ITERS = 2;
+
+/** How much of a live leash correction is carried into the previous-position
+ *  buffer: most of it (so projections don't pump the verlet springs), but not
+ *  all (the remainder becomes velocity — the elastic tug that makes a capped
+ *  fist drag its arm along instead of stopping dead). */
+const LEASH_CARRY = 0.85;
+
+/**
+ * The limb chains, outermost blob first: [outer, inner, outerShare].
+ * When a segment over-stretches, `outerShare` of the excess reels the outer
+ * blob in and the rest drags the inner blob out — weighted so the expressive
+ * end keeps its authority (a pointing fist stays pointed; the elbow chases)
+ * while rootward blobs sit heavier the closer they are to the trunk. The
+ * toes ride their foot so a kick can't leave them orphaned on the floor.
+ */
+const SEGMENTS: ReadonlyArray<readonly [number, number, number]> = [
+  [A.FIST_L, A.ELBOW_L, 0.1],
+  [A.ELBOW_L, A.SHOULDER_L, 0.65],
+  [A.SHOULDER_L, A.CHEST_L, 0.88],
+  [A.FIST_R, A.ELBOW_R, 0.1],
+  [A.ELBOW_R, A.SHOULDER_R, 0.65],
+  [A.SHOULDER_R, A.CHEST_R, 0.88],
+  [A.BASE_L, A.KNEE_L, 0.85],
+  [A.KNEE_L, A.HIP_L, 0.55],
+  [A.HIP_L, A.PELVIS, 0.85],
+  [A.BASE_R, A.KNEE_R, 0.85],
+  [A.KNEE_R, A.HIP_R, 0.55],
+  [A.HIP_R, A.PELVIS, 0.85],
+  [A.BASE_F, A.BASE_L, 0.85],
+  [A.BASE_B, A.BASE_R, 0.85],
+  [A.HEAD, A.NECK, 0.5],
+];
+
+/** The trunk — the blobs that are always one mass. A limb blob bridged to
+ *  any of these is already home (POINT's fist parked on the hip, VOGUE's
+ *  arm slung across the belly), so the leash leaves it where it lies. */
+const TRUNK: ReadonlyArray<number> = [
+  A.HEAD, A.NECK, A.CHEST_L, A.CHEST_R, A.BELLY, A.PELVIS, A.HIP_L, A.HIP_R,
+];
+
+/** Connector joints that swell to fill their stretched segments:
+ *  [joint, neighbourA, neighbourB, max swell]. Elbows and knees carry the
+ *  reach; shoulders only beef up a little (deltoids, not balloons). */
+const CONNECTORS: ReadonlyArray<readonly [number, number, number, number]> = [
+  [A.ELBOW_L, A.SHOULDER_L, A.FIST_L, 1.45],
+  [A.ELBOW_R, A.SHOULDER_R, A.FIST_R, 1.45],
+  [A.KNEE_L, A.HIP_L, A.BASE_L, 1.5],
+  [A.KNEE_R, A.HIP_R, A.BASE_R, 1.5],
+  [A.SHOULDER_L, A.CHEST_L, A.ELBOW_L, 1.22],
+  [A.SHOULDER_R, A.CHEST_R, A.ELBOW_R, 1.22],
+  [A.HIP_L, A.PELVIS, A.KNEE_L, 1.4],
+  [A.HIP_R, A.PELVIS, A.KNEE_R, 1.4],
+];
+
 export class GoopSim {
   private core: Blob[] = [];
   private lumps: Lump[] = [];
@@ -115,6 +198,21 @@ export class GoopSim {
    *  up): scales the blob shove, the crater size and the torn-lump size —
    *  spectacle only, it never touches scoring. */
   impactScale = 1;
+
+  /** ONE PIECE enforcement (the swell + the leash, see the header). On by
+   *  default; the cohesion harness flips it off to measure the before. The
+   *  KO puddle ignores it either way — a doormat is deliberately apart. */
+  cohesion = true;
+  /** Per-anchor swell floor the stretch maintains on connector joints. It
+   *  FLOORS the authored radius scales (max, never multiply), so a strike's
+   *  hand-tuned mid-limb swell wins whenever it asks for more. */
+  private readonly cohesionSwell: Float32Array = new Float32Array(ANCHOR_COUNT).fill(1);
+  /** This step's pose targets, packed [x,y,z,r] — computed up front so the
+   *  leash can see whole limbs before the springs chase them. */
+  private readonly targets: Float32Array = new Float32Array(ANCHOR_COUNT * 4);
+  /** Target radii WITHOUT the cohesion floor — the honest authored size, so
+   *  the swell measures real stretch instead of chasing its own tail. */
+  private readonly rawTargetR: Float32Array = new Float32Array(ANCHOR_COUNT);
 
   /** Extra per-anchor offsets (punch animation drives arm anchors here). */
   readonly offsets: Float32Array = new Float32Array(ANCHOR_COUNT * 3);
@@ -192,12 +290,15 @@ export class GoopSim {
     x += this.styleOffsets[i * 3] * sf;
     y += this.styleOffsets[i * 3 + 1] * sf;
     z += this.styleOffsets[i * 3 + 2] * sf;
-    r *= 1 + (this.styleRadius[i] - 1) * sf;
 
     x += this.offsets[i * 3];
     y += this.offsets[i * 3 + 1];
     z += this.offsets[i * 3 + 2];
-    r *= this.radiusScale[i] * this.core[i].scale;
+    // The cohesion swell FLOORS the authored scales (style pose + strike):
+    // whichever asks for the fatter joint wins, they never stack.
+    const authored = (1 + (this.styleRadius[i] - 1) * sf) * this.radiusScale[i];
+    this.rawTargetR[i] = r * authored * this.core[i].scale;
+    r *= Math.max(authored, this.cohesionSwell[i]) * this.core[i].scale;
 
     out.x = x;
     out.y = y;
@@ -436,23 +537,36 @@ export class GoopSim {
     const damp = Math.pow(0.9, h * 60); // per-frame velocity retention
     const w2 = 120; // spring stiffness (omega^2-ish) toward pose anchors
 
+    // --- pose targets for the whole body, then the cohesion passes ---
+    // Targets are computed up front (instead of per blob inside the spring
+    // loop) so the swell and the leash can read whole limbs at once.
+    for (let i = 0; i < this.core.length; i++) {
+      this.target(i, this._tgt);
+      const o = i * 4;
+      this.targets[o] = this._tgt.x;
+      this.targets[o + 1] = this._tgt.y;
+      this.targets[o + 2] = this._tgt.z;
+      this.targets[o + 3] = this._tgt.r;
+    }
+    this.updateCohesion(h);
+
     // --- core blobs: underdamped springs to their pose targets ---
     for (let i = 0; i < this.core.length; i++) {
       const b = this.core[i];
-      this.target(i, this._tgt);
+      const o = i * 4;
       const vx = (b.x - b.px) * damp;
       const vy = (b.y - b.py) * damp;
       const vz = (b.z - b.pz) * damp;
-      const ax = (this._tgt.x - b.x) * w2;
-      const ay = (this._tgt.y - b.y) * w2;
-      const az = (this._tgt.z - b.z) * w2;
+      const ax = (this.targets[o] - b.x) * w2;
+      const ay = (this.targets[o + 1] - b.y) * w2;
+      const az = (this.targets[o + 2] - b.z) * w2;
       b.px = b.x;
       b.py = b.y;
       b.pz = b.z;
       b.x += vx + ax * h * h;
       b.y += vy + ay * h * h;
       b.z += vz + az * h * h;
-      b.rTarget = this._tgt.r;
+      b.rTarget = this.targets[o + 3];
       b.r += (b.rTarget - b.r) * Math.min(1, h * 10);
       b.scale = Math.min(1, b.scale + h * 0.25); // stolen volume regrows
 
@@ -486,8 +600,12 @@ export class GoopSim {
       }
     }
 
+    // --- the leash on the live body: overshoot, inertia and impact shoves
+    // whip the whole limb along instead of stretching it into beads ---
+    this.leashBlobs();
+
     // Kinematic pin overrides everything (the striking fist): applied after
-    // springs AND separation so nothing can nudge it off its line.
+    // springs, separation AND the leash so nothing can nudge it off its line.
     if (this.pinIndex >= 0 && this.pinIndex < this.core.length) {
       const b = this.core[this.pinIndex];
       b.x = this.pinPos.x;
@@ -496,6 +614,10 @@ export class GoopSim {
       b.px = b.x;
       b.py = b.y;
       b.pz = b.z;
+      // The pin can teleport its blob (a fast strike outruns the springs) —
+      // leash again so the limb chases it THIS frame, not one frame late.
+      // The pinned blob itself carries zero weight, so its line is gospel.
+      this.leashBlobs();
     }
 
     // --- lumps: fly, splat, rest, crawl home ---
@@ -618,12 +740,191 @@ export class GoopSim {
     this.pack();
   }
 
+  // -------------------------------------------------------------- cohesion
+
+  /** Surface gap between two anchors' targets, using the HONEST radii (no
+   *  cohesion floor) — so the swell measures stretch, not its own effect. */
+  private targetGap(a: number, b: number): number {
+    const t = this.targets;
+    const dx = t[a * 4] - t[b * 4];
+    const dy = t[a * 4 + 1] - t[b * 4 + 1];
+    const dz = t[a * 4 + 2] - t[b * 4 + 2];
+    return Math.sqrt(dx * dx + dy * dy + dz * dz) - this.rawTargetR[a] - this.rawTargetR[b];
+  }
+
+  /** Is this anchor's target already resting against the trunk? */
+  private targetOnTrunk(i: number, maxGap: number): boolean {
+    const t = this.targets;
+    for (const g of TRUNK) {
+      if (g === i) continue;
+      const dx = t[i * 4] - t[g * 4];
+      const dy = t[i * 4 + 1] - t[g * 4 + 1];
+      const dz = t[i * 4 + 2] - t[g * 4 + 2];
+      const d = Math.sqrt(dx * dx + dy * dy + dz * dz) - t[i * 4 + 3] - t[g * 4 + 3];
+      if (d <= maxGap) return true;
+    }
+    return false;
+  }
+
+  /** Is this live blob already resting against the trunk? */
+  private blobOnTrunk(i: number, maxGap: number): boolean {
+    const b = this.core[i];
+    for (const g of TRUNK) {
+      if (g === i) continue;
+      const c = this.core[g];
+      const d = Math.hypot(b.x - c.x, b.y - c.y, b.z - c.z) - b.r - c.r;
+      if (d <= maxGap) return true;
+    }
+    return false;
+  }
+
+  /**
+   * THE SWELL + THE LEASH, on this step's pose targets. Swell first: each
+   * connector joint eases toward a radius that fills its worst stretched
+   * segment (capped — a rope, not a balloon). Then the leash: any segment
+   * still stretched past the bridgeable gap has the excess split between its
+   * ends, so the springs chase a body that is already one piece. Because the
+   * style ease is one uniform rate, a transition between two legal poses
+   * stays legal the whole way — only live-blob dynamics can break it, and
+   * leashBlobs() below catches those.
+   */
+  private updateCohesion(h: number): void {
+    const ease = Math.min(1, h * 7);
+    if (!this.cohesion || this.ko > 0.5) {
+      // The KO puddle is DELIBERATELY blown apart — stand the swell down.
+      for (const [j] of CONNECTORS) {
+        this.cohesionSwell[j] += (1 - this.cohesionSwell[j]) * ease;
+      }
+      return;
+    }
+
+    for (const [j, na, nb, cap] of CONNECTORS) {
+      const gap = Math.max(0, this.targetGap(j, na), this.targetGap(j, nb));
+      const want = Math.min(cap, 1 + (gap * 0.85) / Math.max(this.rawTargetR[j], 0.02));
+      this.cohesionSwell[j] += (want - this.cohesionSwell[j]) * ease;
+    }
+
+    const maxGap = CREATURE.blend * this.blendScale * BRIDGE;
+    for (let iter = 0; iter < COHESION_ITERS; iter++) {
+      for (const [outer, inner, outerShare] of SEGMENTS) {
+        this.projectTargets(outer, inner, outerShare, maxGap);
+      }
+    }
+    // The closer: shared weights converge softly, which is right for the
+    // everyday small stretch but too slow when a strike path JUMPS a limb.
+    // One authoritative outward-in sweep (the inner blob absorbs the whole
+    // remainder) leaves every chain exactly legal; SEGMENTS is ordered
+    // outermost-first per limb, so the tail cascades into the trunk.
+    for (const [outer, inner] of SEGMENTS) {
+      this.projectTargets(outer, inner, 0, maxGap);
+    }
+  }
+
+  /** Close one over-stretched segment of the TARGET chain (see the leash). */
+  private projectTargets(outer: number, inner: number, outerShare: number, maxGap: number): void {
+    const t = this.targets;
+    const oo = outer * 4;
+    const oi = inner * 4;
+    const dx = t[oo] - t[oi];
+    const dy = t[oo + 1] - t[oi + 1];
+    const dz = t[oo + 2] - t[oi + 2];
+    const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    const maxDist = t[oo + 3] + t[oi + 3] + maxGap;
+    if (dist <= maxDist || dist < 1e-4) return;
+    if (this.targetOnTrunk(outer, maxGap)) return; // draped on the body
+    // The strike's pinned blob is gospel — its partner takes the whole
+    // correction, so the leash never tugs a punch off its line.
+    let wOut = outerShare;
+    let wIn = 1 - outerShare;
+    if (outer === this.pinIndex) {
+      wOut = 0;
+      wIn = 1;
+    } else if (inner === this.pinIndex) {
+      wOut = 1;
+      wIn = 0;
+    }
+    const c = (dist - maxDist) / dist;
+    t[oo] -= dx * c * wOut;
+    t[oo + 1] -= dy * c * wOut;
+    t[oo + 2] -= dz * c * wOut;
+    t[oi] += dx * c * wIn;
+    t[oi + 1] += dy * c * wIn;
+    t[oi + 2] += dz * c * wIn;
+  }
+
+  /**
+   * THE LEASH on the live blobs — the physical backstop. Spring overshoot,
+   * root-motion inertia and punch shoves all land on positions the target
+   * pass never saw; this projects them back inside the chain caps, carrying
+   * most of each correction into the verlet history (no energy pumping) and
+   * leaving the rest as velocity — the tug that drags the arm along.
+   */
+  private leashBlobs(): void {
+    if (!this.cohesion || this.ko > 0.5) return;
+    const maxGap = CREATURE.blend * this.blendScale * BRIDGE;
+    for (let iter = 0; iter < COHESION_ITERS; iter++) {
+      for (const [outer, inner, outerShare] of SEGMENTS) {
+        this.projectBlobs(outer, inner, outerShare, maxGap);
+      }
+    }
+    // The closer (see updateCohesion) — after it, the live body is exactly
+    // one piece even on the frame a spinning strike jumps its limb.
+    for (const [outer, inner] of SEGMENTS) {
+      this.projectBlobs(outer, inner, 0, maxGap);
+    }
+  }
+
+  /** Close one over-stretched segment of the LIVE chain (see the leash). */
+  private projectBlobs(outer: number, inner: number, outerShare: number, maxGap: number): void {
+    const a = this.core[outer];
+    const b = this.core[inner];
+    const dx = a.x - b.x;
+    const dy = a.y - b.y;
+    const dz = a.z - b.z;
+    const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    const maxDist = a.r + b.r + maxGap;
+    if (dist <= maxDist || dist < 1e-4) return;
+    if (this.blobOnTrunk(outer, maxGap)) return;
+    let wOut = outerShare;
+    let wIn = 1 - outerShare;
+    if (outer === this.pinIndex) {
+      wOut = 0;
+      wIn = 1;
+    } else if (inner === this.pinIndex) {
+      wOut = 1;
+      wIn = 0;
+    }
+    const c = (dist - maxDist) / dist;
+    const axc = dx * c * wOut;
+    const ayc = dy * c * wOut;
+    const azc = dz * c * wOut;
+    a.x -= axc;
+    a.y -= ayc;
+    a.z -= azc;
+    a.px -= axc * LEASH_CARRY;
+    a.py -= ayc * LEASH_CARRY;
+    a.pz -= azc * LEASH_CARRY;
+    const bxc = dx * c * wIn;
+    const byc = dy * c * wIn;
+    const bzc = dz * c * wIn;
+    b.x += bxc;
+    b.y += byc;
+    b.z += bzc;
+    b.px += bxc * LEASH_CARRY;
+    b.py += byc * LEASH_CARRY;
+    b.pz += bzc * LEASH_CARRY;
+    // A dragged foot still rests ON the floor, never through it.
+    if (a.y < FLOOR_Y + a.r * 0.55) a.y = FLOOR_Y + a.r * 0.55;
+    if (b.y < FLOOR_Y + b.r * 0.55) b.y = FLOOR_Y + b.r * 0.55;
+  }
+
   /** All lumps snap home instantly (round reset). */
   reabsorbAll(): void {
     this.lumps.length = 0;
     this.drips.length = 0;
     this.dents.length = 0;
     for (const b of this.core) b.scale = 1;
+    this.cohesionSwell.fill(1);
   }
 
   // ------------------------------------------------------------------- pack

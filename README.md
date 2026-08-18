@@ -450,7 +450,8 @@ src/
   main.ts              IWSDK world + system registration
   audio/techno.ts      the beat clock + the synthesised set
   audio/sfx.ts         WebAudio sfx kit (vendored)
-  goopliath/           the raymarched gel creature (vendored, untouched)
+  goopliath/           the raymarched gel creature (vendored; patched with
+                       the dance vocabulary and the ONE PIECE cohesion law)
   choreo/setlist.ts    seeded, beat-quantized move generation
   choreo/telegraphs.ts the hazard-shape shader kit (vendored)
   choreo/strikes.ts    landing FX per platform
@@ -472,7 +473,9 @@ tools/                 track analyzer · preview-shot · club-capture ·
                        crown-check (the crown's relay protocol) ·
                        floor-clear (who a cleared floor ends the set for) ·
                        glass-physics · glass-stack (towers and pyramids) ·
-                       music-switch (the floor's music toggle, end to end)
+                       music-switch (the floor's music toggle, end to end) ·
+                       goop-cohesion (the DJ stays ONE PIECE, field-checked
+                       through the whole show)
 avatar-preview.html    dev-only dancer catwalk (never shipped)
 ```
 
