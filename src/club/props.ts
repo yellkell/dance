@@ -65,16 +65,67 @@ export const PROP_PHYS = {
   bodyR: 0.072,
   /** Energy kept when two glasses meet (they ring more than they stick). */
   glassRestitution: 0.45,
-  /** How fast a settled glass eases upright (per second).
-   *
-   *  This came out once, to see whether a coupe could be left lying where it
-   *  fell and whether two of them could be stacked. Both worked exactly as
-   *  built and both were wrong in the hand: without a physics engine there
-   *  is no friction to hold a rim on a rim, so every attempt at a tower was
-   *  a pile sliding apart, and every slide rang the glass-on-glass tap —
-   *  a dozen at once. A stack you cannot build is worse than no stack, and
-   *  the noise made it unmistakable. */
+  /** How fast a settled glass eases upright (per second). Righting is what
+   *  makes a tower buildable by hand: every glass you set down finishes
+   *  level, so the next one meets a flat rim instead of a slope. */
   uprightEase: 6,
+
+  /* ── THE STACK ────────────────────────────────────────────────────────
+   * A coupe tower is the one thing an Art Deco club owes you, and the
+   * first attempt at it failed for a specific reason worth keeping on the
+   * record: glass rims were not surfaces, so nothing ever RESTED on
+   * anything — a stacked pair was two free bodies leaning on a shove-apart
+   * rule, which slid apart and rang the glass tap a dozen times doing it.
+   *
+   * The fix is not a physics engine and not sockets (a glass that CLICKS
+   * into place is a Lego brick, and this is a bar). It is three plain
+   * rules: a rim is a surface, a glass resting ON a glass is STUCK to it
+   * (the static friction a solver would have given us), and glasses only
+   * shove each other apart when they share a level. Where you set a glass
+   * down is where it stays — free placement, no grid, no snap.
+   */
+  /** The rim ring a coupe presents as a shelf: height up its own axis, and
+   *  the radius of the disc. (The profile's top ring — kept here as named
+   *  numbers because the stack maths reads them every frame.) */
+  rimY: 0.187,
+  rimR: 0.066,
+  /** The foot a glass stands on. */
+  baseR: 0.042,
+  /** How far a base centre may sit from a rim's axis and still be carried.
+   *  rimR + baseR is "the foot overlaps the rim disc at all", which is
+   *  exactly the reach a champagne tower needs: the upper glass in a
+   *  pyramid bridges the gap between two below, ~0.066 from each axis and
+   *  comfortably inside this. Generous on purpose — the fantasy is
+   *  building the tower, not fighting for it. */
+  stackReach: 0.108,
+  /** A glass only carries another if it is standing reasonably upright —
+   *  a coupe on its side is scenery, not a shelf. (World-Y of its up axis.) */
+  stackUprightMin: 0.86,
+  /** A glass is only a SHELF for one whose origin sits at least this far
+   *  above its own. Two coupes side by side on a table are at the same
+   *  height and neither carries the other; a stacked one clears this by
+   *  the full rim height. Being a strict height ordering, it also makes
+   *  mutual support (two glasses each floating on the other) impossible. */
+  stackLevelEps: 0.05,
+  /** Resting glasses shove each other apart only within this much height of
+   *  one another — same level, same shelf. Without it, the nudge that keeps
+   *  two glasses off one coaster would fire at every stacked pair (distance
+   *  ~0 horizontally) and blow every tower apart on contact. */
+  stackSameLevel: 0.03,
+  /** A stack that loses its footing falls: if a resting glass ends up this
+   *  far above the surface actually under it (someone lifted the glass it
+   *  stood on), it goes back to flight and drops. */
+  stackFallGap: 0.02,
+
+  /* ── the tap, rationed ────────────────────────────────────────────────
+   * Glass-on-glass is the sound of a bar, and it was also the sound of the
+   * first stacking attempt failing: every micro-nudge between touching
+   * glasses rang it. A tower has a dozen contacts, so the tap now has to
+   * earn itself — real closing speed, and never twice in a breath from the
+   * same glass. Setting one down deliberately stays silent-ish; knocking a
+   * tower over still sounds like knocking a tower over. */
+  tapMinSpeed: 0.35,
+  tapCooldown: 0.12,
 } as const;
 
 /**
