@@ -1,10 +1,11 @@
 /**
  * THE BALL — how a raid is called from the club floor.
  *
- * Someone sends it up (from the SOCIAL panel or the board) and a mirror
- * ball hangs in front of them for sixty seconds, turning slowly, wearing a
- * countdown plate: the song, who called it, the seconds left, and who has
- * touched in — one orbiting pip per dancer, in their colour. TOUCH the
+ * Someone calls it (from the SOCIAL panel or the board) and a mirror ball
+ * is winched down out of the ceiling to hang in front of them for sixty
+ * seconds, turning slowly, wearing a countdown plate: the song, who called
+ * it, the seconds left, and who has touched in — one orbiting pip per
+ * dancer, in their colour. TOUCH the
  * ball (hand close + trigger) to join the set; touch again to step back
  * out; the caller's touch waves it away. When the relay's clock runs out,
  * the caller and everyone holding a pip leave for the ring together — and
@@ -59,6 +60,33 @@ export function ballSpawnPos(head: Vector3, fwd: Vector3): [number, number, numb
   return [x, 1.5, z];
 }
 
+/** The eclipse's reach: its widest ring plus the ball's radius and a
+ *  whisker — inside this footprint a descending ball would thread the
+ *  fixture's rings, so it hangs OFF the eclipse instead. */
+const ECLIPSE_SPAN = Math.max(...CLUB.chandelier.rings.map((r) => r.r)) + 0.27;
+/** ...and where that hang starts: just under the fixture's lowest glow
+ *  channel, with the ball's radius of clearance. */
+const ECLIPSE_UNDERSIDE = CLUB.chandelier.y - 0.35;
+
+/**
+ * Where the cable that lowers THE BALL is anchored — the local ceiling
+ * over a spot on the floor. The corner rooms cap at door height, the
+ * eclipse claims its own footprint (the ball hangs off the fixture and
+ * never threads its rings — `bare`, because there is no slab there to
+ * emerge from), the dome's first tread covers the floor's rim, and the
+ * main slab takes the rest of the hall.
+ */
+export function ballAnchor(x: number, z: number): { y: number; bare: boolean } {
+  const Q = CLUB.quiet;
+  const A = CLUB.arcade;
+  if (x >= Q.minX && x <= Q.maxX && z >= Q.minZ && z <= Q.maxZ) return { y: CLUB.roomCeilH, bare: false };
+  if (x >= A.minX && x <= A.maxX && z >= A.minZ && z <= A.maxZ) return { y: CLUB.roomCeilH, bare: false };
+  const d = Math.hypot(x - CLUB.floor.x, z - CLUB.floor.z);
+  if (d < ECLIPSE_SPAN) return { y: ECLIPSE_UNDERSIDE, bare: true };
+  if (d < 3.3) return { y: CLUB.ceilH + 0.55, bare: false }; // the dome's first tread
+  return { y: CLUB.ceilH, bare: false };
+}
+
 export interface BallVisual {
   group: Group;
   /** Spin this. */
@@ -67,6 +95,10 @@ export interface BallVisual {
    *  Call every frame — the sparks ride the sphere, so the spin carries
    *  them round the room the way a real mirror ball throws its dots. */
   twinkle(dt: number): void;
+  /** THE CABLE: stretch the stem from the ball's crown to `len` metres up
+   *  (group-local), so the ball visibly hangs from the ceiling it was
+   *  lowered out of, wherever the group currently is on its way. */
+  setCable(len: number): void;
   /** The countdown/track/joins plate under the ball (yaw-billboard it). */
   plate: Mesh;
   /** Repaint the plate. */
@@ -90,7 +122,8 @@ export function buildBallVisual(): BallVisual {
   group.name = 'raid-ball';
 
   // The mirror ball itself — painted facets (nothing to reflect in a
-  // procedural room), a hot core halo, a stem hanging it from nothing.
+  // procedural room), a hot core halo, and the cable it is winched down
+  // on (setCable stretches this stub to the ceiling every frame).
   const facets = document.createElement('canvas');
   facets.width = facets.height = 128;
   const fg = facets.getContext('2d')!;
@@ -112,6 +145,13 @@ export function buildBallVisual(): BallVisual {
   );
   stem.position.y = 0.49;
   group.add(stem);
+  // The unit stem spans 0.24..0.74 (ball crown upward); setCable rescales
+  // that span to reach the anchor.
+  const setCable = (len: number): void => {
+    const l = Math.max(0.02, len);
+    stem.scale.y = l / 0.5;
+    stem.position.y = 0.24 + l / 2;
+  };
   group.add(glowSprite(0xffffff, 0.9, 0.4));
 
   // THE GLIMMER — a handful of four-point lens glints living on the facet
@@ -283,6 +323,7 @@ export function buildBallVisual(): BallVisual {
     group,
     ball,
     twinkle,
+    setCable,
     plate,
     paint,
     setPips,

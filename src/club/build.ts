@@ -1395,7 +1395,7 @@ function buildVestibule(root: Group): void {
 
 function buildStillRoom(root: Group, candleMat: SpriteMaterial): MeshStandardMaterial {
   const Q = CLUB.quiet;
-  const H = 2.5;
+  const H = CLUB.roomCeilH;
   const plaster = new MeshStandardMaterial({ map: plasterTexture([3, 1.4]), roughness: 0.95, metalness: 0.02 });
 
   // Its two interior walls (east + south), split around the doorway, plus a
@@ -1533,7 +1533,7 @@ function buildStillRoom(root: Group, candleMat: SpriteMaterial): MeshStandardMat
 
 function buildArcade(root: Group): void {
   const A = CLUB.arcade;
-  const H = 2.5;
+  const H = CLUB.roomCeilH;
   const plaster = new MeshStandardMaterial({ map: plasterTexture([3, 1.4]), roughness: 0.95, metalness: 0.02 });
 
   // Interior walls (west + NORTH split around the door), lintel, low cap.

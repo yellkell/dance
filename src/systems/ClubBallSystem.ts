@@ -16,7 +16,7 @@
 import { createSystem, InputComponent } from '@iwsdk/core';
 import { Group, Vector3 } from 'three';
 import * as sfx from '../audio/sfx.js';
-import { BALL_TOUCH_RADIUS, buildBallVisual, type BallVisual } from '../club/ball.js';
+import { BALL_TOUCH_RADIUS, ballAnchor, buildBallVisual, type BallVisual } from '../club/ball.js';
 import { seatHue } from '../config.js';
 import { match } from '../game/state.js';
 import { cancelBall, joinBall, memberHue, net } from '../net/session.js';
@@ -24,15 +24,23 @@ import { cancelBall, joinBall, memberHue, net } from '../net/session.js';
 const _hand = new Vector3();
 const _cam = new Vector3();
 
-/** The raise's clock (s) — the spring below runs its bounces inside this. */
-const RISE_SECONDS = 0.9;
-/** The lower's clock (s) — gravity is brisker than a winch. */
-const DROP_SECONDS = 0.55;
-/** Where the raise starts: knee height, so the ball is visibly SENT UP. */
-const RISE_FROM_Y = 0.32;
-/** Under-damped spring 0 → 1: shoots past the top, dips back, settles —
- *  two visible bounces inside the raise window. */
-const springUp = (p: number): number => 1 - Math.exp(-4.6 * p) * Math.cos(9.0 * p);
+/** The descent's clock (s) — the winch pays out, the cable bounces. */
+const DESCEND_SECONDS = 1.0;
+/** The hoist's clock (s) — spooled back up into the dark. */
+const ASCEND_SECONDS = 0.7;
+/** How deep inside a slab the ball starts (and finishes) hidden — a hair
+ *  over its own radius, so it emerges through the ceiling rather than
+ *  popping into the air below it. The eclipse's `bare` anchor has no slab
+ *  to hide in and uses 0. */
+const SLAB_HIDE = 0.28;
+/** The cable runs this far past the anchor plane — into the slab (hiding
+ *  its cut end), or up to the eclipse's underside where the ball hangs
+ *  off the fixture itself. */
+const CABLE_OVERRUN = 0.32;
+/** Under-damped spring 0 → 1: shoots past the end of the travel, dips
+ *  back, settles — the bounce of a winched cable reaching its stop, twice
+ *  inside the descent window. */
+const spring = (p: number): number => 1 - Math.exp(-4.6 * p) * Math.cos(9.0 * p);
 
 export class ClubBallSystem extends createSystem({}) {
   private holder = new Group();
@@ -40,11 +48,16 @@ export class ClubBallSystem extends createSystem({}) {
   private clock = 0;
   private wasReach = false;
   private lastPaintKey = '';
-  /** The ball's life on the floor: bounced up → hanging → lowered away. */
-  private anim: 'rise' | 'hang' | 'drop' = 'rise';
+  /** The ball's life on the floor: winched down → hanging → hoisted away. */
+  private anim: 'descend' | 'hang' | 'ascend' = 'descend';
   private animT = 0;
-  /** Height the lower started from (the bob leaves y mid-wave). */
-  private dropFrom = 0;
+  /** The local ceiling the cable is anchored to (see ballAnchor). */
+  private anchorY = 0;
+  /** Where the descent begins and the hoist ends (hidden in the slab, or
+   *  flush under the eclipse). */
+  private startY = 0;
+  /** Height the hoist started from (the bob leaves y mid-wave). */
+  private ascendFrom = 0;
 
   init(): void {
     this.holder.name = 'raid-ball-holder';
@@ -57,20 +70,21 @@ export class ClubBallSystem extends createSystem({}) {
       (net.phase === 'hosting' || net.phase === 'joined');
     const ballUp = inClub && net.ball !== null;
 
-    // A resolving ball (called off, or fired without me) LOWERS away
-    // instead of blinking out — but only while I'm still on the floor to
-    // watch it go. Being whisked to the ring, or walking out, clears it
-    // the old instant way.
-    if (!ballUp && this.visual && inClub && this.anim !== 'drop') {
-      this.anim = 'drop';
+    // A resolving ball (called off, or fired without me) is HOISTED back
+    // into the ceiling instead of blinking out — but only while I'm still
+    // on the floor to watch it go. Being whisked to the ring, or walking
+    // out, clears it the old instant way.
+    if (!ballUp && this.visual && inClub && this.anim !== 'ascend') {
+      this.anim = 'ascend';
       this.animT = 0;
-      this.dropFrom = this.visual.group.position.y;
-      sfx.throwWhoosh();
+      this.ascendFrom = this.visual.group.position.y;
+      // The recall's rising magnetic pull IS the winch spooling it home.
+      sfx.recall();
     }
-    const dropping = !ballUp && this.visual !== null && inClub && this.anim === 'drop';
-    this.holder.visible = ballUp || dropping;
+    const ascending = !ballUp && this.visual !== null && inClub && this.anim === 'ascend';
+    this.holder.visible = ballUp || ascending;
 
-    if (!ballUp && !dropping) {
+    if (!ballUp && !ascending) {
       if (this.visual) {
         this.visual.dispose();
         this.visual = null;
@@ -80,9 +94,9 @@ export class ClubBallSystem extends createSystem({}) {
     }
     const state = net.ball;
 
-    // A fresh ball over a still-lowering husk (called off and re-called in
+    // A fresh ball over a still-rising husk (called off and re-called in
     // one breath): the old visual finishes nothing — the new one takes over.
-    if (this.visual && ballUp && this.anim === 'drop') {
+    if (this.visual && ballUp && this.anim === 'ascend') {
       this.visual.dispose();
       this.visual = null;
       this.lastPaintKey = '';
@@ -90,12 +104,20 @@ export class ClubBallSystem extends createSystem({}) {
     if (!this.visual) {
       this.visual = buildBallVisual();
       this.holder.add(this.visual.group);
-      this.anim = 'rise';
+      this.anim = 'descend';
       this.animT = 0;
-      if (state) this.visual.group.position.set(state.pos[0], RISE_FROM_Y, state.pos[2]);
-      // SENT UP, audibly: the recall's magnetic pull is the ball leaving
-      // the caller's hands.
-      sfx.recall();
+      if (state) {
+        // OUT OF THE CEILING: the cable anchors to whatever is overhead —
+        // the slab, the dome's tread, a corner room's cap, or the eclipse
+        // itself — and the ball starts hidden inside it (or flush under
+        // the fixture, which has no slab to hide in).
+        const a = ballAnchor(state.pos[0], state.pos[2]);
+        this.anchorY = a.y;
+        this.startY = a.y + (a.bare ? 0 : SLAB_HIDE);
+        this.visual.group.position.set(state.pos[0], this.startY, state.pos[2]);
+      }
+      // The descent announces itself with the falling whoosh and its WHOOMP.
+      sfx.throwWhoosh();
     }
     const v = this.visual;
 
@@ -105,24 +127,19 @@ export class ClubBallSystem extends createSystem({}) {
     v.ball.rotation.y += delta * 0.9;
     v.twinkle(delta);
 
-    if (this.anim === 'rise' && state) {
-      // THE BOUNCY RAISE: a springy launch from the floor to its hang
-      // height, overshooting and settling, swelling from a pip as it goes.
-      const p = Math.min(1, this.animT / RISE_SECONDS);
-      const k = springUp(p);
-      v.group.position.set(state.pos[0], RISE_FROM_Y + (state.pos[1] - RISE_FROM_Y) * k, state.pos[2]);
-      v.group.scale.setScalar(Math.max(0.05, 0.3 + 0.7 * k));
-      if (p >= 1) {
-        this.anim = 'hang';
-        v.group.scale.setScalar(1);
-      }
-    } else if (this.anim === 'drop') {
-      // THE LOWER: gravity takes it — an accelerating sink to the boards,
-      // shrinking away, whirling faster the further it falls.
-      const p = Math.min(1, this.animT / DROP_SECONDS);
-      v.group.position.y = this.dropFrom - (this.dropFrom - 0.1) * p * p;
-      v.group.scale.setScalar(Math.max(0.02, 1 - p * p * 0.9));
-      v.ball.rotation.y += delta * p * 9;
+    if (this.anim === 'descend' && state) {
+      // THE DROP: winched down out of the ceiling to its hang height on an
+      // under-damped spring — the cable overshoots its stop, dips, and
+      // settles, the bounce of a real ball reaching the end of its travel.
+      const p = Math.min(1, this.animT / DESCEND_SECONDS);
+      const k = spring(p);
+      v.group.position.set(state.pos[0], this.startY + (state.pos[1] - this.startY) * k, state.pos[2]);
+      if (p >= 1) this.anim = 'hang';
+    } else if (this.anim === 'ascend') {
+      // THE HOIST: spooled back up to where it came from, gathering speed —
+      // ease-in, the winch taking up slack — and gone into the dark.
+      const p = Math.min(1, this.animT / ASCEND_SECONDS);
+      v.group.position.y = this.ascendFrom + (this.startY - this.ascendFrom) * p * p;
       if (p >= 1) {
         v.dispose();
         this.visual = null;
@@ -134,10 +151,14 @@ export class ClubBallSystem extends createSystem({}) {
       v.group.position.set(state.pos[0], state.pos[1] + Math.sin(this.clock * 1.3) * 0.03, state.pos[2]);
     }
 
+    // THE CABLE always reaches its anchor — through the descent, the bob
+    // and the hoist alike, the ball hangs FROM the ceiling it came out of.
+    v.setCable(this.anchorY + CABLE_OVERRUN - v.group.position.y - 0.24);
+
     // The plate faces whoever looks, wherever the ball is on its way.
     this.camera.getWorldPosition(_cam);
     v.plate.rotation.y = Math.atan2(_cam.x - v.group.position.x, _cam.z - v.group.position.z);
-    if (!state) return; // lowering away — nothing left to touch or read
+    if (!state) return; // hoisted away — nothing left to touch or read
 
     // Touch: either hand close to the ball's heart.
     let inReach = false;

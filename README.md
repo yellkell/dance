@@ -60,15 +60,19 @@ everyone else.
   ROOM, under an eclipse of counter-rotating brass rings. Teleport around
   it, **talk** to your room (spatial voice), and mute/block anyone from the
   SOCIAL panel.
-- Raids are **called from the floor with THE BALL**: anyone sends a mirror
-  ball up (their song pick rides along) — and *up* means up: it **bounces**
-  from knee height to its hang on an under-damped spring, glimmers there
-  (lens glints popping and dying across the facets, riding the spin the
-  way a real mirror ball throws its dots), and hangs for sixty seconds.
-  Whoever **touches it** rides to the ring with them at zero — while the
-  rest of the room keeps the floor, watching the ball **whirl away down
-  to the boards** as it resolves. When the set ends, the players are
-  deposited straight back among their friends.
+- Raids are **called from the floor with THE BALL**: anyone calls one
+  (their song pick rides along) and a mirror ball is **winched down out of
+  the ceiling** — its cable pays out from whatever is overhead (the main
+  slab, the dome's tread, a corner room's low cap, or the eclipse itself,
+  whose rings it never threads), overshoots its stop and **bounces** like
+  a real ball reaching the end of its travel, then hangs glimmering (lens
+  glints popping and dying across the facets, riding the spin the way a
+  real mirror ball throws its dots) for sixty seconds — visibly hanging
+  *from* the ceiling the whole time. Whoever **touches it** rides to the
+  ring with them at zero — while the rest of the room keeps the floor,
+  watching the ball **hoisted back up into the dark** as it resolves.
+  When the set ends, the players are deposited straight back among their
+  friends.
 - The set itself happens inside **THE VOID** — an actual environment in the
   Beat-Saber-background bloodline, built in four depth layers so a black
   room reads as a vast one: **18 monolith towers** at 17 m carrying
