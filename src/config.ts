@@ -727,8 +727,9 @@ export const RANK = {
 };
 
 /* ────────────────────────────── THE PODIUM ───────────────────────────────
- * When the set ends (or one dancer remains) the winner takes the high
- * ground, confetti cannons fire, and the board freezes for the reading.
+ * When the set ends (or, on the tour and on a club ring, one dancer
+ * remains) the winner takes the high ground, confetti cannons fire, and
+ * the board freezes for the reading.
  */
 export const PODIUM = {
   holdSeconds: 18,

@@ -54,6 +54,12 @@ everyone else.
   the room sees it (the mirror included), a 👑 leads their name on the
   SOCIAL panel, and it stays on until their **next game** takes it off at
   the door (or they leave the room, and it leaves with them).
+- **Clearing the floor ends the record early** on **THE TOUR** and on a
+  **club ring** — outlasting the room is the win there, and nobody waits
+  once it's decided. A **SOLO** set is the exception and always plays out:
+  you picked that record to dance it, and the groupies falling early never
+  costs you the back half of your chart, your grade, or your run at the
+  board.
 - Between sets, online rooms live in **THE CLUB** (it has no name — the
   sign over the stage is a moon, not a word). An Art Deco hall with a dance
   floor, a backlit bar, velvet booths, a raised terrace and a hushed STILL
@@ -446,7 +452,8 @@ server/index.mjs       the room relay (seats/seed/poses + club poses,
                        outlive their sets)
 tools/                 track analyzer · preview-shot · club-capture ·
                        social-check (three-headset end-to-end) ·
-                       crown-check (the crown's relay protocol)
+                       crown-check (the crown's relay protocol) ·
+                       floor-clear (who a cleared floor ends the set for)
 avatar-preview.html    dev-only dancer catwalk (never shipped)
 ```
 
