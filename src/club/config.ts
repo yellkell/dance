@@ -372,4 +372,9 @@ export const CLUB_NET = {
 } as const;
 
 /** Localstorage keys for the club's social safety lists. */
-export const SOCIAL_KEYS = { muted: 'gdr-muted', blocked: 'gdr-blocked', voice: 'gdr-voice' } as const;
+export const SOCIAL_KEYS = {
+  muted: 'gdr-muted',
+  blocked: 'gdr-blocked',
+  voice: 'gdr-voice',
+  music: 'gdr-club-music',
+} as const;

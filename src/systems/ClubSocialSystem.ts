@@ -45,7 +45,14 @@ import { pickRaidTrack, trackById, tracksFor } from '../audio/tracks.js';
 import { platformRoot } from '../arena/arena.js';
 import { ballSpawnPos } from '../club/ball.js';
 import { CLUB_NET } from '../club/config.js';
-import { socialBlocked, socialMuted, toggleSocialBlock, toggleSocialMute } from '../club/social.js';
+import {
+  clubMusicOn,
+  socialBlocked,
+  socialMuted,
+  toggleClubMusic,
+  toggleSocialBlock,
+  toggleSocialMute,
+} from '../club/social.js';
 import {
   clearVoiceSpeakers,
   isSpeaking,
@@ -151,6 +158,11 @@ export const socialView: {
   snapSocial?: () => string;
   snapSongs?: () => string;
   openSongs?: (on: boolean) => void;
+  /** Press any panel button by id — the headless finger for the floor's
+   *  console. Named apart from menuView.act on purpose: __gdr.menu merges
+   *  the two views into one namespace, and a shared name would hand every
+   *  press to the board. */
+  press?: (id: string) => void;
 } = {};
 
 export class ClubSocialSystem extends createSystem({}) {
@@ -207,6 +219,7 @@ export class ClubSocialSystem extends createSystem({}) {
     socialView.snapSongs = () => (this.songs.ctx().canvas as HTMLCanvasElement).toDataURL('image/png');
     socialView.openSongs = (on) => this.openSongs(on);
     socialView.snapSocial = () => (this.panel.ctx().canvas as HTMLCanvasElement).toDataURL('image/png');
+    socialView.press = (id) => this.act(id);
   }
 
   update(delta: number): void {
@@ -511,45 +524,57 @@ export class ClubSocialSystem extends createSystem({}) {
     }
     if (clicked) {
       sfx.uiClick();
-      const onList = clicked.startsWith('song:');
-      (onList ? this.songs : this.panel).press(clicked);
-      if (onList) {
-        const pick = clicked.slice(5);
-        if (pick !== 'close') this.setTrack(pick === 'shuffle' ? '' : pick);
-        this.closeSongs();
-      } else if (clicked === 'voice') {
-        setVoiceEnabled(!voiceEnabled());
-      } else if (clicked === 'mic') {
-        toggleVoiceMuted();
-      } else if (clicked === 'track') {
-        this.openSongs(!this.songsOpen);
-      } else if (clicked === 'call') {
-        this.callFromHere();
-      } else if (clicked === 'cancel') {
-        cancelBall();
-      } else if (clicked.startsWith('diff')) {
-        // The act floor for the chart my ball calls — same store the board
-        // uses, so the foyer and the floor always agree.
-        match.difficulty = Math.max(0, Math.min(3, Number(clicked.slice(4))));
-        try {
-          localStorage.setItem(DIFF_KEY, String(match.difficulty));
-        } catch {
-          /* fine */
-        }
-      } else if (clicked === 'leave') {
-        this.panel.setShown(false);
-        this.closeSongs();
-        leaveRoom();
-      } else if (clicked.startsWith('mute:')) {
-        toggleSocialMute(clicked.slice(5));
-      } else if (clicked.startsWith('block:')) {
-        toggleSocialBlock(clicked.slice(6));
-      }
-      this.paintKey = '';
+      this.act(clicked);
     }
 
     this.paint();
     if (this.songsOpen) this.paintSongs();
+  }
+
+  /** Press one of the console's buttons — the trigger's path, and the
+   *  headless finger's (socialView.press). */
+  private act(id: string): void {
+    const onList = id.startsWith('song:');
+    (onList ? this.songs : this.panel).press(id);
+    if (onList) {
+      const pick = id.slice(5);
+      if (pick !== 'close') this.setTrack(pick === 'shuffle' ? '' : pick);
+      this.closeSongs();
+    } else if (id === 'voice') {
+      setVoiceEnabled(!voiceEnabled());
+    } else if (id === 'mic') {
+      toggleVoiceMuted();
+    } else if (id === 'music') {
+      // THE MUSIC SWITCH. Local and persisted, like MUTE and BLOCK: the
+      // floor keeps dancing to a record the room can still hear, and the
+      // hush is waiting for you the next night too. MusicSystem reads the
+      // preference every tick and closes the fader.
+      toggleClubMusic();
+    } else if (id === 'track') {
+      this.openSongs(!this.songsOpen);
+    } else if (id === 'call') {
+      this.callFromHere();
+    } else if (id === 'cancel') {
+      cancelBall();
+    } else if (id.startsWith('diff')) {
+      // The act floor for the chart my ball calls — same store the board
+      // uses, so the foyer and the floor always agree.
+      match.difficulty = Math.max(0, Math.min(3, Number(id.slice(4))));
+      try {
+        localStorage.setItem(DIFF_KEY, String(match.difficulty));
+      } catch {
+        /* fine */
+      }
+    } else if (id === 'leave') {
+      this.panel.setShown(false);
+      this.closeSongs();
+      leaveRoom();
+    } else if (id.startsWith('mute:')) {
+      toggleSocialMute(id.slice(5));
+    } else if (id.startsWith('block:')) {
+      toggleSocialBlock(id.slice(6));
+    }
+    this.paintKey = '';
   }
 
   /* ── SONGS: the list that flies out of the ♪ row ──────────────────────── */
@@ -699,6 +724,7 @@ export class ClubSocialSystem extends createSystem({}) {
     const more = Math.max(0, net.members.length - 1 - members.length);
     const on = voiceEnabled();
     const mic = !isVoiceMuted() && isVoiceCapturing();
+    const music = clubMusicOn();
     const cued = trackById(match.preferredTrack);
     const ballUp = net.ball !== null;
     const mine = ballUp && net.ball!.callerIdx === net.myIdx;
@@ -706,7 +732,7 @@ export class ClubSocialSystem extends createSystem({}) {
     const inRoom = net.phase === 'hosting' || net.phase === 'joined';
     const key =
       members.map((m) => `${m.name}|${socialMuted(m.name) ? 1 : 0}${socialBlocked(m.name) ? 1 : 0}`).join(';') +
-      `#${this.hover ?? ''}#${on ? 1 : 0}#${mic ? 1 : 0}#${net.phase}#${cued?.id ?? ''}#${ballUp ? (mine ? 'B' : 'b') : ''}#${setOut ? net.gamePlayers.size : 0}#${more}#${match.difficulty}#${this.songsOpen ? 1 : 0}#${net.crownIdx ?? ''}`;
+      `#${this.hover ?? ''}#${on ? 1 : 0}#${mic ? 1 : 0}#${music ? 1 : 0}#${net.phase}#${cued?.id ?? ''}#${ballUp ? (mine ? 'B' : 'b') : ''}#${setOut ? net.gamePlayers.size : 0}#${more}#${match.difficulty}#${this.songsOpen ? 1 : 0}#${net.crownIdx ?? ''}`;
     if (key === this.paintKey) return;
     this.paintKey = key;
 
@@ -804,13 +830,29 @@ export class ClubSocialSystem extends createSystem({}) {
       h: 54,
       small: true,
     });
+    // The desk's bottom line: the two things you HEAR on this floor, side
+    // by side. Voice and music are one decision made twice — quiet enough
+    // to talk, or loud enough to dance — and reading them as a pair is
+    // what makes "turn the music down so we can chat" a single glance.
     buttons.push({
       id: 'voice',
       label: on ? 'VOICE CHAT: ON' : 'VOICE CHAT: OFF',
       tone: on ? undefined : UI.danger,
       x: 24,
       y: 958,
-      w: 652,
+      w: 320,
+      h: 60,
+      small: true,
+    });
+    buttons.push({
+      id: 'music',
+      label: music ? 'MUSIC: ON' : 'MUSIC: OFF',
+      // OFF is the LOUD state on this desk — a silenced floor is a thing
+      // you did on purpose and want to see you did.
+      tone: music ? undefined : UI.danger,
+      x: 356,
+      y: 958,
+      w: 320,
       h: 60,
       small: true,
     });

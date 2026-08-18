@@ -15,6 +15,7 @@ import {
   ambientRunning,
   beatNow,
   preload,
+  setAmbientMuted,
   setPlaybackState,
   setRunning,
   startAmbient,
@@ -24,6 +25,7 @@ import {
 } from '../audio/music.js';
 import { pickRaidTrack, trackById, tracksFor } from '../audio/tracks.js';
 import { actOfBeat } from '../choreo/setlist.js';
+import { clubMusicOn } from '../club/social.js';
 import { campaignComplete, match, menuMusic, phraseBeats } from '../game/state.js';
 import { net } from '../net/session.js';
 
@@ -103,6 +105,13 @@ export class MusicSystem extends createSystem({}) {
         const social = net.phase === 'hosting' || net.phase === 'joined';
         const closing = match.credits || (!social && menuMusic() === 'credits' && campaignComplete());
         const room = closing ? tracksFor('credits') : social ? tracksFor('club') : tracksFor('lobby');
+        // THE MUSIC SWITCH belongs to the CLUB, not to the room loop as a
+        // system: hush the floor to talk to your friends and the foyer's
+        // house rotation still greets you on the way out, because that is
+        // a different place with a different record on. The record keeps
+        // spinning either way — see setAmbientMuted — so the floor never
+        // stops dancing just because one headset stopped listening.
+        setAmbientMuted(social && !clubMusicOn());
         if (room.length) startAmbient(room, closing ? 0.75 : social ? 0.7 : 0.55);
         // Warm the raid record while the room track holds the floor, so the
         // drop is instant when someone hits START.
