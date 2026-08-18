@@ -266,7 +266,11 @@ export class HudSystem extends createSystem({}) {
     const color = GRADE.colors[letter] ?? '#f4f6fb';
     const faced = d.dodges + d.hits;
 
-    ink(g, d.alive ? 'THE SET SAYS' : 'GAME OVER', CW / 2, 46, 32, d.alive ? 'rgba(240,244,250,0.95)' : '#ff5040');
+    // The letter needs no introduction — a giant glowing grade IS the
+    // headline ("THE SET SAYS" above it was saying nothing). Only a
+    // chain-out still earns one: GAME OVER explains why the night ended
+    // early and why the letter under it is an F.
+    if (!d.alive) ink(g, 'GAME OVER', CW / 2, 46, 32, '#ff5040');
     // The letter, huge, with its own halo.
     g.shadowColor = color;
     g.shadowBlur = 40;
