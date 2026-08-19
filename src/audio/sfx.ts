@@ -553,9 +553,12 @@ export function hitTaken(): void {
  *  beside a landing's crash, and anything percussive there reads as
  *  taking the hit (the old glass clink — a struck plate — did exactly
  *  that). So: a quick rising fifth with a sparkle climbing off the top —
- *  the kit's reward vocabulary (the recall's rise, the routine's C-major
- *  ticks, an octave above them), pitched over the mix and gone in a
- *  third of a second. Rising = good; falling and banging = hit. */
+ *  the kit's reward vocabulary (the recall's rise), pitched over the mix
+ *  and gone in a third of a second. Rising = good; falling and banging =
+ *  hit. (It used to be described as an octave over the routine's ticks;
+ *  those are wooden knocks now, and this is the last pitched cue in the
+ *  set — deliberately, because a payoff is allowed to sing where a
+ *  metronome is not.) */
 export function perfectChime(): void {
   tone({ freq: 1046.5, type: 'triangle', dur: 0.07, gain: 0.15 }); // C6, the pickup
   tone({ freq: 1568, type: 'triangle', dur: 0.2, gain: 0.19, delay: 0.06 }); // G6 — the lift
@@ -950,18 +953,36 @@ export function railZap(): void {
   tone({ freq: 120, to: 52, type: 'sine', dur: 0.26, gain: 0.24, delay: 0.02 });
 }
 
-/** THE ROUTINE calling a step: a bright bell a beat ahead of each landing,
- *  pitched by step number up a major arpeggio. Once the marks are out this
- *  tick is the ONLY cue, so it has to say two things at once — "now", and
- *  "this is step three" — and pitch is how a dancer counts without
- *  counting. */
-const ROUTINE_NOTES = [523.25, 659.25, 783.99, 987.77]; // C E G B
+/** THE ROUTINE calling a step: a dry wooden COUNT a beat ahead of each
+ *  landing — one knock for step one, two for step two, three for three,
+ *  four for four.
+ *
+ *  Once the marks are out this tick is the ONLY cue, so it still has to
+ *  say two things at once — "now", and "this is step three" — but it now
+ *  says the second by COUNTING instead of by playing a tune. It used to
+ *  climb a C-major arpeggio, which is a melody laid over whatever record
+ *  is spinning: on any track not in C it was a wrong note on the grid,
+ *  and the boss is not supposed to be in the band. The knock is a clank's
+ *  inharmonic partial stack — no pitch class at all — so it lands on the
+ *  rhythm rather than the harmony, and counting is the very thing the
+ *  move is already asking the dancer to do.
+ *
+ *  Redundant by design: the knocks also brighten step by step, so the
+ *  count and the colour agree about which step this is. */
+const ROUTINE_KNOCK = 820; // the block's body — inharmonic, so never a note
+const ROUTINE_STEP_LIFT = 1.14; // each step's block a touch smaller/brighter
+const ROUTINE_GAP = 0.058; // seconds between knocks — a count, not a roll
 
 export function routineTick(step: number): void {
-  const f = ROUTINE_NOTES[Math.max(0, Math.min(ROUTINE_NOTES.length - 1, step))];
-  tone({ freq: f, to: f, type: 'triangle', dur: 0.16, gain: 0.15 });
-  tone({ freq: f * 2, to: f * 2, type: 'sine', dur: 0.1, gain: 0.06 }); // the shine
-  clank(f * 3, 0.05, 0.06, 0.005);
+  const n = Math.max(0, Math.min(3, step)) + 1;
+  const base = ROUTINE_KNOCK * Math.pow(ROUTINE_STEP_LIFT, n - 1);
+  for (let i = 0; i < n; i++) {
+    // The last knock of the count is the loudest and the longest — it's
+    // the one sitting on the beat line, and it keeps a four-knock count
+    // from smearing into a drum roll.
+    const last = i === n - 1;
+    clank(base, last ? 0.16 : 0.1, last ? 0.085 : 0.05, i * ROUTINE_GAP);
+  }
 }
 
 /** The blocks landing on the three quarters you didn't learn. */
