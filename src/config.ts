@@ -190,8 +190,10 @@ export const GOOP = {
  *           boss teaches a ROUTINE — two to four corners, never the same
  *           one twice, each marked with its step number and pointed out in
  *           order by his own body. Then the marks go out. From there the
- *           only cue is a TICK a beat ahead of each step, pitched by step
- *           number, and blocks crush the three corners you didn't learn.
+ *           only cue is a TICK a beat ahead of each step — one dry wooden
+ *           knock, pure time, because the COUNTING happened during the
+ *           lesson (one knock per step number as each corner was taught)
+ *           — and blocks crush the three corners you didn't learn.
  *           The quarter lines stay lit the whole way through: the floor
  *           tells you where the boxes are, never which one is yours.
  *  donut  : the RIM burns and the middle lives — a closing ring with a

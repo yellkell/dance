@@ -163,6 +163,8 @@ export class ChoreoSystem extends createSystem({}) {
   private landedSfx = new Set<string>();
   private cuedSteps = new Set<string>();
   private cuedTicks = new Set<string>();
+  /** Which corners of a routine's LESSON have already been counted out. */
+  private cuedLesson = new Set<string>();
   private ended = false;
   /** Is this chart running EXPERT double time? Decides which pace tables
    *  the windows below read (set in rebuild, from the same shared inputs
@@ -344,6 +346,7 @@ export class ChoreoSystem extends createSystem({}) {
     this.landedSfx.clear();
     this.cuedSteps.clear();
     this.cuedTicks.clear();
+    this.cuedLesson.clear();
     this.ended = false;
     // A record's bans: the ones it always carries, plus the ones that only
     // hold on an authored campaign night.
@@ -418,16 +421,34 @@ export class ChoreoSystem extends createSystem({}) {
       match.gestures.push({ kind: z.kind, chargeBeats: lead, step: true, ...cueDirection(z.kind, z.zone, z.moveIdx, z.landingIdx), dueBeat: z.dueBeat });
     }
 
-    // THE ROUTINE calls itself: one tick a beat ahead of every step,
-    // pitched by step number. Once the marks have faded this is the only
-    // cue there is, so it fires for the whole ring at once (one landing,
-    // one call) regardless of how many decks are still dancing.
+    // THE ROUTINE's LESSON, counted out loud. While the marks are lit the
+    // boss walks the corners in order (one slice of the wind-up each, the
+    // same slices his body points along — see McSystem), and each corner
+    // is counted as it's taught: one knock for step one, two for step two.
+    // Hung on the step-0 zone, which is the one that draws the marks.
+    for (const z of this.zones) {
+      if (z.resolved || z.zone.kind !== 'quad' || z.zone.step !== 0) continue;
+      const n = z.zone.routine.length;
+      const span = Math.max(0.001, z.dueBeat - z.tgStartBeat);
+      for (let i = 0; i < n; i++) {
+        if (beat < z.tgStartBeat + (span * i) / n) continue;
+        const key = `${z.moveIdx}:lesson:${i}`;
+        if (this.cuedLesson.has(key)) continue;
+        this.cuedLesson.add(key);
+        sfx.routineCount(i);
+      }
+    }
+
+    // …and then the STEPS: one knock a beat ahead of every landing, the
+    // same block, counting nothing. Once the marks have faded this is the
+    // only cue there is, so it fires for the whole ring at once (one
+    // landing, one call) regardless of how many decks are still dancing.
     for (const z of this.zones) {
       if (z.resolved || z.zone.kind !== 'quad' || beat < z.dueBeat - beatScale) continue;
       const key = `${z.moveIdx}:${z.landingIdx}`;
       if (this.cuedTicks.has(key)) continue;
       this.cuedTicks.add(key);
-      sfx.routineTick(z.zone.step);
+      sfx.routineTick();
     }
 
     // Advance live zones.

@@ -553,9 +553,12 @@ export function hitTaken(): void {
  *  beside a landing's crash, and anything percussive there reads as
  *  taking the hit (the old glass clink — a struck plate — did exactly
  *  that). So: a quick rising fifth with a sparkle climbing off the top —
- *  the kit's reward vocabulary (the recall's rise, the routine's C-major
- *  ticks, an octave above them), pitched over the mix and gone in a
- *  third of a second. Rising = good; falling and banging = hit. */
+ *  the kit's reward vocabulary (the recall's rise), pitched over the mix
+ *  and gone in a third of a second. Rising = good; falling and banging =
+ *  hit. (It used to be described as an octave over the routine's ticks;
+ *  those are wooden knocks now, and this is the last pitched cue in the
+ *  set — deliberately, because a payoff is allowed to sing where a
+ *  metronome is not.) */
 export function perfectChime(): void {
   tone({ freq: 1046.5, type: 'triangle', dur: 0.07, gain: 0.15 }); // C6, the pickup
   tone({ freq: 1568, type: 'triangle', dur: 0.2, gain: 0.19, delay: 0.06 }); // G6 — the lift
@@ -950,18 +953,48 @@ export function railZap(): void {
   tone({ freq: 120, to: 52, type: 'sine', dur: 0.26, gain: 0.24, delay: 0.02 });
 }
 
-/** THE ROUTINE calling a step: a bright bell a beat ahead of each landing,
- *  pitched by step number up a major arpeggio. Once the marks are out this
- *  tick is the ONLY cue, so it has to say two things at once — "now", and
- *  "this is step three" — and pitch is how a dancer counts without
- *  counting. */
-const ROUTINE_NOTES = [523.25, 659.25, 783.99, 987.77]; // C E G B
+/* THE ROUTINE speaks in KNOCKS — a dry wooden block, never a note. It
+ * used to climb a C-major arpeggio, which is a melody laid over whatever
+ * record is spinning: on any track not in C it was a wrong note sitting
+ * on the grid, and the boss is not in the band. The knock is a clank's
+ * inharmonic partial stack (no pitch class at all), so it lands on the
+ * rhythm instead of the harmony.
+ *
+ * It says two different things in the move's two halves, and the split is
+ * the whole point:
+ *
+ *   THE LESSON — while the marks are lit and you are reading the dots,
+ *     each corner is COUNTED as it's taught: one knock for step one, two
+ *     for step two. Counting is what a lesson does.
+ *   THE STEPS — once the marks go dark, a SINGLE knock a beat ahead of
+ *     every landing. You already know which corner is next; what you need
+ *     now is the time, so the tick becomes a metronome and nothing else.
+ *
+ * Counting through the live steps as well made the performance re-teach a
+ * lesson you'd already been given, and put four knocks in the bar exactly
+ * where the blocks were coming down. */
+const ROUTINE_KNOCK = 820; // the block's body — inharmonic, so never a note
+const ROUTINE_STEP_LIFT = 1.14; // each taught step's block a touch brighter
+const ROUTINE_GAP = 0.058; // seconds between knocks — a count, not a roll
 
-export function routineTick(step: number): void {
-  const f = ROUTINE_NOTES[Math.max(0, Math.min(ROUTINE_NOTES.length - 1, step))];
-  tone({ freq: f, to: f, type: 'triangle', dur: 0.16, gain: 0.15 });
-  tone({ freq: f * 2, to: f * 2, type: 'sine', dur: 0.1, gain: 0.06 }); // the shine
-  clank(f * 3, 0.05, 0.06, 0.005);
+/** One strike of the block. `hard` is the knock that carries the beat. */
+function routineKnock(base: number, hard: boolean, delay = 0): void {
+  clank(base, hard ? 0.16 : 0.1, hard ? 0.085 : 0.05, delay);
+}
+
+/** THE LESSON: corner `step` being taught — counted out, one knock per
+ *  step number, the last one landing hardest so four knocks read as a
+ *  count and not a roll. The body brightens step by step too, so the
+ *  count and the colour agree about which corner this is. */
+export function routineCount(step: number): void {
+  const n = Math.max(0, Math.min(3, step)) + 1;
+  const base = ROUTINE_KNOCK * Math.pow(ROUTINE_STEP_LIFT, n - 1);
+  for (let i = 0; i < n; i++) routineKnock(base, i === n - 1, i * ROUTINE_GAP);
+}
+
+/** THE STEPS: one knock, a beat ahead of each landing. Pure time. */
+export function routineTick(): void {
+  routineKnock(ROUTINE_KNOCK, true);
 }
 
 /** The blocks landing on the three quarters you didn't learn. */

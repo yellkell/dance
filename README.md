@@ -177,8 +177,11 @@ each step, three spinning neon polyhedra (the
 [DOWN](https://yellkell.github.io/down) bloodline, upside down — dark core,
 glowing shell, blazing wireframe, a deck ring brightening underneath)
 descend on a beat-locked path onto the three quarters you must not be in,
-crushing flat exactly on the tick. A bell rings a beat ahead of each step,
-pitched up an arpeggio so the sound says *which* step as well as *when*.
+crushing flat exactly on the tick. The sound is a dry wooden block, never
+a note: while the marks are up each corner is COUNTED as it's taught —
+one knock for step one, two for step two — and once they go dark a single
+knock a beat ahead of every step keeps the time. The lesson says *which*;
+the performance says *when*.
 The quarter lines stay lit the whole way through, because the floor should
 always tell you where the boxes land — never which one is yours.
 
