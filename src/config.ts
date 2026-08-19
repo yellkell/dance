@@ -420,12 +420,18 @@ export const CHOREO = {
   seesawGapBeats: [4, 4, 2, 2, 2],
   /** Forgiveness strip either side of the centreline (m). */
   seesawSafeLip: 0.06,
-  /** Nova safe-wedge half-angle (radians); tightens in the last act. */
+  /** Nova safe-wedge half-angle (radians); tightens with the acts. */
   novaHalfAngle: 0.6,
   novaHalfAngleLate: 0.45,
-  /** Act 4 nudges the wedge, gently — expert lives in density and
-   *  combinations, not in slivers of safe ground. */
-  novaHalfAngleExpert: 0.42,
+  /** EXPERT's one and only pie, held for the whole night — and cut a touch
+   *  WIDER than the slivers the last act used to serve (0.42). Expert is
+   *  the difficulty where every nova arrives as THE CHAIN: three pies in a
+   *  row, each wedge a third of the compass on, walking the ring the whole
+   *  way around. Three of anything asks for a slice you can actually stand
+   *  in — expert lives in density and combinations, not in slivers of safe
+   *  ground, and a chain of slivers is just the same read three times with
+   *  less room to make it. */
+  novaHalfAngleExpert: 0.5,
   novaRadius: 1.15,
   /** THE CHAIN (late-act nova): three SINGULAR pies, one after the other,
    *  each safe wedge a third of the compass further on — three dodges walk

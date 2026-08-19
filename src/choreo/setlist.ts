@@ -440,8 +440,15 @@ function buildLandings(
     // disc appears only as the previous pie detonates (ChoreoSystem gates
     // the telegraph per landing) — one pie on the floor at a time, ever.
     const slices = act >= 3 ? 3 : act >= 2 && rng() < 0.45 ? 2 : 1;
-    const halfAngle =
-      act >= 4 ? CHOREO.novaHalfAngleExpert : act >= 3 ? CHOREO.novaHalfAngleLate : CHOREO.novaHalfAngle;
+    // THE WEDGE. It tightens act by act — except on EXPERT, which holds one
+    // wedge all night, cut a touch wider than the last act used to. Every
+    // expert nova is a three-pie chain, and three walks around the rose in
+    // a row want a slice you can stand in rather than thread.
+    const halfAngle = expert
+      ? CHOREO.novaHalfAngleExpert
+      : act >= 3
+        ? CHOREO.novaHalfAngleLate
+        : CHOREO.novaHalfAngle;
     let bearing = rng() * Math.PI * 2;
     const turn = (rng() < 0.5 ? 1 : -1) * CHOREO.novaChainTurn;
     const chain = doubleTime ? CHOREO.doubleTimePace.novaChainBeats : CHOREO.novaChainBeats;

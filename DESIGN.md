@@ -59,20 +59,29 @@ with NO rest, duck donut twice as common, and THE SWEPT ROUTINE: on the
 charts that carry it (a per-song coin, so the hardest nights stay
 distinct), every blast of the routine arrives under the sweep's blade —
 stand in the taught corner AND duck on every tick. Geometry barely
-tightens at act 4 (gate 0.22 → 0.20, nova wedge 0.45 → 0.42 rad): expert
-lives in density and combinations, not in slivers of safe ground.
+tightens at act 4 (gate 0.22 → 0.20): expert lives in density and
+combinations, not in slivers of safe ground.
 
-The donut is the one shape that does NOT ride that curve. On EXPERT its
-safe disc is a flat 0.30 m from the first bar to the last — the tightest
-in the game, and the same one every time it lands. Everywhere else the
-disc still tightens with the acts (0.42, and 0.34 on hard's back
-stretch), but expert is the difficulty where the donut is *run back
-into*: the opening laser drives you off the exact ground the rim is
-about to demand, so you return on memory, not on the read. A target that
-quietly resized between phrases asked you to re-learn the answer in the
-middle of the set — expert now gets the honest version. Online, the ball
-carries the caller's difficulty with the song pick, so the whole ring
-dances one chart.
+**Two shapes step off that curve entirely, and EXPERT holds each of them
+at one size all night.** Both are moves the difficulty serves so heavily
+that a geometry which quietly resized between phrases stopped being
+learnable:
+
+- **The donut's safe disc** is a flat **0.30 m** from the first bar to
+  the last — the tightest in the game. Everywhere else it still tightens
+  with the acts (0.42, and 0.34 on hard's back stretch). Expert is the
+  difficulty where the donut is *run back into*: the opening laser drives
+  you off the exact ground the rim is about to demand, so you return on
+  memory rather than on the read.
+- **The nova's safe wedge** is a flat **0.50 rad** half-angle — a touch
+  WIDER than the 0.45/0.42 slivers the act curve used to cut there. On
+  expert every nova arrives as THE CHAIN: three pies in a row, each wedge
+  a third of the compass on, so one move walks the whole ring the whole
+  way around. Three reads in a row want a slice you can stand in; a chain
+  of slivers is the same read three times with less room to make it.
+
+Online, the ball carries the caller's difficulty with the song pick, so
+the whole ring dances one chart.
 
 And EXPERT keeps one more law: **slow records chart in DOUBLE TIME**. The
 pressure curve is written in beats, so its real-time density scales with
