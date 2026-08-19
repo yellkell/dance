@@ -261,8 +261,13 @@ export const MOVES: Record<
   // the floor talks about afterwards, and a memory test you meet every
   // phrase stops being one.
   routine: { chargeBeats: 8, weights: [0, 1, 2, 2, 3] },
-  // THE COMBINATION is a finale spice: act 3 only, and rare even there.
-  duckdonut: { chargeBeats: 6, weights: [0, 0, 0, 1, 2] },
+  // THE COMBINATION asks for the two hardest answers in the game on one
+  // beat, which is exactly why it should be something you meet once in a
+  // night and talk about after — not a shape the back stretch serves
+  // regularly. Fractional weights (the roll is a plain weighted sum, so
+  // they work): well under a percent of the moves at act 3, and still
+  // rare at act 4, where it stays twice as likely as the act below it.
+  duckdonut: { chargeBeats: 6, weights: [0, 0, 0, 0.2, 0.4] },
   // THE WAVE is the travel move: four beams marching 1-2-3-4 across the
   // whole deck. Each beam gets the beam's own short fuse; the march is
   // the long read.
@@ -360,8 +365,19 @@ export const CHOREO = {
   waveStepBeats: [2, 2, 1, 1, 1],
   /** Beats between the out-march's last fire and the turn's first — a
    *  double step plus one whole extra beat: you only just reached the
-   *  exit, and the breather is what makes the wheel readable. */
+   *  exit, and the breather is what makes the wheel readable. The same
+   *  breather buys the third march below its own wheel. */
   waveTurnExtraBeats: 1,
+  /** THE LONG WAVE — EXPERT only, and only sometimes: the march wheels a
+   *  SECOND time and runs the deck once more. Across, back, and across
+   *  again — the exact rally the twin's bounce plays with lasers, told in
+   *  a march. Every wave already turns, so the shape is one a dancer
+   *  knows by the time expert serves it; what the third leg asks for is
+   *  the legs to still be there on the last beat of it. Kept a coin
+   *  rather than a promise: a wave that ALWAYS ran three times would own
+   *  its phrase, and the read that makes the move (breathe at the wheel,
+   *  ride one square behind) stops being a read once it's a routine. */
+  waveThirdChance: 0.3,
   /** THE ROUTINE: how many corners you're asked to hold in your head (per
    *  act, clamped to the 2–4 the deck's four quarters can offer without
    *  ever repeating one), and how many beats apart the steps land. Two
@@ -371,8 +387,10 @@ export const CHOREO = {
   /** THE SWEPT ROUTINE (act 4): every blast of the routine arrives under
    *  the sweep's blade — stand in the taught corner AND duck on each tick.
    *  A per-SONG coin, not a per-move one: some expert charts carry it,
-   *  some never do, so the hardest nights stay distinct. */
-  routineSweepChance: 0.5,
+   *  some never do, so the hardest nights stay distinct — and at even odds
+   *  "some" was every other night, which is a garnish, not a legend. At
+   *  one chart in eight it is the thing a floor remembers a record for. */
+  routineSweepChance: 0.12,
   /** Three beats corner-to-corner: two read as a shove at raid tempo — the
    *  memory needs a breath between ticks, not just travel time. */
   routineStepBeats: 3,
@@ -387,12 +405,20 @@ export const CHOREO = {
    *  at once and the whole move would be free — so the routine asks you to
    *  commit, and the lit quarter lines show exactly where the line is. */
   routineMargin: 0.08,
-  /** THE DONUT: radius of the safe disc in the middle (tighter at the
-   *  peak), how long after the opening laser the ring closes, and how often
-   *  it opens with that laser instead of arriving alone. A full bar between
-   *  the two is the whole move: driven off centre, then hauled back. */
+  /** THE DONUT: radius of the safe disc in the middle, how long after the
+   *  opening laser the ring closes, and how often it opens with that laser
+   *  instead of arriving alone. A full bar between the two is the whole
+   *  move: driven off centre, then hauled back.
+   *
+   *  The disc tightens act by act — EXCEPT on EXPERT, which serves ONE
+   *  donut all night: the tight disc, first bar to last. The donut is the
+   *  move you run BACK INTO, off the memory of where the middle was, and a
+   *  target that quietly resizes between phrases is a target nobody can
+   *  learn. Expert gets the honest version — the same disc every time, and
+   *  the smallest one the game serves. */
   donutInnerR: 0.42,
   donutInnerRLate: 0.34,
+  /** EXPERT's one and only donut, and the tightest disc in the game. */
   donutInnerRExpert: 0.3,
   donutRadius: 1.15,
   donutFollowBeats: 4,
@@ -412,12 +438,18 @@ export const CHOREO = {
   seesawGapBeats: [4, 4, 2, 2, 2],
   /** Forgiveness strip either side of the centreline (m). */
   seesawSafeLip: 0.06,
-  /** Nova safe-wedge half-angle (radians); tightens in the last act. */
+  /** Nova safe-wedge half-angle (radians); tightens with the acts. */
   novaHalfAngle: 0.6,
   novaHalfAngleLate: 0.45,
-  /** Act 4 nudges the wedge, gently — expert lives in density and
-   *  combinations, not in slivers of safe ground. */
-  novaHalfAngleExpert: 0.42,
+  /** EXPERT's one and only pie, held for the whole night — and cut a touch
+   *  WIDER than the slivers the last act used to serve (0.42). Expert is
+   *  the difficulty where every nova arrives as THE CHAIN: three pies in a
+   *  row, each wedge a third of the compass on, walking the ring the whole
+   *  way around. Three of anything asks for a slice you can actually stand
+   *  in — expert lives in density and combinations, not in slivers of safe
+   *  ground, and a chain of slivers is just the same read three times with
+   *  less room to make it. */
+  novaHalfAngleExpert: 0.5,
   novaRadius: 1.15,
   /** THE CHAIN (late-act nova): three SINGULAR pies, one after the other,
    *  each safe wedge a third of the compass further on — three dodges walk

@@ -55,14 +55,54 @@ What each act brings: act 0 — beam, sweep, seesaw, gate (both axes),
 crossfire; act 1 — donut one-twos, the routine, THE WAVE; act 2 — surge,
 nova, rail traps, double beams, THE X; act 3 — duck donut, 5-stage
 seesaws, tight novas; act 4 (EXPERT's back stretch) — six moves a phrase
-with NO rest, duck donut twice as common, and THE SWEPT ROUTINE: on the
-charts that carry it (a per-song coin, so the hardest nights stay
-distinct), every blast of the routine arrives under the sweep's blade —
-stand in the taught corner AND duck on every tick. Geometry barely
-tightens at act 4 (gate 0.22 → 0.20, nova wedge 0.45 → 0.42 rad, donut
-disc 0.34 → 0.30): expert lives in density and combinations, not in
-slivers of safe ground. Online, the ball carries the caller's difficulty
-with the song pick, so the whole ring dances one chart.
+with NO rest, duck donut twice as likely as the act below, and THE SWEPT
+ROUTINE: on the charts that carry it (a per-song coin, so the hardest
+nights stay distinct), every blast of the routine arrives under the
+sweep's blade — stand in the taught corner AND duck on every tick.
+
+**Rare means rare.** Those two are the show's set pieces, and both used
+to turn up often enough to be furniture: the duck donut landed twice in
+a typical expert set (in 86% of them), and the swept routine rode 30% of
+expert charts. A combination you meet twice a night is a move, not an
+event. The duck donut now carries a FRACTIONAL roll weight — the pick is
+a plain weighted sum, so a weight below one is honest — and lands about
+once every other expert set (one in eight on HARD); the swept coin is
+one chart in eight, which reads as one in twelve after you account for a
+routine actually falling in act 4. Neither was made easier; both were
+made worth waiting for.
+
+EXPERT keeps one escalation of its own: **THE LONG WAVE**. Every wave
+already turns at its exit and marches home — about three in ten expert
+waves now wheel a SECOND time and cross the deck again, nine landings
+instead of six. It is the twin bounce's rally (across, back, across)
+told as a march, and it stays a coin rather than a rule: a wave that
+always ran three times would own its phrase, and the read that makes the
+move — breathe at the wheel, then ride one square behind — stops being a
+read once it is a routine.
+
+Geometry barely tightens at act 4 (gate 0.22 → 0.20): expert lives in
+density and combinations, not in slivers of safe ground.
+
+**Two shapes step off that curve entirely, and EXPERT holds each of them
+at one size all night.** Both are moves the difficulty serves so heavily
+that a geometry which quietly resized between phrases stopped being
+learnable:
+
+- **The donut's safe disc** is a flat **0.30 m** from the first bar to
+  the last — the tightest in the game. Everywhere else it still tightens
+  with the acts (0.42, and 0.34 on hard's back stretch). Expert is the
+  difficulty where the donut is *run back into*: the opening laser drives
+  you off the exact ground the rim is about to demand, so you return on
+  memory rather than on the read.
+- **The nova's safe wedge** is a flat **0.50 rad** half-angle — a touch
+  WIDER than the 0.45/0.42 slivers the act curve used to cut there. On
+  expert every nova arrives as THE CHAIN: three pies in a row, each wedge
+  a third of the compass on, so one move walks the whole ring the whole
+  way around. Three reads in a row want a slice you can stand in; a chain
+  of slivers is the same read three times with less room to make it.
+
+Online, the ball carries the caller's difficulty with the song pick, so
+the whole ring dances one chart.
 
 And EXPERT keeps one more law: **slow records chart in DOUBLE TIME**. The
 pressure curve is written in beats, so its real-time density scales with

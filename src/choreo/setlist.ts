@@ -188,6 +188,7 @@ function buildLandings(
   sweptRoutines = false,
   park: Park = null,
   doubleTime = false,
+  expert = false,
 ): Landing[] {
   const landings: Landing[] = [];
   if (kind === 'beam') {
@@ -251,8 +252,17 @@ function buildLandings(
     // ground left. Out, then back — the whole deck used in four beats.
     // (The ring's own telegraph holds off until the laser has fired; see
     // ChoreoSystem, which gates the second stage's window.)
-    const innerR =
-      act >= 4 ? CHOREO.donutInnerRExpert : act >= 3 ? CHOREO.donutInnerRLate : CHOREO.donutInnerR;
+    // THE SAFE DISC tightens act by act — except on EXPERT, where every
+    // donut in the night is the same tight disc. This is the one move you
+    // run BACK INTO on memory (the opening laser drives you off the very
+    // ground the rim then demands), so a middle that quietly resizes
+    // between phrases asks you to re-learn the answer mid-set. Expert
+    // holds the tightest disc from the first bar and never moves it.
+    const innerR = expert
+      ? CHOREO.donutInnerRExpert
+      : act >= 3
+        ? CHOREO.donutInnerRLate
+        : CHOREO.donutInnerR;
     const opens = rng() < CHOREO.donutOpenChance;
     if (opens) {
       landings.push({
@@ -365,6 +375,10 @@ function buildLandings(
     // step plus one whole beat late (you only just got there; the
     // breather is the read), and the new exit is the far side where the
     // whole thing began. Across, and all the way back.
+    //
+    // THE LONG WAVE — EXPERT, sometimes: it wheels a SECOND time and runs
+    // the deck again, so the move goes across, back, and across once more
+    // — the twin bounce's rally, marched instead of fired.
     const axis: 0 | 1 = rng() < 0.5 ? 1 : 0;
     const steps = doubleTime ? CHOREO.doubleTimePace.waveStepBeats : CHOREO.waveStepBeats;
     const step = steps[Math.min(act, steps.length - 1)];
@@ -378,6 +392,18 @@ function buildLandings(
       at.push(stop);
       beats.push(turnAt + i * step);
     });
+    // Rolled before the gate, never inside it, so the seeded stream draws
+    // the same numbers in the same order whatever the difficulty.
+    const third = rng() < CHOREO.waveThirdChance && expert;
+    if (third) {
+      // The return parked everyone at ordered[0]; the third leg walks back
+      // out from there, exit returning to the far side it started from.
+      const backAt = beats[beats.length - 1] + step * 2 + turnExtra;
+      [ordered[0], ordered[1], ordered[2]].forEach((stop, i) => {
+        at.push(stop);
+        beats.push(backAt + i * step);
+      });
+    }
     const from: 1 | -1 = rng() < 0.5 ? 1 : -1;
     at.forEach((stop, i) => {
       landings.push({
@@ -430,8 +456,15 @@ function buildLandings(
     // disc appears only as the previous pie detonates (ChoreoSystem gates
     // the telegraph per landing) — one pie on the floor at a time, ever.
     const slices = act >= 3 ? 3 : act >= 2 && rng() < 0.45 ? 2 : 1;
-    const halfAngle =
-      act >= 4 ? CHOREO.novaHalfAngleExpert : act >= 3 ? CHOREO.novaHalfAngleLate : CHOREO.novaHalfAngle;
+    // THE WEDGE. It tightens act by act — except on EXPERT, which holds one
+    // wedge all night, cut a touch wider than the last act used to. Every
+    // expert nova is a three-pie chain, and three walks around the rose in
+    // a row want a slice you can stand in rather than thread.
+    const halfAngle = expert
+      ? CHOREO.novaHalfAngleExpert
+      : act >= 3
+        ? CHOREO.novaHalfAngleLate
+        : CHOREO.novaHalfAngle;
     let bearing = rng() * Math.PI * 2;
     const turn = (rng() < 0.5 ? 1 : -1) * CHOREO.novaChainTurn;
     const chain = doubleTime ? CHOREO.doubleTimePace.novaChainBeats : CHOREO.novaChainBeats;
@@ -670,6 +703,9 @@ export function generateSetlist(
 ): SetMove[] {
   const rng = mulberry32(mix(seed, 0xc03e0));
   const moves: SetMove[] = [];
+  // EXPERT is a floor, not a phase: the whole night is served at the top
+  // difficulty's terms (the donut's disc reads this — see buildLandings).
+  const expert = difficulty >= 3;
   // THE SWEPT ROUTINE is a per-CHART coin: some expert nights carry it,
   // some never do — the hardest challenges stay distinct records, not a
   // constant garnish. (Rolled for every chart so the stream stays aligned;
@@ -719,7 +755,7 @@ export function generateSetlist(
       let charge = chartChargeBeats(kind, doubleTime);
       // Land on the next bar downbeat that the telegraph fits in front of.
       let landBeat = Math.ceil((cursor + charge) / barBeats) * barBeats;
-      let landings = buildLandings(kind, landBeat, act, rng, sweptRoutines, park, doubleTime);
+      let landings = buildLandings(kind, landBeat, act, rng, sweptRoutines, park, doubleTime, expert);
       // THE FLOOR MANAGER: a move whose danger never touches the ground
       // the last move parked you on asks for nothing — roll another shape
       // (same seeded stream, so every client re-rolls identically). A WHOLE
@@ -734,7 +770,7 @@ export function generateSetlist(
         kind = pickKind(rng, act, last, banned);
         charge = chartChargeBeats(kind, doubleTime);
         landBeat = Math.ceil((cursor + charge) / barBeats) * barBeats;
-        landings = buildLandings(kind, landBeat, act, rng, sweptRoutines, park, doubleTime);
+        landings = buildLandings(kind, landBeat, act, rng, sweptRoutines, park, doubleTime, expert);
       }
       if (!evictsPark(landings, park) || landings[landings.length - 1].beat > moveEnd) {
         // TWELVE SHAPES AND NOT ONE OF THEM FITS. This used to abandon the
