@@ -188,6 +188,7 @@ function buildLandings(
   sweptRoutines = false,
   park: Park = null,
   doubleTime = false,
+  expert = false,
 ): Landing[] {
   const landings: Landing[] = [];
   if (kind === 'beam') {
@@ -251,8 +252,17 @@ function buildLandings(
     // ground left. Out, then back — the whole deck used in four beats.
     // (The ring's own telegraph holds off until the laser has fired; see
     // ChoreoSystem, which gates the second stage's window.)
-    const innerR =
-      act >= 4 ? CHOREO.donutInnerRExpert : act >= 3 ? CHOREO.donutInnerRLate : CHOREO.donutInnerR;
+    // THE SAFE DISC tightens act by act — except on EXPERT, where every
+    // donut in the night is the same tight disc. This is the one move you
+    // run BACK INTO on memory (the opening laser drives you off the very
+    // ground the rim then demands), so a middle that quietly resizes
+    // between phrases asks you to re-learn the answer mid-set. Expert
+    // holds the tightest disc from the first bar and never moves it.
+    const innerR = expert
+      ? CHOREO.donutInnerRExpert
+      : act >= 3
+        ? CHOREO.donutInnerRLate
+        : CHOREO.donutInnerR;
     const opens = rng() < CHOREO.donutOpenChance;
     if (opens) {
       landings.push({
@@ -670,6 +680,9 @@ export function generateSetlist(
 ): SetMove[] {
   const rng = mulberry32(mix(seed, 0xc03e0));
   const moves: SetMove[] = [];
+  // EXPERT is a floor, not a phase: the whole night is served at the top
+  // difficulty's terms (the donut's disc reads this — see buildLandings).
+  const expert = difficulty >= 3;
   // THE SWEPT ROUTINE is a per-CHART coin: some expert nights carry it,
   // some never do — the hardest challenges stay distinct records, not a
   // constant garnish. (Rolled for every chart so the stream stays aligned;
@@ -719,7 +732,7 @@ export function generateSetlist(
       let charge = chartChargeBeats(kind, doubleTime);
       // Land on the next bar downbeat that the telegraph fits in front of.
       let landBeat = Math.ceil((cursor + charge) / barBeats) * barBeats;
-      let landings = buildLandings(kind, landBeat, act, rng, sweptRoutines, park, doubleTime);
+      let landings = buildLandings(kind, landBeat, act, rng, sweptRoutines, park, doubleTime, expert);
       // THE FLOOR MANAGER: a move whose danger never touches the ground
       // the last move parked you on asks for nothing — roll another shape
       // (same seeded stream, so every client re-rolls identically). A WHOLE
@@ -734,7 +747,7 @@ export function generateSetlist(
         kind = pickKind(rng, act, last, banned);
         charge = chartChargeBeats(kind, doubleTime);
         landBeat = Math.ceil((cursor + charge) / barBeats) * barBeats;
-        landings = buildLandings(kind, landBeat, act, rng, sweptRoutines, park, doubleTime);
+        landings = buildLandings(kind, landBeat, act, rng, sweptRoutines, park, doubleTime, expert);
       }
       if (!evictsPark(landings, park) || landings[landings.length - 1].beat > moveEnd) {
         // TWELVE SHAPES AND NOT ONE OF THEM FITS. This used to abandon the

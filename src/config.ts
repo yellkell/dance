@@ -387,12 +387,20 @@ export const CHOREO = {
    *  at once and the whole move would be free — so the routine asks you to
    *  commit, and the lit quarter lines show exactly where the line is. */
   routineMargin: 0.08,
-  /** THE DONUT: radius of the safe disc in the middle (tighter at the
-   *  peak), how long after the opening laser the ring closes, and how often
-   *  it opens with that laser instead of arriving alone. A full bar between
-   *  the two is the whole move: driven off centre, then hauled back. */
+  /** THE DONUT: radius of the safe disc in the middle, how long after the
+   *  opening laser the ring closes, and how often it opens with that laser
+   *  instead of arriving alone. A full bar between the two is the whole
+   *  move: driven off centre, then hauled back.
+   *
+   *  The disc tightens act by act — EXCEPT on EXPERT, which serves ONE
+   *  donut all night: the tight disc, first bar to last. The donut is the
+   *  move you run BACK INTO, off the memory of where the middle was, and a
+   *  target that quietly resizes between phrases is a target nobody can
+   *  learn. Expert gets the honest version — the same disc every time, and
+   *  the smallest one the game serves. */
   donutInnerR: 0.42,
   donutInnerRLate: 0.34,
+  /** EXPERT's one and only donut, and the tightest disc in the game. */
   donutInnerRExpert: 0.3,
   donutRadius: 1.15,
   donutFollowBeats: 4,
