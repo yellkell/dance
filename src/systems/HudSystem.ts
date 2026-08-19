@@ -15,10 +15,12 @@
  * F, with the share of landings you survived under it.
  *
  * THE GROOVE ROW is how you see the combo catch: four pips light one per
- * rhythmic swap as it winds up, and once it's running they give way to a
- * fill bar with the points that streak has paid so far. It dies with the
- * streak, so the row always reads "this run". The sparks off the sticks
- * are still the loud half of the answer; this is the quiet ledger.
+ * rhythmic swap as it winds up — and once it's running the pips KEEP
+ * DANCING: the cycle walks 1-2-3-4 with your swaps, and the pip whose
+ * turn it is hops with a lens-glint sparkle, with the points the streak
+ * has paid beside. It dies with the streak, so the row always reads
+ * "this run". The sparks off the sticks are still the loud half of the
+ * answer; this is the quiet ledger.
  *
  * The count-in and the final grade take the centre — they're cards you
  * READ while nothing is trying to kill you — and the flair pops
@@ -38,7 +40,7 @@ import {
   MeshBasicMaterial,
   PlaneGeometry,
 } from 'three';
-import { GRADE, GROOVE, SCORE, TOUR } from '../config.js';
+import { GRADE, SCORE, TOUR } from '../config.js';
 import { trackById } from '../audio/tracks.js';
 import { danceHue } from '../game/profile.js';
 import { dodgeRate, gradeOf, match, me, showBeat } from '../game/state.js';
@@ -243,6 +245,10 @@ export class HudSystem extends createSystem({}) {
       d?.alive,
       match.grooveStreak,
       match.grooveScore,
+      // The RUNNING groove animates (the turn pip hops on every swap), so
+      // while it runs the strip repaints on a sub-beat clock — ten frames
+      // a beat — and not at all when the row is cold or winding up.
+      match.grooveStreak > 4 ? Math.floor((showBeat() % 1) * 10) : -1,
     ].join(':');
     if (key !== this.lastKey) {
       this.lastKey = key;
@@ -393,8 +399,14 @@ export class HudSystem extends createSystem({}) {
    *
    * Cold: four hollow pips, an invitation. Winding up: one fills per
    * rhythmic swap, so the very first paid swap is visible. Running (past
-   * the fourth): the pips give way to a fill bar that creeps toward the
-   * pay ceiling, with the streak's earnings beside it. It all vanishes
+   * the fourth): the pips stay on the floor and keep dancing — the cycle
+   * walks 1-2-3-4 with every paid swap, and the pip whose turn it is
+   * grows a touch and HOPS, a four-point lens glint riding it and dying
+   * out through the beat, with the streak's earnings beside. (This
+   * replaced a fill bar that crept toward the pay ceiling: the tally
+   * already says what the groove is worth, and a meter filling under the
+   * row said it twice — while four dots dancing your own one-up-one-down
+   * back at you says the thing the sticks are saying.) It all vanishes
    * when the groove drops — you always know whether you're on or off.
    */
   private drawGroove(g: CanvasRenderingContext2D, cx: number): void {
@@ -427,19 +439,54 @@ export class HudSystem extends createSystem({}) {
         g.shadowBlur = 0;
       }
     } else {
-      // The bar: how deep the groove runs, against the pay ceiling.
-      const h = 15;
-      const fill = Math.min(1, streak / GROOVE.payCap);
-      g.lineWidth = 6;
-      g.strokeStyle = 'rgba(0,2,6,0.96)';
-      g.strokeRect(left, y - h / 2, meterW, h);
-      g.fillStyle = 'rgba(58,66,82,0.8)';
-      g.fillRect(left, y - h / 2, meterW, h);
-      g.shadowColor = GROOVE_CSS;
-      g.shadowBlur = 16;
-      g.fillStyle = GROOVE_CSS;
-      g.fillRect(left, y - h / 2, Math.max(5, meterW * fill), h);
-      g.shadowBlur = 0;
+      // RUNNING: whose turn it is walks the row with every paid swap, and
+      // the hop rides the front of the beat — up and home again before the
+      // next swap is due.
+      const gap = meterW / PIPS;
+      const turn = (streak - 1) % PIPS;
+      const phase = Math.min(1, Math.max(0, showBeat() % 1));
+      const hop = phase < 0.6 ? Math.sin((phase / 0.6) * Math.PI) : 0;
+      let sx = 0;
+      let sy = 0;
+      for (let i = 0; i < PIPS; i++) {
+        const active = i === turn;
+        const px = left + gap / 2 + i * gap;
+        const py = y - (active ? hop * 7 : 0);
+        g.beginPath();
+        g.arc(px, py, 11 + (active ? hop * 3 : 0), 0, Math.PI * 2);
+        g.lineWidth = 6;
+        g.strokeStyle = 'rgba(0,2,6,0.96)';
+        g.stroke();
+        g.shadowColor = GROOVE_CSS;
+        g.shadowBlur = active ? 14 + hop * 12 : 12;
+        g.fillStyle = GROOVE_CSS;
+        g.fill();
+        g.shadowBlur = 0;
+        if (active) {
+          sx = px;
+          sy = py;
+        }
+      }
+      // The sparkle: a four-point lens glint (the glowsticks' own language)
+      // flaring off the hopping pip and dying out through the beat.
+      if (hop > 0.04) {
+        const arm = 12 + hop * 9;
+        const w2 = 2.4;
+        g.globalAlpha = Math.min(1, hop * 1.4);
+        g.shadowColor = GROOVE_CSS;
+        g.shadowBlur = 10;
+        g.fillStyle = '#eafffb';
+        g.beginPath();
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+          g.moveTo(sx + dx * arm, sy + dy * arm);
+          g.lineTo(sx + dy * w2, sy - dx * w2);
+          g.lineTo(sx - dy * w2, sy + dx * w2);
+          g.closePath();
+        }
+        g.fill();
+        g.globalAlpha = 1;
+        g.shadowBlur = 0;
+      }
     }
 
     // What the streak has paid — the combo's own ledger, dying with it.

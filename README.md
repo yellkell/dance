@@ -20,8 +20,9 @@ everyone else.
   hotter and denser the deeper the groove, mirror themselves in the
   floor's polish, and die in the air (nothing ever lies on the floor as
   litter). The HUD's **groove row** keeps the ledger:
-  four pips light one per swap as it catches, then give way to a fill bar
-  and the points that streak has paid. Stop, swap off-rhythm, or **get
+  four pips light one per swap as it catches, and once it's running the
+  pips keep dancing — each one hops with a lens-glint sparkle on its turn
+  of the four-beat cycle — with the points that streak has paid beside. Stop, swap off-rhythm, or **get
   clipped** — a hit knocks the rhythm out of your hands — and it lets go,
   row and all.
 - Get clipped → the chain dies. **There are no lives** — you dance the
