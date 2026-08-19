@@ -55,12 +55,33 @@ What each act brings: act 0 — beam, sweep, seesaw, gate (both axes),
 crossfire; act 1 — donut one-twos, the routine, THE WAVE; act 2 — surge,
 nova, rail traps, double beams, THE X; act 3 — duck donut, 5-stage
 seesaws, tight novas; act 4 (EXPERT's back stretch) — six moves a phrase
-with NO rest, duck donut twice as common, and THE SWEPT ROUTINE: on the
-charts that carry it (a per-song coin, so the hardest nights stay
-distinct), every blast of the routine arrives under the sweep's blade —
-stand in the taught corner AND duck on every tick. Geometry barely
-tightens at act 4 (gate 0.22 → 0.20): expert lives in density and
-combinations, not in slivers of safe ground.
+with NO rest, duck donut twice as likely as the act below, and THE SWEPT
+ROUTINE: on the charts that carry it (a per-song coin, so the hardest
+nights stay distinct), every blast of the routine arrives under the
+sweep's blade — stand in the taught corner AND duck on every tick.
+
+**Rare means rare.** Those two are the show's set pieces, and both used
+to turn up often enough to be furniture: the duck donut landed twice in
+a typical expert set (in 86% of them), and the swept routine rode 30% of
+expert charts. A combination you meet twice a night is a move, not an
+event. The duck donut now carries a FRACTIONAL roll weight — the pick is
+a plain weighted sum, so a weight below one is honest — and lands about
+once every other expert set (one in eight on HARD); the swept coin is
+one chart in eight, which reads as one in twelve after you account for a
+routine actually falling in act 4. Neither was made easier; both were
+made worth waiting for.
+
+EXPERT keeps one escalation of its own: **THE LONG WAVE**. Every wave
+already turns at its exit and marches home — about three in ten expert
+waves now wheel a SECOND time and cross the deck again, nine landings
+instead of six. It is the twin bounce's rally (across, back, across)
+told as a march, and it stays a coin rather than a rule: a wave that
+always ran three times would own its phrase, and the read that makes the
+move — breathe at the wheel, then ride one square behind — stops being a
+read once it is a routine.
+
+Geometry barely tightens at act 4 (gate 0.22 → 0.20): expert lives in
+density and combinations, not in slivers of safe ground.
 
 **Two shapes step off that curve entirely, and EXPERT holds each of them
 at one size all night.** Both are moves the difficulty serves so heavily

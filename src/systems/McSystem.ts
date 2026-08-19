@@ -503,11 +503,18 @@ export class McSystem extends createSystem({}) {
         // body — or, front-to-back, walks its chops away from or in toward
         // the crowd — and where the count is IS where the doom is.
         const start = this.mir(mime.cue.side ?? 1);
-        // Three stops out (steps 0–2) — and on a return wave the count
-        // wheels at the exit and walks home (steps 3–5), so his arm rides
-        // the march both ways, breather included.
-        const raw = Math.min(5, mime.steps) + strike * 0.5;
-        const frac = raw <= 2 ? Math.min(1, raw / 2) : Math.max(0, (5 - raw) / 2);
+        // Three stops out (steps 0–2); the count wheels at the exit and
+        // walks home (steps 3–5); and on EXPERT's LONG WAVE it wheels once
+        // more and runs back out (steps 6–8). His arm rides every leg,
+        // holding at each end through the breather that makes the wheel
+        // readable — so the body always says which way the march is going.
+        const raw = Math.min(8, mime.steps) + strike * 0.5;
+        const frac =
+          raw <= 2
+            ? Math.min(1, raw / 2)
+            : raw <= 5
+              ? Math.max(0, (5 - raw) / 2)
+              : Math.min(1, Math.max(0, (raw - 6) / 2));
         const chop = Math.max(0, Math.sin(beat * Math.PI)) * 0.16;
         if ((mime.cue.axis ?? 0) === 1) {
           // Crowd-near ground is HIS far reach (he faces you): a march

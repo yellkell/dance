@@ -139,8 +139,8 @@ There's also a debug hook in the console:
 | **NOVA** | everything burns except one wedge — same compass bearing for the whole ring | **stand** in the safe ground, together |
 | **CROSSFIRE** | a laser is loaded on one side rail and a strip fills **across** the deck (late on, a stage lane crosses it) — and from mid-set it can come as **THE TRAP**: both side rails at once, one ahead of you and one behind, landing on the same beat | **step forward or back** off the strip — diagonally, once it's a lattice; against the trap, **squeeze into the band between the rails** |
 | **DONUT** | usually a laser straight down the middle, and a bar later the rim closes fast with chevrons marching **inward** on a tight safe disc | **step off** the middle, then **run back into it** |
-| **DUCK DONUT** | the finale combination, rare even in act 3: the rim closes **and** the blade hangs at chest height, both on one beat | **get to the middle AND duck** — small and close |
-| **THE WAVE** | beams marching **1-2-3** across the deck (their staggered fills ARE the count) — sideways, or front-to-back — with the far quarter left dark: the **EXIT**. Every wave **TURNS**: the march wheels at the exit — its first return strike is that very square, a double step plus a whole extra beat late — and sweeps back, new exit on the far side | **travel with the march into the exit**; breathe at the turn, then **ride one square behind the return** all the way home |
+| **DUCK DONUT** | the finale combination, and the rarest thing the show throws — about one an expert night, and one in eight HARD nights: the rim closes **and** the blade hangs at chest height, both on one beat | **get to the middle AND duck** — small and close |
+| **THE WAVE** | beams marching **1-2-3** across the deck (their staggered fills ARE the count) — sideways, or front-to-back — with the far quarter left dark: the **EXIT**. Every wave **TURNS**: the march wheels at the exit — its first return strike is that very square, a double step plus a whole extra beat late — and sweeps back, new exit on the far side. On **EXPERT** it sometimes wheels a second time and runs the deck again — **THE LONG WAVE**, across and back and across | **travel with the march into the exit**; breathe at the turn, then **ride one square behind the return** all the way home — and on a long wave, turn and do it again |
 | **ROUTINE** | the deck splits into quarters and the boss **teaches** a corner sequence — each marked with its step number, each pointed out in turn — then the marks go out and, on every step, three spinning neon blocks **fall from above** onto the quarters you weren't taught. On some EXPERT charts it comes **SWEPT**: the blade hangs over every blast | **remember it**, and stand in the taught corner on each tick — on a swept routine, **duck there too** |
 
 The telegraph is the whole instruction: whatever fills amber→red, don't be
@@ -401,9 +401,12 @@ not moderation.
 the act floor for the whole song — every record used to open trivially easy
 and ramp; now you choose the floor and the song lifts one act in its back
 stretch. EXPERT's back stretch is act 4: six moves a phrase with no rest,
-duck donut twice as common, and — on the charts that carry it — THE SWEPT
-ROUTINE. Online, the ball carries the caller's difficulty with their song
-pick.
+and the two rarities the difficulty keeps for itself — **duck donut**
+(twice as likely as the act below, which still only lands about once a
+night) and, on roughly one chart in twelve, **THE SWEPT ROUTINE**.
+EXPERT also has the only **long waves**: a march that wheels twice and
+crosses the deck three times. Online, the ball carries the caller's
+difficulty with their song pick.
 
 **EXPERT DOUBLE TIME**: the whole pressure curve is written in beats, so
 its real-time density used to scale with the record — at act 4 a 91 BPM

@@ -375,6 +375,10 @@ function buildLandings(
     // step plus one whole beat late (you only just got there; the
     // breather is the read), and the new exit is the far side where the
     // whole thing began. Across, and all the way back.
+    //
+    // THE LONG WAVE — EXPERT, sometimes: it wheels a SECOND time and runs
+    // the deck again, so the move goes across, back, and across once more
+    // — the twin bounce's rally, marched instead of fired.
     const axis: 0 | 1 = rng() < 0.5 ? 1 : 0;
     const steps = doubleTime ? CHOREO.doubleTimePace.waveStepBeats : CHOREO.waveStepBeats;
     const step = steps[Math.min(act, steps.length - 1)];
@@ -388,6 +392,18 @@ function buildLandings(
       at.push(stop);
       beats.push(turnAt + i * step);
     });
+    // Rolled before the gate, never inside it, so the seeded stream draws
+    // the same numbers in the same order whatever the difficulty.
+    const third = rng() < CHOREO.waveThirdChance && expert;
+    if (third) {
+      // The return parked everyone at ordered[0]; the third leg walks back
+      // out from there, exit returning to the far side it started from.
+      const backAt = beats[beats.length - 1] + step * 2 + turnExtra;
+      [ordered[0], ordered[1], ordered[2]].forEach((stop, i) => {
+        at.push(stop);
+        beats.push(backAt + i * step);
+      });
+    }
     const from: 1 | -1 = rng() < 0.5 ? 1 : -1;
     at.forEach((stop, i) => {
       landings.push({

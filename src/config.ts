@@ -261,8 +261,13 @@ export const MOVES: Record<
   // the floor talks about afterwards, and a memory test you meet every
   // phrase stops being one.
   routine: { chargeBeats: 8, weights: [0, 1, 2, 2, 3] },
-  // THE COMBINATION is a finale spice: act 3 only, and rare even there.
-  duckdonut: { chargeBeats: 6, weights: [0, 0, 0, 1, 2] },
+  // THE COMBINATION asks for the two hardest answers in the game on one
+  // beat, which is exactly why it should be something you meet once in a
+  // night and talk about after — not a shape the back stretch serves
+  // regularly. Fractional weights (the roll is a plain weighted sum, so
+  // they work): well under a percent of the moves at act 3, and still
+  // rare at act 4, where it stays twice as likely as the act below it.
+  duckdonut: { chargeBeats: 6, weights: [0, 0, 0, 0.2, 0.4] },
   // THE WAVE is the travel move: four beams marching 1-2-3-4 across the
   // whole deck. Each beam gets the beam's own short fuse; the march is
   // the long read.
@@ -360,8 +365,19 @@ export const CHOREO = {
   waveStepBeats: [2, 2, 1, 1, 1],
   /** Beats between the out-march's last fire and the turn's first — a
    *  double step plus one whole extra beat: you only just reached the
-   *  exit, and the breather is what makes the wheel readable. */
+   *  exit, and the breather is what makes the wheel readable. The same
+   *  breather buys the third march below its own wheel. */
   waveTurnExtraBeats: 1,
+  /** THE LONG WAVE — EXPERT only, and only sometimes: the march wheels a
+   *  SECOND time and runs the deck once more. Across, back, and across
+   *  again — the exact rally the twin's bounce plays with lasers, told in
+   *  a march. Every wave already turns, so the shape is one a dancer
+   *  knows by the time expert serves it; what the third leg asks for is
+   *  the legs to still be there on the last beat of it. Kept a coin
+   *  rather than a promise: a wave that ALWAYS ran three times would own
+   *  its phrase, and the read that makes the move (breathe at the wheel,
+   *  ride one square behind) stops being a read once it's a routine. */
+  waveThirdChance: 0.3,
   /** THE ROUTINE: how many corners you're asked to hold in your head (per
    *  act, clamped to the 2–4 the deck's four quarters can offer without
    *  ever repeating one), and how many beats apart the steps land. Two
@@ -371,8 +387,10 @@ export const CHOREO = {
   /** THE SWEPT ROUTINE (act 4): every blast of the routine arrives under
    *  the sweep's blade — stand in the taught corner AND duck on each tick.
    *  A per-SONG coin, not a per-move one: some expert charts carry it,
-   *  some never do, so the hardest nights stay distinct. */
-  routineSweepChance: 0.5,
+   *  some never do, so the hardest nights stay distinct — and at even odds
+   *  "some" was every other night, which is a garnish, not a legend. At
+   *  one chart in eight it is the thing a floor remembers a record for. */
+  routineSweepChance: 0.12,
   /** Three beats corner-to-corner: two read as a shove at raid tempo — the
    *  memory needs a breath between ticks, not just travel time. */
   routineStepBeats: 3,
