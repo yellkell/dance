@@ -189,11 +189,11 @@ export const GOOP = {
  *  routine: THE MEMORY TEST. The deck splits into four quarters and the
  *           boss teaches a ROUTINE — two to four corners, never the same
  *           one twice, each marked with its step number and pointed out in
- *           order by his own body. Then the marks go out. From there the
- *           only cue is a TICK a beat ahead of each step — one dry wooden
- *           knock, pure time, because the COUNTING happened during the
- *           lesson (one knock per step number as each corner was taught)
- *           — and blocks crush the three corners you didn't learn.
+ *           order by his own body. Then the marks go out, and blocks
+ *           crush the three corners you didn't learn. NOTHING calls the
+ *           steps: the blocks are visibly falling for two beats before
+ *           each landing (routineDropBeats), so the move is already its
+ *           own clock and a cue over the top of it was only noise.
  *           The quarter lines stay lit the whole way through: the floor
  *           tells you where the boxes are, never which one is yours.
  *  donut  : the RIM burns and the middle lives — a closing ring with a
