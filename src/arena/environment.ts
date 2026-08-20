@@ -279,13 +279,28 @@ export class FoyerEnvironment {
 
     // The towers stand ON the plain, so the platform reads as floating
     // ABOVE a world rather than parked in an empty box.
+    //
+    // AND THEY STAY DOWN THERE. A tower is a black body with a thin lit
+    // edge — architecture when you look ACROSS at it, an occluder when it
+    // rises past you. The foyer's rings used to top out at +6 and +15 with
+    // the near one only 13 m off, so from the menu spot you stood in a
+    // grove of black pillars leaning in from overhead on both sides, and
+    // the thing you came here to read had them in front of it. Playtest
+    // called them exactly that: pillars coming down from the ceiling.
+    //
+    // So the near ring's tops now sit BELOW the deck you stand on and the
+    // mid ring's barely clear it: you look down and out over a city on a
+    // plain, the way a floating platform should, and the sky above the
+    // board belongs to the canopy and the arcs. (The SET's void is a
+    // different class and is untouched — out there the towers ARE the
+    // room, and nothing asks you to read a menu through them.)
     const reflectable = new Group();
     this.near = buildTowerRing({
       count: 10,
-      radius: 13,
+      radius: 15,
       baseY: plain,
-      minH: 6.5,
-      maxH: 13,
+      minH: 3,
+      maxH: 6, // tops −4 … −1: under the deck, looked down on
       width: 1,
       shafts: true,
       portholes: true,
@@ -297,15 +312,18 @@ export class FoyerEnvironment {
       count: 16,
       radius: 26,
       baseY: plain,
-      minH: 12,
-      maxH: 22,
+      minH: 6,
+      maxH: 11, // tops −1 … +4: a skyline you look across, not up at
       width: 1.7,
       shafts: true,
       seed: 0x77,
       scatter: 3.5,
     });
     reflectable.add(this.mid.group);
-    const sky = buildSkyline(30, 40, 70, 16, 44, 0x5b);
+    // The far backdrop keeps its spread but loses the towers that reached
+    // 37 m into the sky — at 40 m that is still 23° up, and it read as
+    // more ceiling.
+    const sky = buildSkyline(30, 40, 70, 10, 24, 0x5b);
     sky.group.position.y = plain;
     reflectable.add(sky.group);
     this.skyEdges = sky.edges;

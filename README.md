@@ -215,10 +215,13 @@ npm run server       # room relay on :8788
 There are **three places**, and where you are is what you're doing:
 
 1. **THE FOYER** — the menu place, and a piece of THE VOID: a floating
-   neon-edged platform in the set's own abstract space (monolith pylons,
-   slow hexes, drifting shards, a horizon with no land under it), with the
-   board and the MC posing. The club's door is the board's MULTIPLAYER
-   seat, nothing in the room.
+   neon-edged platform in the set's own abstract space, with the board and
+   the MC posing. You look DOWN and out over the monolith city — its
+   pylons top out below the deck you stand on, so the sky over the board
+   belongs to the canopy rings and the arcs and nothing crowds the thing
+   you came here to read. Slow hexes, drifting shards, a horizon with no
+   land under it. The club's door is the board's MULTIPLAYER seat, nothing
+   in the room.
 2. **THE CLUB** — the social place, the warm room between the voids.
    Two doors. **ENTER THE CLUB** walks you straight onto the PUBLIC floor —
    no code, no arranging; the relay puts you wherever the crowd already is.
