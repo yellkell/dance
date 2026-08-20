@@ -162,7 +162,6 @@ export class ChoreoSystem extends createSystem({}) {
   private lastBar = -1;
   private landedSfx = new Set<string>();
   private cuedSteps = new Set<string>();
-  private cuedTicks = new Set<string>();
   private ended = false;
   /** Is this chart running EXPERT double time? Decides which pace tables
    *  the windows below read (set in rebuild, from the same shared inputs
@@ -343,7 +342,6 @@ export class ChoreoSystem extends createSystem({}) {
     this.lastBar = -1;
     this.landedSfx.clear();
     this.cuedSteps.clear();
-    this.cuedTicks.clear();
     this.ended = false;
     // A record's bans: the ones it always carries, plus the ones that only
     // hold on an authored campaign night.
@@ -418,23 +416,12 @@ export class ChoreoSystem extends createSystem({}) {
       match.gestures.push({ kind: z.kind, chargeBeats: lead, step: true, ...cueDirection(z.kind, z.zone, z.moveIdx, z.landingIdx), dueBeat: z.dueBeat });
     }
 
-    // THE ROUTINE's STEPS: one knock a beat ahead of every landing, and
-    // NOTHING during the lesson. The wind-up used to count each corner out
-    // as it was taught (one knock for step one, two for step two) and
-    // playtest was clear: knocking before the attack is bad, knocking
-    // during it is good. The lesson is a thing you READ — the marks carry
-    // their own step numbers in dots — and a sound over the top of it was
-    // noise arriving before anything had happened. Once the marks fade
-    // this tick is the only cue there is, so it fires for the whole ring
-    // at once (one landing, one call) regardless of how many decks are
-    // still dancing.
-    for (const z of this.zones) {
-      if (z.resolved || z.zone.kind !== 'quad' || beat < z.dueBeat - beatScale) continue;
-      const key = `${z.moveIdx}:${z.landingIdx}`;
-      if (this.cuedTicks.has(key)) continue;
-      this.cuedTicks.add(key);
-      sfx.routineTick();
-    }
+    // THE ROUTINE CALLS NOTHING. It used to knock a beat ahead of every
+    // step; it doesn't now, because the move is already telling you —
+    // the taught marks carry their step numbers, and the blocks are
+    // visibly falling for two beats before they land. The only sound it
+    // makes is those blocks arriving (sfx.quadCrash, with the strikes
+    // below), which is the event rather than a cue for it.
 
     // Advance live zones.
     for (const z of this.zones) {

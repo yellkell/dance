@@ -953,28 +953,17 @@ export function railZap(): void {
   tone({ freq: 120, to: 52, type: 'sine', dur: 0.26, gain: 0.24, delay: 0.02 });
 }
 
-/* THE ROUTINE speaks in KNOCKS — a dry wooden block, never a note. It
- * used to climb a C-major arpeggio, which is a melody laid over whatever
- * record is spinning: on any track not in C it was a wrong note sitting
- * on the grid, and the boss is not in the band. The knock is a clank's
- * inharmonic partial stack (no pitch class at all), so it lands on the
- * rhythm instead of the harmony.
+/* THE ROUTINE MAKES NO CUE SOUND AT ALL. Three passes tried to give it
+ * one — a C-major arpeggio pitched by step number, then a dry wooden
+ * count through the lesson, then a single knock a beat ahead of each
+ * landing — and each pass was less wrong than the last without ever
+ * being right. The move already tells you everything, twice: the taught
+ * marks carry their step numbers in dots, and from there the blocks are
+ * VISIBLY falling for two beats before they crush. A cue on top of a
+ * danger you can watch descend is a metronome for a clock you can see.
  *
- * And it speaks ONLY while the move is happening. Two earlier passes put
- * sound on the LESSON as well — first the arpeggio, then a count of one
- * knock per step number as each corner was taught — and playtest was
- * clear both times: knocking before the attack is bad, knocking during it
- * is good. The lesson is a thing you READ (the marks carry their own step
- * numbers, in dots); a sound over the top of it is noise arriving before
- * anything has happened. So the wind-up is silent, and the block speaks
- * once a beat ahead of every landing — the only cue there is once the
- * marks have faded, and pure time when it comes. */
-const ROUTINE_KNOCK = 820; // the block's body — inharmonic, so never a note
-
-/** THE ROUTINE calling a step: one knock, a beat ahead of each landing. */
-export function routineTick(): void {
-  clank(ROUTINE_KNOCK, 0.16, 0.085);
-}
+ * What stays is quadCrash below — the blocks actually landing. That is
+ * not a cue, it is the event. */
 
 /** The blocks landing on the three quarters you didn't learn. */
 export function quadCrash(): void {
