@@ -260,8 +260,6 @@ export class FoyerEnvironment {
   private skyEdges: GlowBank;
   private skyCount: number;
   private canopy: Canopy;
-  private arcs: GlowBank;
-  private arcCount: number;
   private shards: ShardField;
   private floor: VoidFloor;
   private horizonNear: MeshBasicMaterial;
@@ -316,18 +314,15 @@ export class FoyerEnvironment {
     // A small truss and a few arches over the deck.
     this.canopy = buildCanopy(2, 5.2, 2.2, 6.4, 1.4, 14);
     this.root.add(this.canopy.group);
-    // HOLLOW here. An arc's legs come down either side of the menu spot,
-    // and its dark structural tube is pure black against an empty sky —
-    // playtest saw four small black bars hanging out of the ceiling,
-    // eating whatever they crossed (a drifting shard, most visibly). The
-    // lit rib alone still draws the arc and occludes nothing. The SET
-    // keeps its solid arcs: out there they spring over a lit floor with a
-    // world behind them, which is what the dark tube is for.
-    const arcs = buildArcs(4, 8.5, 0.13, 0x2b, false);
-    arcs.group.position.y = 0.2;
-    this.root.add(arcs.group);
-    this.arcs = arcs.bank;
-    this.arcCount = 4;
+    // NO ARCS over the menu. Four hoops used to spring across this deck at
+    // 8.5 m, which put a leg down either side of exactly where you stand
+    // to read the board. Hollowing them (dropping the dark structural tube
+    // that was punching black holes in the sky) stopped them eating the
+    // scenery, but the legs were still there, still in the way, and an
+    // arch is architecture for a room you WALK through — this is a place
+    // you stand still in and read. The canopy overhead carries the
+    // structure on its own. The SET keeps its six: out there the arcs
+    // spring over a floor you dodge across, which is what they are for.
 
     this.shards = buildShardField(16, 8, 18, plain + 3, 8, 0x1f);
     this.root.add(this.shards.group);
@@ -363,11 +358,6 @@ export class FoyerEnvironment {
     this.canopy.spin(dt, 0.09);
     this.canopy.setGlow(hue(1), 0.6 + pulse * 0.3);
     this.canopy.commit();
-    for (let i = 0; i < this.arcCount; i++) {
-      this.arcs.tint(i, hue(i + 2), 0.35 + Math.max(0, Math.sin(clock * 0.5 + i)) * 0.3);
-    }
-    this.arcs.commit();
-
     for (let i = 0; i < this.floor.rayCount; i++) {
       const chase = Math.sin(clock * 1.1 - (i / this.floor.rayCount) * Math.PI * 4);
       this.floor.rays.tint(i, hue(2), 0.16 + Math.max(0, chase) * 0.4);
