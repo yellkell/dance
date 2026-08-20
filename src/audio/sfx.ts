@@ -960,41 +960,20 @@ export function railZap(): void {
  * inharmonic partial stack (no pitch class at all), so it lands on the
  * rhythm instead of the harmony.
  *
- * It says two different things in the move's two halves, and the split is
- * the whole point:
- *
- *   THE LESSON — while the marks are lit and you are reading the dots,
- *     each corner is COUNTED as it's taught: one knock for step one, two
- *     for step two. Counting is what a lesson does.
- *   THE STEPS — once the marks go dark, a SINGLE knock a beat ahead of
- *     every landing. You already know which corner is next; what you need
- *     now is the time, so the tick becomes a metronome and nothing else.
- *
- * Counting through the live steps as well made the performance re-teach a
- * lesson you'd already been given, and put four knocks in the bar exactly
- * where the blocks were coming down. */
+ * And it speaks ONLY while the move is happening. Two earlier passes put
+ * sound on the LESSON as well — first the arpeggio, then a count of one
+ * knock per step number as each corner was taught — and playtest was
+ * clear both times: knocking before the attack is bad, knocking during it
+ * is good. The lesson is a thing you READ (the marks carry their own step
+ * numbers, in dots); a sound over the top of it is noise arriving before
+ * anything has happened. So the wind-up is silent, and the block speaks
+ * once a beat ahead of every landing — the only cue there is once the
+ * marks have faded, and pure time when it comes. */
 const ROUTINE_KNOCK = 820; // the block's body — inharmonic, so never a note
-const ROUTINE_STEP_LIFT = 1.14; // each taught step's block a touch brighter
-const ROUTINE_GAP = 0.058; // seconds between knocks — a count, not a roll
 
-/** One strike of the block. `hard` is the knock that carries the beat. */
-function routineKnock(base: number, hard: boolean, delay = 0): void {
-  clank(base, hard ? 0.16 : 0.1, hard ? 0.085 : 0.05, delay);
-}
-
-/** THE LESSON: corner `step` being taught — counted out, one knock per
- *  step number, the last one landing hardest so four knocks read as a
- *  count and not a roll. The body brightens step by step too, so the
- *  count and the colour agree about which corner this is. */
-export function routineCount(step: number): void {
-  const n = Math.max(0, Math.min(3, step)) + 1;
-  const base = ROUTINE_KNOCK * Math.pow(ROUTINE_STEP_LIFT, n - 1);
-  for (let i = 0; i < n; i++) routineKnock(base, i === n - 1, i * ROUTINE_GAP);
-}
-
-/** THE STEPS: one knock, a beat ahead of each landing. Pure time. */
+/** THE ROUTINE calling a step: one knock, a beat ahead of each landing. */
 export function routineTick(): void {
-  routineKnock(ROUTINE_KNOCK, true);
+  clank(ROUTINE_KNOCK, 0.16, 0.085);
 }
 
 /** The blocks landing on the three quarters you didn't learn. */

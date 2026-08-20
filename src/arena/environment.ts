@@ -316,7 +316,14 @@ export class FoyerEnvironment {
     // A small truss and a few arches over the deck.
     this.canopy = buildCanopy(2, 5.2, 2.2, 6.4, 1.4, 14);
     this.root.add(this.canopy.group);
-    const arcs = buildArcs(4, 8.5, 0.13, 0x2b);
+    // HOLLOW here. An arc's legs come down either side of the menu spot,
+    // and its dark structural tube is pure black against an empty sky —
+    // playtest saw four small black bars hanging out of the ceiling,
+    // eating whatever they crossed (a drifting shard, most visibly). The
+    // lit rib alone still draws the arc and occludes nothing. The SET
+    // keeps its solid arcs: out there they spring over a lit floor with a
+    // world behind them, which is what the dark tube is for.
+    const arcs = buildArcs(4, 8.5, 0.13, 0x2b, false);
     arcs.group.position.y = 0.2;
     this.root.add(arcs.group);
     this.arcs = arcs.bank;
