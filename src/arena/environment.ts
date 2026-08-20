@@ -279,28 +279,13 @@ export class FoyerEnvironment {
 
     // The towers stand ON the plain, so the platform reads as floating
     // ABOVE a world rather than parked in an empty box.
-    //
-    // AND THEY STAY DOWN THERE. A tower is a black body with a thin lit
-    // edge — architecture when you look ACROSS at it, an occluder when it
-    // rises past you. The foyer's rings used to top out at +6 and +15 with
-    // the near one only 13 m off, so from the menu spot you stood in a
-    // grove of black pillars leaning in from overhead on both sides, and
-    // the thing you came here to read had them in front of it. Playtest
-    // called them exactly that: pillars coming down from the ceiling.
-    //
-    // So the near ring's tops now sit BELOW the deck you stand on and the
-    // mid ring's barely clear it: you look down and out over a city on a
-    // plain, the way a floating platform should, and the sky above the
-    // board belongs to the canopy and the arcs. (The SET's void is a
-    // different class and is untouched — out there the towers ARE the
-    // room, and nothing asks you to read a menu through them.)
     const reflectable = new Group();
     this.near = buildTowerRing({
       count: 10,
-      radius: 15,
+      radius: 13,
       baseY: plain,
-      minH: 3,
-      maxH: 6, // tops −4 … −1: under the deck, looked down on
+      minH: 6.5,
+      maxH: 13,
       width: 1,
       shafts: true,
       portholes: true,
@@ -312,18 +297,15 @@ export class FoyerEnvironment {
       count: 16,
       radius: 26,
       baseY: plain,
-      minH: 6,
-      maxH: 11, // tops −1 … +4: a skyline you look across, not up at
+      minH: 12,
+      maxH: 22,
       width: 1.7,
       shafts: true,
       seed: 0x77,
       scatter: 3.5,
     });
     reflectable.add(this.mid.group);
-    // The far backdrop keeps its spread but loses the towers that reached
-    // 37 m into the sky — at 40 m that is still 23° up, and it read as
-    // more ceiling.
-    const sky = buildSkyline(30, 40, 70, 10, 24, 0x5b);
+    const sky = buildSkyline(30, 40, 70, 16, 44, 0x5b);
     sky.group.position.y = plain;
     reflectable.add(sky.group);
     this.skyEdges = sky.edges;
@@ -334,7 +316,14 @@ export class FoyerEnvironment {
     // A small truss and a few arches over the deck.
     this.canopy = buildCanopy(2, 5.2, 2.2, 6.4, 1.4, 14);
     this.root.add(this.canopy.group);
-    const arcs = buildArcs(4, 8.5, 0.13, 0x2b);
+    // HOLLOW here. An arc's legs come down either side of the menu spot,
+    // and its dark structural tube is pure black against an empty sky —
+    // playtest saw four small black bars hanging out of the ceiling,
+    // eating whatever they crossed (a drifting shard, most visibly). The
+    // lit rib alone still draws the arc and occludes nothing. The SET
+    // keeps its solid arcs: out there they spring over a lit floor with a
+    // world behind them, which is what the dark tube is for.
+    const arcs = buildArcs(4, 8.5, 0.13, 0x2b, false);
     arcs.group.position.y = 0.2;
     this.root.add(arcs.group);
     this.arcs = arcs.bank;
