@@ -674,22 +674,7 @@ export function buildCanopy(
 
 /** Great half-rings springing over the arena, each turned a little off the
  *  last — the structure you notice when you look up mid-set. */
-/**
- * Arcs springing over the floor. `solid` gives each one a dark structural
- * tube under its lit rib — right where the arc has a lit world behind it
- * to be a silhouette against, WRONG where it hasn't: the tube is twice
- * the rib's width, so against empty sky it is a black bar with a thin
- * line in it, and a black bar in a black room is a hole that eats
- * whatever it crosses. The foyer builds them hollow for exactly that
- * reason (see FoyerEnvironment).
- */
-export function buildArcs(
-  count: number,
-  radius: number,
-  tube: number,
-  seed = 3,
-  solid = true,
-): { group: Group; bank: GlowBank } {
+export function buildArcs(count: number, radius: number, tube: number, seed = 3): { group: Group; bank: GlowBank } {
   const group = new Group();
   const rnd = rng(seed);
   // The geometry is a UNIT torus scaled to `radius` per instance, so the
@@ -711,8 +696,7 @@ export function buildArcs(
   }
   dark.instanceMatrix.needsUpdate = true;
   bank.commit(true);
-  if (solid) group.add(dark);
-  group.add(bank.mesh);
+  group.add(dark, bank.mesh);
   return { group, bank };
 }
 
