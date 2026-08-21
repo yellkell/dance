@@ -46,28 +46,8 @@ everyone else.
 - Every other dancer is a **slender humanoid figure** — gloss-black mannequin,
   neon collar/waist/wrist trim and visor in their seat colour, glowsticks in
   hand — solved live from just a head and two hands (which is all VR knows).
-  The figure is for everyone else's view of you — but on a **SOLO or TOUR
-  set you now have a body of your own: THE GOOP ARMS** (an experiment,
-  vendored home from SLUGFEST, the lineage's boxing spinoff where both
-  fighters ARE the gel). While the set is live you wear two arms of slime
-  in your seat's colours — controllers for fists, elbows solved, the ropes
-  swelling with every fast swing, glowsticks riding the gel hands — and a
-  landing that clips you visibly **dents** them. The floor is the game's
-  one instruction, and two cracks taught the body to honour it: the first
-  wore the whole body and the chest hid the paint; the second kept only
-  the arms and the ropes still hung in the read. So the arms now wear
-  **THE READ-THROUGH**: the deck is always downward of your eyes, so the
-  gel dissolves along any sightline pitching down toward paint — full and
-  chunky above the horizon where the grooving lives, glass below it — and
-  the worn body never writes depth, so the telegraphs can't be
-  depth-erased by an arm at any opacity. The FULL body takes the moments
-  with nothing to read: it pours up whole during the count-in, sheds to
-  the arms on the drop, returns to slump into a breathing ghost-glob if
-  the chain takes you out, and dances the podium formed. Strictly your own view of yourself, and strictly offline
-  sets: club floors and online raids keep the mannequins (the mirror
-  included), and the judge never reads it. `BODY.enabled` in
-  `src/config.ts` turns the experiment off; `BODY.liveDress` puts the
-  full body back mid-set if you must.
+  **You have no body of your own**: the local player sees only their
+  controllers; the figure is for everyone else's view of you.
 - Last dancer standing (or the highest score when the set ends) **owns the
   night**: podium, crown, confetti cannons. When the set was called from
   the club, the crown is REAL: the winner walks back onto the floor with a
@@ -483,9 +463,7 @@ src/
   audio/techno.ts      the beat clock + the synthesised set
   audio/sfx.ts         WebAudio sfx kit (vendored)
   goopliath/           the raymarched gel creature (vendored; patched with
-                       the dance vocabulary, the ONE PIECE cohesion law,
-                       and SLUGFEST's embodiment organ: multi-pin puppet
-                       mode + embody.ts, head+hands → a whole body of gel)
+                       the dance vocabulary and the ONE PIECE cohesion law)
   choreo/setlist.ts    seeded, beat-quantized move generation
   choreo/telegraphs.ts the hazard-shape shader kit (vendored)
   choreo/strikes.ts    landing FX per platform
@@ -497,7 +475,6 @@ src/
   game/                state, flow, ring math, rng, avatars + their
                        shared pose-motion layer (springy hands)
   systems/             Music, Choreo, Player, Avatar, Rank, Goopliath,
-                       GoopBody (your own gel body — solo/tour sets),
                        Disco, Hud, Menu, Network, Arena,
                        Club, ClubTeleport, ClubSocial, ClubBall
   net/                 room session + pose stores (ring + club floor)
@@ -511,13 +488,7 @@ tools/                 track analyzer · preview-shot · club-capture ·
                        glass-physics · glass-stack (towers and pyramids) ·
                        music-switch (the floor's music toggle, end to end) ·
                        goop-cohesion (the goop stays ONE PIECE, field-checked
-                       through the whole show) · goop-body (the worn body:
-                       one piece through a night's verbs, each arm one
-                       rendered rope, fists on the hands, eyes in
-                       daylight — then the real app's gate: solo/tour wear
-                       it, the drop sheds it to the arms, online never
-                       builds it) ·
-                       arm-motion (the figures'
+                       through the whole show) · arm-motion (the figures'
                        hand springs, elbow poles and stick grips, checked
                        live)
 avatar-preview.html    dev-only dancer catwalk (never shipped)

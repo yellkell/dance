@@ -149,48 +149,6 @@ export const GOOP = {
   danceBounce: 0.35,
 };
 
-/* ─────────────────────────────── YOUR BODY ───────────────────────────────
- * THE EXPERIMENT (SLUGFEST tech, brought home): in a SOLO or TOUR set you
- * WEAR the goop — your headset is its head, your controllers are its
- * fists, and everything in between (the leaning trunk, the shrugging
- * shoulders, the folding elbows, the puddle-skirt footwork chasing your
- * dodges) is derived and simulated, the same ~20-blob body as the boss at
- * 1:1 scale. First-person masked (no gel helmet), tinted to your seat
- * colour, and getting clipped by a landing visibly dents it.
- *
- * Club floors and online raids are untouched: the figures everyone else
- * sees — and the mirror — stay the mannequins. This body is strictly your
- * own view of yourself, so it can't desync anything.
- */
-export const BODY = {
-  /** The experiment's master switch. */
-  enabled: true,
-  /** What renders while the set is LIVE. The first crack wore 'full' and
-   *  failed the game's one law — the floor is the instruction, and your
-   *  own chest was hiding it. 'arms' is the read-through dress: only the
-   *  arm chains (the part playtest loved) reach your eyes mid-set; the
-   *  full body still takes the count-in pour, the eliminated slump and
-   *  the podium, where there is nothing left to read. */
-  liveDress: 'arms' as 'arms' | 'full',
-  /** Raymarch step budget scale for the body you inhabit — leaner than the
-   *  boss (most of it is behind your eyes)… */
-  quality: 0.75,
-  /** …and leaner again when the GOOP shares the frame (finale nights: two
-   *  marchers, one Quest). */
-  finaleQuality: 0.55,
-  /** The body's own march-step floor. The boss keeps the vendored 20; the
-   *  man-sized body's tight bounds converge in far fewer steps. */
-  stepFloor: 14,
-  /** m/s treated as a full-speed hand — fist swell saturates here. */
-  maxHandSpeed: 5.5,
-  /** Sim clock (1 = real time — this body is people-sized; only the giant
-   *  runs slow). */
-  timeScale: 1,
-  /** How hard a clipped landing works the gel (sim.impactScale — spectacle
-   *  only, scoring never reads the body). */
-  hitImpact: 1.15,
-};
-
 /* ─────────────────────────────── THE MOVES ───────────────────────────────
  * Every move telegraphs on EVERY live platform at once and lands ON a
  * downbeat. The windup is sacred: escalation compresses the gaps between
