@@ -16,10 +16,14 @@
  * the body is spectacle.
  *
  * Body language: it POURS UP from a glob during the count-in (the uFade
- * reveal keeps the morph out of your eyes), dances the set formed, and if
- * the chain takes you out it slumps back into a breathing glob at your
- * feet — the same body language as the fallen boss, and the ghost of it
- * stays faintly visible so looking down never reads as empty.
+ * reveal keeps the morph out of your eyes) — then, the moment the record
+ * drops, it sheds down to THE ARMS (BODY.liveDress): the floor is the
+ * game's one instruction and the first playtest proved a chest between
+ * your eyes and the deck hides it, so mid-set only the arm chains render
+ * (pinned fists, solved elbows — the part worth keeping). If the chain
+ * takes you out the whole body returns and slumps into a breathing glob
+ * at your feet — nothing left to read, so the body can be a body — and
+ * the podium gets the full formed gel for the same reason.
  *
  * Perf: the raymarched gel is the most expensive draw in the game, so the
  * body runs leaner than the boss (BODY.quality, a lower step floor its
@@ -111,6 +115,7 @@ export class GoopBodySystem extends createSystem({}) {
   private handR = new HandTracker();
   private clock = 0;
   private lastHits = 0;
+  private dress: 'full' | 'arms' = 'full';
 
   private pose: TrackedPose = {
     head: new Vector3(),
@@ -159,6 +164,7 @@ export class GoopBodySystem extends createSystem({}) {
     this.body.snapYaw(fxz > 0.05 ? Math.atan2(_dir.x / fxz, _dir.z / fxz) : 0);
 
     this.lastHits = me()?.hits ?? 0;
+    this.dress = 'full'; // the pour arrives whole; the drop sheds it
     bodyView.creature = this.body;
   }
 
@@ -213,7 +219,21 @@ export class GoopBodySystem extends createSystem({}) {
     // Body language: formed while I'm in the set; slumped into a breathing
     // glob once the chain takes me out (the fallen dim, they don't vanish).
     const d = me();
-    body.setFormTarget(d?.alive === false ? 0 : 1);
+    const alive = d?.alive !== false;
+    body.setFormTarget(alive ? 1 : 0);
+
+    // THE DRESS: full gel through the count-in pour and wherever there is
+    // nothing left to read (the slump, the podium); BODY.liveDress — the
+    // arms — while the set is live. The flip rides a fade dip and an
+    // agitation pulse so it reads as the gel shedding, never a pop.
+    const wear: 'full' | 'arms' =
+      match.screen === 'raid' && alive ? BODY.liveDress : 'full';
+    if (wear !== this.dress) {
+      this.dress = wear;
+      body.setFirstPersonDress(wear);
+      body.fadeScale = 0.3;
+      body.sim.agitation = Math.min(1, body.sim.agitation + 0.6);
+    }
 
     // A landing clipped me since last frame: the body takes the hit —
     // dent, ripple, a spray of my own colour. Spectacle only; the judge

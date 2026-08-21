@@ -17,16 +17,22 @@
  *   cross-the-deck dash · a whip 180 read · getting CLIPPED (the dent) ·
  *   the eliminated slump and the stand-back-up
  *
- * and after every sim step checks (a) the bridge graph over the actual
- * field — one component = one body (paused only while a dent deliberately
- * carves it, then demanded again once the gel flows back) — (b) PIN
- * TRUTH: each fist blob within 1 cm of the tracked hand (glowstick hands
- * that aren't your hands read as someone else's body), (c) first-person
- * DAYLIGHT, two layers: the rendered pack (head/neck masked) never
- * swallows the wearer's eye point, and the cockpit fade is armed so
- * anything transient that DOES brush the lens (spring-lag wake mid-dash,
- * elbow overshoot) dissolves instead of smearing it, and (d) the NaN
- * poison law: one bad tracking frame is shrugged off, not inherited.
+ * The battery wears the LIVE dress — ARMS ONLY (BODY.liveDress): the
+ * first playtest proved a chest between your eyes and the deck hides the
+ * paint the game is made of, so mid-set only the arm chains render. After
+ * every sim step it checks (a) the bridge graph over the PHYSICS field —
+ * one component = one body (paused only while a dent deliberately carves
+ * it, then demanded again once the gel flows back) — (b) THE ARM ROPES:
+ * in the RENDERED field (packed blobs only — what the shader marches),
+ * each arm's shoulder→elbow→fist chain stays one rope of gel, including
+ * hands resting at the chest, where the old trunk-drape exemption used to
+ * let a fist bridge to an INVISIBLE belly and float off its own arm as a
+ * bead — (c) PIN TRUTH: each fist blob within 1 cm of the tracked hand,
+ * (d) THE MASK LAW: a masked core never enters the render pack, (e)
+ * first-person DAYLIGHT: the rendered pack never swallows the wearer's
+ * eye point, with the cockpit fade armed for anything transient that
+ * brushes the lens, and (f) the NaN poison law: one bad tracking frame is
+ * shrugged off, not inherited.
  */
 
 import { chromium } from 'playwright';
@@ -125,7 +131,9 @@ const result = await page.evaluate(async () => {
     worstSplit: '',
     worstPinErr: 0,
     minEyeField: 1e9,
-    headRendered: 0,
+    maskLeaks: 0,
+    armBeads: 0,
+    firstBead: '',
     nanEscaped: 0,
     reFormed: false,
   };
@@ -157,21 +165,74 @@ const result = await page.evaluate(async () => {
     return d;
   };
 
-  // The render pack must never carry the wearer's head: with HEAD+NECK
-  // masked the pack is 2 short of the sim cores (plus transients). Any
-  // packed blob CENTRED inside the head sphere is the mask failing.
-  const headLeaked = () => {
+  // THE MASK LAW: a masked core never enters the render pack. The pack
+  // copies core positions verbatim, so a leak is an exact float match
+  // against a masked core's live position.
+  const maskLeaked = () => {
     const sim = creature.sim;
-    sim.corePos(A.HEAD, _a);
-    for (let i = 0; i < sim.packedCount; i++) {
-      const d = Math.hypot(
-        _a.x - sim.packed[i * 4],
-        _a.y - sim.packed[i * 4 + 1],
-        _a.z - sim.packed[i * 4 + 2],
-      );
-      if (d < 0.02) return true;
+    for (let c = 0; c < CORE; c++) {
+      if (!sim.renderSkip[c]) continue;
+      sim.corePos(c, _a);
+      for (let i = 0; i < sim.packedCount; i++) {
+        if (
+          Math.abs(_a.x - sim.packed[i * 4]) < 1e-6 &&
+          Math.abs(_a.y - sim.packed[i * 4 + 1]) < 1e-6 &&
+          Math.abs(_a.z - sim.packed[i * 4 + 2]) < 1e-6
+        ) {
+          return true;
+        }
+      }
     }
     return false;
+  };
+
+  // The RENDERED field — smooth-min over the PACKED blobs only, the same
+  // maths the shader marches. Physics keeps the whole body; what the
+  // wearer SEES is only this.
+  const smin = (a, b, k) => {
+    const h = Math.min(Math.max(0.5 + (0.5 * (b - a)) / k, 0), 1);
+    return b + (a - b) * h - k * h * (1 - h);
+  };
+  const packedFieldAt = (sim, x, y, z) => {
+    const k = CREATURE.blend * sim.blendScale;
+    let d = 1e5;
+    for (let i = 0; i < sim.packedCount; i++) {
+      const dx = x - sim.packed[i * 4];
+      const dy = y - sim.packed[i * 4 + 1];
+      const dz = z - sim.packed[i * 4 + 2];
+      d = smin(d, Math.hypot(dx, dy, dz) - sim.packed[i * 4 + 3], k);
+    }
+    return d;
+  };
+
+  // THE ARM ROPES: in the arms dress each rendered chain must be one
+  // piece of the RENDERED field — a fist bridged only to an invisible
+  // trunk is a floating bead.
+  const ARM_CHAINS = [
+    ['L', [A.SHOULDER_L, A.ELBOW_L, A.FIST_L]],
+    ['R', [A.SHOULDER_R, A.ELBOW_R, A.FIST_R]],
+  ];
+  const armBead = () => {
+    const sim = creature.sim;
+    for (const [side, chain] of ARM_CHAINS) {
+      for (let seg = 0; seg + 1 < chain.length; seg++) {
+        sim.corePos(chain[seg], _a);
+        sim.corePos(chain[seg + 1], _b);
+        let worst = -1e5;
+        for (let n = 1; n <= 9; n++) {
+          const t = n / 10;
+          const f = packedFieldAt(
+            sim,
+            _a.x + (_b.x - _a.x) * t,
+            _a.y + (_b.y - _a.y) * t,
+            _a.z + (_b.z - _a.z) * t,
+          );
+          if (f > worst) worst = f;
+        }
+        if (worst > -0.02) return `${side}:${seg === 0 ? 'shoulder-elbow' : 'elbow-fist'}`;
+      }
+    }
+    return null;
   };
 
   let segment = 'warmup';
@@ -212,11 +273,22 @@ const result = await page.evaluate(async () => {
     const eye = eyeField();
     stats.minEyeField = Math.min(stats.minEyeField, eye);
     seg.minEye = Math.min(seg.minEye, eye);
-    if (headLeaked()) stats.headRendered++;
+    if (maskLeaked()) stats.maskLeaks++;
+    if (creature.dress === 'arms' && !craterHold) {
+      const bead = armBead();
+      if (bead) {
+        stats.armBeads++;
+        if (!stats.firstBead) stats.firstBead = `${segment} ${bead}`;
+      }
+    }
   };
 
-  // Warm up: form up from the glob (the count-in pour).
+  // Warm up: form up from the glob (the count-in pour), in the FULL dress.
   for (let i = 0; i < 200; i++) step();
+
+  // The record drops: shed to the ARMS — the shipping live-set dress the
+  // whole battery below is danced in (exactly what GoopBodySystem does).
+  creature.setFirstPersonDress('arms');
 
   const runPose = (frames, fn) => {
     for (let f = 0; f < frames; f++) {
@@ -235,6 +307,15 @@ const result = await page.evaluate(async () => {
     pose.handL.set(-0.22, 1.35 + swap * 0.45, -0.2);
     pose.handR.set(0.22, 1.35 - swap * 0.45, -0.2);
     pose.speedL = pose.speedR = Math.abs(Math.cos(f * 0.19)) * 2.2;
+  });
+  segment = 'guard-at-chest';
+  // Hands resting AT the chest — the old drape-exemption zone: with the
+  // trunk invisible, the leash must still rope each fist to its own arm.
+  runPose(100, () => {
+    pose.head.set(0, 1.62, 0);
+    pose.handL.set(-0.12, 1.2, -0.16);
+    pose.handR.set(0.12, 1.18, -0.15);
+    pose.speedL = pose.speedR = 0;
   });
   segment = 'sidestep';
   // Sidestep dash: a beam answer — head crosses half the deck and back.
@@ -298,7 +379,9 @@ const result = await page.evaluate(async () => {
   segment = 'poison-heal';
   runPose(90, () => {});
 
-  /* ---- THE SLUMP: eliminated → glob → stand back up ---- */
+  /* ---- THE SLUMP: eliminated → glob → stand back up. Elimination hands
+   * the FULL dress back (nothing left to read; the body can be a body). */
+  creature.setFirstPersonDress('full');
   segment = 'slump';
   creature.setFormTarget(0);
   runPose(160, () => {});
@@ -345,7 +428,11 @@ check(
   `the cockpit fade is armed on the worn body (${result.bodyNearFade})`,
 );
 check(result.bossNearFade === 0, `…and only on the worn body (bystander fade ${result.bossNearFade})`);
-check(result.headRendered === 0, `the wearer's head is never in the render pack (${result.headRendered} leaks)`);
+check(result.maskLeaks === 0, `masked anchors never reach the render pack (${result.maskLeaks} leaks)`);
+check(
+  result.armBeads === 0,
+  `each arm renders as ONE rope, hands-at-chest included (beads: ${result.armBeads}${result.firstBead ? ' first: ' + result.firstBead : ''})`,
+);
 check(result.hitLanded === true, `a clipped landing actually dents the body`);
 check(result.nanEscaped === 0, `NaN poison shrugged off (${result.nanEscaped} escaped)`);
 check(result.reFormed === true, `the slump collapses and the body pours back up`);
@@ -370,7 +457,15 @@ const bodyState = () =>
   appPage.evaluate(() => {
     const c = window.__gdr.body.creature;
     return c
-      ? { exists: true, firstPerson: c.firstPerson, mode: c.mode, form: c.formValue, quality: c.qualityOverride }
+      ? {
+          exists: true,
+          firstPerson: c.firstPerson,
+          mode: c.mode,
+          form: c.formValue,
+          quality: c.qualityOverride,
+          dress: c.dress,
+          screen: window.__gdr.match.screen,
+        }
       : { exists: false };
   });
 const startAndSettle = async (opts) => {
@@ -379,9 +474,36 @@ const startAndSettle = async (opts) => {
   return bodyState();
 };
 
-const solo = await startAndSettle({ seats: 8 });
+await appPage.evaluate((o) => window.__gdr.startRaid(o), { seats: 8 });
+// The count-in: the FULL body pours up while the screen is still counting.
+const pouredFull = await appPage
+  .waitForFunction(
+    () => {
+      const c = window.__gdr.body.creature;
+      return !!c && c.dress === 'full' && c.formValue > 0.5 && window.__gdr.match.screen === 'countdown';
+    },
+    { timeout: 15000, polling: 100 },
+  )
+  .then(() => true)
+  .catch(() => false);
+const solo = await bodyState();
 check(solo.exists && solo.firstPerson && solo.mode === 'puppet', `a SOLO set wears the body (puppet, first person)`);
-check(solo.exists && solo.form > 0.5, `…and it pours up through the count-in (form ${solo.form?.toFixed(2)})`);
+check(pouredFull, `the count-in pours the FULL body (dress ${solo.dress}, form ${solo.form?.toFixed(2)})`);
+// The drop: the record starts and the body sheds to the arms.
+await appPage.waitForFunction(() => window.__gdr.match.screen === 'raid', { timeout: 30000, polling: 100 });
+await appPage.waitForTimeout(400);
+const liveState = await bodyState();
+check(liveState.dress === 'arms', `the record drops and the body sheds to THE ARMS (dress ${liveState.dress})`);
+// Elimination: the whole ghost returns and slumps.
+await appPage.evaluate(() => {
+  for (const pl of window.__gdr.match.players) if (pl.kind === 'local') pl.alive = false;
+});
+await appPage.waitForTimeout(900);
+const outState = await bodyState();
+check(
+  outState.dress === 'full' && outState.form < 0.9,
+  `eliminated: the full ghost returns and slumps (dress ${outState.dress}, form ${outState.form?.toFixed(2)})`,
+);
 
 const tour = await startAndSettle({ seats: 8, tour: { set: 0, song: 2 } });
 check(tour.exists && tour.firstPerson, `a TOUR finale wears it too`);

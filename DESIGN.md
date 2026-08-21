@@ -280,15 +280,46 @@ weight. That is the cockpit fade's job: gel within a hand's width of the
 per-eye camera dissolves instead of smearing the lens, tight enough
 (0.12 m) that your own chest at ~0.22 m stays full when you look down.
 
+**The second crack: THE ARMS.** The first playtest returned a clean
+verdict — the arms were the joy, and the trunk was a wall: a chest and
+belly between your eyes and the deck hid the paint the whole game is
+made of. So the body now wears a DRESS (`setFirstPersonDress`), and the
+dress follows what there is to read. While the set is LIVE only the arm
+chains render — shoulder→elbow→fist, both sides, six blobs, the fists
+still pinned and the elbows still solved — and the contact shadow parks
+with them (a shadow under no visible body would sit exactly on the paint
+the dress exists to show). The FULL body keeps every moment with nothing
+to read: it pours up whole through the count-in, sheds to the arms on
+the drop (a fade dip and an agitation pulse make the flip read as the
+gel shedding, not a pop), returns whole to slump when the chain takes
+you out, and dances the podium formed. Physics never changes dress —
+the whole body is always simmed, so the arms keep their weight and the
+skirt still drags in the numbers even when it doesn't draw.
+
+Three sim rules learned to read the mask so floating arms stay honest
+gel: the render AABB hugs RENDERED mass only (the box no longer marches
+an invisible trunk's worth of empty field — the arms dress is cheaper,
+not just cleaner); drips bud off and crawl home to rendered blobs only
+(gel never appears from or vanishes into nothing); and the trunk-drape
+leash exemption only counts VISIBLE trunk — a fist resting on an
+invisible belly stays leashed to its own arm, because the old rule let
+it bridge to gel that wasn't there and float off the rope as a bead.
+
 `node tools/goop-body.mjs` machine-checks all of it against the shipping
-modules: ONE PIECE through a night's verbs (groove, dashes, the duck, a
-whip-180) with the dent allowed to carve and then required to heal
-closed; pin truth under 1 cm; the head never in the render pack; the eye
-point never swallowed and the cockpit fade armed (and only on the worn
-body); NaN tracking poison shrugged off; the slump and the stand-back-up.
-Then it boots the REAL app and walks the gate: a solo set wears the body,
-a tour finale wears it leaner, an online set never builds it, the menu
-rooms tear it down.
+modules, danced in the live arms dress: ONE PIECE through a night's
+verbs (groove, hands-at-chest, dashes, the duck, a whip-180) on the
+physics field, with the dent allowed to carve and then required to heal
+closed; THE ARM ROPES — each arm one piece of the RENDERED field (the
+packed blobs the shader actually marches), including hands resting at
+the chest; pin truth under 1 cm; the mask law (a masked core never
+enters the render pack); the eye point never swallowed (worst clearance
+tripled once the trunk's wake stopped rendering) and the cockpit fade
+armed on the worn body only; NaN tracking poison shrugged off; the slump
+and the stand-back-up. Then it boots the REAL app and walks the gate and
+the dress: a solo set pours the full body through the count-in, sheds to
+the arms on the drop, hands the full ghost back on elimination; a tour
+finale wears it leaner; an online set never builds it; the menu rooms
+tear it down.
 
 ## The figures' arms (the humanoid motion layer)
 

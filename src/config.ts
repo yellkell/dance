@@ -165,6 +165,13 @@ export const GOOP = {
 export const BODY = {
   /** The experiment's master switch. */
   enabled: true,
+  /** What renders while the set is LIVE. The first crack wore 'full' and
+   *  failed the game's one law — the floor is the instruction, and your
+   *  own chest was hiding it. 'arms' is the read-through dress: only the
+   *  arm chains (the part playtest loved) reach your eyes mid-set; the
+   *  full body still takes the count-in pour, the eliminated slump and
+   *  the podium, where there is nothing left to read. */
+  liveDress: 'arms' as 'arms' | 'full',
   /** Raymarch step budget scale for the body you inhabit — leaner than the
    *  boss (most of it is behind your eyes)… */
   quality: 0.75,
