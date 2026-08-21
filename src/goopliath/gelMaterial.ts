@@ -67,6 +67,8 @@ const FRAG = /* glsl */ `
   uniform int uSteps;
   uniform float uFade;
   uniform float uNearFade;
+  uniform float uDownFadeStart;
+  uniform float uDownFadeEnd;
   uniform vec3 uShallow;
   uniform vec3 uDeep;
   uniform vec3 uNucleus;
@@ -262,6 +264,16 @@ const FRAG = /* glsl */ `
     // wake swept through mid-dash. t is the ray's hit distance from the
     // per-eye camera, so each eye fades its own encounters.
     if (uNearFade > 0.0) alpha *= smoothstep(uNearFade * 0.35, uNearFade, t);
+    // THE READ-THROUGH (the worn arms only; 0 = off): the deck is the
+    // game's one instruction and it is always DOWNWARD of the eyes — so
+    // the gel dissolves along any sightline that pitches down toward
+    // paint, and stays whole above the horizon, where the dance lives.
+    // (The paint is depth-safe too: the worn body never writes depth, so
+    // the order-20 telegraph decals can never be depth-erased by an arm.)
+    if (uDownFadeEnd > 0.0) {
+      float down = -normalize(mat3(modelMatrix) * rd).y;
+      alpha *= 1.0 - smoothstep(uDownFadeStart, uDownFadeEnd, down);
+    }
     if (alpha < 0.01) discard;
 
     gl_FragColor = vec4(col, alpha);
@@ -318,6 +330,8 @@ export function createGelMaterial(): GelUniforms {
       uSteps: { value: GEL_LOOK.maxSteps },
       uFade: { value: 1 },
       uNearFade: { value: 0 },
+      uDownFadeStart: { value: 0 },
+      uDownFadeEnd: { value: 0 },
       uShallow: { value: new Color(GEL_LOOK.shallowColor) },
       uDeep: { value: new Color(GEL_LOOK.deepColor) },
       uNucleus: { value: new Color(GEL_LOOK.nucleusColor) },

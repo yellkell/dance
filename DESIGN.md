@@ -296,6 +296,28 @@ you out, and dances the podium formed. Physics never changes dress —
 the whole body is always simmed, so the arms keep their weight and the
 skirt still drags in the numbers even when it doesn't draw.
 
+**And the arms wear THE READ-THROUGH.** The second playtest said the
+quiet part: even arms-only wasn't enough, because hands REST low and
+forward — two thick gel ropes hanging exactly in the cone where the
+paint lives. Two mechanisms fixed it, and the second turned out to be
+the one that mattered most. First, the worn body's material stops
+writing depth: the telegraph decals draw after the gel (order 20,
+additive, depth-tested), so a body that wrote its marched fragDepth was
+not tinting the paint but ERASING it outright — at any alpha. Without
+the write, paint composites over the gel; the depth TEST stays, so the
+sticks and the boss still sort into the surface correctly. Second, the
+down-fade: the deck is always DOWNWARD of the eyes, so the shader
+dissolves gel along any sightline pitching below the horizon
+(GEL_LOOK.readFadeStart/End — full gel until ~14° down, gone by 30°;
+even a ducked dancer reading the far rim looks 27°+ down). The arms are
+whole where the dance lives — raised, swapping, at eye level — and
+glass wherever a ray could be carrying paint. Per-RAY, not per-head:
+rays to the bottom of your view fade even when your head is level,
+because that lower band is exactly where the deck appears. The fade
+rides the arms dress only; the full dress (count-in, slump, podium)
+keeps every angle, since fading a body you are looking down at would
+just eat it.
+
 Three sim rules learned to read the mask so floating arms stay honest
 gel: the render AABB hugs RENDERED mass only (the box no longer marches
 an invisible trunk's worth of empty field — the arms dress is cheaper,

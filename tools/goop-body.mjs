@@ -289,6 +289,16 @@ const result = await page.evaluate(async () => {
   // The record drops: shed to the ARMS — the shipping live-set dress the
   // whole battery below is danced in (exactly what GoopBodySystem does).
   creature.setFirstPersonDress('arms');
+  const matOf = (c) => {
+    let m = null;
+    c.group.traverse((o) => {
+      if (o.material?.uniforms?.uDownFadeEnd) m = o.material;
+    });
+    return m;
+  };
+  const liveMat = matOf(creature);
+  stats.liveDownFade = liveMat?.uniforms.uDownFadeEnd.value ?? null;
+  stats.liveDepthWrite = liveMat?.depthWrite ?? null;
 
   const runPose = (frames, fn) => {
     for (let f = 0; f < frames; f++) {
@@ -405,8 +415,13 @@ const result = await page.evaluate(async () => {
     return v;
   };
   stats.bodyNearFade = fadeOf(creature);
+  // The battery ended in the FULL dress (the slump) — the read-through
+  // must be OFF there, or looking down at your own slumped body eats it.
+  stats.fullDownFade = matOf(creature)?.uniforms.uDownFadeEnd.value ?? null;
   const bystander = new GelCreature(fx, {});
   stats.bossNearFade = fadeOf(bystander);
+  stats.bossDownFade = matOf(bystander)?.uniforms.uDownFadeEnd.value ?? null;
+  stats.bossDepthWrite = matOf(bystander)?.depthWrite ?? null;
 
   return stats;
 });
@@ -428,6 +443,16 @@ check(
   `the cockpit fade is armed on the worn body (${result.bodyNearFade})`,
 );
 check(result.bossNearFade === 0, `…and only on the worn body (bystander fade ${result.bossNearFade})`);
+check(
+  typeof result.liveDownFade === 'number' && result.liveDownFade > 0,
+  `THE READ-THROUGH is armed in the live dress (down-fade ${result.liveDownFade})`,
+);
+check(result.liveDepthWrite === false, `the worn body never writes depth — paint can't be depth-erased by an arm`);
+check(result.fullDownFade === 0, `the full dress keeps the body whole when you look down at it (down-fade ${result.fullDownFade})`);
+check(
+  result.bossDownFade === 0 && result.bossDepthWrite === true,
+  `the boss keeps his depth and never fades (down-fade ${result.bossDownFade}, depthWrite ${result.bossDepthWrite})`,
+);
 check(result.maskLeaks === 0, `masked anchors never reach the render pack (${result.maskLeaks} leaks)`);
 check(
   result.armBeads === 0,
@@ -456,17 +481,22 @@ await appPage.waitForTimeout(2000);
 const bodyState = () =>
   appPage.evaluate(() => {
     const c = window.__gdr.body.creature;
-    return c
-      ? {
-          exists: true,
-          firstPerson: c.firstPerson,
-          mode: c.mode,
-          form: c.formValue,
-          quality: c.qualityOverride,
-          dress: c.dress,
-          screen: window.__gdr.match.screen,
-        }
-      : { exists: false };
+    if (!c) return { exists: false };
+    let m = null;
+    c.group.traverse((o) => {
+      if (o.material?.uniforms?.uDownFadeEnd) m = o.material;
+    });
+    return {
+      exists: true,
+      firstPerson: c.firstPerson,
+      mode: c.mode,
+      form: c.formValue,
+      quality: c.qualityOverride,
+      dress: c.dress,
+      screen: window.__gdr.match.screen,
+      downFade: m?.uniforms.uDownFadeEnd.value ?? null,
+      depthWrite: m?.depthWrite ?? null,
+    };
   });
 const startAndSettle = async (opts) => {
   await appPage.evaluate((o) => window.__gdr.startRaid(o), opts);
@@ -494,6 +524,10 @@ await appPage.waitForFunction(() => window.__gdr.match.screen === 'raid', { time
 await appPage.waitForTimeout(400);
 const liveState = await bodyState();
 check(liveState.dress === 'arms', `the record drops and the body sheds to THE ARMS (dress ${liveState.dress})`);
+check(
+  liveState.downFade > 0 && liveState.depthWrite === false,
+  `…wearing the read-through: down-fade armed, no depth writes (${liveState.downFade}, depthWrite ${liveState.depthWrite})`,
+);
 // Elimination: the whole ghost returns and slumps.
 await appPage.evaluate(() => {
   for (const pl of window.__gdr.match.players) if (pl.kind === 'local') pl.alive = false;

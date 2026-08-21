@@ -196,6 +196,14 @@ export class GelCreature {
       skip[A.NECK] = 1;
     }
     this.shadow.visible = dress === 'full';
+    // THE READ-THROUGH rides the live dress only: mid-set every downward
+    // sightline may carry paint, so the arms dissolve along it; the full
+    // dress is worn exactly when there is nothing to read (the count-in
+    // pour, the slump, the podium), where fading a body you are looking
+    // down at would just eat it.
+    const u = this.gel.material.uniforms;
+    u.uDownFadeStart.value = dress === 'arms' ? GEL_LOOK.readFadeStart : 0;
+    u.uDownFadeEnd.value = dress === 'arms' ? GEL_LOOK.readFadeEnd : 0;
   }
   /** True while it's an exhausted puddle — hits do double (see EXHAUST). */
   vulnerable = false;
@@ -256,9 +264,15 @@ export class GelCreature {
       // Your own head is not for your own eyes (setFirstPersonDress below
       // writes the mask — 'full' to start: head + neck skipped).
       this.setFirstPersonDress('full');
-      // And gel that reaches the eye itself dissolves (the cockpit fade) —
+      // Gel that reaches the eye itself dissolves (the cockpit fade) —
       // an elbow's overshoot, the trunk's wake mid-dash, a fist at the nose.
       this.gel.material.uniforms.uNearFade.value = GEL_LOOK.firstPersonNearFade;
+      // And the worn body NEVER writes depth: the telegraph decals draw
+      // after the gel (order 20) and depth-test — a body that wrote its
+      // fragDepth ERASED the paint behind any arm outright, at any alpha.
+      // Without the write the paint composites over faded gel instead;
+      // the depth TEST stays, so sticks and the boss still sort into it.
+      this.gel.material.depthWrite = false;
     } else {
       const mkEye = (): Group => {
         const g = new Group();
