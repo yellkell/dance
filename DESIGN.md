@@ -264,6 +264,28 @@ sweep's blade) finally reads in the sticks themselves, not just the reach.
 overshoot that settles, tracking with zero bounce, the yaw wrap, the elbow
 tuck, and the stick's three grips.
 
+**THE COLLAR.** Every piece of the torso is a `LatheGeometry`, which is an
+OPEN surface with its back faces culled — a profile that stops short of the
+axis leaves a hole the width of its last ring, and the `TORSO_X`/`TORSO_Z`
+cross-section then stretches that hole wider across the shoulders than
+whatever is meant to plug it. The bodice stopped at 0.028, pulled out to
+0.033 across the body, against a neck only 0.0287 wide where the two meet.
+Front to back the neck covered it; side to side it fell a few millimetres
+short each way. **Two crescents either side of his throat, straight through
+the figure and out the far side** — invisible head-on, obvious the moment
+you looked down at him, which in a headset is most of the time. The dome
+now closes all the way to nothing, so the neck pokes through a sealed
+trapezius instead of standing in a ring of daylight.
+
+The neck came out of the detail list in the same pass. The rule written
+over that list is that nothing carrying the silhouette goes in it, and a
+neck carries as much of it as a limb does: culled at distance, the head
+came off and floated a hand's width above the shoulders. Thirty-two
+triangles is a cheap price for the head staying on at the back of the club.
+`node tools/collar-seal.mjs` holds both closed — 512 looks down at him
+across nods, tilts, turns and a melt, 2024 points sampled across the yoke
+each time, in both detail tiers, and not one of them may come back sky.
+
 ## THE CLUB, THE VOID, and the three places
 
 FIRE FIGHT's pub proved a third thing worth stealing whole: **a social room

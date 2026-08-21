@@ -490,7 +490,8 @@ tools/                 track analyzer · preview-shot · club-capture ·
                        goop-cohesion (the goop stays ONE PIECE, field-checked
                        through the whole show) · arm-motion (the figures'
                        hand springs, elbow poles and stick grips, checked
-                       live)
+                       live) · collar-seal (no sky inside the neck ring,
+                       from every angle you can look down at him from)
 avatar-preview.html    dev-only dancer catwalk (never shipped)
 ```
 

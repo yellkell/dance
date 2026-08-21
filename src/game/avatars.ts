@@ -261,11 +261,23 @@ function latheGeo(key: string, profile: number[][]): BufferGeometry {
  * Radii are real metres (before the TORSO_X/Z cross-section); height is
  * unit, and align() stretches it to whatever the solve asks for. */
 const BODICE = [
-  // waist cinch → ribs → chest → SHOULDER YOKE → neck root.
+  // waist cinch → ribs → chest → SHOULDER YOKE → neck root → CLOSED.
   // An S, not a cone: lean through the ribs, filling late into the chest —
   // a straight taper reads as a funnel. The yoke is the widest ring in the
   // whole figure (shoulder balls need something to hang off) and closes
   // over the top as a trapezius DOME rather than a flat shelf.
+  //
+  // The dome closes ALL THE WAY, to a radius of nothing. A lathe is an open
+  // surface: stopping the profile at 0.028 leaves a hole the width of that
+  // ring, and the cross-section stretches it to 0.033 across the shoulders
+  // against a neck only 0.0287 wide there. Front to back the neck covered
+  // it; side to side it fell short by a few millimetres each way, and with
+  // the lathe's back faces culled you looked straight down through the
+  // collar and out of the figure — two crescents either side of the throat.
+  // Sealing the apex plugs it at every nod and yaw — and unlike fattening
+  // the neck, it plugs it whatever else is or isn't drawn over the top.
+  // The last two rings sit a whisker above the yoke, buried inside the neck
+  // and well within the collar's own tube: no silhouette changes.
   [0.03, 0.0],
   [0.043, 0.09],
   [0.053, 0.26],
@@ -276,6 +288,8 @@ const BODICE = [
   [0.06, 0.96],
   [0.042, 0.99],
   [0.028, 1.0],
+  [0.0145, 1.005],
+  [0, 1.007],
 ];
 const BASQUE = [
   // hip line → flared basque → back up to the same 0.03 waist cinch.
@@ -572,7 +586,14 @@ export function buildDancer(hue: number): DancerRig {
   // Tapered to CLEAR THE JAW at the top (the skull is only ~0.026 wide down
   // at the chin) and to PLUG THE YOKE at the bottom, where the buried part
   // fills the lathe's neck hole instead of leaving a rim around it.
-  const neck = detail(seg(0.017, 0.034, suit));
+  //
+  // NOT a detail mesh, though it sat in that list for a long time. The rule
+  // right above the list is that nothing carrying the silhouette goes in
+  // it, and a neck carries as much of it as a limb does: culled, the head
+  // came off and floated a hand's width above the shoulders with the room
+  // showing through the gap. Thirty-two triangles is a cheap price for the
+  // head staying on at the back of the club.
+  const neck = seg(0.017, 0.034, suit);
   const bodice = M(latheGeo('bodice', BODICE), suit);
   const basque = M(latheGeo('basque', BASQUE), lit); // the lit midriff
   root.add(neck, bodice, basque);
@@ -590,6 +611,7 @@ export function buildDancer(hue: number): DancerRig {
   const belt = M(torusGeo(0.04, 0.007), neonStd);
   collar.scale.set(TORSO_X, TORSO_Z, 1);
   belt.scale.set(TORSO_X, TORSO_Z, 1);
+  collar.name = 'collar'; // tools/collar-seal.mjs aims its camera at this
   root.add(collar, choker, belt);
   // Slim bones, fat end buried in the chest: at 0.021 the notch end rose
   // over the collar ring and chopped its front arc into bright/dark stripes.
