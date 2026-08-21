@@ -52,13 +52,18 @@ everyone else.
   fighters ARE the gel). While the set is live you wear two arms of slime
   in your seat's colours — controllers for fists, elbows solved, the ropes
   swelling with every fast swing, glowsticks riding the gel hands — and a
-  landing that clips you visibly **dents** them. The first crack wore the
-  whole body and failed the game's one law: the floor is the instruction,
-  and your own chest was hiding it — so mid-set only the arms render, and
-  the FULL body takes the moments with nothing to read: it pours up whole
-  during the count-in, sheds to the arms on the drop, returns to slump
-  into a breathing ghost-glob if the chain takes you out, and dances the
-  podium formed. Strictly your own view of yourself, and strictly offline
+  landing that clips you visibly **dents** them. The floor is the game's
+  one instruction, and two cracks taught the body to honour it: the first
+  wore the whole body and the chest hid the paint; the second kept only
+  the arms and the ropes still hung in the read. So the arms now wear
+  **THE READ-THROUGH**: the deck is always downward of your eyes, so the
+  gel dissolves along any sightline pitching down toward paint — full and
+  chunky above the horizon where the grooving lives, glass below it — and
+  the worn body never writes depth, so the telegraphs can't be
+  depth-erased by an arm at any opacity. The FULL body takes the moments
+  with nothing to read: it pours up whole during the count-in, sheds to
+  the arms on the drop, returns to slump into a breathing ghost-glob if
+  the chain takes you out, and dances the podium formed. Strictly your own view of yourself, and strictly offline
   sets: club floors and online raids keep the mannequins (the mirror
   included), and the judge never reads it. `BODY.enabled` in
   `src/config.ts` turns the experiment off; `BODY.liveDress` puts the
