@@ -27,7 +27,6 @@ import { ClubSocialSystem } from './systems/ClubSocialSystem.js';
 import { ClubSystem } from './systems/ClubSystem.js';
 import { ClubTeleportSystem } from './systems/ClubTeleportSystem.js';
 import { DiscoSystem } from './systems/DiscoSystem.js';
-import { GoopBodySystem } from './systems/GoopBodySystem.js';
 import { GoopliathSystem } from './systems/GoopliathSystem.js';
 import { HudSystem } from './systems/HudSystem.js';
 import { IntroSystem, introView } from './systems/IntroSystem.js';
@@ -101,8 +100,6 @@ World.create(container, {
   world.registerSystem(MusicSystem);
   world.registerSystem(ChoreoSystem);
   world.registerSystem(GoopliathSystem);
-  // THE EXPERIMENT: your own goop body, solo/tour sets only (see BODY).
-  world.registerSystem(GoopBodySystem);
   world.registerSystem(McSystem);
   world.registerSystem(AvatarSystem);
   world.registerSystem(RankSystem);
@@ -160,7 +157,6 @@ import { socialView } from './systems/ClubSocialSystem.js';
 import { propsView } from './systems/ClubPropsSystem.js';
 import { teleportView } from './systems/ClubTeleportSystem.js';
 import { grooveView } from './systems/PlayerSystem.js';
-import { bodyView } from './systems/GoopBodySystem.js';
 import {
   callBall,
   cancelBall,
@@ -187,9 +183,6 @@ declare global {
       match: typeof match;
       arena: typeof arena;
       choreo: typeof choreoView;
-      /** THE EXPERIMENT: the live first-person goop body (solo/tour sets),
-       *  or null anywhere it doesn't exist. */
-      body: typeof bodyView;
       /** Fire a glowstick sparkle burst (heat 0..1) for tuning. */
       sparkle: (heat?: number) => void;
       /** What the controller models are doing (see grooveView.controllers). */
@@ -247,7 +240,6 @@ window.__gdr = {
   match,
   arena,
   choreo: choreoView,
-  body: bodyView,
   sparkle: (heat = 1) => grooveView.burst?.(heat),
   pads: () => grooveView.controllers?.() ?? [],
   padAdapters: () => grooveView.padAdapters?.() ?? null,

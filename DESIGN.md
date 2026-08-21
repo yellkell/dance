@@ -228,120 +228,27 @@ field-checks the bridge graph every frame: before, the show was one piece
 on ~55% of frames; now 100%, with every bridge deep enough to survive the
 agitation wobble.
 
-## Your body (the SLUGFEST experiment)
+## Your own body (a closed experiment)
 
-The lineage came home wearing something: SLUGFEST (the two-player goop
-boxing spinoff) evolved the vendored creature into a body a HUMAN drives —
-head + two hands become 20 anchor targets, fists ride kinematic pins, and
-everything unmeasured is derived. That organ is vendored back here as
-`goopliath/embody.ts` + `systems/GoopBodySystem.ts`: **in a SOLO or TOUR
-set, the local player wears the goop.** Look down mid-dodge and you're
-gel — the trunk squashes into your duck, the puddle-skirt legs drag across
-the deck after your sidestep, your glowsticks ride pinned gel fists in
-your seat's colours, and a landing that clips you dents and ripples the
-body (`sim.punchAt`, the boss's own impact reception).
+Three cracks tried to give the solo dancer a first-person body of gel —
+SLUGFEST's embodiment organ (head + hands driving the same ~20-blob sim
+as the boss at 1:1) vendored home. The full body came first; the
+playtest loved the arms and couldn't see the floor. Arms-only came
+second; the ropes still hung in the read. The third crack taught the
+arms to get out of the way entirely — no depth writes (the worn gel had
+been depth-ERASING the order-20 telegraph decals at any alpha, not
+tinting them) plus a read-through fade that dissolved gel along any
+sightline pitching below the horizon. Each pass was less wrong than the
+last, and the verdict never moved: hands REST low and forward, so
+anything worn on them lives exactly in the cone where the paint lives —
+and in this game the floor is the one instruction. A body worth seeing
+and a floor that must be read want the same pixels, and the floor wins.
 
-Strictly scoped, on purpose:
-
-- **Solo and tour only.** `match.online` gates it off entirely — club
-  floors and online raids keep the mannequin figures (and the mirror keeps
-  yours). The body is your own view of yourself; nothing else reads it, so
-  it cannot desync a room, and the judge never touches it (dodges still
-  read `match.headX/Z`).
-- **Menu rooms are body-free** — the boss's own law ("he appears where he
-  performs"); the raymarched gel is the most expensive draw in the game
-  and it never idles on a menu.
-- **Leaner march than the boss**: `BODY.quality` scales the step budget
-  down (further on finale nights, when the GOOP shares the frame), and the
-  man-sized body's tight AABB affords a lower step floor than the giant's
-  (`BODY.stepFloor`).
-
-What the port taught the shared stack (all in `goopliath/`, boss
-behaviour unchanged): the single strike pin became a pin SET (`sim.pin` /
-`clearPins`, every pinned blob leashed as gospel, both-ends-pinned
-segments left to the swell); `renderSkip` masks the wearer's head + neck
-out of the render pack while physics keeps the whole body; the pairwise
-separation push is now dt-scaled (at 120 Hz the unscaled push out-muscled
-the springs and slowly extruded the derived human column into the
-wearer's eyes); and the shader grew two first-person courtesies — `uFade`
-(your own gel only reaches your eyes once the body has FORMED, so the
-count-in pour is an arrival, not a veil, and an eliminated slump leaves a
-faint ghost at your feet) and `uNearFade`, the cockpit fade.
-
-Two of those were bought fresh on this dancefloor. Boxing keeps elbows
-low and forward; a groove swap throws the hand HIGH, the solved elbow
-rides up beside the temple, and spring overshoot carried the live blob
-into the eye — so the elbow solver now keeps a hard clearance sphere
-around the head (a real elbow can't occupy your skull either). And the
-oozy root lag that makes the skirt drag behind a sidestep also drags the
-trunk's WAKE through the space your head just dashed into — transient,
-inches from the lens, and unfixable at the rig level without killing the
-weight. That is the cockpit fade's job: gel within a hand's width of the
-per-eye camera dissolves instead of smearing the lens, tight enough
-(0.12 m) that your own chest at ~0.22 m stays full when you look down.
-
-**The second crack: THE ARMS.** The first playtest returned a clean
-verdict — the arms were the joy, and the trunk was a wall: a chest and
-belly between your eyes and the deck hid the paint the whole game is
-made of. So the body now wears a DRESS (`setFirstPersonDress`), and the
-dress follows what there is to read. While the set is LIVE only the arm
-chains render — shoulder→elbow→fist, both sides, six blobs, the fists
-still pinned and the elbows still solved — and the contact shadow parks
-with them (a shadow under no visible body would sit exactly on the paint
-the dress exists to show). The FULL body keeps every moment with nothing
-to read: it pours up whole through the count-in, sheds to the arms on
-the drop (a fade dip and an agitation pulse make the flip read as the
-gel shedding, not a pop), returns whole to slump when the chain takes
-you out, and dances the podium formed. Physics never changes dress —
-the whole body is always simmed, so the arms keep their weight and the
-skirt still drags in the numbers even when it doesn't draw.
-
-**And the arms wear THE READ-THROUGH.** The second playtest said the
-quiet part: even arms-only wasn't enough, because hands REST low and
-forward — two thick gel ropes hanging exactly in the cone where the
-paint lives. Two mechanisms fixed it, and the second turned out to be
-the one that mattered most. First, the worn body's material stops
-writing depth: the telegraph decals draw after the gel (order 20,
-additive, depth-tested), so a body that wrote its marched fragDepth was
-not tinting the paint but ERASING it outright — at any alpha. Without
-the write, paint composites over the gel; the depth TEST stays, so the
-sticks and the boss still sort into the surface correctly. Second, the
-down-fade: the deck is always DOWNWARD of the eyes, so the shader
-dissolves gel along any sightline pitching below the horizon
-(GEL_LOOK.readFadeStart/End — full gel until ~14° down, gone by 30°;
-even a ducked dancer reading the far rim looks 27°+ down). The arms are
-whole where the dance lives — raised, swapping, at eye level — and
-glass wherever a ray could be carrying paint. Per-RAY, not per-head:
-rays to the bottom of your view fade even when your head is level,
-because that lower band is exactly where the deck appears. The fade
-rides the arms dress only; the full dress (count-in, slump, podium)
-keeps every angle, since fading a body you are looking down at would
-just eat it.
-
-Three sim rules learned to read the mask so floating arms stay honest
-gel: the render AABB hugs RENDERED mass only (the box no longer marches
-an invisible trunk's worth of empty field — the arms dress is cheaper,
-not just cleaner); drips bud off and crawl home to rendered blobs only
-(gel never appears from or vanishes into nothing); and the trunk-drape
-leash exemption only counts VISIBLE trunk — a fist resting on an
-invisible belly stays leashed to its own arm, because the old rule let
-it bridge to gel that wasn't there and float off the rope as a bead.
-
-`node tools/goop-body.mjs` machine-checks all of it against the shipping
-modules, danced in the live arms dress: ONE PIECE through a night's
-verbs (groove, hands-at-chest, dashes, the duck, a whip-180) on the
-physics field, with the dent allowed to carve and then required to heal
-closed; THE ARM ROPES — each arm one piece of the RENDERED field (the
-packed blobs the shader actually marches), including hands resting at
-the chest; pin truth under 1 cm; the mask law (a masked core never
-enters the render pack); the eye point never swallowed (worst clearance
-tripled once the trunk's wake stopped rendering) and the cockpit fade
-armed on the worn body only; NaN tracking poison shrugged off; the slump
-and the stand-back-up. Then it boots the REAL app and walks the gate and
-the dress: a solo set pours the full body through the count-in, sheds to
-the arms on the drop, hands the full ghost back on elimination; a tour
-finale wears it leaner; an online set never builds it; the menu rooms
-tear it down.
+The whole organ — the embody rig, the multi-pin puppet mode, the dress
+masks, the fades, and the probe that held it all to law — lives intact
+in the git history, and in SLUGFEST, where both fighters ARE the gel
+and the trade runs the other way. The figures the ROOM sees of you were
+never part of it and are unchanged. Worth trying.
 
 ## The figures' arms (the humanoid motion layer)
 

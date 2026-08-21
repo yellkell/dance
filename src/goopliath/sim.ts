@@ -1,18 +1,7 @@
 /**
  * The gel simulation — a verlet blob soup that IS the creature's body.
- * Evolved once since vendoring, with the SLUGFEST lineage's structural
- * change brought home: MULTIPLE kinematic pins.
  *
- * The boss only ever pinned one blob (the striking fist). An EMBODIED
- * body — the player's own goop in a solo/tour set — needs both fists
- * riding the real controllers exactly (a glowstick hand must be where the
- * hand is, not where a spring got to). So `pinIndex/pinPos` became a pin
- * SET; everywhere the leash used to treat "the pinned blob" as gospel
- * (zero correction weight — its partner takes the whole projection) now
- * treats every pinned blob that way, and a segment pinned at BOTH ends is
- * left alone entirely (two gospels don't argue; the swell bridges them).
- *
- * ~20 core blobs chase pose anchors on underdamped springs (so everything
+ * ~22 core blobs chase pose anchors on underdamped springs (so everything
  * arrives with a wobble), while transient blobs come and go around them:
  *
  *  - LUMPS: punched clean out of the body, they fly ballistically, splat on
@@ -238,21 +227,13 @@ export class GoopSim {
   readonly styleRadius: Float32Array = new Float32Array(ANCHOR_COUNT).fill(1);
 
   /**
-   * THE PINS: while set, a core blob is slammed to its pin every step
-   * instead of spring-chasing it. Strikes pin the striking blob (a real
-   * punch arrives EXACTLY where it was thrown, no spring lag); embodiment
-   * pins both fists to the player's tracked hardware. Unpinning hands the
-   * blob back to its spring for the snap-back wobble.
+   * Kinematic pin: while >= 0, that core blob is slammed to pinPos every
+   * step instead of spring-chasing it. The strike uses this — a real punch
+   * arrives EXACTLY where it was thrown, no spring lag; unpinning lets the
+   * spring snap it back with wobble.
    */
-  private readonly pinMask = new Uint8Array(ANCHOR_COUNT);
-  private readonly pinPos = new Float32Array(ANCHOR_COUNT * 3);
-  private pinCount = 0;
-
-  /** First-person masking: core anchors excluded from the RENDER pack (the
-   *  body you inhabit hides its head — you'd be wearing it as a helmet of
-   *  gel). Physics and the CPU field keep every blob: the mass, the dents
-   *  and the field tests always see the whole body. */
-  readonly renderSkip = new Uint8Array(ANCHOR_COUNT);
+  pinIndex = -1;
+  readonly pinPos = { x: 0, y: 0, z: 0 };
 
   events: SimEvents = {};
 
@@ -271,29 +252,6 @@ export class GoopSim {
       this.core.push({ x, y, z, px: x, py: y, pz: z, r, rTarget: r, scale: 1, seed: i * 17.37 });
     }
     this.pack();
-  }
-
-  // ------------------------------------------------------------------- pins
-
-  /** Pin core blob `i` to a creature-local point for this frame onward. */
-  pin(i: number, x: number, y: number, z: number): void {
-    if (!this.pinMask[i]) this.pinCount++;
-    this.pinMask[i] = 1;
-    const o = i * 3;
-    this.pinPos[o] = x;
-    this.pinPos[o + 1] = y;
-    this.pinPos[o + 2] = z;
-  }
-
-  /** Release every pin (springs take the blobs back with a wobble). */
-  clearPins(): void {
-    if (this.pinCount === 0) return;
-    this.pinMask.fill(0);
-    this.pinCount = 0;
-  }
-
-  isPinned(i: number): boolean {
-    return this.pinMask[i] === 1;
   }
 
   // ---------------------------------------------------------------- targets
@@ -413,10 +371,7 @@ export class GoopSim {
     return out.set(b.x, b.y, b.z);
   }
 
-  /** AABB of RENDERED mass + margin for blend/wobble (drives the render
-   *  bounds — physics never reads it, so masked cores are rightly skipped:
-   *  in the arms-only dress the box hugs the arms instead of marching an
-   *  invisible trunk's worth of empty field). */
+  /** AABB of all mass + margin for blend/wobble (drives the render bounds). */
   bounds(outCenter: Vector3, outHalf: Vector3): void {
     let minX = 1e5, minY = 1e5, minZ = 1e5, maxX = -1e5, maxY = -1e5, maxZ = -1e5;
     const scan = (b: Blob) => {
@@ -427,9 +382,7 @@ export class GoopSim {
       maxY = Math.max(maxY, b.y + b.r);
       maxZ = Math.max(maxZ, b.z + b.r);
     };
-    for (let i = 0; i < this.core.length; i++) {
-      if (!this.renderSkip[i]) scan(this.core[i]);
-    }
+    for (const b of this.core) scan(b);
     for (const l of this.lumps) scan(l);
     for (const d of this.drips) scan(d);
     const margin = CREATURE.blend * 0.8 + 0.05;
@@ -551,9 +504,8 @@ export class GoopSim {
 
   private spawnDrip(): void {
     if (this.drips.length >= 4 || this.ko > 0) return;
-    // Bud off a random low-ish blob — a RENDERED one: a bead budding out
-    // of an invisible (masked) leg is gel appearing from nothing.
-    const candidates = this.core.filter((b, i) => !this.renderSkip[i] && b.y < 0.75);
+    // Bud off a random low-ish blob.
+    const candidates = this.core.filter((b) => b.y < 0.75);
     const host = candidates[Math.floor(Math.random() * candidates.length)];
     if (!host) return;
     const ang = Math.random() * Math.PI * 2;
@@ -627,13 +579,6 @@ export class GoopSim {
     }
 
     // --- light pairwise separation so the core never collapses to a point ---
-    // dt-SCALED (a fix from the SLUGFEST lineage the boss never needed):
-    // the push is a position nudge per CALL, while the springs recovering
-    // from it are per-SECOND — at 120 Hz an unscaled push wins double and
-    // slowly extrudes any tight pose (the embodied human column) until a
-    // body swallows its own camera. Scaling by h·60 makes every refresh
-    // rate behave like the 60 Hz the constant was tuned at.
-    const sepK = 0.18 * Math.min(1.5, h * 60);
     for (let i = 0; i < this.core.length; i++) {
       for (let j = i + 1; j < this.core.length; j++) {
         const a = this.core[i];
@@ -644,7 +589,7 @@ export class GoopSim {
         const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
         const minDist = (a.r + c.r) * 0.52;
         if (dist < minDist && dist > 1e-4) {
-          const push = ((minDist - dist) / dist) * sepK;
+          const push = ((minDist - dist) / dist) * 0.18;
           a.x -= dx * push;
           a.y -= dy * push;
           a.z -= dz * push;
@@ -659,23 +604,19 @@ export class GoopSim {
     // whip the whole limb along instead of stretching it into beads ---
     this.leashBlobs();
 
-    // THE PINS override everything: applied after springs, separation AND
-    // the leash so nothing can nudge a pinned blob off its line. Pins can
-    // teleport their blobs (a fast strike or a real fist outruns the
-    // springs) — leash again so limbs chase THIS frame, not one frame late.
-    // Pinned blobs carry zero projection weight, so their lines are gospel.
-    if (this.pinCount > 0) {
-      for (let i = 0; i < ANCHOR_COUNT; i++) {
-        if (!this.pinMask[i]) continue;
-        const b = this.core[i];
-        const o = i * 3;
-        b.x = this.pinPos[o];
-        b.y = this.pinPos[o + 1];
-        b.z = this.pinPos[o + 2];
-        b.px = b.x;
-        b.py = b.y;
-        b.pz = b.z;
-      }
+    // Kinematic pin overrides everything (the striking fist): applied after
+    // springs, separation AND the leash so nothing can nudge it off its line.
+    if (this.pinIndex >= 0 && this.pinIndex < this.core.length) {
+      const b = this.core[this.pinIndex];
+      b.x = this.pinPos.x;
+      b.y = this.pinPos.y;
+      b.z = this.pinPos.z;
+      b.px = b.x;
+      b.py = b.y;
+      b.pz = b.z;
+      // The pin can teleport its blob (a fast strike outruns the springs) —
+      // leash again so the limb chases it THIS frame, not one frame late.
+      // The pinned blob itself carries zero weight, so its line is gospel.
       this.leashBlobs();
     }
 
@@ -764,11 +705,9 @@ export class GoopSim {
           }
           d.state = 'returning';
           d.timer = 0;
-          // Home = nearest RENDERED core blob (gel crawls back into gel you
-          // can see, never vanishing into a masked anchor).
+          // Home = nearest core blob at floor level.
           let nd = 1e5;
           for (let i = 0; i < this.core.length; i++) {
-            if (this.renderSkip[i]) continue;
             const b = this.core[i];
             const dist = Math.hypot(b.x - d.x, b.y - d.y, b.z - d.z);
             if (dist < nd) {
@@ -813,15 +752,11 @@ export class GoopSim {
     return Math.sqrt(dx * dx + dy * dy + dz * dz) - this.rawTargetR[a] - this.rawTargetR[b];
   }
 
-  /** Is this anchor's target already resting against the trunk? Masked
-   *  trunk anchors don't count — the drape exemption exists because the
-   *  bridge is VISIBLE through the trunk, and a fist resting on an
-   *  invisible belly must stay leashed to its own (rendered) arm or it
-   *  reads as a bead floating off the rope. Boss unaffected (no masks). */
+  /** Is this anchor's target already resting against the trunk? */
   private targetOnTrunk(i: number, maxGap: number): boolean {
     const t = this.targets;
     for (const g of TRUNK) {
-      if (g === i || this.renderSkip[g]) continue;
+      if (g === i) continue;
       const dx = t[i * 4] - t[g * 4];
       const dy = t[i * 4 + 1] - t[g * 4 + 1];
       const dz = t[i * 4 + 2] - t[g * 4 + 2];
@@ -831,12 +766,11 @@ export class GoopSim {
     return false;
   }
 
-  /** Is this live blob already resting against the trunk? (Same visible-
-   *  trunk rule as targetOnTrunk above.) */
+  /** Is this live blob already resting against the trunk? */
   private blobOnTrunk(i: number, maxGap: number): boolean {
     const b = this.core[i];
     for (const g of TRUNK) {
-      if (g === i || this.renderSkip[g]) continue;
+      if (g === i) continue;
       const c = this.core[g];
       const d = Math.hypot(b.x - c.x, b.y - c.y, b.z - c.z) - b.r - c.r;
       if (d <= maxGap) return true;
@@ -898,18 +832,14 @@ export class GoopSim {
     const maxDist = t[oo + 3] + t[oi + 3] + maxGap;
     if (dist <= maxDist || dist < 1e-4) return;
     if (this.targetOnTrunk(outer, maxGap)) return; // draped on the body
-    // A pinned blob is gospel — its partner takes the whole correction, so
-    // the leash never tugs a strike (or a real fist) off its line. Both
-    // ends pinned: two gospels don't argue; the swell bridges the gap.
-    const oPin = this.pinMask[outer] === 1;
-    const iPin = this.pinMask[inner] === 1;
-    if (oPin && iPin) return;
+    // The strike's pinned blob is gospel — its partner takes the whole
+    // correction, so the leash never tugs a punch off its line.
     let wOut = outerShare;
     let wIn = 1 - outerShare;
-    if (oPin) {
+    if (outer === this.pinIndex) {
       wOut = 0;
       wIn = 1;
-    } else if (iPin) {
+    } else if (inner === this.pinIndex) {
       wOut = 1;
       wIn = 0;
     }
@@ -955,15 +885,12 @@ export class GoopSim {
     const maxDist = a.r + b.r + maxGap;
     if (dist <= maxDist || dist < 1e-4) return;
     if (this.blobOnTrunk(outer, maxGap)) return;
-    const oPin = this.pinMask[outer] === 1;
-    const iPin = this.pinMask[inner] === 1;
-    if (oPin && iPin) return;
     let wOut = outerShare;
     let wIn = 1 - outerShare;
-    if (oPin) {
+    if (outer === this.pinIndex) {
       wOut = 0;
       wIn = 1;
-    } else if (iPin) {
+    } else if (inner === this.pinIndex) {
       wOut = 1;
       wIn = 0;
     }
@@ -1013,10 +940,7 @@ export class GoopSim {
       this.packed[o + 3] = Math.max(0.008, b.r);
       n++;
     };
-    for (let i = 0; i < this.core.length; i++) {
-      if (this.renderSkip[i]) continue; // first-person: your head isn't drawn
-      put(this.core[i]);
-    }
+    for (const b of this.core) put(b);
     for (const l of this.lumps) put(l);
     for (const d of this.drips) put(d);
     this.packedCount = n;
