@@ -103,6 +103,11 @@ export const GEL_LOOK = {
   telegraphColor: 0xffb03a,
   /** Raymarch step cap (the single biggest perf knob on Quest). */
   maxSteps: 22,
+  /** First-person cockpit fade: gel closer to the eye than this (metres,
+   *  along the ray) dissolves instead of smearing the lens. Only a body
+   *  built with `firstPerson` gets it; the boss renders whole. Tight on
+   *  purpose — looking down at your own chest (~0.22 m) must stay full. */
+  firstPersonNearFade: 0.12,
   /** Surface wobble amplitude at rest / when agitated. The agitated figure is
    *  turned up so a fresh hit sets the whole surface roiling. */
   wobble: 0.010,

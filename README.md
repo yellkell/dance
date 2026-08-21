@@ -46,8 +46,17 @@ everyone else.
 - Every other dancer is a **slender humanoid figure** — gloss-black mannequin,
   neon collar/waist/wrist trim and visor in their seat colour, glowsticks in
   hand — solved live from just a head and two hands (which is all VR knows).
-  **You have no body of your own**: the local player sees only their
-  controllers; the figure is for everyone else's view of you.
+  The figure is for everyone else's view of you — but on a **SOLO or TOUR
+  set you now have a body of your own: THE GOOP BODY** (an experiment,
+  vendored home from SLUGFEST, the lineage's boxing spinoff where both
+  fighters ARE the gel). Look down and you're a man-sized body of slime in
+  your seat's colours — headset for a head, controllers for fists, the
+  trunk, elbows and dragging puddle-skirt footwork all derived and
+  simulated, first-person masked so it never blocks a read, and a landing
+  that clips you visibly **dents** it. Strictly your own view of yourself,
+  and strictly offline sets: club floors and online raids keep the
+  mannequins (the mirror included), and the judge never reads it. One
+  switch (`BODY.enabled` in `src/config.ts`) turns the experiment off.
 - Last dancer standing (or the highest score when the set ends) **owns the
   night**: podium, crown, confetti cannons. When the set was called from
   the club, the crown is REAL: the winner walks back onto the floor with a
@@ -463,7 +472,9 @@ src/
   audio/techno.ts      the beat clock + the synthesised set
   audio/sfx.ts         WebAudio sfx kit (vendored)
   goopliath/           the raymarched gel creature (vendored; patched with
-                       the dance vocabulary and the ONE PIECE cohesion law)
+                       the dance vocabulary, the ONE PIECE cohesion law,
+                       and SLUGFEST's embodiment organ: multi-pin puppet
+                       mode + embody.ts, head+hands → a whole body of gel)
   choreo/setlist.ts    seeded, beat-quantized move generation
   choreo/telegraphs.ts the hazard-shape shader kit (vendored)
   choreo/strikes.ts    landing FX per platform
@@ -475,6 +486,7 @@ src/
   game/                state, flow, ring math, rng, avatars + their
                        shared pose-motion layer (springy hands)
   systems/             Music, Choreo, Player, Avatar, Rank, Goopliath,
+                       GoopBody (your own gel body — solo/tour sets),
                        Disco, Hud, Menu, Network, Arena,
                        Club, ClubTeleport, ClubSocial, ClubBall
   net/                 room session + pose stores (ring + club floor)
@@ -488,7 +500,11 @@ tools/                 track analyzer · preview-shot · club-capture ·
                        glass-physics · glass-stack (towers and pyramids) ·
                        music-switch (the floor's music toggle, end to end) ·
                        goop-cohesion (the goop stays ONE PIECE, field-checked
-                       through the whole show) · arm-motion (the figures'
+                       through the whole show) · goop-body (the worn body:
+                       one piece through a night's verbs, fists on the
+                       hands, eyes in daylight — then the real app's gate:
+                       solo/tour wear it, online never does) ·
+                       arm-motion (the figures'
                        hand springs, elbow poles and stick grips, checked
                        live)
 avatar-preview.html    dev-only dancer catwalk (never shipped)

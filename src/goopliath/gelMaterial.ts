@@ -65,6 +65,8 @@ const FRAG = /* glsl */ `
   uniform float uWobble;
   uniform float uWobbleAgitated;
   uniform int uSteps;
+  uniform float uFade;
+  uniform float uNearFade;
   uniform vec3 uShallow;
   uniform vec3 uDeep;
   uniform vec3 uNucleus;
@@ -250,7 +252,17 @@ const FRAG = /* glsl */ `
     col = mix(col, uFlash, uTelegraph * 0.35 * (0.6 + 0.4 * sin(uTime * 18.0)));
 
     // ---- alpha: more transparent at thin grazing edges, meaty in the body.
-    float alpha = clamp(0.44 + 0.38 * thickN + 0.24 * fresnel, 0.0, 0.96);
+    // uFade is the first-person reveal: your own body only reaches your
+    // eyes once it has finished pouring into place under them. The boss
+    // never touches it (it stays 1).
+    float alpha = clamp(0.44 + 0.38 * thickN + 0.24 * fresnel, 0.0, 0.96) * uFade;
+    // The cockpit fade (first person only; 0 = off): gel within a hand's
+    // width of the eye itself dissolves instead of smearing the lens — a
+    // fist at your nose, an elbow's spring overshoot, the trunk's oozy
+    // wake swept through mid-dash. t is the ray's hit distance from the
+    // per-eye camera, so each eye fades its own encounters.
+    if (uNearFade > 0.0) alpha *= smoothstep(uNearFade * 0.35, uNearFade, t);
+    if (alpha < 0.01) discard;
 
     gl_FragColor = vec4(col, alpha);
 
@@ -276,8 +288,10 @@ export interface GelUniforms {
     telegraph: number,
     invModel: Matrix4,
   ): void;
-  /** Scale the march-step budget (1 = full quality; drops with distance). */
-  setQuality(q: number): void;
+  /** Scale the march-step budget (1 = full quality; drops with distance).
+   *  `floor` is the never-fewer-than step count — the vendored 20 unless a
+   *  host with tighter bounds (the man-sized first-person body) says so. */
+  setQuality(q: number, floor?: number): void;
 }
 
 export function createGelMaterial(): GelUniforms {
@@ -302,6 +316,8 @@ export function createGelMaterial(): GelUniforms {
       uWobble: { value: GEL_LOOK.wobble },
       uWobbleAgitated: { value: GEL_LOOK.wobbleAgitated },
       uSteps: { value: GEL_LOOK.maxSteps },
+      uFade: { value: 1 },
+      uNearFade: { value: 0 },
       uShallow: { value: new Color(GEL_LOOK.shallowColor) },
       uDeep: { value: new Color(GEL_LOOK.deepColor) },
       uNucleus: { value: new Color(GEL_LOOK.nucleusColor) },
@@ -324,8 +340,8 @@ export function createGelMaterial(): GelUniforms {
       u.uTelegraph.value = telegraph;
       (u.uInvModel.value as Matrix4).copy(invModel);
     },
-    setQuality(q) {
-      material.uniforms.uSteps.value = Math.max(20, Math.round(GEL_LOOK.maxSteps * Math.min(1, q)));
+    setQuality(q, floor = 20) {
+      material.uniforms.uSteps.value = Math.max(floor, Math.round(GEL_LOOK.maxSteps * Math.min(1, q)));
     },
   };
 }
