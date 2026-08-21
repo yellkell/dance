@@ -152,6 +152,51 @@ export class GelCreature {
     (u.uDeep.value as Color).setHex(t ? t.deep : GEL_LOOK.deepColor);
     (u.uNucleus.value as Color).setHex(t ? t.nucleus : GEL_LOOK.nucleusColor);
   }
+
+  /** External scale on the first-person reveal (uFade) — hosts dip it for
+   *  a beat when the dress flips so the mask change reads as the gel
+   *  shedding, never a pop. Eases back to 1 on its own each update. */
+  fadeScale = 1;
+
+  private dressValue: 'full' | 'arms' = 'full';
+
+  /** What the wearer's own render mask currently is (probes read this). */
+  get dress(): 'full' | 'arms' {
+    return this.dressValue;
+  }
+
+  /**
+   * The first-person render DRESS — what of your own body reaches your
+   * eyes. Physics always keeps the whole body; this is strictly the mask.
+   *
+   *  - 'full' — everything but head + neck: the count-in pour, the
+   *    eliminated slump, the podium. The body is the show.
+   *  - 'arms' — ONLY the arm chains (shoulder→elbow→fist, both sides):
+   *    the READ-THROUGH dress for a live set. The floor is the game's one
+   *    instruction, and a chest between your eyes and the deck was hiding
+   *    it; the arms — pinned fists, solved elbows — are the part worth
+   *    keeping in view. The contact shadow parks too: a shadow under no
+   *    visible body would sit exactly on the paint this dress exists to
+   *    show.
+   *
+   * First-person bodies only; the boss never wears a dress.
+   */
+  setFirstPersonDress(dress: 'full' | 'arms'): void {
+    if (!this.firstPerson) return; // the boss never wears a dress
+    this.dressValue = dress;
+    const skip = this.sim.renderSkip;
+    if (dress === 'arms') {
+      skip.fill(1);
+      for (const i of [A.SHOULDER_L, A.SHOULDER_R, A.ELBOW_L, A.ELBOW_R, A.FIST_L, A.FIST_R]) {
+        skip[i] = 0;
+      }
+    } else {
+      skip.fill(0);
+      skip[A.HEAD] = 1;
+      skip[A.NECK] = 1;
+    }
+    this.shadow.visible = dress === 'full';
+  }
   /** True while it's an exhausted puddle — hits do double (see EXHAUST). */
   vulnerable = false;
   /** Movement urgency: 1 = ooze, higher = lurch (the AI dashes in to strike). */
@@ -208,9 +253,9 @@ export class GelCreature {
     this.group.add(this.shadow);
 
     if (this.firstPerson) {
-      // Your own head is not for your own eyes.
-      this.sim.renderSkip[A.HEAD] = 1;
-      this.sim.renderSkip[A.NECK] = 1;
+      // Your own head is not for your own eyes (setFirstPersonDress below
+      // writes the mask — 'full' to start: head + neck skipped).
+      this.setFirstPersonDress('full');
       // And gel that reaches the eye itself dissolves (the cockpit fade) —
       // an elbow's overshoot, the trunk's wake mid-dash, a fist at the nose.
       this.gel.material.uniforms.uNearFade.value = GEL_LOOK.firstPersonNearFade;
@@ -568,7 +613,8 @@ export class GelCreature {
     // slumped at your feet (eliminated) so looking down never reads empty.
     if (this.firstPerson) {
       const formed = Math.max(0, Math.min(1, (this.form - 0.86) / 0.12));
-      this.gel.material.uniforms.uFade.value = 0.22 + 0.78 * formed;
+      this.fadeScale = Math.min(1, this.fadeScale + (1 - this.fadeScale) * Math.min(1, dt * 6));
+      this.gel.material.uniforms.uFade.value = (0.22 + 0.78 * formed) * this.fadeScale;
     }
 
     // Shadow hugs the current mass footprint.

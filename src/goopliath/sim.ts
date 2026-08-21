@@ -413,7 +413,10 @@ export class GoopSim {
     return out.set(b.x, b.y, b.z);
   }
 
-  /** AABB of all mass + margin for blend/wobble (drives the render bounds). */
+  /** AABB of RENDERED mass + margin for blend/wobble (drives the render
+   *  bounds — physics never reads it, so masked cores are rightly skipped:
+   *  in the arms-only dress the box hugs the arms instead of marching an
+   *  invisible trunk's worth of empty field). */
   bounds(outCenter: Vector3, outHalf: Vector3): void {
     let minX = 1e5, minY = 1e5, minZ = 1e5, maxX = -1e5, maxY = -1e5, maxZ = -1e5;
     const scan = (b: Blob) => {
@@ -424,7 +427,9 @@ export class GoopSim {
       maxY = Math.max(maxY, b.y + b.r);
       maxZ = Math.max(maxZ, b.z + b.r);
     };
-    for (const b of this.core) scan(b);
+    for (let i = 0; i < this.core.length; i++) {
+      if (!this.renderSkip[i]) scan(this.core[i]);
+    }
     for (const l of this.lumps) scan(l);
     for (const d of this.drips) scan(d);
     const margin = CREATURE.blend * 0.8 + 0.05;
@@ -546,8 +551,9 @@ export class GoopSim {
 
   private spawnDrip(): void {
     if (this.drips.length >= 4 || this.ko > 0) return;
-    // Bud off a random low-ish blob.
-    const candidates = this.core.filter((b) => b.y < 0.75);
+    // Bud off a random low-ish blob — a RENDERED one: a bead budding out
+    // of an invisible (masked) leg is gel appearing from nothing.
+    const candidates = this.core.filter((b, i) => !this.renderSkip[i] && b.y < 0.75);
     const host = candidates[Math.floor(Math.random() * candidates.length)];
     if (!host) return;
     const ang = Math.random() * Math.PI * 2;
@@ -758,9 +764,11 @@ export class GoopSim {
           }
           d.state = 'returning';
           d.timer = 0;
-          // Home = nearest core blob at floor level.
+          // Home = nearest RENDERED core blob (gel crawls back into gel you
+          // can see, never vanishing into a masked anchor).
           let nd = 1e5;
           for (let i = 0; i < this.core.length; i++) {
+            if (this.renderSkip[i]) continue;
             const b = this.core[i];
             const dist = Math.hypot(b.x - d.x, b.y - d.y, b.z - d.z);
             if (dist < nd) {
@@ -805,11 +813,15 @@ export class GoopSim {
     return Math.sqrt(dx * dx + dy * dy + dz * dz) - this.rawTargetR[a] - this.rawTargetR[b];
   }
 
-  /** Is this anchor's target already resting against the trunk? */
+  /** Is this anchor's target already resting against the trunk? Masked
+   *  trunk anchors don't count — the drape exemption exists because the
+   *  bridge is VISIBLE through the trunk, and a fist resting on an
+   *  invisible belly must stay leashed to its own (rendered) arm or it
+   *  reads as a bead floating off the rope. Boss unaffected (no masks). */
   private targetOnTrunk(i: number, maxGap: number): boolean {
     const t = this.targets;
     for (const g of TRUNK) {
-      if (g === i) continue;
+      if (g === i || this.renderSkip[g]) continue;
       const dx = t[i * 4] - t[g * 4];
       const dy = t[i * 4 + 1] - t[g * 4 + 1];
       const dz = t[i * 4 + 2] - t[g * 4 + 2];
@@ -819,11 +831,12 @@ export class GoopSim {
     return false;
   }
 
-  /** Is this live blob already resting against the trunk? */
+  /** Is this live blob already resting against the trunk? (Same visible-
+   *  trunk rule as targetOnTrunk above.) */
   private blobOnTrunk(i: number, maxGap: number): boolean {
     const b = this.core[i];
     for (const g of TRUNK) {
-      if (g === i) continue;
+      if (g === i || this.renderSkip[g]) continue;
       const c = this.core[g];
       const d = Math.hypot(b.x - c.x, b.y - c.y, b.z - c.z) - b.r - c.r;
       if (d <= maxGap) return true;

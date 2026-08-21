@@ -47,16 +47,22 @@ everyone else.
   neon collar/waist/wrist trim and visor in their seat colour, glowsticks in
   hand — solved live from just a head and two hands (which is all VR knows).
   The figure is for everyone else's view of you — but on a **SOLO or TOUR
-  set you now have a body of your own: THE GOOP BODY** (an experiment,
+  set you now have a body of your own: THE GOOP ARMS** (an experiment,
   vendored home from SLUGFEST, the lineage's boxing spinoff where both
-  fighters ARE the gel). Look down and you're a man-sized body of slime in
-  your seat's colours — headset for a head, controllers for fists, the
-  trunk, elbows and dragging puddle-skirt footwork all derived and
-  simulated, first-person masked so it never blocks a read, and a landing
-  that clips you visibly **dents** it. Strictly your own view of yourself,
-  and strictly offline sets: club floors and online raids keep the
-  mannequins (the mirror included), and the judge never reads it. One
-  switch (`BODY.enabled` in `src/config.ts`) turns the experiment off.
+  fighters ARE the gel). While the set is live you wear two arms of slime
+  in your seat's colours — controllers for fists, elbows solved, the ropes
+  swelling with every fast swing, glowsticks riding the gel hands — and a
+  landing that clips you visibly **dents** them. The first crack wore the
+  whole body and failed the game's one law: the floor is the instruction,
+  and your own chest was hiding it — so mid-set only the arms render, and
+  the FULL body takes the moments with nothing to read: it pours up whole
+  during the count-in, sheds to the arms on the drop, returns to slump
+  into a breathing ghost-glob if the chain takes you out, and dances the
+  podium formed. Strictly your own view of yourself, and strictly offline
+  sets: club floors and online raids keep the mannequins (the mirror
+  included), and the judge never reads it. `BODY.enabled` in
+  `src/config.ts` turns the experiment off; `BODY.liveDress` puts the
+  full body back mid-set if you must.
 - Last dancer standing (or the highest score when the set ends) **owns the
   night**: podium, crown, confetti cannons. When the set was called from
   the club, the crown is REAL: the winner walks back onto the floor with a
@@ -501,9 +507,11 @@ tools/                 track analyzer · preview-shot · club-capture ·
                        music-switch (the floor's music toggle, end to end) ·
                        goop-cohesion (the goop stays ONE PIECE, field-checked
                        through the whole show) · goop-body (the worn body:
-                       one piece through a night's verbs, fists on the
-                       hands, eyes in daylight — then the real app's gate:
-                       solo/tour wear it, online never does) ·
+                       one piece through a night's verbs, each arm one
+                       rendered rope, fists on the hands, eyes in
+                       daylight — then the real app's gate: solo/tour wear
+                       it, the drop sheds it to the arms, online never
+                       builds it) ·
                        arm-motion (the figures'
                        hand springs, elbow poles and stick grips, checked
                        live)
