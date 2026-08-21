@@ -8,6 +8,21 @@
  * a punch. That separation is what lets the flat-screen workbench (dev.html)
  * drive the identical creature you box in passthrough.
  *
+ * Two driving modes (the SLUGFEST evolution, brought home for the player's
+ * own goop body in solo/tour sets):
+ *
+ *  - 'ai'     — the vendored performer: throwAttack() runs the full
+ *               telegraph→strike→recover choreography (the GOOPLIATH).
+ *  - 'puppet' — the body is DRIVEN: an EmbodyRig (goopliath/embody.ts)
+ *               writes sim offsets/pins straight from tracked hardware.
+ *               The attack timeline stands down entirely; the springs, the
+ *               leash, the swell, dents and drips all stay live — the body
+ *               remains gel, it just answers to a human.
+ *
+ * First-person (`firstPerson: true`): the head/neck blobs are masked out of
+ * the RENDER (you'd wear them as a gel helmet) and the eyes aren't built.
+ * Physics and the CPU field keep the whole body.
+ *
  * The eyes are the personality trick: two glossy beads that float wherever
  * the gel surface currently is (found by walking the SDF outward from the
  * head blob toward whatever they're looking at), so they ride every wobble,
@@ -36,6 +51,13 @@ import type { StylePoseDelta } from './styles.js';
 import { GoopSim, type PunchResult } from './sim.js';
 
 export type Hand = 'left' | 'right';
+
+export interface CreatureOptions {
+  /** Body colours (defaults to the classic green — GEL_LOOK). */
+  tint?: { shallow: number; deep: number; nucleus: number } | null;
+  /** The body you inhabit: no eyes, head unrendered, fade-in reveal. */
+  firstPerson?: boolean;
+}
 
 interface ActiveAttack {
   name: AttackName;
@@ -87,12 +109,16 @@ export class GelCreature {
   readonly group = new Group();
   readonly sim = new GoopSim();
 
+  /** See the header: 'ai' runs the strike choreography, 'puppet' is driven. */
+  mode: 'ai' | 'puppet' = 'ai';
+  readonly firstPerson: boolean;
+
   private gel: GelUniforms;
   private gelMesh: Mesh;
   private shadow: Mesh;
 
-  private eyeL: Group;
-  private eyeR: Group;
+  private eyeL: Group | null = null;
+  private eyeR: Group | null = null;
   private eyeMats: MeshBasicMaterial[] = [];
   private blinkTimer = 3;
   private blink = 0; // 0 open .. 1 shut
@@ -115,6 +141,9 @@ export class GelCreature {
    *  heuristic below reads group-local distance, which is meaningless inside
    *  a scaled parent — and a giant that fills the view is never "far". */
   qualityOverride: number | null = null;
+  /** March-step floor handed to setQuality. The boss keeps the vendored 20;
+   *  the first-person body's tight bounds settle for less (BODY.stepFloor). */
+  stepFloor = 20;
   /** DANCE RAID patch: recolour the whole gel (tour finales bring the goop
    *  back in a new colour). Pass null to restore the classic green. */
   tint(t: { shallow: number; deep: number; nucleus: number } | null): void {
@@ -138,6 +167,11 @@ export class GelCreature {
   private prevVel = new Vector3();
   private yaw = 0;
 
+  /** Puppet-mode WORLD-SPACE pins (the tracked fists). Localised fresh
+   *  each frame AFTER root motion, so the glove is never a frame behind
+   *  the hand however hard the body whips. EmbodyRig fills this. */
+  readonly puppetPins: { anchor: number; pos: Vector3 }[] = [];
+
   private playerLocal = new Vector3(0, 1.6, 2);
   private time = 0;
 
@@ -145,14 +179,23 @@ export class GelCreature {
   private styleO = new Float32Array(ANCHOR_COUNT * 3);
   private styleR = new Float32Array(ANCHOR_COUNT).fill(1);
 
-  constructor(private fx: GooFx) {
+  constructor(
+    private fx: GooFx,
+    opts: CreatureOptions = {},
+  ) {
     this.group.name = 'the-goop';
+    this.firstPerson = opts.firstPerson === true;
 
     this.gel = createGelMaterial();
     this.gelMesh = new Mesh(new BoxGeometry(2, 2, 2), this.gel.material);
     this.gelMesh.frustumCulled = false;
-    this.gelMesh.renderOrder = 2; // after opaque eyes so blending sees them
+    // After opaque eyes so blending sees them; the body you inhabit draws
+    // after the boss, so an arm thrown across the stage blends over his
+    // surface (both write true fragDepth, so occlusion stays honest).
+    this.gelMesh.renderOrder = this.firstPerson ? 3 : 2;
     this.group.add(this.gelMesh);
+
+    if (opts.tint) this.tint(opts.tint);
 
     // Contact shadow — grounds the creature on the REAL floor in passthrough.
     this.shadow = new Mesh(
@@ -164,23 +207,32 @@ export class GelCreature {
     this.shadow.renderOrder = 0;
     this.group.add(this.shadow);
 
-    const mkEye = (): Group => {
-      const g = new Group();
-      const ball = new MeshBasicMaterial({ color: 0x101b10 });
-      this.eyeMats.push(ball);
-      const eye = new Mesh(new SphereGeometry(0.046, 16, 12), ball);
-      const glint = new Mesh(
-        new SphereGeometry(0.013, 8, 6),
-        new MeshBasicMaterial({ color: 0xf4fff2 }),
-      );
-      glint.position.set(0.015, 0.017, 0.035);
-      g.add(eye);
-      g.add(glint);
-      this.group.add(g);
-      return g;
-    };
-    this.eyeL = mkEye();
-    this.eyeR = mkEye();
+    if (this.firstPerson) {
+      // Your own head is not for your own eyes.
+      this.sim.renderSkip[A.HEAD] = 1;
+      this.sim.renderSkip[A.NECK] = 1;
+      // And gel that reaches the eye itself dissolves (the cockpit fade) —
+      // an elbow's overshoot, the trunk's wake mid-dash, a fist at the nose.
+      this.gel.material.uniforms.uNearFade.value = GEL_LOOK.firstPersonNearFade;
+    } else {
+      const mkEye = (): Group => {
+        const g = new Group();
+        const ball = new MeshBasicMaterial({ color: 0x101b10 });
+        this.eyeMats.push(ball);
+        const eye = new Mesh(new SphereGeometry(0.046, 16, 12), ball);
+        const glint = new Mesh(
+          new SphereGeometry(0.013, 8, 6),
+          new MeshBasicMaterial({ color: 0xf4fff2 }),
+        );
+        glint.position.set(0.015, 0.017, 0.035);
+        g.add(eye);
+        g.add(glint);
+        this.group.add(g);
+        return g;
+      };
+      this.eyeL = mkEye();
+      this.eyeR = mkEye();
+    }
 
     // The sim narrates; the creature makes the noises and the mess.
     this.sim.events = {
@@ -231,6 +283,28 @@ export class GelCreature {
     }
   }
 
+  /**
+   * Warm start: skip the glob morph and the springs' settling — the body
+   * comes up FORMED and converged. Mid-session rebuilds of a first-person
+   * body use this so fresh gel never pours through its wearer's eyes;
+   * drive the puppet offsets once BEFORE calling it so the settle lands
+   * on the real pose.
+   */
+  primeFormed(): void {
+    this.form = 1;
+    this.formTarget = 1;
+    this.sim.form = 1;
+    if (this.mode === 'puppet' && this.koTarget === 0) {
+      for (const p of this.puppetPins) {
+        _v.copy(p.pos);
+        this.group.updateMatrixWorld();
+        this.group.worldToLocal(_v);
+        this.sim.pin(p.anchor, _v.x, _v.y, _v.z);
+      }
+    }
+    for (let i = 0; i < 70; i++) this.sim.update(1 / 60);
+  }
+
   /** Knock it out (or stand it back up for the rematch). */
   setKo(down: boolean): void {
     if (down === this.koTarget > 0.5) return;
@@ -239,6 +313,7 @@ export class GelCreature {
       this.attack = null;
       this.extraYaw = 0;
       this.telegraph = 0;
+      this.sim.clearPins();
       sfx.koSplat();
     } else {
       this.sim.reabsorbAll();
@@ -255,6 +330,20 @@ export class GelCreature {
   /** What it should face (world) — normally the player's head. */
   faceToward(worldPos: Vector3): void {
     this.facePoint.copy(worldPos);
+  }
+
+  /** Snap the body's facing instantly (rebuild warm starts — the yaw
+   *  normally eases, and a fresh body settling 180° backwards would whip
+   *  round through its wearer). */
+  snapYaw(yaw: number): void {
+    this.yaw = yaw;
+    this.group.rotation.set(0, yaw, 0);
+    this.group.updateMatrixWorld();
+  }
+
+  /** Current body yaw (root facing). */
+  get bodyYaw(): number {
+    return this.yaw + this.extraYaw;
   }
 
   /** World-space position of the creature root. */
@@ -301,6 +390,7 @@ export class GelCreature {
     onApex?: (limbWorld: Vector3, hand: Hand) => void,
     onDone?: () => void,
   ): boolean {
+    if (this.mode !== 'ai') return false;
     if (this.attack || this.koTarget > 0 || this.form < 0.7) return false;
     this.group.updateMatrixWorld();
     const target = new Vector3().copy(targetWorld);
@@ -433,8 +523,22 @@ export class GelCreature {
       this.sim.styleRadius[i] += (this.styleR[i] - this.sim.styleRadius[i]) * sk;
     }
 
-    // --- attack timeline ---
-    this.updateAttack(dt);
+    // --- attack timeline (AI) / the puppeteer's frame (puppet) ---
+    if (this.mode === 'ai') {
+      this.updateAttack(dt);
+    } else {
+      // A puppet's offsets, radius scales and blendScale were written by
+      // its EmbodyRig before this call; the fist pins are world-space and
+      // localised HERE — after the root moved — so they land exactly.
+      this.telegraph = Math.max(0, this.telegraph - dt * 6);
+      if (this.koTarget === 0 && this.form > 0.65) {
+        for (const p of this.puppetPins) {
+          _v.copy(p.pos);
+          this.group.worldToLocal(_v);
+          this.sim.pin(p.anchor, _v.x, _v.y, _v.z);
+        }
+      }
+    }
 
     // --- simulate the body ---
     this.sim.update(dt);
@@ -458,6 +562,14 @@ export class GelCreature {
     // Strike-time blend widening (see sim.blendScale) — shader stays in
     // lock-step with the CPU field.
     this.gel.material.uniforms.uBlend.value = CREATURE.blend * this.sim.blendScale;
+    // First person: your own gel fades in only once the body has FORMED —
+    // the mid-morph blob would otherwise pour straight through your eyes
+    // as a coloured veil at every set start. A ghost of you stays visible
+    // slumped at your feet (eliminated) so looking down never reads empty.
+    if (this.firstPerson) {
+      const formed = Math.max(0, Math.min(1, (this.form - 0.86) / 0.12));
+      this.gel.material.uniforms.uFade.value = 0.22 + 0.78 * formed;
+    }
 
     // Shadow hugs the current mass footprint.
     const spread = Math.max(_v2.x, _v2.z) * 2.4;
@@ -469,9 +581,9 @@ export class GelCreature {
     // Distance LOD: past ~3.5 m the full step budget is invisible — shed it.
     // (A scaled-up boss overrides this — see qualityOverride.)
     const camDist = this.group.position.distanceTo(playerHeadWorld);
-    this.gel.setQuality(this.qualityOverride ?? (camDist < 3.5 ? 1 : 3.5 / camDist));
+    this.gel.setQuality(this.qualityOverride ?? (camDist < 3.5 ? 1 : 3.5 / camDist), this.stepFloor);
 
-    this.updateEyes(dt, playerHeadWorld);
+    if (this.eyeL && this.eyeR) this.updateEyes(dt, playerHeadWorld);
   }
 
   /**
@@ -487,7 +599,7 @@ export class GelCreature {
     this.sim.offsets.fill(0);
     this.sim.radiusScale.fill(1);
     if (!a) {
-      this.sim.pinIndex = -1;
+      this.sim.clearPins();
       this.extraYaw = 0;
       this.sim.blendScale = 1;
       this.telegraph = Math.max(0, this.telegraph - dt * 6);
@@ -495,7 +607,7 @@ export class GelCreature {
     }
 
     a.t += dt;
-    this.sim.pinIndex = -1; // the strike phase below re-pins each frame
+    this.sim.clearPins(); // the strike phase below re-pins each frame
     const spec = ATTACKS[a.name];
     // Difficulty stretches the readable parts; the strike stays snappy.
     const T = spec.telegraph * this.tempoScale;
@@ -590,10 +702,7 @@ export class GelCreature {
         this.sim.blendScale = 1.4;
         // Pin the right hand to its slam path so the clap lands on the beat;
         // the left chases into the same point and they smack together.
-        this.sim.pinIndex = A.FIST_R;
-        this.sim.pinPos.x = rx;
-        this.sim.pinPos.y = ry;
-        this.sim.pinPos.z = rz;
+        this.sim.pin(A.FIST_R, rx, ry, rz);
         if (!a.apexFired && k > 0.86) {
           a.apexFired = true;
           sfx.gooSlam();
@@ -813,10 +922,7 @@ export class GelCreature {
       swell = kick ? 1.35 : 1.45;
       midSwell = 1.5;
       this.sim.blendScale = 1.35;
-      this.sim.pinIndex = limbI;
-      this.sim.pinPos.x = this._pin.x;
-      this.sim.pinPos.y = this._pin.y;
-      this.sim.pinPos.z = this._pin.z;
+      this.sim.pin(limbI, this._pin.x, this._pin.y, this._pin.z);
       const apexK = a.name === 'backfist' ? 0.93 : 0.9;
       if (!a.apexFired && k > apexK) {
         a.apexFired = true;
@@ -914,8 +1020,8 @@ export class GelCreature {
       eye.scale.set(1, lid, 1);
       eye.lookAt(playerHeadWorld);
     };
-    place(this.eyeL, 1);
-    place(this.eyeR, -1);
+    place(this.eyeL!, 1);
+    place(this.eyeR!, -1);
 
     // Telegraph turns the eyes hot amber.
     const flash = this.telegraph;

@@ -228,6 +228,68 @@ field-checks the bridge graph every frame: before, the show was one piece
 on ~55% of frames; now 100%, with every bridge deep enough to survive the
 agitation wobble.
 
+## Your body (the SLUGFEST experiment)
+
+The lineage came home wearing something: SLUGFEST (the two-player goop
+boxing spinoff) evolved the vendored creature into a body a HUMAN drives —
+head + two hands become 20 anchor targets, fists ride kinematic pins, and
+everything unmeasured is derived. That organ is vendored back here as
+`goopliath/embody.ts` + `systems/GoopBodySystem.ts`: **in a SOLO or TOUR
+set, the local player wears the goop.** Look down mid-dodge and you're
+gel — the trunk squashes into your duck, the puddle-skirt legs drag across
+the deck after your sidestep, your glowsticks ride pinned gel fists in
+your seat's colours, and a landing that clips you dents and ripples the
+body (`sim.punchAt`, the boss's own impact reception).
+
+Strictly scoped, on purpose:
+
+- **Solo and tour only.** `match.online` gates it off entirely — club
+  floors and online raids keep the mannequin figures (and the mirror keeps
+  yours). The body is your own view of yourself; nothing else reads it, so
+  it cannot desync a room, and the judge never touches it (dodges still
+  read `match.headX/Z`).
+- **Menu rooms are body-free** — the boss's own law ("he appears where he
+  performs"); the raymarched gel is the most expensive draw in the game
+  and it never idles on a menu.
+- **Leaner march than the boss**: `BODY.quality` scales the step budget
+  down (further on finale nights, when the GOOP shares the frame), and the
+  man-sized body's tight AABB affords a lower step floor than the giant's
+  (`BODY.stepFloor`).
+
+What the port taught the shared stack (all in `goopliath/`, boss
+behaviour unchanged): the single strike pin became a pin SET (`sim.pin` /
+`clearPins`, every pinned blob leashed as gospel, both-ends-pinned
+segments left to the swell); `renderSkip` masks the wearer's head + neck
+out of the render pack while physics keeps the whole body; the pairwise
+separation push is now dt-scaled (at 120 Hz the unscaled push out-muscled
+the springs and slowly extruded the derived human column into the
+wearer's eyes); and the shader grew two first-person courtesies — `uFade`
+(your own gel only reaches your eyes once the body has FORMED, so the
+count-in pour is an arrival, not a veil, and an eliminated slump leaves a
+faint ghost at your feet) and `uNearFade`, the cockpit fade.
+
+Two of those were bought fresh on this dancefloor. Boxing keeps elbows
+low and forward; a groove swap throws the hand HIGH, the solved elbow
+rides up beside the temple, and spring overshoot carried the live blob
+into the eye — so the elbow solver now keeps a hard clearance sphere
+around the head (a real elbow can't occupy your skull either). And the
+oozy root lag that makes the skirt drag behind a sidestep also drags the
+trunk's WAKE through the space your head just dashed into — transient,
+inches from the lens, and unfixable at the rig level without killing the
+weight. That is the cockpit fade's job: gel within a hand's width of the
+per-eye camera dissolves instead of smearing the lens, tight enough
+(0.12 m) that your own chest at ~0.22 m stays full when you look down.
+
+`node tools/goop-body.mjs` machine-checks all of it against the shipping
+modules: ONE PIECE through a night's verbs (groove, dashes, the duck, a
+whip-180) with the dent allowed to carve and then required to heal
+closed; pin truth under 1 cm; the head never in the render pack; the eye
+point never swallowed and the cockpit fade armed (and only on the worn
+body); NaN tracking poison shrugged off; the slump and the stand-back-up.
+Then it boots the REAL app and walks the gate: a solo set wears the body,
+a tour finale wears it leaner, an online set never builds it, the menu
+rooms tear it down.
+
 ## The figures' arms (the humanoid motion layer)
 
 Every humanoid — the MC, the groupies, remote humans on the ring and the

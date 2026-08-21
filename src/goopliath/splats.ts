@@ -47,14 +47,17 @@ function flashTexture(): CanvasTexture {
   return new CanvasTexture(c);
 }
 
-function splatTexture(): CanvasTexture {
+function splatTexture(tint: number): CanvasTexture {
+  const col = new Color(tint);
+  const rgb = (a: number): string =>
+    `rgba(${Math.round(col.r * 255)}, ${Math.round(col.g * 255)}, ${Math.round(col.b * 255)}, ${a})`;
   const c = document.createElement('canvas');
   c.width = c.height = 128;
   const g = c.getContext('2d')!;
   const grad = g.createRadialGradient(64, 64, 4, 64, 64, 62);
-  grad.addColorStop(0, 'rgba(84, 214, 100, 0.85)');
-  grad.addColorStop(0.55, 'rgba(46, 150, 62, 0.5)');
-  grad.addColorStop(1, 'rgba(30, 110, 46, 0)');
+  grad.addColorStop(0, rgb(0.85));
+  grad.addColorStop(0.55, rgb(0.5));
+  grad.addColorStop(1, rgb(0));
   g.fillStyle = grad;
   // A blobby, non-circular splat: main disc + a few satellite dabs.
   g.fillRect(0, 0, 128, 128);
@@ -64,8 +67,8 @@ function splatTexture(): CanvasTexture {
     const x = 64 + Math.cos(a) * rr;
     const y = 64 + Math.sin(a) * rr;
     const dab = g.createRadialGradient(x, y, 1, x, y, 12 + (i % 4) * 4);
-    dab.addColorStop(0, 'rgba(70, 190, 88, 0.6)');
-    dab.addColorStop(1, 'rgba(70, 190, 88, 0)');
+    dab.addColorStop(0, rgb(0.6));
+    dab.addColorStop(1, rgb(0));
     g.fillStyle = dab;
     g.fillRect(0, 0, 128, 128);
   }
@@ -99,10 +102,13 @@ export class GooFx {
   private flashSize: number[] = [];
   private flashCursor = 0;
 
-  constructor() {
+  /** `tint` is the body colour this mess sprays in — the classic green by
+   *  default (the boss); the player's body bleeds in their seat colour. */
+  constructor(tint = 0x54d664) {
     this.group.name = 'goo-fx';
 
-    const tex = splatTexture();
+    const dropCol = new Color(tint);
+    const tex = splatTexture(tint);
     const geo = new PlaneGeometry(1, 1);
     for (let i = 0; i < MAX_SPLATS; i++) {
       const mat = new MeshBasicMaterial({
@@ -134,7 +140,10 @@ export class GooFx {
       transparent: true,
       depthWrite: false,
       blending: AdditiveBlending,
-      uniforms: { uSize: { value: 14 } },
+      uniforms: {
+        uSize: { value: 14 },
+        uColor: { value: new Vector3(dropCol.r, dropCol.g, dropCol.b) },
+      },
       vertexShader: /* glsl */ `
         attribute float aAlpha;
         varying float vAlpha;
@@ -149,11 +158,12 @@ export class GooFx {
       `,
       fragmentShader: /* glsl */ `
         varying float vAlpha;
+        uniform vec3 uColor;
         void main() {
           float r = length(gl_PointCoord - 0.5);
           if (r > 0.5) discard;
           float a = vAlpha * (1.0 - smoothstep(0.28, 0.5, r));
-          gl_FragColor = vec4(0.44, 0.88, 0.48, a);
+          gl_FragColor = vec4(uColor, a);
         }
       `,
     });
