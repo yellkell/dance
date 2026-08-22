@@ -835,12 +835,27 @@ export class ChoreoSystem extends createSystem({}) {
   }
 
   private judgeLocal(z: LiveZone, d: Dancer): void {
-    const touching = this.touchesLocal(z);
-    if (touching && match.beat >= d.invulnUntilBeat) {
+    // Inside i-frames NOTHING is judged — no harm, no reward — exactly the
+    // rule judgeBot has always played by. It used to skip only the harm:
+    // the wave strip after the one that clipped you still paid a dodge,
+    // revived the combo the hit had just killed, wiped the three-in-a-row
+    // chain, and — if its probe had caught you "still inside" while you
+    // were busy being hit — shouted PERFECT! over the HIT it came with.
+    if (match.beat < d.invulnUntilBeat) return;
+    if (this.touchesLocal(z)) {
       this.applyHit(z, d);
       return;
     }
-    if (touching) return; // clipped inside i-frames — no harm, no reward
+    // Same-beat partners (a twin's second rail, the split, THE X, the
+    // trap): the zones resolve in array order, so when the lane you ARE in
+    // is judged after the lane you left, its i-frames come too late to
+    // stop the phantom dodge. If any sibling landing on this same tick is
+    // on you right now, the hit owns the whole moment — this zone judges
+    // nothing.
+    for (const other of this.zones) {
+      if (other === z || other.resolved || other.seat !== z.seat) continue;
+      if (match.beat >= other.dueBeat && this.touchesLocal(other)) return;
+    }
     this.applyDodge(z, d, z.wasInside);
   }
 

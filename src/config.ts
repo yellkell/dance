@@ -795,8 +795,12 @@ export const PODIUM = {
 export const MC = {
   /** Rig root scale — the groupie figure is ~1.6 m, so ×2.1 ≈ a 3.4 m icon. */
   scale: 2.1,
-  /** Signature colour (hue for hueToColor) — icy stage-cyan, no seat owns it. */
-  hue: 0.52,
+  /** Signature colour (hue for hueToColor) — royal violet. He wore the
+   *  stage's own icy cyan for a while and read as scenery; purple against
+   *  his gold warn burn is the headliner's outfit, and it sits inside the
+   *  disco's magenta/cyan/violet vocabulary without touching danger amber,
+   *  red, or goop green. One number to taste. */
+  hue: 0.8,
   /** Sticks/accents flip to WARN amber while a move charges. */
   warnColor: 0xffb03a,
 };

@@ -35,6 +35,7 @@
 import {
   BoxGeometry,
   BufferGeometry,
+  CircleGeometry,
   CylinderGeometry,
   Group,
   LatheGeometry,
@@ -249,6 +250,9 @@ function boxGeo(): BufferGeometry {
 function torusGeo(r: number, tube: number): BufferGeometry {
   return cached(`tor:${r}:${tube}`, () => new TorusGeometry(r, tube, 8, 20));
 }
+function discGeo(): BufferGeometry {
+  return cached('disc', () => new CircleGeometry(1, 24));
+}
 function hexGeo(): BufferGeometry {
   return cached('hex', () => new CylinderGeometry(0.5, 0.5, 1, 6));
 }
@@ -276,6 +280,13 @@ const BODICE = [
   [0.06, 0.96],
   [0.042, 0.99],
   [0.028, 1.0],
+  // …and SEALS at the axis. The profile used to stop at 0.028 and let the
+  // neck plug the hole — but the yoke is squashed to TORSO_X/Z and the neck
+  // is round, so either side of it the ellipse stayed open: two black
+  // slots into the hollow chest, dead centre of the collar ring. From
+  // above (THE CLIMB looks down on the MC all night) they read as the eye
+  // holes of a second face. A closed cap costs sixteen triangles.
+  [0, 1.0],
 ];
 const BASQUE = [
   // hip line → flared basque → back up to the same 0.03 waist cinch.
@@ -570,8 +581,10 @@ export function buildDancer(hue: number): DancerRig {
    * Both lathes are squashed to TORSO_X/Z and TURNED WITH THE YAW — an
    * elliptical torso, unlike a round one, has a front. */
   // Tapered to CLEAR THE JAW at the top (the skull is only ~0.026 wide down
-  // at the chin) and to PLUG THE YOKE at the bottom, where the buried part
-  // fills the lathe's neck hole instead of leaving a rim around it.
+  // at the chin) and to ROOT IN THE YOKE at the bottom. The dome itself is
+  // sealed (see BODICE) — the buried base is for the join, not a plug, so a
+  // far dancer whose neck is culled with the detail set shows a closed
+  // shoulder line instead of an open hatch.
   const neck = detail(seg(0.017, 0.034, suit));
   const bodice = M(latheGeo('bodice', BODICE), suit);
   const basque = M(latheGeo('basque', BASQUE), lit); // the lit midriff
@@ -591,6 +604,19 @@ export function buildDancer(hue: number): DancerRig {
   collar.scale.set(TORSO_X, TORSO_Z, 1);
   belt.scale.set(TORSO_X, TORSO_Z, 1);
   root.add(collar, choker, belt);
+  // THE GORGET — a lit panel across the collar's throat. Seen from above
+  // (THE CLIMB spends whole songs looking down on the MC), the dark yoke
+  // under the glowing ring crushed to two near-black lobes either side of
+  // the neck: a second face, eye holes in a bright outline, dead centre of
+  // the figure. Filling the ring with the sleeves' lit cloth keeps that
+  // view costume instead of cavity — and on the MC it burns warn amber
+  // with the rest of the lit panels, so the tell reads from overhead too.
+  // A child of the collar: it inherits the ellipse and rides every pose.
+  const gorget = M(discGeo(), lit);
+  gorget.scale.setScalar(0.058);
+  gorget.rotation.x = Math.PI; // the X90 lay-flat points local +Z DOWN — flip to face the sky
+  gorget.position.z = -0.004; // a shade proud of the ring's plane, clear of the yoke's crown
+  collar.add(gorget);
   // Slim bones, fat end buried in the chest: at 0.021 the notch end rose
   // over the collar ring and chopped its front arc into bright/dark stripes.
   const clavL = detail(seg(0.014, 0.016, suit));

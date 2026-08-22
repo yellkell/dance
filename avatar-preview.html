@@ -58,9 +58,11 @@
         MeshStandardMaterial,
         PerspectiveCamera,
         PointLight,
+        Raycaster,
         RingGeometry,
         Scene,
         SRGBColorSpace,
+        Vector3,
         WebGLRenderer,
       } from 'three';
       import { buildDancer, styleVariant, STYLE_STEP } from '/src/game/avatars.ts';
@@ -238,6 +240,36 @@
           frozen = true;
           neck = { yaw, pitch, roll };
         },
+        /** The scene itself, for headless probes (what mesh is THAT?). */
+        scene,
+        camera,
+        /** Name every surface under a SCREEN pixel (front and back faces) —
+         *  point it at a black region and it says which shape leaks. */
+        pick(px, py) {
+          const ndc = new Vector3((px / innerWidth) * 2 - 1, -(py / innerHeight) * 2 + 1, 0.5);
+          ndc.unproject(camera);
+          const dir = ndc.sub(camera.position).normalize();
+          return this.ray(camera.position.x, camera.position.y, camera.position.z, dir.x, dir.y, dir.z);
+        },
+        /** Cast a ray and name every surface it passes through, front AND
+         *  back faces — the tool for "what is this black region": a hit
+         *  list that starts with a backface means the ray entered a shape
+         *  through a culled wall, i.e. a hole. */
+        ray(ox, oy, oz, dx, dy, dz) {
+          const ray = new Raycaster(new Vector3(ox, oy, oz), new Vector3(dx, dy, dz).normalize());
+          const hits = [];
+          scene.traverse((o) => {
+            if (!o.isMesh) return;
+            const side = o.material.side;
+            o.material.side = 2; // DoubleSide, so culled walls still report
+            for (const h of ray.intersectObject(o, false)) {
+              const front = h.face ? h.face.normal.clone().transformDirection(o.matrixWorld).dot(ray.ray.direction) < 0 : true;
+              hits.push({ d: +h.distance.toFixed(4), name: o.name || o.geometry.type, mat: o.material.type, front });
+            }
+            o.material.side = side;
+          });
+          return hits.sort((a, b) => a.d - b.d);
+        },
       };
 
       const t0 = performance.now();
@@ -267,6 +299,16 @@
           const y = p.hy - 0.16;
           camera.position.set(cx - Math.sin(a) * 0.3, y - 0.06, p.hz - Math.cos(a) * 0.3);
           camera.lookAt(cx, y + 0.02, p.hz);
+        } else if (cam === 'collar') {
+          // Straight DOWN onto the collar — the angle a leading dancer gets
+          // on the boss during THE CLIMB, and the one that shows whether
+          // the yoke is sealed around the neck or open to the hollow chest.
+          const p = poseAt(solo, t);
+          const cx = rigs[solo].x + p.hx;
+          const a = p.yaw + orbit * 0.4;
+          const y = p.hy - 0.15; // the shoulder line
+          camera.position.set(cx - Math.sin(a) * 0.34, y + 0.5, p.hz - Math.cos(a) * 0.34);
+          camera.lookAt(cx, y, p.hz);
         } else if (cam === 'hips') {
           // The hip line, front-on and low — where the basque hands the
           // silhouette to the thighs. The one angle that shows whether the
