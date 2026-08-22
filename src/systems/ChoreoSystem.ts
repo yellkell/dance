@@ -883,13 +883,19 @@ export class ChoreoSystem extends createSystem({}) {
     d.score += Math.round(SCORE.base * mult * (perfect ? SCORE.perfectMult : 1));
 
     if (d.kind === 'local' && perfect) {
-      pushFlair('PERFECT!', 'perfect');
+      // The pop carries THE CHAIN: the multiplier this landing was actually
+      // paid at, which is the same ×N the wedge is holding a hand's width
+      // above it. Deliberately NOT a count of perfects — two in a row is
+      // not a fact about the score, and the thing worth showing is what the
+      // score is doing. So a perfect off a cold floor says ×1.1 and one
+      // ridden in on a long chain says ×3.4, and the HUD bounces the number
+      // every time it lands changed.
+      pushFlair('PERFECT!', 'perfect', mult);
       // Its own chime — all tone, rising. The glass clink it used to
       // borrow from the bar is a struck plate, and beside the landing's
       // crash it read as being clipped, not as skimming the fire.
       sfx.perfectChime();
     }
-    void mult;
   }
 
   private applyHit(z: LiveZone, d: Dancer): void {

@@ -74,6 +74,11 @@ export interface GestureCue {
 export interface Flair {
   text: string;
   tone: 'dodge' | 'perfect' | 'hit' | 'milestone' | 'info';
+  /** THE CHAIN this pop was paid at (1 + comboStep × combo), for the pops
+   *  that are worth a number. Captured at the moment it scored, so the pop
+   *  says what that landing actually earned rather than what the chain has
+   *  climbed to by the time it fades. Undefined = a wordless pop, one line. */
+  mult?: number;
 }
 
 export interface MatchState {
@@ -317,8 +322,8 @@ export function showBeat(): number {
   return match.doubleTime ? match.beat / 2 : match.beat;
 }
 
-export function pushFlair(text: string, tone: Flair['tone']): void {
-  match.flairs.push({ text, tone });
+export function pushFlair(text: string, tone: Flair['tone'], mult?: number): void {
+  match.flairs.push({ text, tone, mult });
   if (match.flairs.length > 6) match.flairs.shift();
 }
 
