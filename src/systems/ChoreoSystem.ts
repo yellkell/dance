@@ -163,6 +163,11 @@ export class ChoreoSystem extends createSystem({}) {
   private landedSfx = new Set<string>();
   private cuedSteps = new Set<string>();
   private ended = false;
+  /** Has the local dancer already been told what a PERFECT is on THIS
+   *  chain? The word announces the mechanic once and the number carries it
+   *  from there (see applyDodge); a hit takes the chain and earns the word
+   *  back. Local-only, because only the local dancer has a HUD. */
+  private saidPerfect = false;
   /** Is this chart running EXPERT double time? Decides which pace tables
    *  the windows below read (set in rebuild, from the same shared inputs
    *  every client holds). */
@@ -343,6 +348,7 @@ export class ChoreoSystem extends createSystem({}) {
     this.landedSfx.clear();
     this.cuedSteps.clear();
     this.ended = false;
+    this.saidPerfect = false;
     // A record's bans: the ones it always carries, plus the ones that only
     // hold on an authored campaign night.
     const record = trackById(match.trackId);
@@ -890,7 +896,16 @@ export class ChoreoSystem extends createSystem({}) {
       // score is doing. So a perfect off a cold floor says ×1.1 and one
       // ridden in on a long chain says ×3.4, and the HUD bounces the number
       // every time it lands changed.
-      pushFlair('PERFECT!', 'perfect', mult);
+      //
+      // THE WORD IS SAID ONCE. The first perfect of a chain names what just
+      // happened and starts the multiplier; after that the word is a
+      // sentence you have already read, and repeating it over and over
+      // buries the only part that is still changing. So every perfect after
+      // it drops the word and sends the number alone, which the HUD kicks
+      // into the space the word was using. A hit takes the chain, and the
+      // next perfect earns the word back.
+      pushFlair(this.saidPerfect ? '' : 'PERFECT!', 'perfect', mult);
+      this.saidPerfect = true;
       // Its own chime — all tone, rising. The glass clink it used to
       // borrow from the bar is a struck plate, and beside the landing's
       // crash it read as being clipped, not as skimming the fire.
@@ -901,6 +916,10 @@ export class ChoreoSystem extends createSystem({}) {
   private applyHit(z: LiveZone, d: Dancer): void {
     d.combo = 0;
     d.invulnUntilBeat = z.dueBeat + SCORE.invulnBeats;
+    // The chain is gone, so the next perfect is a fresh one: it gets to say
+    // the word again. (Bots take hits too, and theirs must never speak for
+    // the one dancer with a HUD.)
+    if (d.kind === 'local') this.saidPerfect = false;
 
     d.hits += 1;
     d.missChain += 1;

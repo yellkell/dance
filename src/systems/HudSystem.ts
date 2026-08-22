@@ -540,15 +540,22 @@ export class HudSystem extends createSystem({}) {
     // The alarm blooms hardest: a deep red only reads as VIVID against the
     // void if it throws light, and this is the pop you must not miss.
     g.shadowBlur = tone === 'hit' ? 22 : 12;
-    // A pop carrying a CHAIN splits in two: the word steps up and shrinks,
-    // and the multiplier takes the lower line at full size in the seat's
-    // own hue — the same colour and the same number the wedge is holding
-    // directly above, so the pop and the readout read as one instrument
-    // rather than two opinions. Wordless pops keep the single centred line.
+    // THE FIRST perfect of a chain says the word and hangs the multiplier
+    // under it. Every one after that arrives with no word at all — and the
+    // number then takes the CENTRE LINE, the space the word was using, so
+    // the kick lands where the eye is already looking instead of bouncing
+    // something small in the margin.
+    //
+    // Both are the tone's own white. The multiplier used to wear the seat's
+    // hue to tie it to the wedge, but at this size a saturated number
+    // beside a white word read as two announcements; one colour makes it
+    // one. It stays under the word rather than over it, and smaller —
+    // shouting a number nobody asked for is the wedge's job, not the pop's.
     const chained = mult !== undefined;
-    ink(g, text, 256, chained ? 48 : 80, chained ? 42 : 52, color, 490);
+    const worded = text !== '';
+    if (worded) ink(g, text, 256, chained ? 46 : 80, chained ? 48 : 52, color, 490);
     g.shadowBlur = 0;
-    if (tone === 'hit') {
+    if (tone === 'hit' && worded) {
       // ...then a crisp core ON TOP of its own bloom. A heavy casing eats
       // into 52px glyphs, and a halo brighter than the letters it surrounds
       // reads as dark text in a red fog — the opposite of vivid.
@@ -557,7 +564,9 @@ export class HudSystem extends createSystem({}) {
       g.fillText(text, 256, 80, 490);
     }
     if (chained) {
-      neon(g, `×${mult.toFixed(1)}`, 256, 114, 60, seatNeonCss(danceHue(match.mySeat, true)));
+      // A soft white bloom, the treatment the score wears: a full-strength
+      // white halo on white glyphs just fogs them.
+      neon(g, `×${mult.toFixed(1)}`, 256, worded ? 116 : 80, 44, color, 'rgba(255,255,255,0.55)');
     }
     this.flairTex.needsUpdate = true;
   }

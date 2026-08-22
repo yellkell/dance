@@ -12,6 +12,9 @@
  *               paid at — the same figure the wedge is holding — climbing
  *               across a run and dropping to the floor after a hit. It is
  *               NOT a count of perfects, which is the whole point.
+ *   THE WORD    "PERFECT!" is said ONCE per chain. The first perfect after
+ *               a reset carries it; every one after that arrives as the
+ *               number alone, and a hit earns the word back.
  *   THE KICK    the plane's scale starts small, overshoots 1 and settles
  *               back, sampled off the live scene graph.
  *
@@ -226,12 +229,20 @@ for (let attempt = 1; attempt <= 10 && clean < 3; attempt++) {
       `  twin ${i + 1} ${label.padEnd(4)} pop=${JSON.stringify(s.pop?.text)} ×${shown?.toFixed(1)} ` +
         `(chain ${s.combo} → wedge ×${s.wedge.toFixed(1)}, perfects ${s.perfects}, hits ${s.hits})`,
     );
-    if (s.pop?.text !== 'PERFECT!') note(`twin ${i + 1} ${label}: pop was ${JSON.stringify(s.pop?.text)}`);
+    if (s.pop === null || s.pop === undefined) note(`twin ${i + 1} ${label}: no pop at all`);
+    else if (s.pop.text !== '' && s.pop.text !== 'PERFECT!') {
+      note(`twin ${i + 1} ${label}: pop said ${JSON.stringify(s.pop.text)}`);
+    }
     if (shown === undefined) note(`twin ${i + 1} ${label}: pop carried no chain`);
     else if (Math.abs(shown - s.wedge) > 1e-9) note(`twin ${i + 1} ${label}: pop ×${shown} ≠ wedge ×${s.wedge}`);
     // Hits WITHIN this twin only. A lifetime count condemns every later
     // round for one raced step ten seconds ago, which says nothing.
     if (s.tookHit !== 0) note(`twin ${i + 1} ${label}: took a hit inside the round`);
+  }
+  // THE WORD, once. Whatever the out half said, the back half is a second
+  // perfect on the same unbroken chain, so it must arrive wordless.
+  if (r.back.pop?.text !== '') {
+    note(`twin ${i + 1}: the word came back on a live chain (${JSON.stringify(r.back.pop?.text)})`);
   }
   // Out then back is two landings each: the chain moves exactly four steps
   // across a twin, so the pop must climb by exactly 0.2 between its halves.
@@ -323,7 +334,13 @@ for (let attempt = 1; attempt <= 14 && !restart; attempt++) {
 // the container, not about the pop.
 if (!restart) console.log('  (no clean perfect farmed in 14 tries — step lost every time; check skipped)');
 else {
-  console.log(`  next pop ×${restart.pop?.mult?.toFixed(1)} against wedge ×${restart.wedge.toFixed(1)}`);
+  console.log(
+    `  next pop ${JSON.stringify(restart.pop?.text)} ×${restart.pop?.mult?.toFixed(1)} ` +
+      `against wedge ×${restart.wedge.toFixed(1)}`,
+  );
+  if (restart.pop?.text !== 'PERFECT!') {
+    note(`the word did not come back after the hit (${JSON.stringify(restart.pop?.text)})`);
+  }
   if (Math.abs(restart.pop?.mult - restart.wedge) > 1e-9) {
     note(`after the hit the pop ×${restart.pop?.mult} ≠ wedge ×${restart.wedge}`);
   }
@@ -414,8 +431,11 @@ const hold = async (name, flair, combo) => {
   if (!up) note(`${name}: the pop never came up for the camera`);
 };
 
-for (const [mult, combo] of [[1.1, 1], [2.4, 14], [4, 30]]) {
-  await hold(`pop-x${String(mult).replace('.', '-')}`, { text: 'PERFECT!', tone: 'perfect', mult }, combo);
+// The first of a chain (word + number), then the ones after it (number
+// alone, in the word's place), then the alarm.
+await hold('pop-first', { text: 'PERFECT!', tone: 'perfect', mult: 1.2 }, 2);
+for (const [mult, combo] of [[1.4, 4], [2.4, 14], [4, 30]]) {
+  await hold(`pop-x${String(mult).replace('.', '-')}`, { text: '', tone: 'perfect', mult }, combo);
 }
 await hold('pop-hit', { text: 'HIT', tone: 'hit' }, 0);
 await look.close();
