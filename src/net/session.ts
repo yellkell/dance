@@ -506,6 +506,15 @@ export function cancelBall(): void {
   send({ t: 'ball-off' });
 }
 
+/** The caller dropping the needle NOW rather than riding the clock down —
+ *  a room whose dancers have all touched in has nothing left to wait for.
+ *  Whoever is on the ball when this lands is who gets dealt; the relay
+ *  runs the same deal the timeout would have. Caller-only, and the relay
+ *  enforces that rather than trusting the button. */
+export function startBall(): void {
+  send({ t: 'ball-go' });
+}
+
 /**
  * A finished (or bailed) set folds back onto the club floor, NOT out of the
  * room: phase returns to hosting/joined and the relay is told this player

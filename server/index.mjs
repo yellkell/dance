@@ -16,8 +16,9 @@
  *    idx as an ascii id and fans them to everyone else — floor or ring.
  *  - THE BALL: any member sends 'ball-up' (their song pick rides along) and
  *    a disco ball hangs in the room for BALL_MS. Members touch it to opt in
- *    ('ball-join'); the caller's touch cancels it ('ball-off'). When the
- *    timer runs out HERE (the server owns the clock), the caller plus
+ *    ('ball-join'); the caller's touch cancels it ('ball-off') or starts it
+ *    early ('ball-go' — a full room should not have to watch the clock).
+ *    When the timer runs out HERE (the server owns the clock), the caller plus
  *    everyone who touched get dealt seats, THE seed, and "beat 0 in N ms" —
  *    and only they leave for the ring. The floor stays open: stay-behinds
  *    keep dancing, newcomers keep joining, and a 'game' broadcast tells
@@ -531,6 +532,23 @@ wss.on('connection', (ws) => {
         if (!room?.ball || !info || room.ball.caller !== info.idx) break;
         clearBall(room);
         broadcast(room, { t: 'ball-off' });
+        break;
+      }
+
+      case 'ball-go': {
+        // The caller cutting the wait short: a room that is already all
+        // present has no reason to watch the clock run down. Same door the
+        // timeout uses — fireBall deals whoever has touched in by now, and
+        // the caller alone is a perfectly good answer.
+        //
+        // Caller-only, like ball-off: anyone else pressing START would be
+        // deciding for the room when it stops filling up.
+        const room = rooms.get(ws.room);
+        const info = room?.members.get(ws);
+        if (!room?.ball || !info || room.ball.caller !== info.idx) break;
+        const code = ws.room;
+        clearTimeout(room.ball.timer); // …but LEAVE the ball: fireBall needs it
+        fireBall(code);
         break;
       }
 
