@@ -1,20 +1,22 @@
 #!/usr/bin/env node
 /**
- * THE PERFECT POP, audited — does it carry the chain, and does it kick?
+ * THE PERFECT POP, audited — one word, every time, and a kick.
  *
  *   npm run dev
- *   node tools/perfect-chain.mjs [outDir]
+ *   node tools/perfect-pop.mjs [outDir]
  *
- * Scores REAL perfects through the live judge and checks the two things
- * the pop is supposed to say:
+ * The pop briefly carried the chain's ×N and it was the wrong instrument
+ * for a number: half a second at the edge of your eye while something is
+ * trying to kill you. The wedge holds the chain; the pop says you rode the
+ * beat and gets out of the way. This holds that line.
  *
- *   THE NUMBER  the ×N on each pop is the chain that landing was actually
- *               paid at — the same figure the wedge is holding — climbing
- *               across a run and dropping to the floor after a hit. It is
- *               NOT a count of perfects, which is the whole point.
- *   THE WORD    "PERFECT!" is said ONCE per chain. The first perfect after
- *               a reset carries it; every one after that arrives as the
- *               number alone, and a hit earns the word back.
+ *   THE WORD    every perfect pops "PERFECT!" — the same word each time,
+ *               and NOTHING else on the plane. No multiplier, no counter.
+ *   THE CHAIN   still climbs behind it, on the wedge where it belongs: the
+ *               score is paid at 1 + 0.1 × combo, and a perfect takes its
+ *               own ×1.5 ON TOP — worth MORE at the ×4 ceiling (+200 a
+ *               landing), not less, which is the thing the pop was never
+ *               the right place to say.
  *   THE KICK    the plane's scale starts small, overshoots 1 and settles
  *               back, sampled off the live scene graph.
  *
@@ -229,42 +231,35 @@ for (let attempt = 1; attempt <= 10 && clean < 3; attempt++) {
       `  twin ${i + 1} ${label.padEnd(4)} pop=${JSON.stringify(s.pop?.text)} ×${shown?.toFixed(1)} ` +
         `(chain ${s.combo} → wedge ×${s.wedge.toFixed(1)}, perfects ${s.perfects}, hits ${s.hits})`,
     );
-    if (s.pop === null || s.pop === undefined) note(`twin ${i + 1} ${label}: no pop at all`);
-    else if (s.pop.text !== '' && s.pop.text !== 'PERFECT!') {
-      note(`twin ${i + 1} ${label}: pop said ${JSON.stringify(s.pop.text)}`);
-    }
-    if (shown === undefined) note(`twin ${i + 1} ${label}: pop carried no chain`);
-    else if (Math.abs(shown - s.wedge) > 1e-9) note(`twin ${i + 1} ${label}: pop ×${shown} ≠ wedge ×${s.wedge}`);
+    if (!s.pop) note(`twin ${i + 1} ${label}: no pop at all`);
+    else if (s.pop.text !== 'PERFECT!') note(`twin ${i + 1} ${label}: pop said ${JSON.stringify(s.pop.text)}`);
+    // NOTHING but the word: a stray number on the plane is the regression
+    // this tool exists to catch.
+    if (shown !== undefined) note(`twin ${i + 1} ${label}: the pop carried a number (×${shown})`);
     // Hits WITHIN this twin only. A lifetime count condemns every later
     // round for one raced step ten seconds ago, which says nothing.
     if (s.tookHit !== 0) note(`twin ${i + 1} ${label}: took a hit inside the round`);
   }
-  // THE WORD, once. Whatever the out half said, the back half is a second
-  // perfect on the same unbroken chain, so it must arrive wordless.
-  if (r.back.pop?.text !== '') {
-    note(`twin ${i + 1}: the word came back on a live chain (${JSON.stringify(r.back.pop?.text)})`);
+  // THE WORD EVERY TIME. The second perfect of a live chain says exactly
+  // what the first did — no shrinking to a number, no going quiet.
+  if (r.back.pop?.text !== 'PERFECT!') {
+    note(`twin ${i + 1}: the second perfect did not say the word (${JSON.stringify(r.back.pop?.text)})`);
   }
-  // Out then back is two landings each: the chain moves exactly four steps
-  // across a twin, so the pop must climb by exactly 0.2 between its halves.
-  const climb = r.back.pop?.mult - r.first.pop?.mult;
+  // THE CHAIN still moves behind it. Both readings are taken AFTER their
+  // own pair resolves, so the gap between them is the return's two landings
+  // — two chain steps, 0.2 on the wedge — even though the pop never
+  // mentions it.
+  const climb = r.back.wedge - r.first.wedge;
   if (Math.abs(climb - 0.2) > 1e-9) {
-    note(`twin ${i + 1}: the pop moved ${climb?.toFixed(2)} across the twin, not 0.20`);
+    note(`twin ${i + 1}: the wedge moved ${climb.toFixed(2)} across the twin, not 0.20`);
   }
 }
 if (clean < 3) note(`only ${clean} clean twin(s) in 10 attempts`);
 // How high the run got, reported but NOT asserted: a step lost to the
 // frame rate takes a hit, a hit resets the chain, and how far a session
-// climbs before that happens is a fact about this renderer. That the
-// number travels at all is already nailed down per twin above — exactly
-// 0.2 across every one, against the wedge every time — which is a
-// stronger claim than any height this container happens to reach.
-const top = Math.max(...pops.map((p) => p.pop?.mult ?? 0));
-console.log(`  highest chain paid this run: ×${top.toFixed(1)}`);
-// …and it is the CHAIN, not a tally of perfects: six perfects in, the pop
-// must read the chain (×2.4 after 24 landings), never ×6.
-const last = pops[pops.length - 1];
-if (last && last.pop?.mult === last.perfects) note('the pop is counting perfects, not the chain');
-
+// climbs before that happens is a fact about this renderer.
+const top = Math.max(...pops.map((p) => p.wedge ?? 0));
+console.log(`  highest chain reached this run: ×${top.toFixed(1)}`);
 console.log('\nthe kick — the curve itself:');
 const curve = await page.evaluate(async () => {
   const { popScale } = await import('/src/systems/HudSystem.ts');
@@ -297,7 +292,7 @@ console.log(`  first frames after a pop: ${wired.join(' ')}`);
 if (!wired.some((v) => Math.abs(v - 1) > 0.005)) note('the pop never moved the plane');
 
 console.log('\nafter a hit, the chain starts over:');
-const beforeHit = pops[pops.length - 1]?.pop?.mult ?? 0;
+const beforeHit = pops[pops.length - 1]?.wedge ?? 0;
 const hit = await page.evaluate(async () => {
   const g = window.__gdr;
   const m = g.match;
@@ -335,15 +330,12 @@ for (let attempt = 1; attempt <= 14 && !restart; attempt++) {
 if (!restart) console.log('  (no clean perfect farmed in 14 tries — step lost every time; check skipped)');
 else {
   console.log(
-    `  next pop ${JSON.stringify(restart.pop?.text)} ×${restart.pop?.mult?.toFixed(1)} ` +
-      `against wedge ×${restart.wedge.toFixed(1)}`,
+    `  next pop ${JSON.stringify(restart.pop?.text)} against wedge ×${restart.wedge.toFixed(1)}`,
   );
   if (restart.pop?.text !== 'PERFECT!') {
-    note(`the word did not come back after the hit (${JSON.stringify(restart.pop?.text)})`);
+    note(`the pop after the hit said ${JSON.stringify(restart.pop?.text)}`);
   }
-  if (Math.abs(restart.pop?.mult - restart.wedge) > 1e-9) {
-    note(`after the hit the pop ×${restart.pop?.mult} ≠ wedge ×${restart.wedge}`);
-  }
+  if (restart.pop?.mult !== undefined) note('the pop after the hit carried a number');
   // Deliberately NOT "lower than the pre-hit pop": between the hit and a
   // clean twin the harness may burn several landings retrying a lost step,
   // and the chain climbs through those. The reset itself is already proven
@@ -431,12 +423,10 @@ const hold = async (name, flair, combo) => {
   if (!up) note(`${name}: the pop never came up for the camera`);
 };
 
-// The first of a chain (word + number), then the ones after it (number
-// alone, in the word's place), then the alarm.
-await hold('pop-first', { text: 'PERFECT!', tone: 'perfect', mult: 1.2 }, 2);
-for (const [mult, combo] of [[1.4, 4], [2.4, 14], [4, 30]]) {
-  await hold(`pop-x${String(mult).replace('.', '-')}`, { text: '', tone: 'perfect', mult }, combo);
-}
+// The pop on a cold floor and the pop at the ceiling: the SAME word, which
+// is the whole point of the revert — only the wedge behind it has moved.
+await hold('pop-perfect-cold', { text: 'PERFECT!', tone: 'perfect' }, 1);
+await hold('pop-perfect-capped', { text: 'PERFECT!', tone: 'perfect' }, 30);
 await hold('pop-hit', { text: 'HIT', tone: 'hit' }, 0);
 await look.close();
 
@@ -449,4 +439,4 @@ if (problems.length) {
   console.log(`\n${problems.length} problem(s).`);
   process.exit(1);
 }
-console.log('\nthe pop tells the truth: the chain it was paid at, and a kick when it changes.');
+console.log('\none word, every time, with a kick — and the chain kept where it belongs.');
