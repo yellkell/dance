@@ -43,7 +43,7 @@ import {
 import { GRADE, SCORE, TOUR } from '../config.js';
 import { trackById } from '../audio/tracks.js';
 import { danceHue } from '../game/profile.js';
-import { dodgeRate, gradeOf, match, me, showBeat } from '../game/state.js';
+import { dodgeRate, type Flair, gradeOf, match, me, showBeat } from '../game/state.js';
 import { font } from '../ui/fonts.js';
 
 const SET_COLORS = ['#8cff70', '#ff6ee0', '#ffd24a'];
@@ -122,6 +122,24 @@ function seatNeonCss(hue: number): string {
   return `hsl(${Math.round(hue * 360)}, 100%, 62%)`;
 }
 
+/**
+ * THE POP'S KICK — an underdamped spring settling on 1, the same language
+ * the boss's hands are written in (game/poseMotion.ts). It arrives PAST its
+ * mark and rocks back instead of easing politely up to size, so a chain
+ * climbing pop to pop reads as a punch rather than a fade-in. Starts near
+ * 0.58, tops out ~13% over at ~0.13 s, and is home well inside the 0.9 s
+ * the pop holds before it fades.
+ *
+ * Exported because it cannot be audited any other way: a container's
+ * software GL runs this scene at about three frames a second, so the whole
+ * bounce lives inside a single frame there and sampling the live plane
+ * proves nothing about its shape. tools/perfect-chain.mjs reads the curve
+ * straight from here.
+ */
+export function popScale(age: number): number {
+  return 1 - 0.42 * Math.exp(-age * 9) * Math.cos(age * 24);
+}
+
 export class HudSystem extends createSystem({}) {
   /** The centre card: count-in, "cueing", the final grade. */
   private cardCanvas = document.createElement('canvas');
@@ -196,15 +214,18 @@ export class HudSystem extends createSystem({}) {
     // Flair pops.
     const next = match.flairs.shift();
     if (next) {
-      this.drawFlair(next.text, next.tone);
+      this.drawFlair(next.text, next.tone, next.mult);
       this.flairAge = 0;
     }
     this.flairAge += delta;
-    const k = Math.min(1, this.flairAge / 0.18);
-    const fade = Math.max(0, 1 - Math.max(0, this.flairAge - 0.9) / 0.5);
+    const t = this.flairAge;
+    const fade = Math.max(0, 1 - Math.max(0, t - 0.9) / 0.5);
     this.flair.visible = inSet && fade > 0;
     if (this.flair.visible) this.flair.lookAt(_head);
-    const pop = 0.6 + 0.4 * k;
+    // THE KICK (see popScale). Every pop resets the age, so each change
+    // bounces on its own — a perfect landing on the tail of the last one
+    // re-kicks rather than sliding quietly to the new number.
+    const pop = popScale(t);
     this.flair.scale.set(pop, pop, 1);
     this.flairMat.opacity = fade;
 
@@ -496,7 +517,7 @@ export class HudSystem extends createSystem({}) {
     }
   }
 
-  private drawFlair(text: string, tone: 'dodge' | 'perfect' | 'hit' | 'milestone' | 'info'): void {
+  private drawFlair(text: string, tone: Flair['tone'], mult?: number): void {
     const g = this.flairCanvas.getContext('2d')!;
     g.clearRect(0, 0, 512, 160);
     // The house semantic set — each tone unmistakably its own: green
@@ -519,15 +540,33 @@ export class HudSystem extends createSystem({}) {
     // The alarm blooms hardest: a deep red only reads as VIVID against the
     // void if it throws light, and this is the pop you must not miss.
     g.shadowBlur = tone === 'hit' ? 22 : 12;
-    ink(g, text, 256, 80, 52, color, 490);
+    // THE FIRST perfect of a chain says the word and hangs the multiplier
+    // under it. Every one after that arrives with no word at all — and the
+    // number then takes the CENTRE LINE, the space the word was using, so
+    // the kick lands where the eye is already looking instead of bouncing
+    // something small in the margin.
+    //
+    // Both are the tone's own white. The multiplier used to wear the seat's
+    // hue to tie it to the wedge, but at this size a saturated number
+    // beside a white word read as two announcements; one colour makes it
+    // one. It stays under the word rather than over it, and smaller —
+    // shouting a number nobody asked for is the wedge's job, not the pop's.
+    const chained = mult !== undefined;
+    const worded = text !== '';
+    if (worded) ink(g, text, 256, chained ? 46 : 80, chained ? 48 : 52, color, 490);
     g.shadowBlur = 0;
-    if (tone === 'hit') {
+    if (tone === 'hit' && worded) {
       // ...then a crisp core ON TOP of its own bloom. A heavy casing eats
       // into 52px glyphs, and a halo brighter than the letters it surrounds
       // reads as dark text in a red fog — the opposite of vivid.
       g.fillStyle = color;
       g.font = font(700, 52);
       g.fillText(text, 256, 80, 490);
+    }
+    if (chained) {
+      // A soft white bloom, the treatment the score wears: a full-strength
+      // white halo on white glyphs just fogs them.
+      neon(g, `×${mult.toFixed(1)}`, 256, worded ? 116 : 80, 44, color, 'rgba(255,255,255,0.55)');
     }
     this.flairTex.needsUpdate = true;
   }

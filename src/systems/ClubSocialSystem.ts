@@ -82,6 +82,7 @@ import {
   seatByIdx,
   sendClubPose,
   sendVoice,
+  startBall,
 } from '../net/session.js';
 import { font } from '../ui/fonts.js';
 import { Panel, UI, type PanelButton } from '../ui/panel.js';
@@ -573,6 +574,9 @@ export class ClubSocialSystem extends createSystem({}) {
       this.callFromHere();
     } else if (id === 'cancel') {
       cancelBall();
+    } else if (id === 'start') {
+      // Cut the wait: the relay deals whoever is on the ball right now.
+      startBall();
     } else if (id.startsWith('diff')) {
       // The act floor for the chart my ball calls — same store the board
       // uses, so the foyer and the floor always agree.
@@ -749,7 +753,7 @@ export class ClubSocialSystem extends createSystem({}) {
     const inRoom = net.phase === 'hosting' || net.phase === 'joined';
     const key =
       members.map((m) => `${m.name}|${socialMuted(m.name) ? 1 : 0}${socialBlocked(m.name) ? 1 : 0}`).join(';') +
-      `#${this.hover ?? ''}#${on ? 1 : 0}#${mic ? 1 : 0}#${music ? 1 : 0}#${net.phase}#${cued?.id ?? ''}#${ballUp ? (mine ? 'B' : 'b') : ''}#${setOut ? net.gamePlayers.size : 0}#${more}#${match.difficulty}#${this.songsOpen ? 1 : 0}#${net.crownIdx ?? ''}`;
+      `#${this.hover ?? ''}#${on ? 1 : 0}#${mic ? 1 : 0}#${music ? 1 : 0}#${net.phase}#${cued?.id ?? ''}#${ballUp ? (mine ? `B${net.ball!.joins.size}` : 'b') : ''}#${setOut ? net.gamePlayers.size : 0}#${more}#${match.difficulty}#${this.songsOpen ? 1 : 0}#${net.crownIdx ?? ''}`;
     if (key === this.paintKey) return;
     this.paintKey = key;
 
@@ -809,13 +813,33 @@ export class ClubSocialSystem extends createSystem({}) {
       });
     });
     if (mine) {
+      // MY BALL IS UP, so the row splits: call it off, or drop the needle
+      // now. The clock is a courtesy to a room still walking over, and a
+      // room already standing at the ball should not have to watch it run
+      // out — so the caller who can see everyone is in gets to say when.
+      //
+      // START carries the count it would deal, because that is the only
+      // question the button raises: the ball fires with whoever has touched
+      // in, and "just you" is a real and easy-to-miss answer.
+      const aboard = net.ball!.joins.size + 1;
       buttons.push({
         id: 'cancel',
         label: 'CALL IT OFF',
         tone: UI.danger,
         x: 24,
         y: 808,
-        w: 652,
+        w: 318,
+        h: 74,
+        small: true,
+      });
+      buttons.push({
+        id: 'start',
+        label: 'START',
+        sub: aboard > 1 ? `${aboard} on the ring` : 'just you',
+        primary: true,
+        x: 358,
+        y: 808,
+        w: 318,
         h: 74,
         small: true,
       });

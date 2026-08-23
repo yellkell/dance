@@ -167,6 +167,7 @@ import {
   net,
   setDancerHue,
   setDancerName,
+  startBall,
 } from './net/session.js';
 import { clubPoses } from './net/poses.js';
 
@@ -201,7 +202,7 @@ declare global {
         poses: typeof clubPoses;
       };
       /** THE BALL, drivable headlessly: call one, touch in, call it off. */
-      club: { call: typeof callBall; touch: typeof joinBall; cancel: typeof cancelBall };
+      club: { call: typeof callBall; touch: typeof joinBall; cancel: typeof cancelBall; go: typeof startBall };
       /** THE DRINKS: read the pool, or launch a glass on a known arc. */
       props: typeof propsView;
       /** The menus, drivable headlessly: board mode/hover, the pause card,
@@ -252,7 +253,7 @@ window.__gdr = {
     state: net,
     poses: clubPoses,
   },
-  club: { call: callBall, touch: joinBall, cancel: cancelBall },
+  club: { call: callBall, touch: joinBall, cancel: cancelBall, go: startBall },
   intro: introView,
   mutedVoices: mutedSpeakerIds,
   ambient: ambientTrackId,
