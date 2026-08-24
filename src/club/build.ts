@@ -692,17 +692,28 @@ function buildStage(root: Group): MeshBasicMaterial {
   // Nothing hangs over the stage: the wall behind the MC is his backdrop,
   // not a billboard. (The moon-phase house mark used to live here.)
 
-  // Footlights along the stage lip: a run of small warm scallops so the
-  // riser face reads and the MC gets his uplight.
+  // Footlights along the stage lip: a run of small warm LENSES so the riser
+  // face reads and the MC gets his uplight.
+  //
+  // Whole circles, not half-shells. They were 180° cylinders, each turned to
+  // face out along the crescent — which is a real fixture, a scallop shade
+  // open to the front, and it read as one from precisely one spot on the
+  // floor. From anywhere else the run was a scatter of crescents all
+  // pointing different ways, and from the terrace it looked like the lamps
+  // were twisting. A full round has no facing to get wrong: it reads as a
+  // lamp from every seat in the room, which is the only thing this row of
+  // seven has to do.
   const footMat = brassGlowMat(1.6);
   for (let i = -3; i <= 3; i++) {
     const a = (i / 8) * Math.PI; // spread across the crescent's front
     const fx = Math.sin(a) * (S.r - 0.12);
     const fz = S.z + Math.cos(a) * (S.r - 0.12);
-    const scallop = new Mesh(new CylinderGeometry(0.05, 0.07, 0.045, 10, 1, false, 0, Math.PI), footMat);
-    scallop.position.set(fx, S.h + 0.02, fz);
-    scallop.rotation.y = Math.PI - a;
-    root.add(scallop);
+    // 16 sides, where the half wanted 10: the same silhouette smoothness
+    // carried round twice the arc. No rotation — a full round is turned
+    // the same way whichever way you turn it.
+    const lens = new Mesh(new CylinderGeometry(0.05, 0.07, 0.045, 16), footMat);
+    lens.position.set(fx, S.h + 0.02, fz);
+    root.add(lens);
   }
 
   return consoleMat;
