@@ -383,18 +383,126 @@ choreography runs off the shared seed. Twenty-four people dancing the same
 chart to twenty-four different records. That fallback has to become an
 explicit branch the moment any track is ownable.
 
-### Which model
+### DOWNLOAD PLAY — the decided model
 
-| Model | What happens | Verdict |
-| --- | --- | --- |
-| Everyone must own it | Host picks a paid record; anyone who doesn't own it is blocked | Kills the social hook. The club is the reason to buy, not the reward for buying |
-| **Host unlocks the room** | Host owns it, everyone in that room plays it, for that set | **Recommended.** Makes buying feel generous, turns owners into promoters, and the room code is a natural licence boundary |
-| Guest preview | Non-owners get a clip or a degraded version | Sounds reasonable, is miserable — a rhythm game is the full record or nothing |
+**One cartridge in the room and everybody races.** A guest who doesn't own
+the record still hears it, still dances it, still scores it — for that
+set, in that room, because somebody there owns it.
 
-Host-unlocks means the audio has to be served, not shipped: a
-**short-lived signed URL scoped to the room code**, issued by the backend
-after checking that the *host* owns the record. Playable in that room,
-not a permanent download.
+That's settled. What Mario Kart DS actually got right, and what carries
+over:
+
+- **The guest keeps nothing.** Turn the DS off and it's gone. Here: the
+  unlock is scoped to the set, not to the person. Nothing lands in their
+  library.
+- **Zero setup for the guest.** No store page, no download, no account,
+  no "the host has invited you to install". You joined a room; the music
+  plays. Any friction here kills the entire point.
+- **The owner is the reason the party is happening.** That is the whole
+  business model, and Nintendo proved it sells cartridges.
+
+The one thing to *not* carry over is Download Play's crippled guest mode
+(Shy Guy, four tracks). A rhythm game is the full record or it is nothing
+— a guest gets the real chart at the real length, or the club is worse
+than not having the feature.
+
+### The grant is the cartridge
+
+The room code cannot be the credential. Codes are four digits — ten
+thousand of them — and `case 'public'` walks any stranger into the fullest
+public room on the floor. "I'm in room 4096" is not proof of anything.
+
+So the thing that gets shared is a **signed, short-lived, room-scoped
+grant**, and it rides the wire the game already has:
+
+```
+ HOST                    ENTITLEMENT SERVER              GUEST
+  │                             │                          │
+  │ POST /room-grant            │                          │
+  │  { room, sku, session } ───▶│  verifies HOST owns it    │
+  │                             │                          │
+  │◀── grant ────────────────── │  JWT{ room, sku, exp+15m, jti }
+  │                             │                          │
+  │ ball-up { track, grant } ──────── relay ──────────────▶ │
+  │      (relay just forwards the string — as it already does)
+  │                             │                          │
+  │                             │◀── POST /track { grant } ─│
+  │                             │                          │
+  │                             │── measured row ─────────▶ │  bpm, downbeat,
+  │                             │   + signed audio URL      │  lufs, phrases
+  │                             │      (5 min TTL)          │
+```
+
+Why this shape and not another:
+
+- **The relay stays dumb.** `server/index.mjs` simulates nothing and knows
+  nobody; `ball-up` already carries `track` as an opaque string. This adds
+  one more string beside it. No entitlement logic ever enters the relay,
+  which is the property that makes that file good.
+- **The grant carries the measurements.** A record is a file *plus* its
+  measured row — without `bpm`/`downbeat`/`lufs` there is no chart to
+  dance. One round trip delivers both.
+- **It expires with the night.** It is a capability, not a key. Nobody
+  accumulates a library of grants.
+
+### The 60-second gift
+
+`BALL_MS` is `60_000`. There is a **full minute** between the ball going
+up and `fireBall()` — a minute in which the disco ball hangs there and
+people decide whether to touch it.
+
+That is exactly the download window, and it is already the right length.
+The moment `ball-up` lands, every client redeems the grant and calls
+`preload(track)` — which already exists (`src/audio/music.ts:176`) and is
+already how the lobby warms a record so the drop is instant. By the time
+the ball fires, a room of strangers is buffered and nobody waited for
+anything. The feature needs no new timing machinery; it needs to use the
+minute that's already sitting there.
+
+### Where this actually leaks, honestly
+
+**You cannot stop someone ripping the audio.** Web Audio has to decode it,
+so it is decodable, so a determined person with a network tab gets an MP3.
+EME/Widevine for a $2.99 record is a multi-week rabbit hole that ends with
+a worse product and the same outcome. The goal is friction and fairness,
+not DRM — and every web game ever shipped is in the same position.
+
+**Public rooms will be farmed, and that's fine.** Someone will join the
+fullest public room to hear records they don't own. Look closely at that
+sentence: it is indistinguishable from the feature working. A grant buys
+one set in one room. Let it.
+
+The things actually worth doing: keep the TTL short (fifteen minutes,
+invalidated on `end`), never let a grant name a user, and rate-limit
+redemption per grant so one leaked token doesn't become a CDN bill.
+
+### Then why does anybody buy?
+
+Same reason one kid in the room bought the cartridge.
+
+- **Only owners can send the ball up on it.** The purchase buys the right
+  to *call* the set. Hosting is the product; hearing is the demo.
+- **Solo requires ownership.** The club is where records are discovered;
+  the tour and quick-raid shelves are where they're owned. This mirrors
+  Download Play exactly — guest mode was always multiplayer-only — and it
+  falls along a seam this codebase already has.
+- **The conversion moment is the last beat of the set.** They just danced
+  a record they don't own, in front of people, and the score is on screen.
+  There will never be higher intent than that. On Quest that button is a
+  Digital Goods `PaymentRequest`; on the web it's the other rail; it is
+  **never** a link out of the Quest build.
+- **Make ownership visible.** The club already has THE CROWN, name tags
+  and hues. Whoever brought the record should be legible on the floor —
+  that's the social proof doing the selling, not a banner.
+
+Two open decisions, both cheap to get wrong and cheap to change:
+
+1. **Does a guest's score count on the WORLD board?** Say yes. Voiding it
+   is punitive, confusing, and removes the sting that sells the record.
+2. **The twenty charted records already in the box should stay free
+   forever.** They're the floor a new player lands on and the reason the
+   club is worth joining. The shop is what comes *next*, not a fence
+   around what exists.
 
 ### What that costs this codebase
 
