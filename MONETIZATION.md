@@ -313,47 +313,134 @@ product; a real report path is a store-review risk, not just a nicety.
 
 ---
 
-## "Use them anywhere"
+## WHO YOU ARE — accounts, and where the login goes
 
-This is the hard part, and it is entirely a problem of identity.
+The instinct is right: there is no account, so a new headset is a
+stranger. But the fix should **not** be a login in front of the store, and
+the reason is worth being precise about.
 
-A Meta entitlement is scoped to a Meta account and is only readable from
-inside the packaged app. The open-web build has no Meta identity and never
-will. So "buy on Quest, play anywhere" requires **an account system of our
-own**, with Meta as one of the ways to prove you own something:
+### On Quest, Meta already solved the purchase half
+
+`listPurchases()` is scoped to the **Meta account**, not the headset. New
+device, same Meta account, install the app, and the call returns every
+record ever bought. That is the restore path, it is free, it is more
+reliable than anything we would build, and it works with no login screen
+at all.
+
+So the specific scenario — *buy a track, pick up a different headset,
+they're gone* — **is already handled on Quest**, on one condition:
+entitlements must rehydrate from `listPurchases()` at boot rather than
+from anything local. Get that right and there is nothing left to fix
+there.
+
+Three reasons a login wall in front of the store would actively hurt:
+
+1. It asks for a signup immediately before asking for money. That is
+   exactly where conversion dies.
+2. It duplicates, worse, an identity Meta is already handing us.
+3. **Typing in VR is miserable.** Email and a password on a floating
+   keyboard is a genuinely bad minute of someone's life. This game already
+   knows that — room codes are four digits on a keypad *because* that is
+   what VR text entry can bear.
+
+### Where the gap is actually real
+
+Three places, and the first is bigger than the one that prompted this:
+
+- **Progress, not purchases.** The name in `localStorage` under
+  `gdr-name`, the hue under `gdr-hue`, campaign progress, personal bests —
+  all device-local. A new headset loses every bit of it. That hits *every*
+  player, not just paying ones, and somebody forty hours in who lost their
+  name and their bests is far angrier than somebody who lost a £3 record
+  Meta will hand straight back.
+- **The web has no store to fall back on.** A web purchase held in
+  `localStorage` dies when someone clears site data. Web buyers genuinely
+  do need an account — this is the one place a login is *required*.
+- **The bridge.** Bought on Quest, playing on the web. No Meta identity
+  exists there.
+
+### We already have the container
+
+**`signInAnonymously()` is already in this repo** — `src/net/scores.ts:107`
+— minting a real Firebase UID that the world board already keys every row
+on. It isn't a nickname; it's an actual account that simply has no
+credentials attached yet.
+
+Which matters because of one Firebase behaviour:
+
+> `linkWithCredential()` upgrades an anonymous account to a real one
+> **without changing the UID.**
+
+Every score, every entitlement, every row keyed on that UID survives the
+upgrade untouched. "Log in to save your old account" is not a system to
+build — it is a call to make against an account system already running
+here.
+
+Two changes to what exists:
+
+1. **Sign in at boot, not on demand.** Today the Firebase import is lazy
+   and only fires when a board is asked for. The UID needs to exist before
+   anything wants to hang an entitlement on it.
+2. **Move the profile onto it.** Name, hue and progress stop being
+   `localStorage` keys and become fields on the account, cached locally.
+
+### The shape
+
+**Meta is the account on Quest. Ours exists to carry things off Quest,
+and it is optional.**
+
+- **Quest boot:** anonymous sign-in → `listPurchases()` → verify → records
+  unlock. No login, ever.
+- **The account is offered as "keep this", never "sign in to continue".**
+  At the profile card, after a strong run, after a purchase. Dismissible,
+  and offered again later.
+- **Web:** anonymous by default; an account is required *to buy*, never to
+  play.
+
+**Create accounts where typing is easy; claim them where it isn't.** Six
+digits in the headset, typed at `raveraid.web.app/link` on a phone — the
+same keypad idiom the club already uses for rooms. The account itself is
+created on the web, where a real keyboard exists. No email is ever entered
+in VR.
 
 ```
 Quest app                     Our backend                     Web build
 ─────────                     ───────────                     ─────────
+anon UID (exists already)
 listPurchases()  ──token──▶   verify_entitlement
 GetUserProof()   ──nonce──▶   (graph.oculus.com)
                                    │
                                    ▼
-                              entitlements/{ourUserId}
-                              { 'track.breakcore': {...} }
+                              player/{playerId}
+                              identities: [ meta:1234…, firebase:abc… ]
+                              entitlements: { 'track.breakcore': {…} }
                                    │
-             ◀── link code ────────┼──── link code ──▶  bind web account
-                                   ▼
-                              our own session token ──▶ gated audio URLs
+             ◀── 6-digit code ─────┼──── typed on a phone ──▶ linkWithCredential()
+                                   ▼                          (UID survives)
+                              session token ──▶ keys + gated audio
 ```
 
-The pieces:
+### Three things to design in now, not later
 
-- **A user identity that isn't the headset.** `profileName()` currently
-  persists a name in `localStorage` under `gdr-name` and that is the
-  entire notion of "who you are". A purchase cannot hang off that.
-- **An entitlements store.** Firestore is already deployed
-  (`raveraid-bc866`) with `firestore.rules` as the security model, and the
-  README is explicit that the client is trusted for nothing. Entitlements
-  belong there, writable only by a server, readable by their owner.
-- **A verification function.** Something server-side that takes
-  `{ itemId, purchaseToken, userProof }`, calls `verify_entitlement`, and
-  writes the grant. Cloud Functions is the shortest path from where this
-  repo already is.
-- **A link code.** Six digits shown in the Quest app, typed on the web —
-  the same shape as the club's four-digit room codes, which players
-  already understand. This is account linking, not purchasing, which keeps
-  it on the right side of the steering rule.
+- **Key the server record on a player, with identities attached** —
+  `meta:<user_id>`, `firebase:<uid>`, `email:<…>` — rather than on the
+  Firebase UID directly. A fresh install mints a *new* anonymous UID, so
+  without this the Meta identity arrives at the server pointing at
+  entitlements filed under a UID nobody has any more. The identity graph
+  is what makes that a merge instead of an orphan.
+- **Decide the merge policy while it's free.** Someone plays anonymously
+  on the web *and* on Quest, then links: take the max score per chart,
+  union the entitlements, keep the older name. Cheap now, miserable to
+  retrofit.
+- **Anonymous is a container, not a guarantee.** A Firebase anonymous UID
+  lives in browser storage — cleared data means it is gone with no
+  recovery. On Quest `listPurchases()` is the recovery. On the web,
+  *only a linked account is*. Say so honestly in the "keep this" prompt;
+  it's also the most persuasive reason to accept it.
+
+One consequence worth pricing: an email address is PII, which widens the
+privacy policy, the Data Use Checkup, and whatever GDPR posture we take.
+Not a blocker — a line item.
 
 ---
 
@@ -795,16 +882,21 @@ happens.
    measured row) is served, not bundled. One branch inside `loadTrack()`.
    This is not a performance chore — *this is the product.* It also
    happens to buy the Quest.Performance.3 VRC.
-4. **Identity, entitlements, and the ledger.** Firestore collection, a
-   verify function, a session token — and the full revenue record on every
-   grant (`sku / rail / gross / fee / net / txn`), from the first row.
-   Grant one *free* record through the whole path end-to-end before any
-   money moves.
+4. **Identity, entitlements, and the ledger.** Promote the anonymous UID
+   that already exists to boot-time, move name/hue/progress onto it, and
+   key the server record on a *player* with identities attached. Then the
+   verify function, the session token, and the full revenue record on
+   every grant (`sku / rail / gross / fee / net / txn`), from the first
+   row. Grant one *free* record through the whole path end-to-end before
+   any money moves. **No login screen in this step** — there is nothing
+   yet for a login to be for.
 5. **Turn on the till.** `horizonBilling` + `alphaDependencies` + the
    Application ID; durable add-ons in the Dashboard; test at the $0.01
    developer price.
-6. **The web rail and account linking.** Paddle or Lemon Squeezy, plus the
-   six-digit link code.
+6. **The web rail, and only now the login.** Paddle or Lemon Squeezy, the
+   six-digit claim code, and `linkWithCredential()` on the UID that has
+   been carrying everything since step 4. The account is created on the
+   web where a keyboard exists; the headset only ever shows six digits.
 7. **Host unlocks the room.** Signed room-scoped stream URLs, and kill
    that silent `?? seeded pick` fallback for good.
 
