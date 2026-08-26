@@ -135,7 +135,11 @@ interface Stick {
 }
 
 /** Stick dimensions, and how thick its black casing runs. */
-const STICK_R = 0.013;
+// A fat rave baton, not a pencil: the bore was 26 mm and read thin in the
+// hand; 32 mm gives the liquid visible body from arm's length and the
+// casing a ring worth outlining. Everything downstream (casing, tube,
+// liquid, slosh spans) derives from this one number.
+const STICK_R = 0.016;
 const STICK_LEN = 0.3;
 const STICK_CASE = 0.007;
 /** How full the tube runs. Deliberately short of the brim: the airspace is

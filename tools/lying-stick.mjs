@@ -29,9 +29,10 @@ const out = await page.evaluate(async () => {
   const { createLiquid } = await import('/src/materials/liquid.ts');
   const THREE = await import('/node_modules/three/build/three.module.js');
 
-  // The stick's real proportions (PlayerSystem's LIQUID_R / STICK_LEN).
-  const R = 0.0115;
-  const SHAFT = 0.28;
+  // The stick's real proportions (PlayerSystem's LIQUID_R and its shaft:
+  // STICK_LEN − 2·STICK_R with STICK_R = 0.016).
+  const R = 0.0145;
+  const SHAFT = 0.268;
   const LEN = R * 2 + SHAFT;
   const FILL = 0.85;
 
