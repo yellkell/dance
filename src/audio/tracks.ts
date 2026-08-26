@@ -26,10 +26,10 @@
  *
  * CHECK THE TEMPO IT GIVES YOU. The analyser's octave fold only looks
  * between 100 and 180 BPM, so a record whose true beat falls outside that
- * comes back as whatever fraction of the grid autocorrelated best — V ONE
- * arrived as 63.333, a third of its real 190 lattice. `tools/octave-check`
- * scores the candidates against the onsets, and `tools/track-check` audits
- * the whole box against the files it claims to describe.
+ * comes back as whatever fraction of the grid autocorrelated best —
+ * ORIGINAL arrived as 63.333, a third of its real 190 lattice.
+ * `tools/octave-check` scores the candidates against the onsets, and
+ * `tools/track-check` audits the whole box against the files it describes.
  */
 
 import sakupenedUrl from '../assets/music/sakupened.mp3';
@@ -293,7 +293,9 @@ export const TRACKS: Track[] = [
   },
   {
     id: 'vone',
-    title: 'V ONE',
+    // Titled ORIGINAL on the shelf; the id stays 'vone' because the
+    // leaderboards and the cued-song preference are keyed on it.
+    title: 'ORIGINAL',
     url: voneUrl,
     bpm: 95.0,
     downbeat: 1.5708,
@@ -378,7 +380,9 @@ export const TRACKS: Track[] = [
   },
   {
     id: 'vfall',
-    title: 'VFALL',
+    // Titled BREAKCORE V4 on the shelf; the id stays 'vfall' for the same
+    // reason ORIGINAL keeps 'vone' — stored scores and picks key on it.
+    title: 'BREAKCORE V4',
     url: vfallUrl,
     bpm: 165.015,
     downbeat: 2.5048,

@@ -620,7 +620,7 @@ export const DIFFICULTY = {
    *  density scales with the record: at act 4 a 91 BPM night threw barely
    *  half the landings per second of a 174 one, and its bar grid walked
    *  right past where those records' grooves actually live (the slow shelf
-   *  is shuffles and struts whose onsets ride the eighths — V ONE's sit on
+   *  is shuffles and struts whose onsets ride the eighths — ORIGINAL's sit on
    *  a literal 190 lattice). So on EXPERT, a record under this tempo runs
    *  its whole chart clock at 2×: the grid rides the eighths and landings
    *  hit the real half-bars (the 1 and the 3). The CLOCK doubles for the

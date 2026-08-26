@@ -100,9 +100,9 @@ const SOLO_ROW_PITCH = 47;
 /** How many song rows the shelf shows at once. The board is 1024px tall and
  *  the rows start at 216 on a 47 pitch, so seventeen would run off the
  *  bottom edge — which is exactly what happened when the box grew past
- *  sixteen records: UNITY, V ONE and VFALL were painted into the void below
- *  the panel, invisible and unclickable, and no amount of adding them to a
- *  role could bring them back. Fifteen leaves the ▲▼ their corner. */
+ *  sixteen records: the tail of the alphabet was painted into the void
+ *  below the panel, invisible and unclickable, and no amount of adding them
+ *  to a role could bring them back. Fifteen leaves the ▲▼ their corner. */
 const SOLO_VISIBLE = 15;
 const SOLO_PAGE_Y = 964;
 const SOLO_RIGHT_X = 1044;
@@ -252,7 +252,7 @@ export class MenuSystem extends createSystem({}) {
       /* fine */
     }
     // Open the shelf on the record you last played. A preference stored near
-    // the end of the alphabet — VFALL, say — would otherwise sit below the
+    // the end of the alphabet — UNITY, say — would otherwise sit below the
     // scroll window, and the shelf would open looking like nothing is cued.
     this.revealCuedSong();
 

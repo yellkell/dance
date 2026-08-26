@@ -320,10 +320,10 @@ quantized to them, so they had to be:
 | ASSEMBLE | 125 | 16 phrases | −7.5 LUFS | quick raid · drops on the slam |
 | INFECTION | 138 | 15 phrases | −10.9 LUFS | quick raid |
 | GIVE IT TO ME | 112 | 13 phrases | −14.2 LUFS | tour: after-hours opener |
-| V ONE | 95 | 8 phrases | −10.8 LUFS | quick raid |
+| ORIGINAL | 95 | 8 phrases | −10.8 LUFS | quick raid |
 | FUSION | 122 | 5 phrases | −8.1 LUFS | quick raid |
 | BRAIN EATER | 149.959 | 7 phrases | −9.1 LUFS | quick raid |
-| VFALL | 165.015 | 10 phrases | −9.4 LUFS | quick raid |
+| BREAKCORE V4 | 165.015 | 10 phrases | −9.4 LUFS | quick raid |
 | FUTURE VIBE | 93.984 | 6 phrases | −14.2 LUFS | quick raid · second on the club rotation |
 | CHILL | 125.001 | — | −8.9 LUFS | the club's house record — opens the rotation |
 | SWAG | 91.974 | — | −15.7 LUFS | foyer rotation |
@@ -337,7 +337,7 @@ minutes of music.)
 - **Tempo** came from an onset-flux autocorrelation phase-locked across each
   whole track, audited by `tools/octave-check` for lattice errors (DISCO
   BALL first arrived as 73.33 — exactly 2/3 of its real 110 grid — and
-  VFALL as a third of its 165). Several land on exact integers (a DAW
+  BREAKCORE V4 as a third of its 165). Several land on exact integers (a DAW
   grid); the rest genuinely sit a hair off — and it matters: locking
   SAKUPENED at a round 134 instead of 133.964 drifts off the kick by the
   last third of the song (grid retention falls from 68% to 35%), so the
@@ -420,7 +420,7 @@ difficulty with their song pick.
 its real-time density used to scale with the record — at act 4 a 91 BPM
 night threw barely half the landings per second of BREAKCORE's 174, and
 its bar grid walked past where the slow shelf's grooves actually live
-(those records ride the eighths; V ONE's onsets sit on a literal 190
+(those records ride the eighths; ORIGINAL's onsets sit on a literal 190
 lattice). So on EXPERT, any record **under 100 BPM runs its chart clock
 at 2×** — the grid rides the eighths, landings hit the real half-bars —
 but the clock doubles for the *grid's* sake only: everything the dancer
