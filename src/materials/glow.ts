@@ -81,6 +81,45 @@ export function glintTexture(): Texture {
   return _glintTex;
 }
 
+const _beamTex: (Texture | undefined)[] = [undefined, undefined];
+
+/**
+ * A vertical alpha ramp for light beams and cones — full-bright at the
+ * SOURCE end, dissolving to nothing before the far end. This one texture is
+ * most of the difference between "a glowing stick" and "a beam through
+ * haze": a flat-opacity cylinder ends in mid-air as a hard 15-metre rod,
+ * while a ramped one simply runs out of light.
+ *
+ * `sourceAtTop` picks which V end is the bright one: cones hang their apex
+ * at V=1 (the ball), beams grow from their emitter at V=0.
+ */
+export function beamGradientTexture(sourceAtTop: boolean): Texture {
+  const slot = sourceAtTop ? 1 : 0;
+  const hit = _beamTex[slot];
+  if (hit) return hit;
+  const c = document.createElement('canvas');
+  c.width = 4;
+  c.height = 128;
+  const g = c.getContext('2d')!;
+  // flipY (default) puts V=0 at the canvas BOTTOM.
+  const grad = g.createLinearGradient(0, 128, 0, 0); // bottom → top = V0 → V1
+  const stops: [number, number][] = [
+    [0, 0.95],
+    [0.3, 0.6],
+    [0.62, 0.24],
+    [0.88, 0.05],
+    [1, 0],
+  ];
+  for (const [at, a] of stops) {
+    grad.addColorStop(sourceAtTop ? 1 - at : at, `rgba(255,255,255,${a})`);
+  }
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 4, 128);
+  const tex = new CanvasTexture(c);
+  _beamTex[slot] = tex;
+  return tex;
+}
+
 /** A camera-facing additive glow halo. */
 export function glowSprite(color: ColorRepresentation, size: number, opacity = 1): Sprite {
   const sprite = new Sprite(

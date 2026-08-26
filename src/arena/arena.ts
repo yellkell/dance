@@ -13,7 +13,9 @@
 
 import {
   AdditiveBlending,
+  BoxGeometry,
   CanvasTexture,
+  Color,
   CylinderGeometry,
   DoubleSide,
   Group,
@@ -37,15 +39,19 @@ import {
 } from '../config.js';
 import { danceHue } from '../game/profile.js';
 import { seatLocal } from '../game/ring.js';
-import { octagonSlab } from './octagon.js';
+import { glowSprite, glowTexture } from '../materials/glow.js';
+import { octagonBand, octagonSlab } from './octagon.js';
 import { font } from '../ui/fonts.js';
 
 export interface PlatformHandle {
   seat: number;
   /** Move THIS for rank lifts — everything on the platform rides along. */
   root: Group;
-  /** The neon rim material (beat pulse + elimination dim live here). */
+  /** The rim's additive HALO (elimination dim lives here). */
   rimMat: MeshBasicMaterial;
+  /** The rim's solid tube core — the part that reads as a physical neon
+   *  fixture. Dimmed alongside the halo when a dancer is out. */
+  rimCoreMat: MeshBasicMaterial;
   slabMat: MeshStandardMaterial;
   /** The floating name tag — a PLANE, not a Sprite: sprites copy the
    *  camera's roll, so every head tilt tilted all the text. RankSystem
@@ -67,6 +73,14 @@ export interface Arena {
   /** The stage podium root (boss stands on top). */
   stage: Group;
   stageRingMat: MeshBasicMaterial;
+  /** The chasing LED tick ring (DiscoSystem spins + pulses it). */
+  stageChase: Group;
+  /** The counter-rotating inner arc. */
+  stageChase2: Group;
+  stageTickMat: MeshBasicMaterial;
+  stageInnerMat: MeshBasicMaterial;
+  /** The apron light pool on the void floor. */
+  stagePoolMat: MeshBasicMaterial;
   /** Stage top surface height (boss feet). */
   stageTopY: number;
   dispose(): void;
@@ -109,17 +123,32 @@ function buildPlatform(seat: number, name: string, isMine: boolean): PlatformHan
   const hue = danceHue(seat, isMine);
   const accent = hueToColor(hue, 0.6);
 
-  // The slab: near-black glass so the neon owns it.
+  // The slab: near-black glass so the neon owns it — with a whisper of the
+  // seat's accent in the emissive so the deck never reads as a flat hole.
   const slabMat = new MeshStandardMaterial({
     color: 0x101318,
     metalness: 0.85,
-    roughness: 0.35,
+    roughness: 0.3,
+    emissive: new Color(accent).multiplyScalar(0.045),
   });
   const slab = new Mesh(octagonSlab(OCTAGON_VERTICES, PLATFORM.thickness), slabMat);
   slab.position.y = -PLATFORM.thickness;
   root.add(slab);
 
-  // Neon rim: the same octagon, a hair larger, as a glowing skirt.
+  // The rim, built like the real fixture it pretends to be: a SOLID tube
+  // core (opaque, depth-writing — you cannot see through a neon tube) with
+  // an additive halo band bleeding past it. The old rim was one filled
+  // octagon ghost-blended over the whole deck, which is exactly why it
+  // read as a see-through outline.
+  const rimCoreMat = new MeshBasicMaterial({
+    color: new Color(accent).lerp(new Color(0xffffff), 0.42),
+    transparent: true, // opacity is animated on elimination; depth still writes
+    opacity: 1,
+  });
+  const core = new Mesh(octagonBand(OCTAGON_VERTICES, 0.06, 0.02), rimCoreMat);
+  core.position.y = PLATFORM.rimLift;
+  root.add(core);
+
   const rimMat = new MeshBasicMaterial({
     color: accent,
     transparent: true,
@@ -128,10 +157,17 @@ function buildPlatform(seat: number, name: string, isMine: boolean): PlatformHan
     depthWrite: false,
     side: DoubleSide,
   });
-  const rim = new Mesh(octagonSlab(OCTAGON_VERTICES, 0.02), rimMat);
-  rim.scale.set(1.035, 1, 1.045);
-  rim.position.y = PLATFORM.rimLift;
-  root.add(rim);
+  const halo = new Mesh(octagonBand(OCTAGON_VERTICES, 0.12, 0.02), rimMat);
+  halo.scale.set(1.045, 1.9, 1.045);
+  halo.position.y = PLATFORM.rimLift - 0.012;
+  root.add(halo);
+
+  // Under-deck glow: a soft pool of the seat's colour hanging beneath the
+  // slab. A platform floating in a void needs to LIGHT the void it floats
+  // in, or it reads as a paper cutout.
+  const under = glowSprite(accent, 2.6, 0.17);
+  under.position.y = -0.55;
+  root.add(under);
 
   // Floating name tag over the far rim (not for my own platform — I know).
   // A yaw-billboarded plane: it turns to face you but never rolls.
@@ -179,21 +215,43 @@ function buildPlatform(seat: number, name: string, isMine: boolean): PlatformHan
     root.add(pedestal);
   }
 
-  return { seat, root, rimMat, slabMat, nameTag, nameMat, pedestal, lift: 0 };
+  return { seat, root, rimMat, rimCoreMat, slabMat, nameTag, nameMat, pedestal, lift: 0 };
 }
 
-function buildStage(): { stage: Group; ringMat: MeshBasicMaterial; topY: number } {
+interface StageBuild {
+  stage: Group;
+  ringMat: MeshBasicMaterial;
+  chase: Group;
+  chase2: Group;
+  tickMat: MeshBasicMaterial;
+  innerMat: MeshBasicMaterial;
+  poolMat: MeshBasicMaterial;
+  topY: number;
+}
+
+/**
+ * The centre stage — the MC's (and later the GOOPLIATH's) platform. It used
+ * to be one flat magenta circle on a puck; now it's a layered light-floor:
+ * the identity ring stays, but under it live a chasing LED tick ring, a
+ * counter-rotating arc, an apron of light pooling on the void floor and a
+ * lip of footlight glints. The CENTRE stays clean — somebody performs there.
+ * DiscoSystem drives all the moving parts through the handles returned here.
+ */
+function buildStage(): StageBuild {
   const stage = new Group();
   stage.name = 'goop-stage';
+  const r = RING.stageRadius;
+  const topY = RING.stageHeight;
 
   const podium = new Mesh(
-    new CylinderGeometry(RING.stageRadius, RING.stageRadius * 1.06, RING.stageHeight, 28),
+    new CylinderGeometry(r, r * 1.06, RING.stageHeight, 48),
     new MeshStandardMaterial({ color: 0x0e1116, metalness: 0.9, roughness: 0.3 }),
   );
   podium.position.y = RING.stageHeight / 2;
   stage.add(podium);
 
-  // The stage's neon ring — the whole rig's colour clock (DiscoSystem cycles it).
+  // The identity ring — the pink circle keeps its job as the stage's
+  // signature; everything new happens around it.
   const ringMat = new MeshBasicMaterial({
     color: PALETTE.magenta,
     transparent: true,
@@ -202,20 +260,84 @@ function buildStage(): { stage: Group; ringMat: MeshBasicMaterial; topY: number 
     depthWrite: false,
     side: DoubleSide,
   });
-  const ring = new Mesh(new RingGeometry(RING.stageRadius * 0.94, RING.stageRadius * 1.05, 48), ringMat);
+  const ring = new Mesh(new RingGeometry(r * 0.94, r * 1.05, 64), ringMat);
   ring.rotation.x = -Math.PI / 2;
-  ring.position.y = RING.stageHeight + 0.012;
+  ring.position.y = topY + 0.012;
   stage.add(ring);
 
-  // Dancefloor tiles on the podium top: a faint checker that DiscoSystem pulses.
+  // Dancefloor plate on the podium top.
   const tiles = new Mesh(
-    new CylinderGeometry(RING.stageRadius * 0.92, RING.stageRadius * 0.92, 0.01, 28),
+    new CylinderGeometry(r * 0.92, r * 0.92, 0.01, 48),
     new MeshStandardMaterial({ color: 0x161a22, metalness: 0.6, roughness: 0.25, emissive: 0x0a0d14 }),
   );
-  tiles.position.y = RING.stageHeight;
+  tiles.position.y = topY;
   stage.add(tiles);
 
-  return { stage, ringMat, topY: RING.stageHeight };
+  // LED tick ring: 32 bars that CHASE around the stage (DiscoSystem turns
+  // the group with the beat and snaps its hue with the bars).
+  const chase = new Group();
+  chase.position.y = topY + 0.011;
+  const tickMat = new MeshBasicMaterial({
+    color: PALETTE.cyan,
+    transparent: true,
+    opacity: 0.7,
+    blending: AdditiveBlending,
+    depthWrite: false,
+  });
+  const tickGeo = new BoxGeometry(0.05, 0.012, 0.2);
+  const TICKS = 32;
+  for (let i = 0; i < TICKS; i++) {
+    const tick = new Mesh(tickGeo, tickMat);
+    const a = (i / TICKS) * Math.PI * 2;
+    tick.position.set(Math.sin(a) * r * 0.84, 0, Math.cos(a) * r * 0.84);
+    tick.rotation.y = a;
+    chase.add(tick);
+  }
+  stage.add(chase);
+
+  // Counter-rotating arc: a 270° sweep with a visible gap, so the floor
+  // reads as MACHINERY turning, not a static decal.
+  const chase2 = new Group();
+  chase2.position.y = topY + 0.009;
+  const innerMat = new MeshBasicMaterial({
+    color: PALETTE.violet,
+    transparent: true,
+    opacity: 0.6,
+    blending: AdditiveBlending,
+    depthWrite: false,
+    side: DoubleSide,
+  });
+  const arc = new Mesh(new RingGeometry(r * 0.62, r * 0.665, 48, 1, 0, Math.PI * 1.5), innerMat);
+  arc.rotation.x = -Math.PI / 2;
+  chase2.add(arc);
+  stage.add(chase2);
+
+  // The apron: a soft pool of light spilling off the stage onto the void
+  // floor — the stage LIGHTS the ground it stands on.
+  const poolMat = new MeshBasicMaterial({
+    map: glowTexture(),
+    color: PALETTE.magenta,
+    transparent: true,
+    opacity: 0.2,
+    blending: AdditiveBlending,
+    depthWrite: false,
+  });
+  const pool = new Mesh(new PlaneGeometry(r * 3.9, r * 3.9), poolMat);
+  pool.rotation.x = -Math.PI / 2;
+  pool.position.y = 0.004;
+  stage.add(pool);
+
+  // Footlights: small hot glints around the lip, like the cans on a real
+  // stage edge.
+  const LIGHTS = 8;
+  for (let i = 0; i < LIGHTS; i++) {
+    const a = (i / LIGHTS) * Math.PI * 2 + Math.PI / LIGHTS;
+    const glint = glowSprite(PALETTE.whiteHot, 0.3, 0.5);
+    glint.position.set(Math.sin(a) * r * 1.02, topY + 0.03, Math.cos(a) * r * 1.02);
+    stage.add(glint);
+  }
+
+  return { stage, ringMat, chase, chase2, tickMat, innerMat, poolMat, topY };
 }
 
 /**
@@ -246,7 +368,7 @@ export function buildArena(scene: Scene, seats: number, mySeat: number, names: (
     platforms.push(handle);
   }
 
-  const { stage, ringMat, topY } = buildStage();
+  const { stage, ringMat, chase, chase2, tickMat, innerMat, poolMat, topY } = buildStage();
   stage.position.set(0, 0, -ringRadius(seats));
   root.add(stage);
 
@@ -257,6 +379,11 @@ export function buildArena(scene: Scene, seats: number, mySeat: number, names: (
     platforms,
     stage,
     stageRingMat: ringMat,
+    stageChase: chase,
+    stageChase2: chase2,
+    stageTickMat: tickMat,
+    stageInnerMat: innerMat,
+    stagePoolMat: poolMat,
     stageTopY: topY,
     dispose() {
       root.removeFromParent();

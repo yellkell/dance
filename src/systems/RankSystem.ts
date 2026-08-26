@@ -108,10 +108,14 @@ export class RankSystem extends createSystem({}) {
         handle.pedestal.scale.y = span;
         handle.pedestal.position.y = -PLATFORM.thickness - span;
       }
-      // Elimination dims the deck's neon.
-      const rimTarget = d && !d.alive ? 0.12 : 0.9;
+      // Elimination dims the deck's neon — halo and tube core together
+      // (the core is the solid fixture; a dead deck's tube goes cold too).
+      const out = d && !d.alive;
+      const rimTarget = out ? 0.12 : 0.9;
       handle.rimMat.opacity += (rimTarget - handle.rimMat.opacity) * Math.min(1, delta * 3);
-      handle.nameMat.opacity = d && !d.alive ? 0.25 : 1;
+      const coreTarget = out ? 0.2 : 1;
+      handle.rimCoreMat.opacity += (coreTarget - handle.rimCoreMat.opacity) * Math.min(1, delta * 3);
+      handle.nameMat.opacity = out ? 0.25 : 1;
 
       // Name tags YAW toward the viewer but never roll or pitch — a tilted
       // head must never tilt the room's text. World yaw minus the seat's
