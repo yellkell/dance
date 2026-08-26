@@ -25,6 +25,13 @@
  * — a few faint motes when the groove is young, a hotter, denser fountain
  * as it deepens. No numbers, no panels: the sticks themselves are the
  * combo meter.
+ *
+ * AND THEY'RE WET: each of your sticks is a frosted tube of LIQUID glow —
+ * SPLASH WARS' clipped-liquid trick (materials/liquid.ts) — whose surface
+ * stays level in world space however you hold it, surges when you swing,
+ * and pours end to end as your hands swap through the groove. Yours only:
+ * the other figures' blades stay bare neon, because nobody can read a
+ * meniscus across the ring and 46 more slosh sims would buy nothing.
  */
 
 import { createSystem, Vector3 } from '@iwsdk/core';
@@ -42,11 +49,13 @@ import {
   MeshBasicMaterial,
   Object3D,
   Points,
+  Quaternion,
   Sprite,
   SpriteMaterial,
 } from 'three';
 import { CHOREO, GROOVE, hueToColor } from '../config.js';
 import { glintTexture, glowSprite, sizedPointsMaterial } from '../materials/glow.js';
+import { createLiquid, HandMotion, type LiquidVisual } from '../materials/liquid.js';
 import { danceHue } from '../game/profile.js';
 import { match, me, showBeat } from '../game/state.js';
 import { net } from '../net/session.js';
@@ -56,6 +65,10 @@ const _hand = new Vector3();
 const _lHand = new Vector3();
 const _rHand = new Vector3();
 const _sw = new Vector3();
+const _tube = new Vector3();
+const _axis = new Vector3();
+const _ws = new Vector3();
+const _q = new Quaternion();
 const _c = new Color();
 const _white = new Color(0xffffff);
 
@@ -113,14 +126,27 @@ interface Stick {
   /** lastTip holds a real sample (a fresh attach must not read as a
    *  lightspeed swing). */
   tracked: boolean;
+  liquid: LiquidVisual;
+  motion: HandMotion;
   pulse: number;
   attachedTo: Object3D | null;
+  /** Last frame's on-show state, so un-bagging can reset the slosh. */
+  shown: boolean;
 }
 
 /** Stick dimensions, and how thick its black casing runs. */
 const STICK_R = 0.013;
 const STICK_LEN = 0.3;
 const STICK_CASE = 0.007;
+/** How full the tube runs. Deliberately short of the brim: the airspace is
+ *  where the Alyx trick lives — a stick with no headroom has no surface to
+ *  keep level, no meniscus to flash, nowhere for the pour to go. */
+const STICK_FILL = 0.85;
+/** The liquid's own radius — the tube's bore, inset by the wall it sits
+ *  inside. The interior capsule's overall span is therefore
+ *  `(STICK_LEN - 2·STICK_R) + 2·LIQUID_R`, which is what the surface
+ *  plane's world height is measured against. */
+const LIQUID_R = STICK_R - 0.0015;
 /** Held like a stick: up and slightly forward off the grip. The shake
  *  wobbles around this, so it has to be a named rest pose rather than a
  *  number set once at build time. */
@@ -353,6 +379,7 @@ export class PlayerSystem extends createSystem({}) {
     grooveView.burst = (heat = 1) => {
       const s = this.sticks.right;
       s.pulse = 1; // the whole reward answer, not just the sparks
+      s.liquid.slosh.energy = Math.max(s.liquid.slosh.energy, 0.9); // …liquid churn included
       if (s.attachedTo) s.tip.getWorldPosition(_hand);
       else _hand.set(0.25, 1.35, -0.4);
       // A parked rig has no real swing — play the burst off a canned
@@ -406,18 +433,30 @@ export class PlayerSystem extends createSystem({}) {
     casing.position.y = 0.02;
     group.add(casing);
 
-    const mat = new MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85 });
+    // THE TUBE. Was a solid neon rod; now it's the FROSTED SHELL over the
+    // liquid — translucent (depthWrite off, blended after the opaque glow
+    // inside, exactly SPLASH WARS' tank-over-juice sort order), still in
+    // your seat colour so the empty headroom reads as tinted plastic
+    // against the casing's black rather than a hole in the stick.
+    const mat = new MeshBasicMaterial({
+      color: 0xffffff,
+      transparent: true,
+      opacity: 0.34,
+      depthWrite: false,
+    });
     const stick = new Mesh(new CapsuleGeometry(STICK_R, shaft, 3, 10), mat);
     stick.position.y = 0.02;
+    stick.renderOrder = 2; // over the liquid, under the halo
     group.add(stick);
-    // A hot white filament down the middle of the neon — the same reason
-    // the casing is there. Colour says WHOSE; brightness says it's a light.
-    const core = new Mesh(
-      new CapsuleGeometry(STICK_R * 0.5, STICK_LEN * 0.97 - STICK_R, 2, 8),
-      new MeshBasicMaterial({ color: 0xfffaff }),
-    );
-    core.position.y = 0.02;
-    group.add(core);
+    // THE LIQUID — the glow itself, sloshing inside the tube. It takes the
+    // old white filament's job: that hot core said "this is a light" by
+    // being solid and central, and the liquid says it with a meniscus and
+    // a surface sheen instead — brighter, and it MOVES. A shrunk interior
+    // copy of the tube (the same capsule, walls running parallel) wearing
+    // the world-space clipped-liquid shader.
+    const liquid = createLiquid(new CapsuleGeometry(LIQUID_R, shaft, 3, 10));
+    liquid.mesh.position.y = 0.02;
+    group.add(liquid.mesh);
     // THE GRIP CAP: the snap-seal collar a real stick wears at the held
     // end. Matte-dark and slightly proud of the casing, it grounds the
     // tube in the fist and settles which end is the light — the tube
@@ -432,6 +471,7 @@ export class PlayerSystem extends createSystem({}) {
     group.name = 'live-glowstick';
     const halo = glowSprite(0xffffff, 0.34, 0.55);
     halo.position.y = 0.08;
+    halo.renderOrder = 3; // additive, on top of the tube's blend
     group.add(halo);
     // THE TIP — the end the sparks leave from, so it gets its own small
     // hot glow (brighter with the groove, popping with the pulse): the
@@ -453,8 +493,11 @@ export class PlayerSystem extends createSystem({}) {
       vel: new Vector3(),
       lastTip: new Vector3(),
       tracked: false,
+      liquid,
+      motion: new HandMotion(),
       pulse: 0,
       attachedTo: null,
+      shown: false,
     };
   }
 
@@ -514,9 +557,22 @@ export class PlayerSystem extends createSystem({}) {
         s.group.removeFromParent();
         s.attachedTo = obj;
         if (obj) obj.add(s.group);
-        s.tracked = false; // a re-parent is a teleport, not a swing
+        // A re-parent is a teleport, not a swing — and the liquid can't
+        // tell the difference either, so both the spark's swing history
+        // and the pour's motion history start fresh rather than reading
+        // the jump as a whipcrack.
+        s.tracked = false;
+        s.motion.reset();
+        s.liquid.slosh.reset();
       }
-      s.group.visible = !clubFloor;
+      const show = !clubFloor;
+      if (show && !s.shown) {
+        // Out of the bag: prime the pour level, don't slosh the journey.
+        s.motion.reset();
+        s.liquid.slosh.reset();
+      }
+      s.shown = show;
+      s.group.visible = show;
 
       // THE SWING: the tip's velocity, sampled per frame, so a rewarded
       // swap can throw its sparks the way the stick was actually moving.
@@ -537,8 +593,11 @@ export class PlayerSystem extends createSystem({}) {
       }
 
       // Brighter the deeper the groove; the pulse pops it on a rewarded swap.
+      // The tube's ceiling is frosted-shell territory now — brightness lives
+      // in the liquid, and a shell opaque enough to glow on its own would
+      // paint over the very thing it's there to show.
       const grooveGlow = Math.min(this.streak, 50) / 50;
-      s.mat.opacity = 0.7 + grooveGlow * 0.3;
+      s.mat.opacity = 0.32 + grooveGlow * 0.22;
       (s.halo.material as SpriteMaterial).opacity = 0.4 + grooveGlow * 0.3 + s.pulse * 0.5;
       const scale = 1 + s.pulse * 0.5;
       s.group.scale.set(scale, 1 + s.pulse * 0.25, scale);
@@ -567,6 +626,26 @@ export class PlayerSystem extends createSystem({}) {
       s.tipGlow.scale.setScalar(0.07 + grooveGlow * 0.025 + s.pulse * 0.055);
       s.group.rotation.x = STICK_TILT + Math.sin(this.clock * 47) * 0.075 * flash;
       s.group.rotation.z = Math.sin(this.clock * 61 + 1.7) * 0.095 * flash;
+
+      // THE POUR. Drive the liquid off the tube's world pose AFTER the
+      // shake has posed the group, so the surface plane belongs to the
+      // frame that's drawn. The fill never moves; the SURFACE does — level
+      // in world space through every tilt of the dance, which is the whole
+      // trick. Projecting the bore onto world up (its two end domes give
+      // 2·LIQUID_R end-on, the straight shaft between them foreshortens by
+      // |axis·up|) keeps the volume honest when the stick lies flat.
+      if (show && s.attachedTo) {
+        s.liquid.mesh.getWorldPosition(_tube);
+        s.motion.update(_tube, delta);
+        s.liquid.mesh.getWorldQuaternion(_q);
+        _axis.set(0, 1, 0).applyQuaternion(_q);
+        s.liquid.mesh.getWorldScale(_ws);
+        const worldHeight =
+          (LIQUID_R * 2 + (STICK_LEN - STICK_R * 2) * Math.abs(_axis.y)) *
+          Math.max(_ws.x, _ws.y, _ws.z);
+        s.liquid.update(this.clock, delta, STICK_FILL, _tube, worldHeight, s.motion.accel);
+        s.liquid.setColor(this.stickColor, flash, grooveGlow);
+      }
 
       // Decay LAST, and never by more than a frame's worth. Draining the
       // pulse before drawing with it meant the frame a swap landed on
@@ -677,6 +756,10 @@ export class PlayerSystem extends createSystem({}) {
     const hand = side === 1 ? 'left' : 'right';
     const stick = this.sticks[hand];
     stick.pulse = 1;
+    // …and the liquid answers with them: the same kick, seen as a surge of
+    // surface shimmer. (The swap's own hand acceleration sloshes it anyway;
+    // this just guarantees the churn lands ON the reward, every time.)
+    stick.liquid.slosh.energy = Math.max(stick.liquid.slosh.energy, 0.9);
     if (stick.attachedTo) {
       // Off the TIP — the hot end — carrying the swing that earned it.
       stick.tip.getWorldPosition(_hand);
