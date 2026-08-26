@@ -13,18 +13,29 @@ read against the live page before anyone signs anything.**
 
 ---
 
-## The premise, corrected
+## Why the door is free, and has to be
 
 > "we can't charge for it"
 
-That isn't a platform limit. The Horizon Store sells PWAs the same way it
-sells anything else — paid app, paid app plus optional subscription, free
-app with in-app purchases, free app behind a mandatory subscription. A
-WebXR PWA is not a second-class citizen at the till.
+Correct, and there is a specific mechanism behind it — worth writing down,
+because the same mechanism decides how the shop has to be built.
 
-So free-with-a-shop should be a **decision**, not an inheritance. It is
-probably still the right decision, for three reasons that have nothing to
-do with what Meta allows:
+**VRC.Quest.Security.1** requires an app sold on the Horizon Store to
+perform a **Platform Entitlement check within 10 seconds of launch**, and
+to handle a failed check by quitting, erroring, or dropping into a limited
+demo. It is the store's anti-piracy floor: prove this user actually bought
+this, or don't run.
+
+A PWA cannot satisfy it, and not because of a missing API. **A PWA has
+nothing to gate.** The app is a Trusted Web Activity — an Android shell
+that opens a URL. The game isn't in the binary; it's at
+`raveraid.web.app`, where anybody with a headset and a browser can load it
+for free, entitlement or no entitlement. There is no version of that check
+that means anything. Charging for the shell would be charging for a
+bookmark.
+
+So: free at the door is not a compromise, it is the only shape the
+platform allows. Good — the reasons to want it were already there:
 
 - A club is worth more the more people are in it. RAVE RAID is a
   twenty-four-seat room with a relay and a ball; a price tag at the door
@@ -34,11 +45,37 @@ do with what Meta allows:
   support burden.
 - Records are the natural unit. The game is already built around a record
   box — twenty-four measured masters, twenty of them charted. Selling
-  records is selling the thing the game is about. Selling *access to the
-  game* is selling the wrapper.
+  records is selling the thing the game is about.
 
-One real caveat, and it is the big one: see **The rights**. Free
-distribution and paid distribution are not the same licence.
+### The part that actually matters
+
+**The same argument applies to a song.**
+
+An add-on you sell for $2.99 whose audio sits at
+`raveraid.web.app/assets/breakcore-a3f9c2.mp3` is exactly as unsellable as
+the paid app was, for exactly the same reason: it is public, and the
+purchase gates nothing. Meta couldn't solve this for the app. You have to
+solve it for the record.
+
+Which turns the lazy-loading work from a performance chore into **the
+product itself**. Gated audio isn't step two of a shop — it *is* the shop.
+Everything else (billing wiring, add-on SKUs, the Dashboard) is plumbing
+attached to it.
+
+### The one lever that could change the app-level answer
+
+`--metaquest` silently enables `horizonPlatformSDK` on every build
+(`cmds/init.ts:304`) — it is not a prompt, you get it whether you asked or
+not — pulling in `com.meta.androidbrowserhelper:horizonplatformsdk:1.1.0`
+and registering a `HorizonPlatformSdkRequestHandler` on the delegation
+service. That is a JS↔platform bridge sitting in the app already.
+
+If it exposes an entitlement check to the page, a paid PWA becomes
+*arguable* (you'd still need the web build to refuse to run un-entitled,
+which is its own fight). What that bridge actually exposes could not be
+confirmed here — Meta's docs are unreachable from this environment. **It
+is worth thirty minutes on-device to enumerate.** Log what the handler
+answers; that's the cheapest experiment in this whole document.
 
 ---
 
@@ -103,7 +140,8 @@ of it reachable from the static import graph in `src/audio/tracks.ts`.
 Meta's own advice for PWAs is to load as much as possible *after* the
 WebXR session initiates. The record box needs to become lazy before
 submission regardless of whether anything is ever sold — and, as it
-happens, making it lazy is also the first half of building a shop.
+happens, moving the audio off the public origin is not *half* the shop —
+it is the whole thing that makes a record sellable at all.
 
 ---
 
@@ -388,46 +426,100 @@ The DRM boundary is the audio, and only the audio.
 
 ---
 
-## The rights
+## The music, as it actually is
 
-**This gates everything above.** No amount of billing plumbing matters if
-the records can't legally be sold.
+The records are made by musicians we work with, paid a share of profit.
+That is a **collaboration**, not a licensing deal, and almost everything
+written about game music licensing is aimed at the other thing — clearing
+somebody else's finished commercial recording, which is where the
+$500–$2,000-a-track numbers and the sync/master two-step come from. None
+of that applies here. Skip it.
 
-Selling a song inside a game needs two grants per track: a **sync
-licence** (the composition) and a **master use licence** (that specific
-recording), and both have to permit *distribution in a commercial product*
-— which is a different, more expensive thing than permission to use it in
-something free. A track that is fine to give away at `raveraid.web.app`
-may be flatly unsellable.
+What a collaboration needs is much smaller, and it is one page.
 
-Rough shape of the market: indie developers typically pay **$500–$2,000
-per track** for traditionally licensed music; royalty-free and buyout
-catalogues are far cheaper. For scale, Beat Saber — which chose the DLC
-model precisely to contain this problem — sells music packs around $13 or
-roughly $2 a track. US statutory damages run to **$150,000 per infringed
-work**, which is the number that makes this a gating item rather than a
-launch-week item.
+### The failure mode, precisely
 
-The twenty-four masters currently in `src/assets/music/` need documented,
-written rights before a single one is put behind a price. Three paths that
-actually work:
+Not a lawsuit. Nobody sues over a rhythm game. The thing that actually
+happens is faster and dumber:
 
-1. **Commission originals.** Work-for-hire with a full buyout. Most
-   expensive up front, cleanest forever, and the only one that makes the
-   record box an asset rather than a liability.
-2. **Royalty-free with explicit resale rights.** Cheap, fast, and legally
-   fine *if* the licence names commercial redistribution inside a game.
-   Read the actual licence; "royalty-free" alone does not mean this.
-3. **Real label deals** for a marquee pack. Slow, expensive, and the thing
-   that sells headsets — a later chapter, not chapter one.
+Meta operates notice-and-takedown under **DMCA §512(c)**. Anyone can file
+a claim against a Store listing. Meta does not adjudicate — it pulls the
+listing and sends you instructions for filing a counter-notification. Then
+you wait.
 
-A fourth, worth naming because it fits this game unusually well: **let
-players bring their own audio.** Charting is deterministic and the
-analyser already exists (`tools/analyze-track.mjs`). Sell the *tooling*
-and the *club*, not the recordings. It sidesteps the licensing problem
-entirely and it is the reason custom-song ecosystems out-live their
-official ones. It also raises its own moderation problem on a public
-relay, so it isn't free either.
+So the risk is not "we get sued in two years." It is: *a musician who
+feels short-changed six months in — reasonably or not — has a button that
+takes the whole store listing down, and we cannot argue with it, because
+the entity holding the button is Meta and Meta has no opinion.* An
+undocumented handshake and a revenue split that only ever existed in a
+group chat is precisely the setup where that happens.
+
+### The one page
+
+Per track, roughly fifteen minutes:
+
+- who made it, and what it's called;
+- the split — **% of net**, with "net" defined once (after the store's
+  cut, after payment fees) so nobody is computing from a different number
+  later;
+- one sentence granting the right to distribute *and sell* this recording
+  in RAVE RAID and its stores;
+- what happens if they walk — does the track stay in the game or come out;
+- a signature, and a date.
+
+That is not the traditional route. The traditional route is a lawyer and
+six weeks. This is a shared doc and a signature block, it moves as fast as
+anything else in this repo, and it converts "one angry text away from a
+takedown" into "impossible."
+
+Do it per track as tracks land, not as a batch cleanup later. The batch
+cleanup is the version that never happens.
+
+### What the rev-share means for the build
+
+This is the part that is engineering, not paperwork, and it is easy to
+miss until it is expensive.
+
+**Paying a % of profit requires per-track revenue attribution, from the
+first sale.** Not from launch — from the *first sale*. If entitlements are
+recorded as "this user owns `track.breakcore`" and nothing else, then in
+twelve months, working out what one artist is owed means reconciling Meta
+financial reports against Paddle CSVs against a Firestore collection that
+never recorded a price. That reconciliation is miserable, it is done by
+hand, and it is done in the same week as an awkward conversation about
+money.
+
+So the entitlement record is not a boolean. Every grant writes:
+
+```ts
+{
+  sku:      'track.breakcore',
+  rail:     'horizon' | 'web',     // whose cut applies
+  gross:    2.99,
+  currency: 'USD',
+  fee:      0.90,                  // store or MoR cut, at time of sale
+  net:      2.09,                  // what the split divides
+  at:       <timestamp>,
+  txn:      <purchase token / MoR order id>,
+}
+```
+
+Then an artist statement is a query, payouts are a script, and the number
+you show a musician is the same number they'd compute themselves. Build it
+in step one; it costs a few extra fields now and it is the difference
+between a rev-share that runs itself and one that quietly poisons the
+thing that makes the music good.
+
+### Worth keeping on the table
+
+**Let players bring their own audio.** Charting is deterministic from
+`(seed, track)` and the analyser already exists
+(`tools/analyze-track.mjs`) — the game can chart a file it has never seen.
+Sell the tooling and the club, not only the recordings. It is the reason
+custom-song ecosystems outlive official ones, and it makes the record box
+a showcase rather than the entire inventory. It carries its own moderation
+problem on a public relay, so it isn't free — but it fits this codebase
+better than it fits almost any other rhythm game.
 
 ---
 
@@ -459,24 +551,34 @@ happens.
 
 1. **Become a PWA.** `manifest.webmanifest`, a service worker, icons.
    Nothing else can start. *(Nothing to do with money; overdue anyway.)*
-2. **Make the record box lazy.** Move audio out of the static import graph
-   and load it after the WebXR session begins. Buys the
-   Quest.Performance.3 VRC *and* is half the shop.
-3. **Ship free on the Horizon Store.** Bubblewrap, no billing, no
-   `alphaDependencies`. Clear VRCs, IARC, age self-certification, privacy
-   policy, Data Use Checkup on a build with no revenue riding on it.
-4. **Settle the rights.** In parallel with 1–3, and slower than all of
-   them. Nothing after this point can ship without it.
-5. **Identity and entitlements.** Firestore collection + a verify
-   function + a session token. Grant one free record through it end-to-end
-   before any money moves.
-6. **Turn on the till.** `horizonBilling` + `alphaDependencies` + the
+2. **Ship free on the Horizon Store.** Bubblewrap, no billing, no
+   `alphaDependencies`. Clear the VRCs, IARC, age self-certification,
+   privacy policy and Data Use Checkup on a build with no revenue riding
+   on it. While in there: **enumerate what the `horizonPlatformSDK` bridge
+   answers** — thirty minutes, and it's the only thing that could reopen
+   the paid-app question.
+3. **Gate the audio.** Records move out of the static import graph and off
+   the public origin, behind a signed-URL endpoint; the catalog (including
+   each track's measured row) is served, not bundled. This is not a
+   performance chore — *this is the product.* It also happens to buy the
+   Quest.Performance.3 VRC.
+4. **Identity, entitlements, and the ledger.** Firestore collection, a
+   verify function, a session token — and the full revenue record on every
+   grant (`sku / rail / gross / fee / net / txn`), from the first row.
+   Grant one *free* record through the whole path end-to-end before any
+   money moves.
+5. **Turn on the till.** `horizonBilling` + `alphaDependencies` + the
    Application ID; durable add-ons in the Dashboard; test at the $0.01
    developer price.
-7. **The web rail and account linking.** Paddle or Lemon Squeezy, plus the
+6. **The web rail and account linking.** Paddle or Lemon Squeezy, plus the
    six-digit link code.
-8. **Host unlocks the room.** Signed room-scoped stream URLs, and kill
+7. **Host unlocks the room.** Signed room-scoped stream URLs, and kill
    that silent `?? seeded pick` fallback for good.
+
+Running alongside, not blocking: **one page per musician, per track**, as
+tracks land. It is fifteen minutes and it is the only thing standing
+between a revenue disagreement and a §512(c) takedown of the whole
+listing.
 
 ---
 
@@ -486,10 +588,18 @@ happens.
 following came from search summaries rather than the source, and each one
 should be confirmed against the live page before it is relied on:
 
+- **What the `horizonPlatformSDK` bridge exposes to the page.** Every
+  `--metaquest` build ships it. If it answers an entitlement check, the
+  paid-app question is open again. Enumerate it on-device; nothing else
+  here has a better ratio of effort to consequence.
 - The exact current wording of the in-app-purchase and commerce clauses in
   **App policies**, and whether the "windows into an existing service"
   exception has moved.
 - Whether Horizon Billing has left alpha since `1.0.0-alpha11`.
+- The current text of **VRC.Quest.Security.1** and whether it applies to
+  free apps with in-app purchases, or only to paid apps. If a free app
+  with add-ons is also expected to entitlement-check, that changes the
+  shape of step 4.
 - The current PWA-specific VRC list, and the exact
   Quest.Performance.3 threshold.
 - Quest Browser's actual storage quota for a PWA — Meta's guidance says
