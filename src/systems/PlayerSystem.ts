@@ -559,13 +559,22 @@ export class PlayerSystem extends createSystem({}) {
       (match.screen === 'lobby' || match.screen === 'tour') &&
       (net.phase === 'hosting' || net.phase === 'joined');
 
-    // ONCE THE RECORD DROPS, THE PLASTIC GOES. Through a set you are a
-    // dancer holding two glowsticks, not somebody wearing two controllers:
-    // the moulded grips are hidden for the whole song and handed back at
-    // the podium. Only the controller MODEL goes — tracked hands are your
-    // actual hands and stay, and the pointer's own ray and cursor still
-    // draw, so the pause card is as pokeable as ever.
-    this.showControllers(!(match.screen === 'countdown' || match.screen === 'raid'));
+    // ONE HAND HOLDS ONE THING. Wherever a glowstick is out, the moulded
+    // grip goes — they occupy the same few centimetres, and a controller
+    // drawn through a stick is two objects fighting over one hand, which
+    // spoils the stick in exactly the place the stick is the whole point.
+    //
+    // This used to be two conditions that disagreed: sticks came out
+    // everywhere but the club floor, while the plastic only went for
+    // 'countdown' and 'raid'. So the solo lobby, the tour menu and the
+    // podium each drew both at once. One rule now, and it cannot drift:
+    // the sticks' own visibility decides it.
+    //
+    // Only the controller MODEL goes — tracked hands are your actual hands
+    // and stay, and the pointer's ray and cursor still draw, so every menu
+    // and the pause card stay exactly as pokeable as before.
+    const sticksOut = !clubFloor;
+    this.showControllers(!sticksOut);
 
     for (const hand of ['left', 'right'] as const) {
       const s = this.sticks[hand];
@@ -582,7 +591,7 @@ export class PlayerSystem extends createSystem({}) {
         s.motion.reset();
         s.liquid.slosh.reset();
       }
-      const show = !clubFloor;
+      const show = sticksOut;
       if (show && !s.shown) {
         // Out of the bag: prime the pour level, don't slosh the journey.
         s.motion.reset();
