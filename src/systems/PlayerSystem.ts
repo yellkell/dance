@@ -132,6 +132,8 @@ interface Stick {
   attachedTo: Object3D | null;
   /** Last frame's on-show state, so un-bagging can reset the slosh. */
   shown: boolean;
+  /** Eased slide up the stick's axis to clear a drawn controller. */
+  push: number;
 }
 
 /** Stick dimensions, and how thick its black casing runs. */
@@ -155,6 +157,14 @@ const LIQUID_R = STICK_R - 0.0015;
  *  wobbles around this, so it has to be a named rest pose rather than a
  *  number set once at build time. */
 const STICK_TILT = -0.55;
+/** How far the stick slides up its own axis to clear a controller that is
+ *  being drawn in the same hand (metres). Outside a song the moulded grip
+ *  is on screen and the two share the same few centimetres; this pushes the
+ *  stick's near end out past the controller's nose instead of through it. */
+const STICK_PAD_PUSH = 0.12;
+/** The stick's rest axis in hand space — local +Y turned by STICK_TILT. */
+const PUSH_Y = Math.cos(STICK_TILT);
+const PUSH_Z = Math.sin(STICK_TILT);
 
 /** One near-black casing material for both hands — never lit, never tinted. */
 let _casingMat: MeshBasicMaterial | null = null;
@@ -515,6 +525,7 @@ export class PlayerSystem extends createSystem({}) {
       pulse: 0,
       attachedTo: null,
       shown: false,
+      push: 0,
     };
   }
 
@@ -559,22 +570,17 @@ export class PlayerSystem extends createSystem({}) {
       (match.screen === 'lobby' || match.screen === 'tour') &&
       (net.phase === 'hosting' || net.phase === 'joined');
 
-    // ONE HAND HOLDS ONE THING. Wherever a glowstick is out, the moulded
-    // grip goes — they occupy the same few centimetres, and a controller
-    // drawn through a stick is two objects fighting over one hand, which
-    // spoils the stick in exactly the place the stick is the whole point.
-    //
-    // This used to be two conditions that disagreed: sticks came out
-    // everywhere but the club floor, while the plastic only went for
-    // 'countdown' and 'raid'. So the solo lobby, the tour menu and the
-    // podium each drew both at once. One rule now, and it cannot drift:
-    // the sticks' own visibility decides it.
-    //
-    // Only the controller MODEL goes — tracked hands are your actual hands
-    // and stay, and the pointer's ray and cursor still draw, so every menu
-    // and the pause card stay exactly as pokeable as before.
-    const sticksOut = !clubFloor;
-    this.showControllers(!sticksOut);
+    // ONCE THE RECORD DROPS, THE PLASTIC GOES. Through a set you are a
+    // dancer holding two glowsticks, not somebody wearing two controllers:
+    // the moulded grips are hidden for the whole song and handed back at
+    // the podium. Only the controller MODEL goes — tracked hands are your
+    // actual hands and stay, and the pointer's own ray and cursor still
+    // draw, so the pause card is as pokeable as ever.
+    this.showControllers(!(match.screen === 'countdown' || match.screen === 'raid'));
+
+    // Whose models are actually on screen this frame — the sticks shift out
+    // of their way below.
+    const pads = this.input?.xr?.visualAdapters?.controller;
 
     for (const hand of ['left', 'right'] as const) {
       const s = this.sticks[hand];
@@ -591,7 +597,7 @@ export class PlayerSystem extends createSystem({}) {
         s.motion.reset();
         s.liquid.slosh.reset();
       }
-      const show = sticksOut;
+      const show = !clubFloor;
       if (show && !s.shown) {
         // Out of the bag: prime the pour level, don't slosh the journey.
         s.motion.reset();
@@ -599,6 +605,16 @@ export class PlayerSystem extends createSystem({}) {
       }
       s.shown = show;
       s.group.visible = show;
+
+      // MAKE ROOM FOR THE PLASTIC. Outside a song the moulded controller is
+      // drawn in this same hand, and the stick's near end runs straight
+      // through it. Slide the stick up its own axis so it starts past the
+      // controller's nose — eased, because the model appears and vanishes
+      // at the edges of a song and a snap there would read as a glitch.
+      const padDrawn = !!pads?.[hand]?.visual?.model?.parent;
+      const wantPush = padDrawn ? STICK_PAD_PUSH : 0;
+      s.push += (wantPush - s.push) * Math.min(1, delta * 8);
+      s.group.position.set(0, PUSH_Y * s.push, PUSH_Z * s.push);
 
       // THE SWING: the tip's velocity, sampled per frame, so a rewarded
       // swap can throw its sparks the way the stick was actually moving.
