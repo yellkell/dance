@@ -170,6 +170,8 @@ const LIQUID_FRAG = /* glsl */ `
   uniform vec3 uPlaneNormal;  // world up, tilted by the slosh sim
   uniform float uTime;
   uniform float uSlosh;       // ripple energy 0..~1
+  uniform float uRippleAmp;   // ripple height (m) — scaled to the liquid's span
+  uniform float uFoamReach;   // meniscus band depth (m) — likewise
   uniform vec3 uColor;        // lit glow body
   uniform vec3 uDeepColor;    // shadowed depths
   uniform vec3 uFoamColor;    // meniscus / surface sheen
@@ -186,7 +188,7 @@ const LIQUID_FRAG = /* glsl */ `
       sin(dot(vWorldPos.xz, vec2(46.0, 32.0)) - uTime * 4.2) * 0.5 +
       sin(dot(vWorldPos.xz, vec2(-28.0, 40.0)) + uTime * 3.0) * 0.5;
     float d = dot(vWorldPos - uPlanePoint, normalize(uPlaneNormal))
-            + ripple * 0.006 * uSlosh * ${SLOSH.rippleGain.toFixed(2)};
+            + ripple * uRippleAmp * uSlosh * ${SLOSH.rippleGain.toFixed(2)};
     if (d > 0.0) discard;
 
     if (!gl_FrontFacing) {
@@ -207,7 +209,7 @@ const LIQUID_FRAG = /* glsl */ `
     // FAT, nearly twice the water version's reach, because a thick pour
     // climbs its glass: the wide bright collar where gel wets the tube is
     // the second half of what "viscous" looks like.
-    col = mix(col, uFoamColor, smoothstep(-0.011, -0.0015, d) * 0.9);
+    col = mix(col, uFoamColor, smoothstep(-uFoamReach, -0.0015, d) * 0.9);
     // Wet gloss: a real Blinn-Phong glint off a fixed key light, tracking
     // the camera, so the glow gleams as the stick turns in your hand.
     vec3 n = normalize(vWorldNormal);
@@ -242,8 +244,20 @@ export interface LiquidVisual {
    * tube's world-space centre, `worldHeight` the interior's extent along
    * WORLD up (project the tube onto world Y before calling — a level
    * surface through a tilted tube spans less height than the tube is long).
+   * `axis` is the tube's world-space axis (unit) and `length` its interior
+   * length — the tilt clamp needs the tube's horizontal footprint, or a
+   * lying stick lets the slosh cut it lengthwise (see update()).
    */
-  update(time: number, dt: number, fill: number, center: Vector3, worldHeight: number, accel: Vector3): void;
+  update(
+    time: number,
+    dt: number,
+    fill: number,
+    center: Vector3,
+    worldHeight: number,
+    axis: Vector3,
+    length: number,
+    accel: Vector3,
+  ): void;
   /**
    * The night's live colours, every frame: `base` is the seat colour,
    * `flash` the rewarded-swap kick (0..1, snaps the glow toward white the
@@ -266,6 +280,8 @@ export function createLiquid(interiorGeo: BufferGeometry): LiquidVisual {
       uPlaneNormal: { value: new Vector3(0, 1, 0) },
       uTime: { value: 0 },
       uSlosh: { value: 0 },
+      uRippleAmp: { value: 0.006 },
+      uFoamReach: { value: 0.011 },
       uColor: { value: new Color(0xffffff) },
       uDeepColor: { value: new Color(0x404040) },
       uFoamColor: { value: new Color(0xffffff) },
@@ -287,10 +303,33 @@ export function createLiquid(interiorGeo: BufferGeometry): LiquidVisual {
     mesh,
     material,
     slosh,
-    update(time, dt, fill, center, worldHeight, accel) {
+    update(time, dt, fill, center, worldHeight, axis, length, accel) {
       slosh.update(dt, accel);
-      // Surface plane: a world-up normal tipped by the slosh pendulum…
-      _up.set(slosh.tiltX, 1, slosh.tiltZ).normalize();
+      // THE LYING-STICK GUARD. The slosh tilt is a SLOPE (rise/run), and a
+      // slope that surges charmingly across a vertical stick's 2 cm bore
+      // swings the cut line ±9 cm across a horizontal stick's 30 cm length
+      // — the whole bore ends up above the plane along half the tube, every
+      // fragment discards, and you see clean through the "liquid". Clamp
+      // the tilt's component ALONG the tube's horizontal direction so the
+      // surface can never leave the glass; tilt ACROSS the bore is left
+      // alone (it can only swing bore-wide, which is the charm). Render
+      // clamp only — the sim keeps its own state, so a stick swung back
+      // upright surges again instantly.
+      let tx = slosh.tiltX;
+      let tz = slosh.tiltZ;
+      const flat = Math.hypot(axis.x, axis.z);
+      if (flat > 1e-4) {
+        const hx = axis.x / flat;
+        const hz = axis.z / flat;
+        const footprint = Math.max(worldHeight, length * flat);
+        const maxAlong = (0.9 * worldHeight) / footprint;
+        const along = tx * hx + tz * hz;
+        const clamped = Math.max(-maxAlong, Math.min(maxAlong, along));
+        tx += (clamped - along) * hx;
+        tz += (clamped - along) * hz;
+      }
+      // Surface plane: a world-up normal tipped by the (guarded) pendulum…
+      _up.set(tx, 1, tz).normalize();
       // …passing through the tube centre offset by the fill level. Measuring
       // the offset along world up (not the tube's axis) keeps the volume
       // believable however the stick is tilted — hang it upside down and
@@ -303,6 +342,13 @@ export function createLiquid(interiorGeo: BufferGeometry): LiquidVisual {
       material.uniforms.uPlaneNormal.value.copy(_up);
       material.uniforms.uTime.value = time;
       material.uniforms.uSlosh.value = slosh.energy;
+      // Ripple height and meniscus reach scale with the liquid's VERTICAL
+      // span: absolute millimetres tuned for a standing stick are half the
+      // bore of a lying one — the ripple alone was flickering the whole top
+      // of a sideways stick in and out of existence, and the meniscus band
+      // was eating most of its visible body.
+      material.uniforms.uRippleAmp.value = Math.min(0.006, worldHeight * 0.12);
+      material.uniforms.uFoamReach.value = Math.min(0.011, worldHeight * 0.3);
       // Fully drained: hide the mesh so no backface slivers linger.
       mesh.visible = fill > 0.005;
     },

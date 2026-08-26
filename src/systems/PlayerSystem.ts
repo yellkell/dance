@@ -62,6 +62,10 @@ const _hand = new Vector3();
 const _lHand = new Vector3();
 const _rHand = new Vector3();
 const _sw = new Vector3();
+// The burst frame: the cone's axis and the scatter disc around it.
+const _bAxis = new Vector3();
+const _bT1 = new Vector3();
+const _bT2 = new Vector3();
 const _tube = new Vector3();
 const _axis = new Vector3();
 const _ws = new Vector3();
@@ -240,6 +244,27 @@ class SparkPool {
     } else {
       _sw.set(0, 0, 0);
     }
+    // THE BURST LEAVES ALONG THE FLING. The old cone was a fixed upward
+    // fountain with the swing merely added on top, so a hard sideways
+    // throw still read as the same fountain with a lean. Now the swing
+    // owns the cone's AXIS: an idle burst still fountains (axis = up),
+    // but the harder the tip was moving the further the whole cone tips
+    // into its direction of travel — the way a struck sparkler throws its
+    // light where the strike sent it. The scatter disc opens around that
+    // axis, and the swing share still rides on top as carried momentum.
+    const swingLen = _sw.length();
+    _bAxis.set(0, 1, 0);
+    if (swingLen > 1e-3) {
+      const w = Math.min(1, swingLen / 1.1); // fully committed by ~1.1 m/s of carried swing
+      _bAxis.multiplyScalar(1 - w).addScaledVector(_sw, w / swingLen);
+      // A dead-vertical downward fling cancels to ~zero — fall back to up.
+      if (_bAxis.lengthSq() < 1e-6) _bAxis.set(0, 1, 0);
+      _bAxis.normalize();
+    }
+    _bT1.set(Math.abs(_bAxis.x) > 0.9 ? 0 : 1, 0, Math.abs(_bAxis.x) > 0.9 ? 1 : 0);
+    _bT1.cross(_bAxis).normalize();
+    _bT2.crossVectors(_bAxis, _bT1);
+
     const M3 = MAX_SPARKS * 3;
     const count = Math.round(6 + heat * 22);
     for (let n = 0; n < count; n++) {
@@ -249,13 +274,17 @@ class SparkPool {
       this.pos[i3] = at.x;
       this.pos[i3 + 1] = at.y;
       this.pos[i3 + 2] = at.z;
-      // An upward cone with a lateral scatter that widens with heat, plus
-      // the swing's share — the burst leans the way the stick was moving.
+      // Muzzle speed along the axis (the old fountain's vertical budget),
+      // scatter across the disc, and the swing's share carried whole.
       const a = Math.random() * Math.PI * 2;
       const r = (0.25 + Math.random() * 0.45) * (0.7 + heat * 0.8);
-      this.vel[i3] = Math.cos(a) * r + _sw.x;
-      this.vel[i3 + 1] = (0.7 + Math.random() * 0.9) * (0.8 + heat * 0.9) + _sw.y;
-      this.vel[i3 + 2] = Math.sin(a) * r + _sw.z;
+      const along = (0.7 + Math.random() * 0.9) * (0.8 + heat * 0.9);
+      const sx = _bT1.x * Math.cos(a) + _bT2.x * Math.sin(a);
+      const sy = _bT1.y * Math.cos(a) + _bT2.y * Math.sin(a);
+      const sz = _bT1.z * Math.cos(a) + _bT2.z * Math.sin(a);
+      this.vel[i3] = _bAxis.x * along + sx * r + _sw.x;
+      this.vel[i3 + 1] = _bAxis.y * along + sy * r + _sw.y;
+      this.vel[i3 + 2] = _bAxis.z * along + sz * r + _sw.z;
       // THE POPULATION: mostly grains, some dust, and about one glint in
       // seven a HERO — the big catch the eye reads the burst by. Heroes
       // live a shade longer, burn steadier and run a touch whiter (the
@@ -616,10 +645,13 @@ export class PlayerSystem extends createSystem({}) {
         s.liquid.mesh.getWorldQuaternion(_q);
         _axis.set(0, 1, 0).applyQuaternion(_q);
         s.liquid.mesh.getWorldScale(_ws);
+        const stickScale = Math.max(_ws.x, _ws.y, _ws.z);
         const worldHeight =
-          (LIQUID_R * 2 + (STICK_LEN - STICK_R * 2) * Math.abs(_axis.y)) *
-          Math.max(_ws.x, _ws.y, _ws.z);
-        s.liquid.update(this.clock, delta, STICK_FILL, _tube, worldHeight, s.motion.accel);
+          (LIQUID_R * 2 + (STICK_LEN - STICK_R * 2) * Math.abs(_axis.y)) * stickScale;
+        // The full interior length rides along too — the liquid's tilt
+        // clamp needs the tube's horizontal footprint (see liquid.ts).
+        const interiorLen = (LIQUID_R * 2 + (STICK_LEN - STICK_R * 2)) * stickScale;
+        s.liquid.update(this.clock, delta, STICK_FILL, _tube, worldHeight, _axis, interiorLen, s.motion.accel);
         s.liquid.setColor(this.stickColor, flash, grooveGlow);
       }
 
