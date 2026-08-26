@@ -16,12 +16,16 @@
  *  - a travelling ripple wobbles the plane, scaled by slosh energy;
  *  - a foam/meniscus band brightens the cut line where glow meets air.
  *
- * Two deliberate departures from the SPLASH WARS original:
+ * Three deliberate departures from the SPLASH WARS original:
  *  - the fill level never drains — a glowstick is not a magazine; the fun
  *    is the pour, not the gauge — so `fill` is just a knob the stick sets;
  *  - the colours are LIVE (setColor), because the sticks wear your seat
  *    colour, run hotter as the groove deepens, and flash white on a
- *    rewarded swap — none of which is known at build time.
+ *    rewarded swap — none of which is known at build time;
+ *  - the liquid is GEL, not water: overdamped slosh that heaps and oozes
+ *    instead of ringing, slow heavy ripples, a fat meniscus climbing the
+ *    tube, and depths dark enough to read as optical density. It is that
+ *    kind of night — the headliner is made of the same stuff.
  *
  * ONLY YOUR OWN STICKS get this. The 23 other dancers' figures keep their
  * bare neon blades: nobody can read a meniscus across the ring, and 46
@@ -39,19 +43,21 @@ import {
 } from 'three';
 
 /**
- * Slosh tuning, sized for a 30 cm × 1.3 cm stick rather than a pistol tank:
- * same pendulum as SPLASH WARS, but the ripple runs finer (the surface disc
- * is barely a fingertip wide — the pistol's wavelengths read as a flat lid
- * at this scale) and gentler (the pistol's amplitude is half this tube's
- * radius).
+ * Slosh tuning, sized for a 30 cm × 1.3 cm stick rather than a pistol tank
+ * — and tuned THICK. SPLASH WARS' juice is water: a lively spring that
+ * rings level in a beat. This glow is GEL (it's that kind of night): the
+ * surface heaps up hard when you throw the stick, then OOZES back level —
+ * overdamped, no ring-back — and what ripples across it travels slow and
+ * heavy. Watery numbers here read as a thin drink; the drag is the
+ * viscosity.
  */
 const SLOSH = {
-  accelGain: 0.045, // hand acceleration (m/s²) → surface tilt drive
-  spring: 34, // pull of the surface back toward level
-  damping: 4.2, // how fast the slosh settles
-  maxTilt: 0.55, // tilt clamp (rise/run) so the surface never flips
-  rippleGain: 0.8, // slosh energy → shader ripple amplitude
-  energyDecay: 1.6, // per-second decay of ripple energy
+  accelGain: 0.06, // hand acceleration (m/s²) → surface tilt drive (gel lags hard)
+  spring: 15, // pull of the surface back toward level — lazy on purpose
+  damping: 9, // heavy: kills the ring-back, leaves the creep
+  maxTilt: 0.6, // tilt clamp (rise/run) so the surface never flips
+  rippleGain: 1.0, // slosh energy → shader ripple amplitude
+  energyDecay: 1.25, // per-second decay of ripple energy — the wobble lingers
 };
 
 // ---------------------------------------------------------------------------
@@ -81,12 +87,17 @@ export class SloshSim {
     // it. (Energy below keeps the true dt: pure decay is stable, and a
     // long frame SHOULD calm the ripple more.)
     const step = Math.min(dt, 0.05);
-    // Surface tips away from the direction of acceleration (liquid lags the
-    // tube), pulled level by the spring, calmed by damping.
+    // Surface tips away from the direction of acceleration (gel lags the
+    // tube), pulled level by the spring, dragged by damping. The damping is
+    // applied IMPLICITLY (divide, not subtract): at gel-grade drag the
+    // explicit form overshoots past zero on a capped step and the "thick"
+    // tuning would ring harder than the watery one it replaced. The
+    // implicit form is a pure decay at any damping and any step.
+    const h = step * 60;
     const driveX = -accel.x * s.accelGain;
     const driveZ = -accel.z * s.accelGain;
-    this.velX += (driveX - s.spring * 0.01 * this.tiltX - s.damping * 0.1 * this.velX) * step * 60;
-    this.velZ += (driveZ - s.spring * 0.01 * this.tiltZ - s.damping * 0.1 * this.velZ) * step * 60;
+    this.velX = (this.velX + (driveX - s.spring * 0.01 * this.tiltX) * h) / (1 + s.damping * 0.1 * h);
+    this.velZ = (this.velZ + (driveZ - s.spring * 0.01 * this.tiltZ) * h) / (1 + s.damping * 0.1 * h);
     this.tiltX += this.velX * step;
     this.tiltZ += this.velZ * step;
     const clamp = s.maxTilt;
@@ -167,11 +178,13 @@ const LIQUID_FRAG = /* glsl */ `
 
   void main(){
     // Signed distance above the (tilted) surface plane, wobbled by two
-    // crossing travelling ripples so churned glow visibly rolls. Spatial
-    // frequencies run double SPLASH WARS' — this surface is 2 cm across.
+    // crossing travelling ripples so churned glow visibly rolls. SPLASH
+    // WARS' water chops fast and fine; this is GEL, so the waves run half
+    // the frequency and a third the speed — a slow, heavy roll, the way a
+    // thick pour wobbles instead of splashing.
     float ripple =
-      sin(dot(vWorldPos.xz, vec2(76.0, 52.0)) - uTime * 13.0) * 0.5 +
-      sin(dot(vWorldPos.xz, vec2(-44.0, 62.0)) + uTime * 9.0) * 0.5;
+      sin(dot(vWorldPos.xz, vec2(46.0, 32.0)) - uTime * 4.2) * 0.5 +
+      sin(dot(vWorldPos.xz, vec2(-28.0, 40.0)) + uTime * 3.0) * 0.5;
     float d = dot(vWorldPos - uPlanePoint, normalize(uPlaneNormal))
             + ripple * 0.006 * uSlosh * ${SLOSH.rippleGain.toFixed(2)};
     if (d > 0.0) discard;
@@ -184,24 +197,29 @@ const LIQUID_FRAG = /* glsl */ `
       return;
     }
 
-    // The body of the glow: simple fixed-key shading so it reads THICK —
-    // deep colour below, lit colour up top.
+    // The body of the glow: simple fixed-key shading, weighted hard toward
+    // the depths — optical density is most of what "thick" looks like, and
+    // a column that stays bright to the bottom reads as water with dye in
+    // it rather than gel.
     float up = clamp(vWorldNormal.y * 0.5 + 0.5, 0.0, 1.0);
-    vec3 col = mix(uDeepColor, uColor, up * 0.75 + 0.25);
+    vec3 col = mix(uDeepColor, uColor, up * 0.85 + 0.15);
     // Meniscus: a foam band hugging the underside of the surface plane —
-    // tighter than the pistol tank's, to match the tube's tiny bore.
-    col = mix(col, uFoamColor, smoothstep(-0.006, -0.0012, d) * 0.85);
+    // FAT, nearly twice the water version's reach, because a thick pour
+    // climbs its glass: the wide bright collar where gel wets the tube is
+    // the second half of what "viscous" looks like.
+    col = mix(col, uFoamColor, smoothstep(-0.011, -0.0015, d) * 0.9);
     // Wet gloss: a real Blinn-Phong glint off a fixed key light, tracking
     // the camera, so the glow gleams as the stick turns in your hand.
     vec3 n = normalize(vWorldNormal);
     vec3 lightDir = normalize(vec3(0.35, 0.85, 0.4));
     vec3 viewDir = normalize(cameraPosition - vWorldPos);
     vec3 h = normalize(lightDir + viewDir);
-    // Two lobes: a broad wet sheen plus a tight hot pin inside it. Glass
-    // gloss is that contrast — a soft glow alone just looks washed out.
+    // Two lobes: a broad wet sheen plus a hot pin inside it. Glass gloss
+    // is that contrast — but the pin runs wider than water's (120 vs 190):
+    // a highlight on gel smears where one on water snaps to a point.
     float ndh = max(dot(n, h), 0.0);
-    col += pow(ndh, 34.0) * 0.35;
-    col += pow(ndh, 190.0) * 1.15;
+    col += pow(ndh, 26.0) * 0.4;
+    col += pow(ndh, 120.0) * 1.0;
     // A second, cooler glint from the opposite side keeps the far edge of
     // the liquid alive as the stick rolls.
     float ndh2 = max(dot(n, normalize(normalize(vec3(-0.5, 0.55, -0.35)) + viewDir)), 0.0);
@@ -294,11 +312,12 @@ export function createLiquid(interiorGeo: BufferGeometry): LiquidVisual {
       // deepens; the flash snaps everything toward white, the way a tube
       // does when it's struck.
       (u.uColor.value as Color).copy(base).lerp(_white, 0.1 + glow * 0.18 + flash * 0.55);
-      // The depths stay the same hue, darkened — that contrast is what
-      // makes the column read as a thick pour instead of flat neon.
+      // The depths stay the same hue, darkened HARD — that contrast is
+      // what makes the column read as a dense gel pour instead of flat
+      // neon, and most of the body wears the deep end of the ramp now.
       (u.uDeepColor.value as Color)
         .copy(base)
-        .multiplyScalar(0.42 + glow * 0.1)
+        .multiplyScalar(0.3 + glow * 0.12)
         .lerp(_white, flash * 0.35);
       // The meniscus and surface sheen sit near-white: this is the "hot
       // filament" job the old solid core used to do — brightness says it's
