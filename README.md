@@ -32,12 +32,16 @@ everyone else.
   clipped** — a hit knocks the rhythm out of your hands — and it lets go,
   row and all.
 - Your glowsticks are **tubes of liquid glow** — SPLASH WARS' Half-Life:
-  Alyx-style clipped-liquid trick, vendored in: the surface stays level in
-  world space however you hold the stick, surges when you swing it, pours
-  end to end as your hands swap through the groove, and every rewarded
-  swap churns a shimmer across it. **Only your own sticks are wet** — the
-  other figures' blades stay bare neon, because nobody can read a meniscus
-  across the ring and 46 more slosh sims would buy nothing but frame time.
+  Alyx-style clipped-liquid trick, vendored in and thickened to **gel**:
+  the surface stays level in world space however you hold the stick, heaps
+  up when you throw it and **oozes back level** instead of ringing, rolls
+  slow heavy ripples, wears a fat meniscus where it climbs the tube, and
+  every rewarded swap churns a shimmer across it. The stick itself is a
+  clean, symmetric cased capsule — no cap, no glow sprites washing over
+  the black outline; the light is the gel. **Only your own sticks are
+  wet** — the other figures' blades stay bare neon, because nobody can
+  read a meniscus across the ring and 46 more slosh sims would buy
+  nothing but frame time.
 - Get clipped → the chain dies. **There are no lives** — you dance the
   whole record and the night **grades** you at the end: **S / A / B / C /
   F**, off the share of landings you survived, with S reserved for a clean

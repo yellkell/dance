@@ -42,7 +42,6 @@ import {
   BufferGeometry,
   CapsuleGeometry,
   Color,
-  CylinderGeometry,
   DynamicDrawUsage,
   Group,
   Mesh,
@@ -50,11 +49,9 @@ import {
   Object3D,
   Points,
   Quaternion,
-  Sprite,
-  SpriteMaterial,
 } from 'three';
 import { CHOREO, GROOVE, hueToColor } from '../config.js';
-import { glintTexture, glowSprite, sizedPointsMaterial } from '../materials/glow.js';
+import { glintTexture, sizedPointsMaterial } from '../materials/glow.js';
 import { createLiquid, HandMotion, type LiquidVisual } from '../materials/liquid.js';
 import { danceHue } from '../game/profile.js';
 import { match, me, showBeat } from '../game/state.js';
@@ -115,11 +112,10 @@ export const grooveView: {
 interface Stick {
   group: Group;
   mat: MeshBasicMaterial;
-  halo: Sprite;
-  /** The business end — the sparks' emitter, and the hot glow that marks
-   *  it as the end that pays. */
+  /** The business end — the sparks' emitter. An invisible marker: the end
+   *  that pays announces itself by PAYING (the burst), not by wearing a
+   *  glow all night. */
   tip: Object3D;
-  tipGlow: Sprite;
   /** Tip velocity (world, m/s) — the swing a burst inherits. */
   vel: Vector3;
   lastTip: Vector3;
@@ -157,14 +153,6 @@ let _casingMat: MeshBasicMaterial | null = null;
 function casingMat(): MeshBasicMaterial {
   if (!_casingMat) _casingMat = new MeshBasicMaterial({ color: 0x02010a, side: BackSide });
   return _casingMat;
-}
-
-/** The grip cap's own near-black — front faces (it's a real end piece, not
- *  an outline), a shade off the casing so the two read as separate parts. */
-let _capMat: MeshBasicMaterial | null = null;
-function capMat(): MeshBasicMaterial {
-  if (!_capMat) _capMat = new MeshBasicMaterial({ color: 0x0b0a16 });
-  return _capMat;
 }
 
 /**
@@ -446,7 +434,7 @@ export class PlayerSystem extends createSystem({}) {
     });
     const stick = new Mesh(new CapsuleGeometry(STICK_R, shaft, 3, 10), mat);
     stick.position.y = 0.02;
-    stick.renderOrder = 2; // over the liquid, under the halo
+    stick.renderOrder = 2; // blends over the opaque liquid inside
     group.add(stick);
     // THE LIQUID — the glow itself, sloshing inside the tube. It takes the
     // old white filament's job: that hot core said "this is a light" by
@@ -457,39 +445,35 @@ export class PlayerSystem extends createSystem({}) {
     const liquid = createLiquid(new CapsuleGeometry(LIQUID_R, shaft, 3, 10));
     liquid.mesh.position.y = 0.02;
     group.add(liquid.mesh);
-    // THE GRIP CAP: the snap-seal collar a real stick wears at the held
-    // end. Matte-dark and slightly proud of the casing, it grounds the
-    // tube in the fist and settles which end is the light — the tube
-    // grows out of a piece of PLASTIC, the way the real thing does.
-    const cap = new Mesh(
-      new CylinderGeometry(STICK_R + STICK_CASE + 0.0018, STICK_R + STICK_CASE + 0.0018, 0.02, 10),
-      capMat(),
-    );
-    cap.position.y = 0.02 - STICK_LEN / 2 + 0.006;
-    group.add(cap);
 
-    group.name = 'live-glowstick';
-    const halo = glowSprite(0xffffff, 0.34, 0.55);
-    halo.position.y = 0.08;
-    halo.renderOrder = 3; // additive, on top of the tube's blend
-    group.add(halo);
-    // THE TIP — the end the sparks leave from, so it gets its own small
-    // hot glow (brighter with the groove, popping with the pulse): the
-    // stick visibly PAYS from somewhere, and that somewhere is a place.
+    // AND NOTHING ELSE ON THE BODY. No halo sprite, no tip glow, no grip
+    // cap — three things this stick used to wear, all retired on the same
+    // grounds:
+    //
+    //  THE OUTLINE IS THE READ. The casing is an inverted hull, so the
+    //    black ring you see is its FAR wall — behind any camera-facing
+    //    sprite parked on the axis. An additive glow drawn in the
+    //    transparent pass therefore always brightens over the outline
+    //    (no renderOrder can put the far wall back on top), and a cased
+    //    object whose case keeps washing out reads as a smudge, not a
+    //    stick. The bloom now comes from what's inside the case: the
+    //    liquid's foam line, its gloss, and the sparks.
+    //
+    //  A GLOWSTICK HAS NO HANDEDNESS. Both ends are the same rounded
+    //    dome — no cap to say "hold me here", no hot end wearing a badge.
+    //    The paying end still announces itself, but by PAYING: the spark
+    //    burst leaves from the tip marker below on the frame a swap lands,
+    //    which is a better badge than a lamp that's on all night.
     const tip = new Object3D();
     tip.position.y = 0.02 + STICK_LEN / 2 - 0.006;
     group.add(tip);
-    const tipGlow = glowSprite(0xffffff, 0.07, 0.2);
-    tipGlow.position.copy(tip.position);
-    group.add(tipGlow);
+    group.name = 'live-glowstick';
     group.rotation.x = STICK_TILT;
     group.position.set(0, 0.01, -0.02);
     return {
       group,
       mat,
-      halo,
       tip,
-      tipGlow,
       vel: new Vector3(),
       lastTip: new Vector3(),
       tracked: false,
@@ -598,7 +582,6 @@ export class PlayerSystem extends createSystem({}) {
       // paint over the very thing it's there to show.
       const grooveGlow = Math.min(this.streak, 50) / 50;
       s.mat.opacity = 0.32 + grooveGlow * 0.22;
-      (s.halo.material as SpriteMaterial).opacity = 0.4 + grooveGlow * 0.3 + s.pulse * 0.5;
       const scale = 1 + s.pulse * 0.5;
       s.group.scale.set(scale, 1 + s.pulse * 0.25, scale);
 
@@ -617,13 +600,6 @@ export class PlayerSystem extends createSystem({}) {
       // to tell you where your hands are.
       const flash = s.pulse * s.pulse;
       s.mat.color.copy(this.stickColor).lerp(_white, flash * 0.55);
-      (s.halo.material as SpriteMaterial).color.copy(this.stickColor).lerp(_white, flash * 0.4);
-      // The tip burns a step hotter than the tube at all times — it's the
-      // paying end — and takes the flash hardest.
-      const tgm = s.tipGlow.material as SpriteMaterial;
-      tgm.opacity = 0.2 + grooveGlow * 0.3 + s.pulse * 0.6;
-      tgm.color.copy(this.stickColor).lerp(_white, 0.35 + flash * 0.5);
-      s.tipGlow.scale.setScalar(0.07 + grooveGlow * 0.025 + s.pulse * 0.055);
       s.group.rotation.x = STICK_TILT + Math.sin(this.clock * 47) * 0.075 * flash;
       s.group.rotation.z = Math.sin(this.clock * 61 + 1.7) * 0.095 * flash;
 
