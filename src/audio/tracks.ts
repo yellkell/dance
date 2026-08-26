@@ -56,6 +56,8 @@ import fusionUrl from '../assets/music/fusion.mp3';
 import futurevibeUrl from '../assets/music/futurevibe.mp3';
 import braineaterUrl from '../assets/music/braineater.mp3';
 import creditsUrl from '../assets/music/credits.mp3';
+import defenseUrl from '../assets/music/defense.m4a';
+import awakeningUrl from '../assets/music/awakening.m4a';
 import type { MoveKind } from '../config.js';
 
 /** Where a record is allowed to play. 'credits' is a role of one: the
@@ -392,6 +394,56 @@ export const TRACKS: Track[] = [
     // called it 66.006 — not half-time but a 2/5 lattice of the real grid
     // (66.006 × 5/2 = 165.015, which out-scores 66, 110 AND 132 on the
     // kick evidence). One of the quickest records on the SOLO shelf now.
+    roles: ['raid'],
+  },
+  {
+    id: 'defense',
+    title: 'DEFENSE',
+    url: defenseUrl,
+    bpm: 125.996,
+    downbeat: 1.4693,
+    seconds: 287.62,
+    lufs: -8.6,
+    // The tightest grid in the box — confidence 7.62, a shade past FUSION's
+    // 7.4 — and the fraction is real: 126 flat scored more than half a
+    // percent worse on the same onsets, so the four thousandths stay.
+    //
+    // Twenty-two seconds of stripped intro before the record drops. The
+    // beat is there the whole way (sparse and clean, which is why the grid
+    // reads so well), but it sits 9 dB under the body, so a set that opened
+    // on it would chart a chorus of ghosts. The drop is a +9.1 dB step at
+    // 22.430 s and bar 12 lands 8 ms from it — the closest a needle drop
+    // has ever come to a bar line here, so the whole intro goes.
+    startAt: 22.4223,
+    roles: ['raid'],
+  },
+  {
+    id: 'awakening',
+    title: 'AWAKENING',
+    url: awakeningUrl,
+    bpm: 165.0,
+    downbeat: 0.9537,
+    seconds: 245.82,
+    lufs: -17.4,
+    // 165 on the nose, a hair off BREAKCORE V4's 165.015 — the two fastest
+    // records in the box are now the same tempo by accident.
+    //
+    // The loosest reading here at confidence 2.70, and it earns that: the
+    // record spends half a minute arriving. `octave-check` still calls 165
+    // the beat rather than a half of 330 (its off-beats run 0.72 of the
+    // on-beats, under the 0.8 that would mean a doubling), and once the
+    // groove is up the grid reads 4× the track mean — as locked as anything
+    // on the fast shelf. It is the WAY IN that is soft, not the record.
+    //
+    // So the needle skips it. The pulse is 1.1–1.3× mean for fourteen bars,
+    // climbs from bar 14 and is fully up by bar 20 — which is also where the
+    // level first comes within 3 dB of the body. That's the drop, 30 s in.
+    startAt: 30.0446,
+    // The quietest master in the box by 1.7 dB, which pushes the spread
+    // across the shelf to 9.9 dB. Gain-matching lifts it +3.4 dB and its
+    // true peak (−1.4 dBFS) goes just over on a maxed music slider — which
+    // is what the limiter on the music bus is for, and SWAG and GIVE IT TO
+    // ME already ask it the same favour.
     roles: ['raid'],
   },
   {

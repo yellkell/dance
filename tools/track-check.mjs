@@ -54,7 +54,7 @@ const out = await page.evaluate(async () => {
 });
 
 const problems = [];
-const NEW = ['giveit', 'vone', 'fusion', 'futurevibe', 'braineater', 'credits'];
+const NEW = ['giveit', 'vone', 'fusion', 'futurevibe', 'braineater', 'credits', 'defense', 'awakening'];
 
 console.log(`record box${out.aac ? '' : '  (this browser has no AAC decoder — .m4a rows are fetch-checked only)'}:`);
 for (const r of out.rows) {

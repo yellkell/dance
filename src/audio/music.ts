@@ -130,8 +130,10 @@ function chain(c: AudioContext): GainNode {
   bus = c.createGain();
   bus.gain.value = musicVol;
   limiter = c.createDynamicsCompressor();
-  // A brick-ish safety limiter: the masters here span 7.6 dB and a couple
+  // A brick-ish safety limiter: the masters here span 9.9 dB and a couple
   // of them already clip their own true peak, so the mix gets a net.
+  // AWAKENING is the reason the spread is that wide — at −17.4 LUFS the
+  // gain match lifts it +3.4 dB, which puts its peak over on a full slider.
   limiter.threshold.value = -6;
   limiter.knee.value = 0;
   limiter.ratio.value = 20;
