@@ -75,7 +75,7 @@ export interface Arena {
   stageRingMat: MeshBasicMaterial;
   /** The chasing LED tick ring (DiscoSystem spins + pulses it). */
   stageChase: Group;
-  /** The counter-rotating inner arc. */
+  /** The counter-rotating inner dash ring. */
   stageChase2: Group;
   stageTickMat: MeshBasicMaterial;
   stageInnerMat: MeshBasicMaterial;
@@ -233,7 +233,7 @@ interface StageBuild {
  * The centre stage — the MC's (and later the GOOPLIATH's) platform. It used
  * to be one flat magenta circle on a puck; now it's a layered light-floor:
  * the identity ring stays, but under it live a chasing LED tick ring, a
- * counter-rotating arc, an apron of light pooling on the void floor and a
+ * counter-rotating dash ring, an apron of light pooling on the void floor and a
  * lip of footlight glints. The CENTRE stays clean — somebody performs there.
  * DiscoSystem drives all the moving parts through the handles returned here.
  */
@@ -295,8 +295,10 @@ function buildStage(): StageBuild {
   }
   stage.add(chase);
 
-  // Counter-rotating arc: a 270° sweep with a visible gap, so the floor
-  // reads as MACHINERY turning, not a static decal.
+  // Counter-rotating DASH ring: eight equal segments, eight equal gaps —
+  // the turn stays visible (the gaps carry it) but the shape is symmetric
+  // from every seat. The first cut was one 270° arc, and a single wandering
+  // hole read as a mistake rather than machinery.
   const chase2 = new Group();
   chase2.position.y = topY + 0.009;
   const innerMat = new MeshBasicMaterial({
@@ -307,9 +309,17 @@ function buildStage(): StageBuild {
     depthWrite: false,
     side: DoubleSide,
   });
-  const arc = new Mesh(new RingGeometry(r * 0.62, r * 0.665, 48, 1, 0, Math.PI * 1.5), innerMat);
-  arc.rotation.x = -Math.PI / 2;
-  chase2.add(arc);
+  const DASHES = 8;
+  const slice = (Math.PI * 2) / DASHES;
+  // One shared arc, laid flat in the geometry so each copy spins in-plane
+  // with a plain rotation.y.
+  const dashGeo = new RingGeometry(r * 0.62, r * 0.665, 10, 1, 0, slice * 0.68);
+  dashGeo.rotateX(-Math.PI / 2);
+  for (let i = 0; i < DASHES; i++) {
+    const dash = new Mesh(dashGeo, innerMat);
+    dash.rotation.y = i * slice;
+    chase2.add(dash);
+  }
   stage.add(chase2);
 
   // The apron: a soft pool of light spilling off the stage onto the void

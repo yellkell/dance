@@ -107,7 +107,7 @@ export class DiscoSystem extends createSystem({}) {
       // The identity ring breathes with the bar, as always.
       a.stageRingMat.opacity = energy > 0.5 ? 0.75 + 0.25 * pulse : 0.5;
 
-      // The tick ring chases one way, the arc sweeps the other — the floor
+      // The tick ring chases one way, the dash ring sweeps the other — the floor
       // visibly TURNS, and the whole mechanism leans harder with the act.
       const drive = 0.5 + act * 0.25;
       a.stageChase.rotation.y = -beat * (Math.PI / 8) * drive;
