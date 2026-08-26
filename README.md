@@ -15,14 +15,20 @@ everyone else.
 - Nail a **last-instant dodge** (still in the fire one beat out, clear on the
   drop) → **PERFECT!**, ×1.5.
 - **COMBO**: dance like the groupies — one hand up, one hand down, swapping
-  on the beat. Every rhythmic swap throws **neon sparkles off the
-  glowstick** that went up — four-point lens glints that twinkle, run
-  hotter and denser the deeper the groove, mirror themselves in the
-  floor's polish, and die in the air (nothing ever lies on the floor as
+  on the beat. The judge reads the swap **between your hands**, not
+  against the world's vertical, so a groove carried sideways through a
+  dodge keeps paying: the throw has to stay full-size and one hand still
+  has to ride higher, that's all. Every rhythmic swap throws **neon
+  sparkles off the tip of the glowstick** that went up — four-point lens
+  glints in a real population (dust, grains, the odd big hero catch),
+  each twinkling at its own rate, inheriting the swing that earned them,
+  running hotter and denser the deeper the groove, mirrored in the
+  floor's polish, and dying in the air (nothing ever lies on the floor as
   litter). The HUD's **groove row** keeps the ledger:
   four pips light one per swap as it catches, and once it's running the
-  pips keep dancing — each one hops with a lens-glint sparkle on its turn
-  of the four-beat cycle — with the points that streak has paid beside. Stop, swap off-rhythm, or **get
+  pips keep dancing — every **paid swap** kicks the turn pip into a hop
+  with a lens-glint riding it, so the row moves exactly when you do —
+  with the points that streak has paid beside. Stop, swap off-rhythm, or **get
   clipped** — a hit knocks the rhythm out of your hands — and it lets go,
   row and all.
 - Get clipped → the chain dies. **There are no lives** — you dance the
@@ -139,7 +145,7 @@ There's also a debug hook in the console:
 | **NOVA** | everything burns except one wedge — same compass bearing for the whole ring | **stand** in the safe ground, together |
 | **CROSSFIRE** | a laser is loaded on one side rail and a strip fills **across** the deck (late on, a stage lane crosses it) — and from mid-set it can come as **THE TRAP**: both side rails at once, one ahead of you and one behind, landing on the same beat | **step forward or back** off the strip — diagonally, once it's a lattice; against the trap, **squeeze into the band between the rails** |
 | **DONUT** | usually a laser straight down the middle, and a bar later the rim closes fast with chevrons marching **inward** on a tight safe disc | **step off** the middle, then **run back into it** |
-| **DUCK DONUT** | the finale combination, and the rarest thing the show throws — about one an expert night, and one in eight HARD nights: the rim closes **and** the blade hangs at chest height, both on one beat | **get to the middle AND duck** — small and close |
+| **DUCK DONUT** | the finale combination, and the rarest thing the show throws — about one an expert night, and one in eight HARD nights: the rim closes **and** the blade hangs at chest height, both on one beat | **get to the middle AND duck** — small and close, on the expert-tight disc every time |
 | **THE WAVE** | beams marching **1-2-3** across the deck (their staggered fills ARE the count) — sideways, or front-to-back — with the far quarter left dark: the **EXIT**. Every wave **TURNS**: the march wheels at the exit — its first return strike is that very square, a double step plus a whole extra beat late — and sweeps back, new exit on the far side. On **EXPERT** it sometimes wheels a second time and runs the deck again — **THE LONG WAVE**, across and back and across | **travel with the march into the exit**; breathe at the turn, then **ride one square behind the return** all the way home — and on a long wave, turn and do it again |
 | **ROUTINE** | the deck splits into quarters and the boss **teaches** a corner sequence — each marked with its step number, each pointed out in turn — then the marks go out and, on every step, three spinning neon blocks **fall from above** onto the quarters you weren't taught. On some EXPERT charts it comes **SWEPT**: the blade hangs over every blast | **remember it**, and stand in the taught corner on each tick — on a swept routine, **duck there too** |
 

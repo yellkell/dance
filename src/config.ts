@@ -420,7 +420,10 @@ export const CHOREO = {
    *  the smallest one the game serves. */
   donutInnerR: 0.42,
   donutInnerRLate: 0.34,
-  /** EXPERT's one and only donut, and the tightest disc in the game. */
+  /** EXPERT's one and only donut, and the tightest disc in the game — and
+   *  the DUCK DONUT's disc wherever THAT deals, on every difficulty: the
+   *  finale combination never opens a roomier middle than the plain donut
+   *  it out-ranks. */
   donutInnerRExpert: 0.3,
   donutRadius: 1.15,
   donutFollowBeats: 4,
@@ -661,8 +664,21 @@ export function chartBpm(trackBpm: number, difficulty: number): number {
  * never be confused in here.
  */
 export const GROOVE = {
-  /** Vertical hand separation (m) that counts as "one up, one down". */
+  /** Hand separation (m) that counts as "one up, one down" — the size of
+   *  the throw, measured between the hands THEMSELVES, not on the world's
+   *  vertical. See splitLean for why. */
   split: 0.35,
+  /** THE LEAN. Mid-dodge the whole dance tilts — a lunge off a beam, a
+   *  crouch under the blade — and a swap thrown just as big stops going
+   *  straight up: at 60° of tilt a 0.55 m throw keeps barely 0.27 m of
+   *  world-vertical, and the old vertical-only judge read a dancer
+   *  grooving THROUGH a dodge as standing still. So the judge asks two
+   *  things instead: the hands a full `split` apart in space (the throw
+   *  is the same size, just aimed sideways), and at least this much of it
+   *  vertical — enough to still name an UP hand, so a level carry (both
+   *  sticks out in front, a T-pose) never reads as dancing. Upright play
+   *  is untouched: |Δy| ≥ split implies both tests pass. */
+  splitLean: 0.16,
   /** Points for a rhythmic swap. */
   base: 6,
   /** Extra points per streak step — the consistency creep. */

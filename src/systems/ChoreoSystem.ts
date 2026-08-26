@@ -319,7 +319,9 @@ export class ChoreoSystem extends createSystem({}) {
         act: 3,
         landings: [
           { beat: land, zone: { kind: 'sweep' } },
-          { beat: land, zone: { kind: 'donut', innerR: CHOREO.donutInnerR } },
+          // The combination's disc is expert's tight one wherever it deals
+          // (setlist.ts serves the same), so the drop rehearses the real move.
+          { beat: land, zone: { kind: 'donut', innerR: CHOREO.donutInnerRExpert } },
         ],
       });
     };

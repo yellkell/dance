@@ -90,7 +90,10 @@ learnable:
 
 - **The donut's safe disc** is a flat **0.30 m** from the first bar to
   the last — the tightest in the game. Everywhere else it still tightens
-  with the acts (0.42, and 0.34 on hard's back stretch). Expert is the
+  with the acts (0.42, and 0.34 on hard's back stretch) — except inside
+  **the duck donut**, which wears the expert 0.30 wherever the
+  combination deals: the once-a-night finale never opens a roomier
+  middle than the plain donut it out-ranks. Expert is the
   difficulty where the donut is *run back into*: the opening laser drives
   you off the exact ground the rim is about to demand, so you return on
   memory rather than on the read.
