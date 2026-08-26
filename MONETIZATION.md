@@ -534,6 +534,131 @@ The DRM boundary is the audio, and only the audio.
 
 ---
 
+## THE UNLOCK — buying without leaving the room
+
+Two questions, both yes, and the second one resolves a tension left
+hanging above.
+
+### Does the purchase happen in-headset?
+
+**The evidence says yes, and one thing needs testing.**
+
+`HorizonBillingFeature` declares the payment activity like this:
+
+```ts
+const category = config.horizonOSAppMode == '2D'
+  ? ''
+  : '<category android:name="com.oculus.intent.category.VR" />';
+```
+
+Meta wrote a *branch* for this. In immersive mode the payment activity is
+tagged as a VR-category activity; in 2D mode that category is empty. That
+branch only exists because the immersive path renders differently — in the
+headset. The theme backs it up: `Theme.Translucent.NoTitleBar`, a
+chromeless activity drawn over whatever is behind it. That is the shape of
+an overlay, not a screen you get thrown to.
+
+**The unknown is what happens to the `XRSession`.** WebXR has three
+visibility states — `visible`, `visible-blurred`, `hidden` — and
+`visible-blurred` exists for exactly this: the scene is still rendering,
+but input is going to a system UI. If Quest puts the session in
+`visible-blurred` for checkout, this is perfect; the club keeps breathing
+behind the dialog and you come back to the same frame. If the session
+**ends** instead, the player gets dumped out of immersive and has to walk
+back in, which is the outcome to design against.
+
+Which one happens could not be confirmed here. **It is a fifteen-minute
+test on-device**, and it should be the first thing run against the first
+build that has billing in it — before the shop's placement is designed
+around it.
+
+Costs nothing to be safe either way:
+
+- **Never call `show()` mid-set.** Only from the board, the club floor, or
+  the post-set score screen — places where a pause is harmless. THE BALL's
+  sixty-second window is fine. A live raid is not.
+- **Write "purchase in flight" down before calling `show()`**, so a killed
+  session resumes into the right screen with the record already unlocked
+  rather than into confusion.
+- Pause on `visibilitychange` when state leaves `visible`; the game
+  already has to handle that for the system menu anyway.
+
+### "Everybody's got it, it's just locked"
+
+Right instinct, and it is how this should work — but it collides with the
+rule from the top of this document: *if the audio sits somewhere public,
+there is nothing to sell.* If the file is already on the device, isn't it
+already taken?
+
+**No — ship the ciphertext, sell the key.**
+
+Paid records sit on the device as **AES-GCM encrypted blobs**. Public
+bytes, useless bytes. The purchase does not deliver four megabytes of
+audio; it delivers **thirty-two bytes of key**. Unlock is one small
+request, a `crypto.subtle.decrypt`, and a decode.
+
+And it lands in one place. `loadTrack()` (`src/audio/music.ts:147`) is
+already the single choke point for every record in the game —
+`fetch → arrayBuffer → decodeAudioData`. Encrypted records add one step in
+the middle:
+
+```
+fetch(url) → arrayBuffer → [ decrypt(key) ] → decodeAudioData
+```
+
+One branch, in one function, in a file that already caches by track id and
+already de-dupes concurrent loads. The runtime change is far smaller than
+the feature sounds.
+
+**This also unifies the club.** A Download Play grant and a purchase now
+deliver the *same object* — a key. One is permanent, one expires with the
+set. A guest in the club doesn't need four megabytes inside the ball's
+sixty seconds; they need thirty-two bytes, and the ciphertext is already
+warm.
+
+### Four things to be honest about
+
+**1. "Already got it" is probabilistic, not guaranteed.** The APK is a
+shell — a TWA does not bundle web assets. "On the device" means "in the
+Cache API, warmed in the background." First run, cleared storage, or quota
+eviction and the bytes are simply not there, so there is a real download.
+The UI has to handle both paths.
+
+**Which is the actual argument for the download animation.** It is not
+decoration — it is the thing that makes the slow path feel identical to
+the fast path. Build it for that reason and it earns its place.
+
+**2. It shouldn't lie, and it doesn't have to.** There is real work in an
+unlock: the key fetch (~100–200 ms), the decrypt (fast — AES is
+hardware-accelerated on the XR2), and `decodeAudioData` on a 4–5 MB master
+(the real cost, likely a few hundred ms). Wire the bar to actual progress.
+Where it genuinely is instant, a short confident **UNLOCKED** beat reads
+better than a three-second fake — players clock a bar that isn't measuring
+anything, and it cheapens the moment they just paid for.
+
+**3. Storage is a real budget.** The free box is already 95 MB and
+Meta's own guidance is "avoid storing large assets locally" with no number
+attached. Do not pre-cache the whole paid catalogue. Check
+`navigator.storage.estimate()` before warming anything, call
+`persist()` to resist eviction, and warm selectively.
+
+**4. The shop screen is the preloader.** Browsing a record starts caching
+it in the background. By the time someone has heard the preview and made
+up their mind, the bytes are there and the unlock genuinely is instant.
+It costs nothing and it spends bandwidth at the highest-signal moment
+there is.
+
+### Two small things that make it feel bought
+
+- **Ship a short unencrypted preview** (~30 s) per paid record. The shop
+  can't sell a record nobody can hear, and a clip is cheap.
+- **Unlock optimistically.** When `PaymentRequest` resolves success,
+  unlock immediately and verify server-side in the background; re-lock only
+  if verification fails. That is the difference between "bought it" and
+  "waiting on a server", and the verification still happens.
+
+---
+
 ## The music, as it actually is
 
 The records are made by musicians we work with, paid a share of profit.
@@ -665,11 +790,11 @@ happens.
    on it. While in there: **enumerate what the `horizonPlatformSDK` bridge
    answers** — thirty minutes, and it's the only thing that could reopen
    the paid-app question.
-3. **Gate the audio.** Records move out of the static import graph and off
-   the public origin, behind a signed-URL endpoint; the catalog (including
-   each track's measured row) is served, not bundled. This is not a
-   performance chore — *this is the product.* It also happens to buy the
-   Quest.Performance.3 VRC.
+3. **Gate the audio.** Records move out of the static import graph; paid
+   ones ship as encrypted blobs and the catalog (including each track's
+   measured row) is served, not bundled. One branch inside `loadTrack()`.
+   This is not a performance chore — *this is the product.* It also
+   happens to buy the Quest.Performance.3 VRC.
 4. **Identity, entitlements, and the ledger.** Firestore collection, a
    verify function, a session token — and the full revenue record on every
    grant (`sku / rail / gross / fee / net / txn`), from the first row.
@@ -696,6 +821,11 @@ listing.
 following came from search summaries rather than the source, and each one
 should be confirmed against the live page before it is relied on:
 
+- **What checkout does to the `XRSession`.** Does Quest put it in
+  `visible-blurred` and hand it back, or end it? This decides whether the
+  shop can live anywhere in the club or only at the board. Fifteen
+  minutes against the first billing build; nothing else in this document
+  changes more design for less effort.
 - **What the `horizonPlatformSDK` bridge exposes to the page.** Every
   `--metaquest` build ships it. If it answers an entitlement check, the
   paid-app question is open again. Enumerate it on-device; nothing else
