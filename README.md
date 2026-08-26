@@ -298,8 +298,8 @@ else in the game needs the server: the whole tour is playable solo.
 
 ## The music
 
-Twenty-four real records are in the box (`src/assets/music/`, registry in
-`src/audio/tracks.ts`) — twenty of them raid charts. Every number in that
+Twenty-six real records are in the box (`src/assets/music/`, registry in
+`src/audio/tracks.ts`) — twenty-two of them raid charts. Every number in that
 registry was **measured from the files**, not guessed — the whole game is
 quantized to them, so they had to be:
 
@@ -320,10 +320,12 @@ quantized to them, so they had to be:
 | ASSEMBLE | 125 | 16 phrases | −7.5 LUFS | quick raid · drops on the slam |
 | INFECTION | 138 | 15 phrases | −10.9 LUFS | quick raid |
 | GIVE IT TO ME | 112 | 13 phrases | −14.2 LUFS | tour: after-hours opener |
-| V ONE | 95 | 8 phrases | −10.8 LUFS | quick raid |
+| ORIGINAL | 95 | 8 phrases | −10.8 LUFS | quick raid |
 | FUSION | 122 | 5 phrases | −8.1 LUFS | quick raid |
 | BRAIN EATER | 149.959 | 7 phrases | −9.1 LUFS | quick raid |
-| VFALL | 165.015 | 10 phrases | −9.4 LUFS | quick raid |
+| BREAKCORE V4 | 165.015 | 10 phrases | −9.4 LUFS | quick raid |
+| DEFENSE | 125.996 | 17 phrases | −8.6 LUFS | quick raid · skips a 22 s intro |
+| AWAKENING | 165 | 18 phrases | −17.4 LUFS | quick raid · skips a 30 s riser |
 | FUTURE VIBE | 93.984 | 6 phrases | −14.2 LUFS | quick raid · second on the club rotation |
 | CHILL | 125.001 | — | −8.9 LUFS | the club's house record — opens the rotation |
 | SWAG | 91.974 | — | −15.7 LUFS | foyer rotation |
@@ -337,13 +339,13 @@ minutes of music.)
 - **Tempo** came from an onset-flux autocorrelation phase-locked across each
   whole track, audited by `tools/octave-check` for lattice errors (DISCO
   BALL first arrived as 73.33 — exactly 2/3 of its real 110 grid — and
-  VFALL as a third of its 165). Several land on exact integers (a DAW
+  BREAKCORE V4 as a third of its 165). Several land on exact integers (a DAW
   grid); the rest genuinely sit a hair off — and it matters: locking
   SAKUPENED at a round 134 instead of 133.964 drifts off the kick by the
   last third of the song (grid retention falls from 68% to 35%), so the
   fractions stay.
-- **Loudness** is EBU R128 integrated. The masters span **8.2 dB** — SWAG at
-  −15.7 against ASSEMBLE at −7.5 — so every track is gain-matched to −14 LUFS
+- **Loudness** is EBU R128 integrated. The masters span **9.9 dB** — AWAKENING
+  at −17.4 against ASSEMBLE at −7.5 — so every track is gain-matched to −14 LUFS
   at playback and the mix runs through a limiter. Nothing is re-encoded; it's
   a gain node, and the files ship untouched.
 - **Downbeat** (seconds to bar 1 beat 1) is the one number a human ear might
@@ -353,9 +355,10 @@ minutes of music.)
   quiet riser carries a `startAt`, and the needle goes down *there* — the
   intro never plays and the count-in stays a count-in instead of a minute of
   waiting. It has to sit on the bar grid (`downbeat + n×4 beats`) so the set
-  still lands where the music does. ASSEMBLE is the extreme case: six seconds
+  still lands where the music does. ASSEMBLE is the sharpest case: six seconds
   of near-silence climbing from −55 dB, then an 18 dB transient inside 5 ms,
-  and the set begins **on that slam**.
+  and the set begins **on that slam**. AWAKENING is the longest — half a
+  minute of riser before its pulse is up, all of it skipped.
 
 **Set length follows the record.** A track's playable length becomes the number
 of 8-bar phrases in the match, and the act boundaries are *fractions* of the
@@ -420,7 +423,7 @@ difficulty with their song pick.
 its real-time density used to scale with the record — at act 4 a 91 BPM
 night threw barely half the landings per second of BREAKCORE's 174, and
 its bar grid walked past where the slow shelf's grooves actually live
-(those records ride the eighths; V ONE's onsets sit on a literal 190
+(those records ride the eighths; ORIGINAL's onsets sit on a literal 190
 lattice). So on EXPERT, any record **under 100 BPM runs its chart clock
 at 2×** — the grid rides the eighths, landings hit the real half-bars —
 but the clock doubles for the *grid's* sake only: everything the dancer
