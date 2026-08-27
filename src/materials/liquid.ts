@@ -172,6 +172,8 @@ const LIQUID_FRAG = /* glsl */ `
   uniform float uSlosh;       // ripple energy 0..~1
   uniform float uRippleAmp;   // ripple height (m) — scaled to the liquid's span
   uniform float uFoamReach;   // meniscus band depth (m) — likewise
+  uniform float uNear;        // camera clip planes — the surface re-projection
+  uniform float uFar;         //   below rebuilds window depth from eye distance
   uniform vec3 uColor;        // lit glow body
   uniform vec3 uDeepColor;    // shadowed depths
   uniform vec3 uFoamColor;    // meniscus / surface sheen
@@ -192,12 +194,42 @@ const LIQUID_FRAG = /* glsl */ `
     if (d > 0.0) discard;
 
     if (!gl_FrontFacing) {
-      // The open cut — the liquid's top surface. Flat and bright, with the
-      // ripple shimmering across it.
+      // The open cut — the liquid's top surface. The COLOUR was always
+      // painted here, on the tube's far wall; the DEPTH was the far wall's
+      // too, and in stereo that lie is visible: look down the bore and both
+      // eyes agree the bright top sits at the BOTTOM of the tube, so the
+      // stick reads as a hollow well down to whatever is under it. Fix the
+      // depth, keep the paint: slide this fragment to where its own view
+      // ray crosses the surface plane, so the top of the liquid SITS at
+      // the top of the liquid.
+      //
+      // Window depth is rebuilt from eye distance: gl_FragCoord.w is
+      // 1/w_clip = 1/(eye distance) under a perspective projection, ratios
+      // along a view ray survive the eye transform, and the projection's
+      // z-row is fully determined by the clip planes. Per-eye correct in
+      // XR, because gl_FragCoord and cameraPosition are both per-eye.
+      vec3 ray = vWorldPos - cameraPosition;
+      float len = max(length(ray), 1e-5);
+      float denom = dot(ray / len, normalize(uPlaneNormal));
+      float tSurf = abs(denom) > 1e-4
+        ? dot(uPlanePoint - cameraPosition, normalize(uPlaneNormal)) / denom
+        : len;
+      // Never nearer than the eye, never farther than the wall the paint
+      // lives on (a ray seen from below meets the plane past the wall —
+      // there the wall's own depth is the honest one).
+      float k = clamp(tSurf / len, 0.02, 1.0);
+      float dEye = max(k / max(gl_FragCoord.w, 1e-6), uNear * 1.0001);
+      float A = (uFar + uNear) / (uFar - uNear);
+      float B = 2.0 * uFar * uNear / (uFar - uNear);
+      gl_FragDepth = clamp((A - B / dEye) * 0.5 + 0.5, 0.0, 1.0);
+
       float shimmer = 0.92 + 0.08 * ripple * uSlosh * 4.0;
       gl_FragColor = vec4(uFoamColor * shimmer, 1.0);
       return;
     }
+    // Writing gl_FragDepth anywhere means writing it everywhere: the body
+    // keeps the rasterised depth it always had.
+    gl_FragDepth = gl_FragCoord.z;
 
     // The body of the glow: simple fixed-key shading, weighted hard toward
     // the depths — optical density is most of what "thick" looks like, and
@@ -282,6 +314,8 @@ export function createLiquid(interiorGeo: BufferGeometry): LiquidVisual {
       uSlosh: { value: 0 },
       uRippleAmp: { value: 0.006 },
       uFoamReach: { value: 0.011 },
+      uNear: { value: 0.1 },
+      uFar: { value: 200 },
       uColor: { value: new Color(0xffffff) },
       uDeepColor: { value: new Color(0x404040) },
       uFoamColor: { value: new Color(0xffffff) },

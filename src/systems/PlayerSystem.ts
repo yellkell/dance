@@ -682,6 +682,13 @@ export class PlayerSystem extends createSystem({}) {
         const interiorLen = (LIQUID_R * 2 + (STICK_LEN - STICK_R * 2)) * stickScale;
         s.liquid.update(this.clock, delta, STICK_FILL, _tube, worldHeight, _axis, interiorLen, s.motion.accel);
         s.liquid.setColor(this.stickColor, flash, grooveGlow);
+        // The surface re-projection rebuilds stereo depth from the clip
+        // planes (liquid.ts) — hand it the real ones, not guesses.
+        const cam = this.camera as { near?: number; far?: number } | undefined;
+        if (cam?.near !== undefined && cam.far !== undefined) {
+          s.liquid.material.uniforms.uNear.value = cam.near;
+          s.liquid.material.uniforms.uFar.value = cam.far;
+        }
       }
 
       // Decay LAST, and never by more than a frame's worth. Draining the
