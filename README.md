@@ -60,9 +60,11 @@ everyone else.
   and can't move, so when you lead, **the rest of the show gently sinks**
   (THE RISE), and the longer you hold #1 the further it goes (THE CLIMB),
   until you're looking **down** on the boss.
-- Every other dancer is a **slender humanoid figure** — gloss-black mannequin,
-  neon collar/waist/wrist trim and visor in their seat colour, glowsticks in
-  hand — solved live from just a head and two hands (which is all VR knows).
+- Every other dancer is a **slender humanoid figure** — gloss-black mannequin
+  in lit couture, a wraparound glass visor with a **white-hot scan-slit**,
+  neon collar/waist/wrist trim in their seat colour, and glowstick batons
+  that burn white at the core inside a coloured bloom (the way real neon
+  does) — solved live from just a head and two hands (which is all VR knows).
   **You have no body of your own**: the local player sees only their
   controllers; the figure is for everyone else's view of you.
 - Last dancer standing (or the highest score when the set ends) **owns the
