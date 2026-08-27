@@ -41,7 +41,7 @@ import type { MeshBasicMaterial, MeshStandardMaterial } from 'three';
 import { MC, RING, hueToColor, ringRadius } from '../config.js';
 import { arena } from '../arena/arena.js';
 import { CLUB as CLUB_LAYOUT } from '../club/config.js';
-import { ACCENT_REST, buildDancer, type DancerPose, type DancerRig } from '../game/avatars.js';
+import { ACCENT_REST, accentHex, buildDancer, type DancerPose, type DancerRig } from '../game/avatars.js';
 import { PoseMotion } from '../game/poseMotion.js';
 import { match, type GestureCue, showBeat } from '../game/state.js';
 import { net } from '../net/session.js';
@@ -575,17 +575,19 @@ export class McSystem extends createSystem({}) {
     // swapped the headliner for a different dancer mid-wind-up.
     const warm = warn > 0.5;
     const drive = 1.1 + warn * 1.5;
-    for (const { mat, gain, neon } of rig.accents) {
-      const color = neon && warm ? MC.warnColor : this.baseColor;
-      const std = mat as MeshStandardMaterial;
+    for (const a of rig.accents) {
+      // Through accentHex(): his blades stay white-cored in violet AND in
+      // warn amber — the whitening is the figure's anatomy, not a state.
+      const color = accentHex(a, a.neon && warm ? MC.warnColor : this.baseColor);
+      const std = a.mat as MeshStandardMaterial;
       if (std.emissive) {
         std.emissive.setHex(color);
         // Scaled by the material's authored gain — his sleeves never
         // outshine his sticks. The dark cloth sits at its authored rest
         // the whole way through.
-        std.emissiveIntensity = (neon ? drive : ACCENT_REST) * gain;
+        std.emissiveIntensity = (a.neon ? drive : ACCENT_REST) * a.gain;
       } else {
-        (mat as MeshBasicMaterial).color.setHex(color);
+        (a.mat as MeshBasicMaterial).color.setHex(color);
       }
     }
   }

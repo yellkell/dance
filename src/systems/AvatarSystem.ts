@@ -23,7 +23,7 @@ import { BOTS, OCTAGON_HALF_DEPTH, OCTAGON_HALF_WIDTH } from '../config.js';
 import { platformRoot } from '../arena/arena.js';
 import { choreoView } from './ChoreoSystem.js';
 import type { Zone } from '../choreo/setlist.js';
-import { buildDancer, type DancerPose, type DancerRig } from '../game/avatars.js';
+import { accentHex, buildDancer, type DancerPose, type DancerRig } from '../game/avatars.js';
 import { PoseMotion, type MotionTuning } from '../game/poseMotion.js';
 import { roll } from '../game/rng.js';
 import { seatBearing, seatIsNear } from '../game/ring.js';
@@ -131,15 +131,21 @@ export class AvatarSystem extends createSystem({}) {
 
       // One drive for the whole rig, scaled by each material's authored
       // gain — the suit stays cooler than its own neon trim in every state.
+      // Colours route through accentHex() so the white-hot tiers keep
+      // their cores through the seat colour AND the flash red.
       const drive = d.alive ? 1.1 + (p.flash > 0 ? 1.6 : 0) : 0.14;
-      for (const { mat, gain } of p.rig.accents) {
-        const std = mat as MeshStandardMaterial;
+      for (const a of p.rig.accents) {
+        const std = a.mat as MeshStandardMaterial;
         if (std.emissive) {
-          std.emissiveIntensity = drive * gain;
-          if (p.flash > 0) std.emissive.setHex(0xff4033);
-          else std.emissive.setHex(p.rig.baseColor);
+          std.emissiveIntensity = drive * a.gain;
+          std.emissive.setHex(accentHex(a, p.flash > 0 ? 0xff4033 : p.rig.baseColor));
         } else {
-          std.color.setHex(p.flash > 0 ? 0xff4033 : d.alive ? p.rig.baseColor : 0x3a3f4a);
+          // Flat mats (blades, slit, soles, halos): white-cored while the
+          // dancer lives; a corpse's sticks go OUT to flat grey — nothing
+          // white-hot on a melted figure.
+          std.color.setHex(
+            p.flash > 0 ? accentHex(a, 0xff4033) : d.alive ? accentHex(a, p.rig.baseColor) : 0x3a3f4a,
+          );
         }
       }
 
