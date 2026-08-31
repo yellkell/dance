@@ -23,7 +23,6 @@
 
 import { createSystem } from '@iwsdk/core';
 import {
-  CanvasTexture,
   Group,
   Mesh,
   MeshBasicMaterial,
@@ -72,10 +71,8 @@ export class CourseVoidSystem extends createSystem({}) {
   private horizonNear!: MeshBasicMaterial;
   private horizonFar!: MeshBasicMaterial;
   private dust!: Points;
+  private card!: Mesh;
   private cardMat!: MeshBasicMaterial;
-  private roomTex!: CanvasTexture;
-  private routeTex!: CanvasTexture;
-  private turned = false;
   private hueCursor = 0;
   private lastBar = -1;
   private clock = 0;
@@ -150,45 +147,28 @@ export class CourseVoidSystem extends createSystem({}) {
     this.horizonNear = horizon.near;
     this.horizonFar = horizon.far;
 
-    // THE CARD — one panel, dead ahead of the home pad, because you arrive
-    // facing that way. It says the thing that matters NOW, and it says
-    // exactly one of them:
+    // THE ROOM CHECK — the only words in the whole place, dead ahead of the
+    // home pad because that is the way you arrive facing.
     //
-    //   before your first step — THE ROOM CHECK. Everything else out here
-    //   is learned by doing; this can't be, and a body that finds a real
-    //   wall halfway through a step has been failed by the experience
-    //   rather than by the room. It is the loudest thing in the void.
+    // Everything else out here is learned by doing and is therefore not
+    // written down: the floor's colours are the instruction, the invitation
+    // is a circle of light on the ground, and stepping is a thing a body
+    // already knows how to do. This one cannot be learned by doing — a body
+    // that finds a real wall halfway through a step has been failed by the
+    // experience rather than by the room — so it is said once, in as few
+    // words as it can be said in, and then it goes.
     //
-    //   after it — THE ROUTE. By then you have demonstrably got the floor,
-    //   and a safety notice that keeps shouting through a whole ride is
-    //   scenery. The card turns over and becomes the four lines that are
-    //   the entire manual (research/03 §5).
-    //
-    // One mesh, two paintings: two cards facing you at once would be two
-    // draw calls and one too many things to read while ground is leaving.
+    // It goes for good on your first step. There was a second card here
+    // that took over at that point and explained the route; it was four
+    // lines of a manual for a game with no controls, in a place whose whole
+    // argument is that it doesn't need one.
     const room = panelTexture({
       title: 'CLEAR 1.8 × 1.8 m',
-      lines: [
-        'STAND IN THE MIDDLE AND RECENTRE',
-        'every step the circuit asks for lands inside that square',
-      ],
-      small: 'on Quest: hold the Meta button to recentre',
+      lines: ['STAND IN THE MIDDLE AND RECENTRE'],
       width: 2.5,
       accent: PALETTE.cyan,
       color: '#dcf1ff',
     });
-    this.routeTex = panelTexture({
-      title: 'VOIDSTEP',
-      lines: [
-        'step between the platforms — the void does the walking',
-        'amber fills to red: that ground is leaving',
-        'the circuit goes out, up, across and home',
-        'close the lap and the door opens behind you',
-      ],
-      small: 'right Ⓐ for the way out · squeeze to see how the circuit thinks',
-      width: 2.5,
-    }).tex;
-    this.roomTex = room.tex;
     // Single-sided: it faces the pad, and mirror writing seen from the air
     // is worse than a card that simply isn't there from behind.
     this.cardMat = new MeshBasicMaterial({
@@ -196,9 +176,9 @@ export class CourseVoidSystem extends createSystem({}) {
       transparent: true,
       depthWrite: false,
     });
-    const card = new Mesh(new PlaneGeometry(2.5, 2.5 * room.aspect), this.cardMat);
-    card.position.set(0, 1.6, -2.5);
-    root.add(card);
+    this.card = new Mesh(new PlaneGeometry(2.5, 2.5 * room.aspect), this.cardMat);
+    this.card.position.set(0, 1.6, -2.5);
+    root.add(this.card);
   }
 
   update(dt: number): void {
@@ -207,19 +187,12 @@ export class CourseVoidSystem extends createSystem({}) {
 
     if (course.roomWarn && !this.warning) this.raiseRoomWarning();
 
-    // The card turns over on your first step: the room check has done its
-    // job the moment you demonstrably have the floor. It fades out, swaps
-    // its painting, and fades back as the route. Every fresh crossing puts
-    // the room check back — you are starting again, and the notice costs a
-    // glance to re-read.
-    if (this.turned && G.handovers === 0) {
-      this.showCard(this.roomTex);
-    } else if (!this.turned && G.handovers > 0) {
-      this.cardMat.opacity -= dt * 3;
-      if (this.cardMat.opacity <= 0) this.showCard(this.routeTex);
-    } else if (this.cardMat.opacity < 1) {
-      this.cardMat.opacity = Math.min(1, this.cardMat.opacity + dt * 1.6);
-    }
+    // The notice goes on your first step — by then you demonstrably have the
+    // floor — and comes back for the next crossing, because that is a fresh
+    // start and the room may be a different room.
+    const want = G.handovers === 0 ? 1 : 0;
+    this.cardMat.opacity += (want - this.cardMat.opacity) * Math.min(1, dt * 3);
+    this.card.visible = this.cardMat.opacity > 0.01;
 
     // Energy: the world ducks while the ground you own is counting itself
     // out — and harder still for the beat after a missed step, so the whole
@@ -301,15 +274,6 @@ export class CourseVoidSystem extends createSystem({}) {
     this.horizonFar.opacity = 0.08 + energy * 0.06;
   }
 
-  /** Turn the card over. A material's texture reference changing needs the
-   *  program re-resolved, so it says so rather than trusting the swap. */
-  private showCard(tex: CanvasTexture): void {
-    this.cardMat.map = tex;
-    this.cardMat.needsUpdate = true;
-    this.cardMat.opacity = 0;
-    this.turned = tex === this.routeTex;
-  }
-
   /** The play-area courtesy: say so, plainly, before the first ride. */
   private raiseRoomWarning(): void {
     const { w, d } = course.roomWarn!;
@@ -317,10 +281,8 @@ export class CourseVoidSystem extends createSystem({}) {
       title: 'ROOM CHECK',
       lines: [
         `this play area reads ${w.toFixed(1)} × ${d.toFixed(1)} m`,
-        'the circuit is authored for 1.8 × 1.8 m',
         'steps may land past your boundary',
       ],
-      small: 'clear more floor, or ride with care',
       width: 1.7,
       color: '#ffd6a0',
       accent: 0xffb000,

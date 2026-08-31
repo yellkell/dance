@@ -291,7 +291,10 @@ There are **four places**, and where you are is what you're doing:
    that doesn't lead anywhere in the building. The club's south-west
    corner — the arcade's opposite number across the way in — is a bare
    little room with a **portal frame** standing in it and the VOID inside
-   the frame. Walk into the doorway and the hall is gone.
+   the frame. It carries no sign — the still room and the arcade have
+   nameplates because they are rooms, and a room can be described; this is a
+   door, and the whole invitation is the light coming out of it. Walk into
+   the doorway and the hall is gone.
 
    You come out on a pad at the heart of the void, on a **parkour circuit**,
    with **different physics**. There is no arc, no thumbstick, no
@@ -301,10 +304,10 @@ There are **four places**, and where you are is what you're doing:
    takes you forty. Stepping is the entire game.
 
    You arrive facing a card that says **CLEAR 1.8 × 1.8 m — STAND IN THE
-   MIDDLE AND RECENTRE**, because that is the one thing out here that can't
-   be learned by doing, and a body that finds a real wall halfway through a
-   step has been failed by the experience rather than by the room. Take your
-   first step and the card turns over into the route.
+   MIDDLE AND RECENTRE**. It is the only writing in the place: everything
+   else out here is learned by doing, and this one thing can't be — a body
+   that finds a real wall halfway through a step has been failed by the
+   experience rather than by the room. Take your first step and it goes.
 
    **Nothing slides**, and **nothing is invisible**. The world moves only
    while the ground you are standing on is travelling — no easing, no

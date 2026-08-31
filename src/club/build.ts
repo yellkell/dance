@@ -1841,33 +1841,13 @@ function buildStep(root: Group): void {
   cap.position.set((S.minX + S.maxX) / 2, H, (S.minZ + S.maxZ) / 2);
   root.add(cap);
 
-  // Door dressing + nameplate, the arcade's twin — but this plate glows
-  // the course's cyan, because past it nothing is magenta any more.
+  // Door dressing, and NOTHING ELSE. The still room and the arcade wear
+  // nameplates because they are rooms and a room can be described. This is
+  // a door, and a door that has to tell you what it is has already failed:
+  // the whole invitation is the light coming out of it. It is the one
+  // opening in the building with nothing written over it.
   for (const x of [S.doorX0, S.doorX1]) box(root, bronzeMat(), 0.08, 2.05, 0.1, x, 1.025, S.minZ);
   box(root, bronzeMat(), S.doorX1 - S.doorX0 + 0.08, 0.09, 0.1, (S.doorX0 + S.doorX1) / 2, 2.05, S.minZ);
-  const plate = signPlane(0.96, 0.24, 512, (g, sw, sh) => {
-    g.fillStyle = 'rgba(10,13,18,0.85)';
-    g.beginPath();
-    g.roundRect(4, 4, sw - 8, sh - 8, 14);
-    g.fill();
-    g.strokeStyle = 'rgba(79,183,255,0.5)';
-    g.lineWidth = 2.5;
-    g.stroke();
-    g.textAlign = 'center';
-    g.textBaseline = 'middle';
-    g.fillStyle = '#dcf1ff';
-    g.shadowColor = css(PALETTE.cyan);
-    g.shadowBlur = 10;
-    g.font = font(600, 58);
-    g.letterSpacing = '8px';
-    g.fillText('THE STEP', sw / 2, sh / 2 + 2);
-    g.letterSpacing = '0px';
-    g.shadowBlur = 0;
-  });
-  plate.name = 'live-step-plate';
-  plate.position.set((S.doorX0 + S.doorX1) / 2, 2.34, S.minZ - 0.06);
-  plate.rotation.y = Math.PI; // the nameplate reads from the floor side
-  root.add(plate);
 
   // ── THE FRAME ────────────────────────────────────────────────────────
   // Three nested heads stepping outward, exactly the vestibule's grammar
@@ -1969,10 +1949,11 @@ function buildStep(root: Group): void {
   const through = new PointLight(PALETTE.cyan, 1.5, 6.5, 1.5);
   through.position.set(S.portalX, 1.35, pz - 0.5);
   root.add(through);
-  // A second, dimmer one out in the doorway, so the bronze dressing and the
-  // nameplate catch it from the hall side.
-  const doorway = new PointLight(0x9fd8ff, 0.7, 4.2, 1.6);
-  doorway.position.set((S.doorX0 + S.doorX1) / 2, 1.5, S.minZ + 0.5);
+  // A second, weaker one just inside the opening — enough that the bronze
+  // jamb reads as a doorway from across the floor, and no more. It used to
+  // be twice this and was really lighting a nameplate.
+  const doorway = new PointLight(0x9fd8ff, 0.35, 3.4, 1.7);
+  doorway.position.set((S.doorX0 + S.doorX1) / 2, 1.4, S.minZ + 0.7);
   root.add(doorway);
 
   // The room's only light comes OUT OF THE DOOR — cool, low, and short
