@@ -375,11 +375,18 @@ function buildWalls(root: Group, W: number, NZ: number, SZ: number, H: number): 
   const coreMat = bronzeMat();
   const reedMat = brassMat(0.3);
   // The hall's wall dressing stops at the side rooms' doors: a pilaster or
-  // a sconce that lands inside the arcade is hall furniture standing in
-  // somebody's room. (Generic, so the rooms can be moved again.)
-  const A = CLUB.arcade;
+  // a sconce that lands inside one of them is hall furniture standing in
+  // somebody's room.
+  //
+  // This claimed to be generic and was not — it only ever tested the
+  // ARCADE, so the moment a second room took the opposite corner it put a
+  // fluted brass pilaster on the south wall INSIDE it, standing directly
+  // over the portal like a keystone nobody designed, and another through
+  // the west wall beside it. It tests every enclosed room now, which is
+  // what it always said it did.
+  const ROOMS = [CLUB.arcade, CLUB.quiet, CLUB.step];
   const inRoom = (x: number, z: number): boolean =>
-    x > A.minX && x < A.maxX && z > A.minZ && z < A.maxZ;
+    ROOMS.some((r) => x > r.minX && x < r.maxX && z > r.minZ && z < r.maxZ);
   const pilaster = (x: number, z: number): void => {
     if (inRoom(x, z)) return;
     const g = new Group();
@@ -1854,17 +1861,27 @@ function buildStep(root: Group): void {
   // (brass inside, bronze, black steel outside) so the two doors of this
   // building are recognisably the same idea. One leads to the street.
   const pz = S.portalZ;
-  // The heads step gently: the room caps at CLUB.roomCeilH, and a 0.1 m
-  // step put the outermost bar straight through the ceiling slab.
+  // The rings are measured from the OPENING outward, not from a width and a
+  // height that happen to be near it. The first cut sized each ring on its
+  // own and left the innermost head 14 cm clear of the top of the void:
+  // the pane stopped short and a band of dark wall showed between it and
+  // the frame, which reads as a picture in a surround rather than as a way
+  // through. Ring 0's inner faces now sit exactly on the pane's edges, and
+  // each ring steps 9 cm out and 7 cm up from the one inside it — so every
+  // reveal is the frame, and none of it is wall. (The step is gentle
+  // because the room caps at CLUB.roomCeilH and a bigger one put the
+  // outermost bar through the ceiling slab.)
   for (let i = 0; i < 3; i++) {
-    const w = S.portalW + 0.16 + i * 0.2;
-    const h = S.portalH + 0.18 + i * 0.05;
     const t = 0.08 - i * 0.018;
+    const inX = S.portalW / 2 + i * 0.09; // this ring's inner face
+    const inY = S.portalH + i * 0.07;
+    const px = inX + t / 2; // …so its bar centres sit half a thickness out
+    const py = inY + t / 2;
     const mat = i === 0 ? brassMat(0.25) : i === 1 ? bronzeMat() : blackSteelMat();
     const z = pz + 0.07 + i * 0.045;
-    box(root, mat, t, h, t, S.portalX - w / 2, h / 2, z);
-    box(root, mat, t, h, t, S.portalX + w / 2, h / 2, z);
-    box(root, mat, w + t, t, t, S.portalX, h, z);
+    box(root, mat, t, py, t, S.portalX - px, py / 2, z);
+    box(root, mat, t, py, t, S.portalX + px, py / 2, z);
+    box(root, mat, px * 2 + t, t, t, S.portalX, py, z);
   }
 
   // THE VOID IN THE DOORWAY. A pane of the set's own background colour —
@@ -1892,7 +1909,9 @@ function buildStep(root: Group): void {
     depthWrite: false,
     toneMapped: false,
   });
-  const shimmer = new Mesh(new PlaneGeometry(S.portalW * 1.06, S.portalH * 1.04), shimmerMat);
+  // The wash is the pane's own size now too — it used to overhang by a few
+  // centimetres, which only ever showed as a bloom smeared on the frame.
+  const shimmer = new Mesh(new PlaneGeometry(S.portalW, S.portalH), shimmerMat);
   shimmer.name = 'live-step-shimmer';
   shimmer.position.set(S.portalX, S.portalH / 2, pz - 0.015);
   shimmer.rotation.y = Math.PI;

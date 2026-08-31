@@ -354,7 +354,11 @@ door is the design:
   wings the same length as each other.
 - **What's in it.** Nothing but the doorway. Three stepped deco frames — the
   vestibule's own grammar at two-thirds scale, so the building's two doors
-  are recognisably one idea — with the void inside them, a brass-edged plate
+  are recognisably one idea — measured OUTWARD FROM THE OPENING so the void
+  runs right up to the underside of the head (sized ring by ring instead,
+  the innermost one sat 14 cm clear of the top of the pane and a band of
+  dark wall showed between them, which reads as a picture in a surround
+  rather than as a way through). Then a brass-edged plate
   let into the floor one stride deep (the trigger volume, made visible,
   brightening as you close on it), and two uplights that are the only cold
   light in a building which is warm everywhere else.
