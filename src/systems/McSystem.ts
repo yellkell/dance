@@ -279,7 +279,11 @@ export class McSystem extends createSystem({}) {
     p.yaw = Math.sin(beat * 0.25) * 0.2;
     // He nods on the beat and rolls his head across the bar — the neck the
     // rig grew for the club floor, spent on the man everyone is watching.
-    p.pitch = -0.1 - Math.abs(Math.sin(beat * Math.PI)) * 0.16;
+    // The nod CROSSES level instead of hanging under it: chin up between
+    // beats, a shallow dip on them. Both ends used to sit below the
+    // horizon, and a 3.4 m headliner pitched 6–15° down all night reads as
+    // a man studying his own shoes, not one working a room.
+    p.pitch = 0.06 - Math.abs(Math.sin(beat * Math.PI)) * 0.15;
     p.roll = Math.sin(beat * 0.33) * 0.12;
     p.slump = 0;
     // The groupies' exact move, giant-sized: one stick up, one down.
@@ -308,9 +312,11 @@ export class McSystem extends createSystem({}) {
     p.hy = STAND;
     // Chin down through the wind-up, up on the release — he stares the
     // crowd down while he charges and throws his head back when it lands.
+    // "Down" is level-ish, not floorward: from up here the crowd is already
+    // below him, so a real dip buries his gaze in the stage.
     // (Set here, not left over: the groove's nod would otherwise ride out
     // the whole mime, because easeTo only ever chases `tgt`.)
-    p.pitch = -0.24 + strike * 0.4;
+    p.pitch = -0.06 + strike * 0.36;
     p.roll = 0;
 
     switch (mime.cue.kind) {
