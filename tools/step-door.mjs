@@ -264,12 +264,19 @@ const out = await page.evaluate(
     const held = st().rig;
     g.course.head(GRID.pitch, 0); // stand where it was
     for (let i = 0; i < 120 && st().slips === slipsBefore; i++) await frames(1);
-    // Read the burn while it is burning: it decays over half a second, and
-    // the floor is painted before the frame of reference judges, so the
-    // flare lands on the frame AFTER the miss is charged.
-    await frames(2);
-    const burn = g.course.deckTint('runner-out');
-    await sleep(400);
+    // Catch the burn while it is burning. It decays over half a second, and
+    // the floor is painted BEFORE the frame of reference judges (the paint
+    // needs this frame's anchors), so the flare always lands on the frame
+    // after the miss is charged. Under a loaded headless renderer a couple
+    // of frames can outlast the whole flare, so take the brightest reading
+    // over the window rather than one sample at a guessed moment.
+    let burn = null;
+    for (let i = 0; i < 40; i++) {
+      await frames(1);
+      const t = g.course.deckTint('runner-out');
+      if (t && (!burn || t.r > burn.r)) burn = t;
+      if (burn && burn.r > 0.6) break;
+    }
     const after = st();
     ok('ground that has left under you is a slip', after.slips === slipsBefore + 1, `${after.slips} slip(s)`);
     const slid = Math.hypot(after.rig.x - held.x, after.rig.y - held.y, after.rig.z - held.z);
