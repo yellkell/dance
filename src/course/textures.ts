@@ -10,7 +10,6 @@
 
 import {
   CanvasTexture,
-  DoubleSide,
   LinearMipmapLinearFilter,
   Mesh,
   MeshBasicMaterial,
@@ -130,11 +129,16 @@ export function panelTexture(spec: PanelSpec): { tex: CanvasTexture; aspect: num
  * A text panel, planted ~3 m out (research/02 §6) in the house typeface and
  * the house magenta. Four lines is the whole manual: embodied movement
  * doesn't have to be learned (research/03 §5).
+ *
+ * SINGLE-SIDED, deliberately. A card is written to be read from one place —
+ * these face the home pad — and a double-sided one hands anybody standing
+ * behind it a page of mirror writing, which from the skywalk is the biggest
+ * thing in the view straight down. Better to be nothing from the back.
  */
 export function textPanel(spec: PanelSpec): Mesh {
   const { tex, aspect } = panelTexture(spec);
   return new Mesh(
     new PlaneGeometry(spec.width, spec.width * aspect),
-    new MeshBasicMaterial({ map: tex, transparent: true, side: DoubleSide, depthWrite: false }),
+    new MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false }),
   );
 }

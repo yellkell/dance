@@ -24,7 +24,6 @@
 import { createSystem } from '@iwsdk/core';
 import {
   CanvasTexture,
-  DoubleSide,
   Group,
   Mesh,
   MeshBasicMaterial,
@@ -190,10 +189,11 @@ export class CourseVoidSystem extends createSystem({}) {
       width: 2.5,
     }).tex;
     this.roomTex = room.tex;
+    // Single-sided: it faces the pad, and mirror writing seen from the air
+    // is worse than a card that simply isn't there from behind.
     this.cardMat = new MeshBasicMaterial({
       map: room.tex,
       transparent: true,
-      side: DoubleSide,
       depthWrite: false,
     });
     const card = new Mesh(new PlaneGeometry(2.5, 2.5 * room.aspect), this.cardMat);

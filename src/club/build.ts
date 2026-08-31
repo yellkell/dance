@@ -1941,14 +1941,39 @@ function buildStep(root: Group): void {
   }
   box(root, brassMat(0.3), S.portalW + 0.02, 0.012, 0.02, S.portalX, 0.008, pz - S.reach);
 
-  // Two brass uplights either side of the frame: the room's only fittings.
+  // Two uplights either side of the frame — the room's only fittings, and
+  // the only ones in the building that burn COLD. They wore the venue's
+  // warm brass cove at first and were the brightest thing in the corner:
+  // two amber posts flanking a cold blue doorway, pulling the eye off the
+  // one thing in the room. Brass body, the course's own light in it.
+  const coldGlow = new MeshStandardMaterial({
+    color: DECOR.brass,
+    emissive: PALETTE.cyan,
+    emissiveIntensity: 0.9,
+    metalness: 0.6,
+    roughness: 0.35,
+  });
   for (const sx of [-1, 1] as const) {
-    const x = S.portalX + sx * (S.portalW / 2 + 0.55);
+    const x = S.portalX + sx * (S.portalW / 2 + 0.62);
     box(root, brassMat(0.3), 0.1, 0.04, 0.16, x, 0.02, pz - 0.22);
-    const bar = new Mesh(new BoxGeometry(0.07, 1.5, 0.02), brassGlowMat(1.1));
-    bar.position.set(x, 0.78, pz - 0.16);
+    const bar = new Mesh(new BoxGeometry(0.05, 1.35, 0.02), coldGlow);
+    bar.position.set(x, 0.72, pz - 0.16);
     root.add(bar);
   }
+
+  // THE DOORWAY IS THE LAMP. Nothing else in here is lit — the hall's own
+  // fittings stop at the wall and the room has no fixture of its own — so
+  // the light in the corner is the light coming THROUGH, cold against a
+  // building that is warm everywhere else. Without it the room read as a
+  // black slot from the floor and nobody would ever have found the door.
+  const through = new PointLight(PALETTE.cyan, 1.5, 6.5, 1.5);
+  through.position.set(S.portalX, 1.35, pz - 0.5);
+  root.add(through);
+  // A second, dimmer one out in the doorway, so the bronze dressing and the
+  // nameplate catch it from the hall side.
+  const doorway = new PointLight(0x9fd8ff, 0.7, 4.2, 1.6);
+  doorway.position.set((S.doorX0 + S.doorX1) / 2, 1.5, S.minZ + 0.5);
+  root.add(doorway);
 
   // The room's only light comes OUT OF THE DOOR — cool, low, and short
   // enough that it dies before the hall (the arcade next door is lit by
@@ -1978,20 +2003,27 @@ function voidPaneTexture(): CanvasTexture {
   g.fillStyle = css(VOID_BG);
   g.fillRect(0, 0, W, Hh);
 
-  const horizon = Hh * 0.58;
-  // The floor grid, converging on the horizon.
-  g.strokeStyle = 'rgba(79,183,255,0.20)';
-  g.lineWidth = 1.4;
-  for (let i = -7; i <= 7; i++) {
+  // THE HORIZON SITS AT EYE HEIGHT. The pane stands on the floor and runs
+  // to 2.1 m, so a horizon drawn down the middle of the canvas lands around
+  // a metre off the ground and the whole view reads as a picture hung low
+  // rather than as somewhere you could walk into. Put it where a real one
+  // would be — level with the eyes of whoever is standing in front of it —
+  // and most of the pane is the floor running away, which is exactly what
+  // you see through a door.
+  const horizon = Hh * 0.22;
+  // The floor grid, converging on the horizon — the deep half of the view.
+  g.strokeStyle = 'rgba(79,183,255,0.22)';
+  g.lineWidth = 1.6;
+  for (let i = -9; i <= 9; i++) {
     g.beginPath();
-    g.moveTo(W / 2 + i * (W / 5), Hh);
-    g.lineTo(W / 2 + i * 9, horizon);
+    g.moveTo(W / 2 + i * (W / 4), Hh);
+    g.lineTo(W / 2 + i * 7, horizon);
     g.stroke();
   }
-  for (let i = 1; i <= 9; i++) {
-    const t = i / 9;
+  for (let i = 1; i <= 14; i++) {
+    const t = i / 14;
     const y = horizon + (Hh - horizon) * t * t * t;
-    g.globalAlpha = 0.5 - t * 0.35;
+    g.globalAlpha = 0.55 - t * 0.4;
     g.beginPath();
     g.moveTo(0, y);
     g.lineTo(W, y);
@@ -2004,7 +2036,7 @@ function voidPaneTexture(): CanvasTexture {
   const rnd = (): number => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
   for (let i = 0; i < 26; i++) {
     const x = rnd() * W;
-    const h = 20 + rnd() * 150;
+    const h = 14 + rnd() * (horizon - 24);
     const w = 5 + rnd() * 16;
     g.fillStyle = 'rgba(12,10,20,0.95)';
     g.fillRect(x, horizon - h, w, h);
@@ -2014,12 +2046,12 @@ function voidPaneTexture(): CanvasTexture {
 
   // The horizon band itself — the brightest line in the picture, because a
   // void with no horizon is just a dark room.
-  const band = g.createLinearGradient(0, horizon - 46, 0, horizon + 10);
+  const band = g.createLinearGradient(0, horizon - 60, 0, horizon + 16);
   band.addColorStop(0, 'rgba(176,107,255,0)');
-  band.addColorStop(0.75, 'rgba(176,107,255,0.35)');
-  band.addColorStop(1, 'rgba(255,42,213,0.10)');
+  band.addColorStop(0.78, 'rgba(176,107,255,0.42)');
+  band.addColorStop(1, 'rgba(255,42,213,0.12)');
   g.fillStyle = band;
-  g.fillRect(0, horizon - 46, W, 56);
+  g.fillRect(0, horizon - 60, W, 76);
 
   const tex = new CanvasTexture(c);
   tex.colorSpace = SRGBColorSpace;
