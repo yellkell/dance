@@ -72,6 +72,10 @@ export const courseView: {
     slips: number;
     handovers: number;
     bars: number;
+    /** The ground you're standing on: is it travelling, and how many bars
+     *  of dwell has it left? The rig may only ever change on a frame where
+     *  `moving` is true — that is the no-sliding law, in one field. */
+    ground: { moving: boolean; departIn: number };
     /** THE DOOR's live read: is the threshold armed, and where is the head
      *  relative to it? */
     door: { refs: boolean; inside: boolean; armed: boolean; dx: number; dz: number };
@@ -139,6 +143,10 @@ export class CourseSystem extends createSystem({}) {
       slips: G.slips,
       handovers: G.handovers,
       bars: G.transport.bars,
+      ground: {
+        moving: G.platforms[G.tracked]?.moving ?? false,
+        departIn: G.platforms[G.tracked]?.departIn ?? Infinity,
+      },
       door: { ...this.door },
     });
   }

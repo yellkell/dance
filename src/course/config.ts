@@ -59,8 +59,14 @@ export const ENERGY = {
 
 export const PLAY_AREA = {
   // Fixed minimum, never adapted (research/03 §1, §8.4).
-  requiredWidth: 2.0,
-  requiredDepth: 2.0,
+  //
+  // 1.8 m is the floor you have to be able to STAND on, not the width of
+  // the decks: the grid's outer tiles are centred at ±0.66 and are 0.6
+  // across, so the ground spans 1.92 m — but every step the circuit asks
+  // for lands you on a tile CENTRE, and 1.8 leaves a quarter of a metre of
+  // real room beyond the furthest of them in each direction.
+  requiredWidth: 1.8,
+  requiredDepth: 1.8,
 };
 
 export const COUNTDOWN = {

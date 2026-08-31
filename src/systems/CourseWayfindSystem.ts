@@ -164,7 +164,10 @@ export class CourseWayfindSystem extends createSystem({}) {
     }
 
     // The berth: brackets only where the route's next machine will dock,
-    // and only while it is away from that dock.
+    // and only while it is away from that dock. Most of the time that is
+    // NOWHERE — and an instanced bank with every instance parked off-world
+    // still costs its draw call, so the whole bank goes dark instead.
+    let anyBerth = false;
     for (const slot of this.berthSlots) {
       const st = G.platforms[slot.platform];
       const relevant =
@@ -172,15 +175,20 @@ export class CourseWayfindSystem extends createSystem({}) {
         !st.aligned &&
         Math.hypot(slot.stop.x - G.rig.x, slot.stop.z - G.rig.z) + Math.abs(slot.stop.y - G.rig.y) <
           1.2;
+      anyBerth ||= relevant;
       const pulse = WAYFIND.berthPulse * (0.7 + 0.3 * Math.sin(G.transport.bars * Math.PI * 2));
       for (const n of slot.nubs) {
         if (relevant) {
           this.berths.set(n.idx, n.x, n.y, n.z, 0.04, 0.1, 0.04);
           this.berths.color(n.idx, COLOR.rimSafe, pulse);
         } else {
+          // Parked, not merely hidden: a berth's nubs stand at fixed world
+          // stops, so leaving them placed would light every dock the route
+          // has ever used the next time the bank comes back on.
           this.berths.set(n.idx, n.x, -999, n.z, 0.0001, 0.0001, 0.0001);
         }
       }
     }
+    this.berths.mesh.visible = anyBerth;
   }
 }

@@ -372,6 +372,22 @@ door is the design:
   ledger closes at centre: the last step east repays the first, and the ride
   ends on the exact spot it began. That is why the door can simply be
   waiting there when you finish — there was never anything to place.
+- **The room check, first and loudest.** One card, dead ahead of the pad
+  because that is the way you arrive facing: CLEAR 1.8 × 1.8 m — STAND IN
+  THE MIDDLE AND RECENTRE. Everything else out here is learned by doing;
+  this can't be. 1.8 m is the floor you must be able to STAND on, not the
+  span of the decks (1.92 m): every step the circuit asks for lands you on
+  a tile centre, and the outermost of those are at ±0.66. The card turns
+  over into the route on your first step — by then you demonstrably have the
+  floor, and a safety notice that keeps shouting through a whole ride is
+  scenery. One mesh, two paintings: two cards facing you at once would be
+  two draw calls and one too many things to read while ground is leaving.
+- **Nothing slides.** The law, stated so it can be checked: the world moves
+  ONLY on frames where the ground under you is travelling. There is no
+  easing term, no correction, nothing catching up — the rig is
+  `anchor(tracked)` and has no history at all. `tools/step-door.mjs` walks a
+  whole dwell and a departure frame by frame and fails on any frame where a
+  parked deck moved the world.
 - **The slip, not the slide.** Handover is gated and CLEAN ONLY: tracking
   passes to a platform exactly when its anchor already agrees with the live
   rig, so the instant of the switch moves nothing at all. The earlier build
@@ -383,6 +399,16 @@ door is the design:
   be on departing ground is to have missed the step — and a miss should read
   as a miss. The ground pulls away, the frame holds, the flow dies, the thud
   lands. The rig has one source of truth and no history.
+
+  Telling *incoming* ground from *leaving* ground has to look a quarter bar
+  ahead at BOTH ends of the gap, which the ported build didn't. It moved the
+  candidate forward and left the rig where it was — fine for a machine
+  pulling out from under you, wrong for a STATIC landing deck, whose anchor
+  never changes: `soon` came out identical to `now`, the gate fell through,
+  and a body stepping onto the deck it was riding INTO — a step taken a beat
+  early, which is a step a player should be allowed — was charged a slip for
+  it. The rig follows the tracked platform, so the closing is measured
+  against where the rig *will be*.
 - **No moves out there.** The `movement` repo's consolidation threw six of
   the GOOPLIATH's moves at the decks mid-ride, and they were the first thing
   cut on the way across. They are a boss's vocabulary, thrown by a boss on a
@@ -392,10 +418,13 @@ door is the design:
   reads off the only hazard there is: the ground you own, counting itself
   out. The void ducks for it, exactly as it ducks for a telegraph on your
   deck in a set.
-- **The bill.** 59 draw calls and ~30 k triangles for the whole far side,
-  against the same budgets the set is held to (≤ 60, ≤ 100 k) — the circuit's
-  decks share their reflection's instance buffers, so the route hangs over
-  its own image the whole way round for one extra draw per bank.
+- **The bill.** 60 draw calls at the start line (the card is up) and 59
+  mid-ride, ~29 k triangles, against the same budgets the set is held to
+  (≤ 60, ≤ 100 k). The circuit's decks share their reflection's instance
+  buffers, so the route hangs over its own image the whole way round for one
+  extra draw per bank; and the berth brackets go dark rather than parking
+  their instances off-world, because a bank with nothing to show still costs
+  its draw call.
 
 `node tools/step-door.mjs` walks the room and the crossing; `--lap` rides the
 entire circuit on autopilot and waits for the ledger to close.

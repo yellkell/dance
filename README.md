@@ -300,11 +300,20 @@ There are **four places**, and where you are is what you're doing:
    it, and stepping onto the next one hands it over. Walking two metres
    takes you forty. Stepping is the entire game.
 
-   The floor says everything. Ground about to leave washes amber, its rim
-   fills a quarter per beat, and a corner post dies with each one — four
-   dead posts and it's gone. Miss the step and it pulls away without you: a
-   **slip**, never a slide, because out here the world never moves on its
-   own. The route rides **out** east on a runner, **up** the lift, **across
+   You arrive facing a card that says **CLEAR 1.8 × 1.8 m — STAND IN THE
+   MIDDLE AND RECENTRE**, because that is the one thing out here that can't
+   be learned by doing, and a body that finds a real wall halfway through a
+   step has been failed by the experience rather than by the room. Take your
+   first step and the card turns over into the route.
+
+   **Nothing slides.** The world moves only while the ground you are
+   standing on is travelling — no easing, no correction, nothing catching up
+   — and the probe checks that frame by frame across a dwell and a
+   departure. The floor says everything else: ground about to leave washes
+   amber, its rim fills a quarter per beat, and a corner post dies with each
+   one — four dead posts and it's gone. Miss the step and it pulls away
+   without you: a **slip**, which holds the frame to the micron rather than
+   correcting it. The route rides **out** east on a runner, **up** the lift, **across
    THE SKYWALK** at height with the mirror floor a storey and a half below,
    then **down** the drop and home on the west runner. The lap is
    geometrically closed — the last step repays the first — so it ends on the

@@ -16,9 +16,12 @@
  *     the club packs away, the void comes up, the rig plants on the home
  *     pad, the clock starts at the top of the score, and the club's
  *     teleport is off the whole time you're out there.
- *  3. THE LAWS — a clean handover moves the rig by nothing at all; riding
- *     carries the world past you; the route's wayfinding always names the
- *     next machine; the way home puts you back outside the doorway.
+ *  3. THE LAWS — a clean handover moves the rig by nothing at all; the
+ *     world moves ONLY on frames where the ground under you is travelling
+ *     (NO SLIDING — checked frame by frame across a dwell and a departure);
+ *     riding carries the world past a body that never moved; and a miss is
+ *     a SLIP that holds the frame to the micron rather than correcting it.
+ *     The way home puts you back outside the doorway.
  *  4. THE BILL — draw calls and triangles on the far side, against the same
  *     budgets the set is held to (≤ 60 draws, ≤ 100 k triangles).
  *
@@ -160,20 +163,98 @@ const out = await page.evaluate(
     ok('the handover moves the world by nothing', moved < 1e-6, `${moved.toExponential(1)} m`);
     ok('and it is a clean one — no slip charged', st().slips === 0);
 
+    /* ── NO SLIDING ────────────────────────────────────────────────────
+     * The claim, exactly: the world moves ONLY on frames where the ground
+     * you are standing on is travelling. Nothing eases, nothing corrects,
+     * nothing catches up. Ride the runner from its dwell at home through
+     * its departure and check every single frame — a slide would be a rig
+     * that moved while its own deck was parked. */
     const boarded = st().rig;
+    let prev = st();
+    let violations = 0;
+    let worst = 0;
+    let sawDwell = false;
+    let sawTravel = false;
     let t0 = performance.now();
-    while (performance.now() - t0 < 30000 && Math.abs(st().rig.x - boarded.x) < 2.0) await sleep(100);
+    while (performance.now() - t0 < 60000 && st().bars < 7) {
+      await frames(1);
+      const now = st();
+      const d = Math.hypot(now.rig.x - prev.rig.x, now.rig.y - prev.rig.y, now.rig.z - prev.rig.z);
+      // Parked at BOTH ends of the frame: the one frame that straddles a
+      // dwell's last instant and a departure's first is the ride starting,
+      // not a slide, and sampling can only ever see it as one or the other.
+      if (prev.ground.moving || now.ground.moving) sawTravel = true;
+      else {
+        sawDwell = true;
+        if (d > 1e-6) {
+          violations++;
+          worst = Math.max(worst, d);
+        }
+      }
+      prev = now;
+    }
+    ok(
+      'the world moves only while your ground is travelling',
+      violations === 0,
+      violations ? `${violations} frames slid, worst ${worst.toExponential(1)} m` : 'no frame slid',
+    );
+    ok('…and both a dwell and a departure were watched', sawDwell && sawTravel);
+
+    t0 = performance.now();
+    let ridingBudget = g.info();
+    while (performance.now() - t0 < 40000 && Math.abs(st().rig.x - boarded.x) < 2.0) {
+      await sleep(100);
+      // The bill mid-ride, not just on a lucky frame at the start line:
+      // keep the worst draw count seen while the world is actually moving.
+      const b = g.info();
+      if (b && b.calls > ridingBudget.calls) ridingBudget = b;
+    }
     ok('the runner carries the world past you', Math.abs(st().rig.x - boarded.x) > 2.0, `rig x ${st().rig.x.toFixed(2)}`);
+    ok(
+      'the bill holds mid-ride, not just at the start line',
+      ridingBudget.calls <= 60 && ridingBudget.triangles <= 100000,
+      `${ridingBudget.calls} draws, ${ridingBudget.triangles} triangles`,
+    );
     // …and YOU didn't move: the body's play-area coordinates are exactly
     // where the step left them. That is the whole inversion.
     const drift = Math.hypot(st().body.x - GRID.pitch, st().body.z);
     ok('and you never moved — the world did', drift < 1e-6, `body drift ${drift.toExponential(1)} m`);
+
+    /* ── THE SLIP — the miss that replaced the slide ──────────────────
+     * Ride in to the east landing, step off onto the static deck, then
+     * stand back on the runner AFTER it has pulled out. Departing ground
+     * under an untracked body is charged as a miss, and the frame must
+     * hold to the micron: there is no correction term to drain. */
+    for (let i = 0; i < 200 && st().tracked !== 'east-step'; i++) {
+      g.course.head(0, 0);
+      await frames(1);
+    }
+    ok('stepping off at the landing boards the east deck', st().tracked === 'east-step', st().tracked);
+    const slipsBefore = st().slips;
+    // The runner pulls out of the east berth at bar 14. The window to be
+    // caught standing on it is narrow by construction — before ~14.11 its
+    // anchor still agrees with the rig and boarding is a CLEAN handover;
+    // after ~14.4 the deck has slid out from under the head altogether and
+    // there is nothing left to be standing on — so poll by frame, not by
+    // clock, and step on the moment it stops being a legal board.
+    while (st().bars < 14.15) await frames(1);
+    const held = st().rig;
+    g.course.head(GRID.pitch, 0); // stand where it was
+    await sleep(900);
+    const after = st();
+    ok('ground that has left under you is a slip', after.slips === slipsBefore + 1, `${after.slips} slip(s)`);
+    const slid = Math.hypot(after.rig.x - held.x, after.rig.y - held.y, after.rig.z - held.z);
+    ok('and a slip slides the world by nothing', slid < 1e-6, `${slid.toExponential(1)} m`);
+    ok('the frame stays with the deck you are actually on', after.tracked === 'east-step', after.tracked);
+    g.course.head(0, 0); // back onto the route
+    await frames(6);
 
     /* ── the whole lap, on autopilot ─────────────────────────────────── */
     let trail = null;
     if (rideLap) {
       trail = [];
       let last = '';
+      const lapSlips = st().slips;
       t0 = performance.now();
       // The autopilot is the INVITATION, obeyed: whenever the route's next
       // ground is actually here, stand on the tile the circle of light is
@@ -190,7 +271,7 @@ const out = await page.evaluate(
         await sleep(40);
       }
       ok('the circuit closes — the lap ends where it began', st().laps === 1, trail.join(' → '));
-      ok('and it closed without a slip', st().slips === 0, `${st().handovers} handovers`);
+      ok('and it closed without a further slip', st().slips === lapSlips, `${st().handovers} handovers`);
       // The lap's own bell holds for a beat and a half, then the door goes.
       t0 = performance.now();
       while (performance.now() - t0 < 20000 && st().phase !== 'off') await sleep(100);
@@ -207,7 +288,7 @@ const out = await page.evaluate(
       ok('stepping back out gives the club back', clubUp() && !courseUp() && !st().active);
     }
 
-    return { checks, clubBudget, courseBudget, trail };
+    return { checks, clubBudget, courseBudget, ridingBudget, trail };
   },
   { rideLap: RIDE_LAP, lapCap: LAP_CAP_MS },
 );
@@ -219,7 +300,8 @@ for (const c of out.checks) {
 }
 console.log(`\n${pass}/${out.checks.length} checks`);
 if (out.clubBudget) console.log(`the club:   ${out.clubBudget.calls} draws, ${out.clubBudget.triangles} triangles`);
-if (out.courseBudget) console.log(`the course: ${out.courseBudget.calls} draws, ${out.courseBudget.triangles} triangles  (budget ≤ 60 / ≤ 100000)`);
+if (out.courseBudget) console.log(`the course: ${out.courseBudget.calls} draws, ${out.courseBudget.triangles} triangles  (at the start line)`);
+if (out.ridingBudget) console.log(`  mid-ride: ${out.ridingBudget.calls} draws, ${out.ridingBudget.triangles} triangles  (budget ≤ 60 / ≤ 100000)`);
 if (!RIDE_LAP) console.log('(run with --lap to ride the whole circuit)');
 
 await browser.close();

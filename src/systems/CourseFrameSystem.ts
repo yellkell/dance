@@ -40,6 +40,7 @@ export class CourseFrameSystem extends createSystem({}) {
   private candidateFrames = 0;
   private slipped = -1; // platform already charged for this departure
   private look = v3(0, 0, 0);
+  private lookRig = v3(0, 0, 0);
 
   update(): void {
     if (!course.active) return;
@@ -126,11 +127,22 @@ export class CourseFrameSystem extends createSystem({}) {
     // bar ahead. Either way THE FRAME HOLDS — incoming ground stays gated,
     // and leaving ground no longer drags the world: it slides out from
     // under you, and that is the slip.
+    //
+    // BOTH ends of that gap move. Looking ahead at the candidate alone was
+    // wrong for STATIC ground: a landing deck's anchor never changes, so
+    // `soon` came out identical to `now` and a body standing on the deck it
+    // was riding INTO — a step taken a beat early, which is a step a player
+    // should be allowed — was charged a slip for it. The rig follows the
+    // tracked platform, so the closing has to be measured against where the
+    // rig will be, not where it is.
     const now =
       Math.hypot(cand.anchor.x - rig.x, cand.anchor.z - rig.z) + Math.abs(cand.anchor.y - rig.y);
-    anchorAt(PLATFORMS[owner], G.transport.bars + 0.25, this.look);
+    const ahead = G.transport.bars + 0.25;
+    anchorAt(PLATFORMS[owner], ahead, this.look);
+    anchorAt(PLATFORMS[G.tracked], ahead, this.lookRig);
     const soon =
-      Math.hypot(this.look.x - rig.x, this.look.z - rig.z) + Math.abs(this.look.y - rig.y);
+      Math.hypot(this.look.x - this.lookRig.x, this.look.z - this.lookRig.z) +
+      Math.abs(this.look.y - this.lookRig.y);
     if (soon < now) return; // incoming: gated, no switch yet
 
     if (this.slipped !== owner) {

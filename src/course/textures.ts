@@ -66,12 +66,8 @@ export interface PanelSpec {
   accent?: number;
 }
 
-/**
- * A text panel, planted ~3 m out (research/02 §6) in the house typeface and
- * the house magenta. Four lines is the whole manual: embodied movement
- * doesn't have to be learned (research/03 §5).
- */
-export function textPanel(spec: PanelSpec): Mesh {
+/** Just the picture, for a card that changes what it says. */
+export function panelTexture(spec: PanelSpec): { tex: CanvasTexture; aspect: number } {
   const W = 1024;
   const pad = 64;
   const titleSize = 104;
@@ -106,7 +102,9 @@ export function textPanel(spec: PanelSpec): Mesh {
     g.shadowBlur = 22;
     g.font = font(700, titleSize);
     g.letterSpacing = '10px';
-    g.fillText(spec.title, W / 2, y + titleSize * 0.82);
+    // Bounded like the body lines: a title long enough to overrun would
+    // otherwise paint straight off the edge of the panel.
+    g.fillText(spec.title, W / 2, y + titleSize * 0.82, W - pad * 2);
     g.letterSpacing = '0px';
     g.shadowBlur = 0;
     y += titleSize + 40;
@@ -125,8 +123,18 @@ export function textPanel(spec: PanelSpec): Mesh {
 
   const tex = new CanvasTexture(c);
   tex.anisotropy = 4;
+  return { tex, aspect: h / W };
+}
+
+/**
+ * A text panel, planted ~3 m out (research/02 §6) in the house typeface and
+ * the house magenta. Four lines is the whole manual: embodied movement
+ * doesn't have to be learned (research/03 §5).
+ */
+export function textPanel(spec: PanelSpec): Mesh {
+  const { tex, aspect } = panelTexture(spec);
   return new Mesh(
-    new PlaneGeometry(spec.width, (spec.width * h) / W),
+    new PlaneGeometry(spec.width, spec.width * aspect),
     new MeshBasicMaterial({ map: tex, transparent: true, side: DoubleSide, depthWrite: false }),
   );
 }

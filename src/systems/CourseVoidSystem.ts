@@ -22,8 +22,16 @@
  */
 
 import { createSystem } from '@iwsdk/core';
-import { Group, type Mesh, type MeshBasicMaterial, type Points } from 'three';
-import { hueToColor, LASER_HUES } from '../config.js';
+import {
+  CanvasTexture,
+  DoubleSide,
+  Group,
+  Mesh,
+  MeshBasicMaterial,
+  PlaneGeometry,
+  type Points,
+} from 'three';
+import { hueToColor, LASER_HUES, PALETTE } from '../config.js';
 import {
   buildArcs,
   buildCanopy,
@@ -42,7 +50,7 @@ import {
 } from '../arena/voidkit.js';
 import { ENERGY } from '../course/config.js';
 import { applyDim } from '../course/dimmer.js';
-import { textPanel } from '../course/textures.js';
+import { panelTexture, textPanel } from '../course/textures.js';
 import { course, G } from '../course/state.js';
 import { courseRoot } from '../course/world.js';
 
@@ -65,6 +73,10 @@ export class CourseVoidSystem extends createSystem({}) {
   private horizonNear!: MeshBasicMaterial;
   private horizonFar!: MeshBasicMaterial;
   private dust!: Points;
+  private cardMat!: MeshBasicMaterial;
+  private roomTex!: CanvasTexture;
+  private routeTex!: CanvasTexture;
+  private turned = false;
   private hueCursor = 0;
   private lastBar = -1;
   private clock = 0;
@@ -139,11 +151,34 @@ export class CourseVoidSystem extends createSystem({}) {
     this.horizonNear = horizon.near;
     this.horizonFar = horizon.far;
 
-    // THE ONLY INSTRUCTION, on an angled panel a few metres out, facing the
-    // home pad from beyond the route's first step. Embodied movement doesn't
-    // have to be learned (research/03 §5) — four lines cover the rest, and
-    // the last one is the way home.
-    const panel = textPanel({
+    // THE CARD — one panel, dead ahead of the home pad, because you arrive
+    // facing that way. It says the thing that matters NOW, and it says
+    // exactly one of them:
+    //
+    //   before your first step — THE ROOM CHECK. Everything else out here
+    //   is learned by doing; this can't be, and a body that finds a real
+    //   wall halfway through a step has been failed by the experience
+    //   rather than by the room. It is the loudest thing in the void.
+    //
+    //   after it — THE ROUTE. By then you have demonstrably got the floor,
+    //   and a safety notice that keeps shouting through a whole ride is
+    //   scenery. The card turns over and becomes the four lines that are
+    //   the entire manual (research/03 §5).
+    //
+    // One mesh, two paintings: two cards facing you at once would be two
+    // draw calls and one too many things to read while ground is leaving.
+    const room = panelTexture({
+      title: 'CLEAR 1.8 × 1.8 m',
+      lines: [
+        'STAND IN THE MIDDLE AND RECENTRE',
+        'every step the circuit asks for lands inside that square',
+      ],
+      small: 'on Quest: hold the Meta button to recentre',
+      width: 2.5,
+      accent: PALETTE.cyan,
+      color: '#dcf1ff',
+    });
+    this.routeTex = panelTexture({
       title: 'VOIDSTEP',
       lines: [
         'step between the platforms — the void does the walking',
@@ -152,11 +187,18 @@ export class CourseVoidSystem extends createSystem({}) {
         'close the lap and the door opens behind you',
       ],
       small: 'hold Ⓑ to step back out · squeeze to see how the circuit thinks',
-      width: 2.6,
+      width: 2.5,
+    }).tex;
+    this.roomTex = room.tex;
+    this.cardMat = new MeshBasicMaterial({
+      map: room.tex,
+      transparent: true,
+      side: DoubleSide,
+      depthWrite: false,
     });
-    panel.position.set(-2.2, 1.7, 2.4);
-    panel.rotation.y = Math.PI + Math.PI / 8;
-    root.add(panel);
+    const card = new Mesh(new PlaneGeometry(2.5, 2.5 * room.aspect), this.cardMat);
+    card.position.set(0, 1.6, -2.5);
+    root.add(card);
   }
 
   update(dt: number): void {
@@ -164,6 +206,20 @@ export class CourseVoidSystem extends createSystem({}) {
     this.clock += dt;
 
     if (course.roomWarn && !this.warning) this.raiseRoomWarning();
+
+    // The card turns over on your first step: the room check has done its
+    // job the moment you demonstrably have the floor. It fades out, swaps
+    // its painting, and fades back as the route. Every fresh crossing puts
+    // the room check back — you are starting again, and the notice costs a
+    // glance to re-read.
+    if (this.turned && G.handovers === 0) {
+      this.showCard(this.roomTex);
+    } else if (!this.turned && G.handovers > 0) {
+      this.cardMat.opacity -= dt * 3;
+      if (this.cardMat.opacity <= 0) this.showCard(this.routeTex);
+    } else if (this.cardMat.opacity < 1) {
+      this.cardMat.opacity = Math.min(1, this.cardMat.opacity + dt * 1.6);
+    }
 
     // Energy: the world ducks while the ground you own is counting itself
     // out, and blooms as the ride stays clean.
@@ -242,6 +298,15 @@ export class CourseVoidSystem extends createSystem({}) {
     this.horizonFar.opacity = 0.08 + energy * 0.06;
   }
 
+  /** Turn the card over. A material's texture reference changing needs the
+   *  program re-resolved, so it says so rather than trusting the swap. */
+  private showCard(tex: CanvasTexture): void {
+    this.cardMat.map = tex;
+    this.cardMat.needsUpdate = true;
+    this.cardMat.opacity = 0;
+    this.turned = tex === this.routeTex;
+  }
+
   /** The play-area courtesy: say so, plainly, before the first ride. */
   private raiseRoomWarning(): void {
     const { w, d } = course.roomWarn!;
@@ -249,7 +314,7 @@ export class CourseVoidSystem extends createSystem({}) {
       title: 'ROOM CHECK',
       lines: [
         `this play area reads ${w.toFixed(1)} × ${d.toFixed(1)} m`,
-        'the circuit is authored for 2 × 2 m',
+        'the circuit is authored for 1.8 × 1.8 m',
         'steps may land past your boundary',
       ],
       small: 'clear more floor, or ride with care',
@@ -257,8 +322,10 @@ export class CourseVoidSystem extends createSystem({}) {
       color: '#ffd6a0',
       accent: 0xffb000,
     });
-    this.warning.position.set(0.9, 1.45, 1.9);
-    this.warning.rotation.y = Math.PI - Math.PI / 10;
+    // Beside the room check, not behind you: a warning you have to turn
+    // round to find is a warning nobody reads.
+    this.warning.position.set(2.1, 1.35, -2.1);
+    this.warning.rotation.y = -Math.PI / 6;
     courseRoot().add(this.warning);
   }
 }
