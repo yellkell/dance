@@ -388,6 +388,28 @@ door is the design:
   `anchor(tracked)` and has no history at all. `tools/step-door.mjs` walks a
   whole dwell and a departure frame by frame and fails on any frame where a
   parked deck moved the world.
+- **Nothing is invisible either.** With no landings out here the floor is
+  the only thing that ever speaks, so it speaks in the club's own colours:
+  CYAN is ground you may step on, AMBER is ground counting itself out, RED
+  is ground in motion. That last one is load-bearing, not decoration — a
+  travelling deck CANNOT be boarded (the handover gate refuses it, and
+  standing on it as it goes is the slip), so one painted like a docked deck
+  would be a hazard you can't see, which is the one thing a floor is never
+  allowed to be. A missed step then flares that deck red for half a second
+  and takes the whole void down with it, so the thud has a picture: the
+  earlier build's only answer to a miss was a sound, and a sound alone
+  cannot tell you WHICH ground went. The probe reads all three straight off
+  the live instance buffer rather than trusting the code that wrote it.
+- **The way out is a card, not a button.** Right Ⓐ raises KEEP RIDING /
+  LEAVE THE COURSE, which is exactly how you leave a set mid-song: leaving
+  is a decision on a button, never the button itself. A bare button held for
+  a second — which is what this was first — is a thing you find by accident
+  and never find on purpose, and out here your hands are empty and your
+  thumb is resting on nothing. Nothing stops while the card is up; ground
+  goes on leaving, which on a circuit costs you a loop and not a life. The
+  card rides in your PLAY AREA rather than the world, because the play area
+  is the one part of this place that holds still against your body — a
+  world-locked card would be left behind by the first platform that moved.
 - **The slip, not the slide.** Handover is gated and CLEAN ONLY: tracking
   passes to a platform exactly when its anchor already agrees with the live
   rig, so the instant of the switch moves nothing at all. The earlier build
@@ -418,8 +440,9 @@ door is the design:
   reads off the only hazard there is: the ground you own, counting itself
   out. The void ducks for it, exactly as it ducks for a telegraph on your
   deck in a set.
-- **The bill.** 60 draw calls at the start line (the card is up) and 59
-  mid-ride, ~29 k triangles, against the same budgets the set is held to
+- **The bill.** 60 draw calls at the start line (the room-check card is up)
+  and 59 mid-ride, ~29 k triangles, against the same budgets the set is held
+  to
   (≤ 60, ≤ 100 k). The circuit's decks share their reflection's instance
   buffers, so the route hangs over its own image the whole way round for one
   extra draw per bank; and the berth brackets go dark rather than parking

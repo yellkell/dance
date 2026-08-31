@@ -54,6 +54,11 @@ export const G = {
   energy: 0.8,
   /** The ground you own is counting itself out: the void ducks for it. */
   groundLeaving: false,
+  /** The deck that just left without you, and how long its burn has to
+   *  run. A miss is audible (the thud) and now visible: the ground that
+   *  went flares red where it went. */
+  slipAt: -1,
+  slipFlash: 0,
   ghosts: false, // the authoring overlay toggle
 };
 
@@ -68,6 +73,8 @@ export function resetRide(): void {
   G.flow = 0;
   G.energy = 0.8;
   G.groundLeaving = false;
+  G.slipAt = -1;
+  G.slipFlash = 0;
   G.wayfind.targetIndex = -1;
   G.wayfind.targetAligned = false;
 }

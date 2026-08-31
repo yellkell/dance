@@ -3,8 +3,15 @@
  * whole countdown grammar.
  *
  * With no landings out here the floor is the only thing that ever speaks, so
- * it says everything three ways at once and none of them can be hidden by
- * the angle you happen to be standing at:
+ * it speaks in the club's own colours — CYAN is ground you may step on, AMBER
+ * is ground counting itself out, RED is ground in motion and the burn of a
+ * step you missed. Red is not decoration: a deck that is travelling cannot be
+ * boarded (the handover gate refuses it), so one painted like a docked deck
+ * would be a hazard you can't see, which is the one thing the floor is never
+ * allowed to be.
+ *
+ * It says all of it three ways at once, and none of them can be hidden by the
+ * angle you happen to be standing at:
  *
  *   1. CORNER POSTS, one extinguished per beat — vertical, so they read
  *      edge-on, from below, and over the fences;
@@ -29,14 +36,23 @@ import {
   Mesh,
   MeshBasicMaterial,
 } from 'three';
-import { COLOR, COUNTDOWN, GRID } from '../course/config.js';
+import { COLOR, COUNTDOWN, GRID, SLIP_FLASH } from '../course/config.js';
 import { conductor } from '../course/conductor.js';
 import { Bank, mirrorBank, shadedBoxGeometry } from '../course/banks.js';
 import { registerDim } from '../course/dimmer.js';
 import { patternTexture } from '../course/textures.js';
-import { anchorAt, dwellInfo, endpointsOf, fencesOf, PLATFORMS, sqOffset } from '../course/score.js';
+import {
+  anchorAt,
+  dwellInfo,
+  endpointsOf,
+  fencesOf,
+  INDEX,
+  PLATFORMS,
+  sqOffset,
+} from '../course/score.js';
 import { course, G } from '../course/state.js';
 import { courseRoot } from '../course/world.js';
+import { courseView } from './CourseSystem.js';
 import { FLOOR_Y } from './CourseVoidSystem.js';
 
 const EDGE_OFF: Record<string, [number, number, number, number]> = {
@@ -80,11 +96,20 @@ export class CoursePlatformSystem extends createSystem({}) {
   private tiles: TileSlot[] = [];
   private fenceSlots: FenceSlot[] = [];
   private ghostGroup!: Group;
+  /** platform index → its first deck instance, for the colour read-back. */
+  private firstDeck: number[] = [];
   private rigPattern!: Mesh;
   private lastBeat = -1;
 
   init(): void {
     const root = courseRoot();
+    courseView.deckTint = (id) => {
+      const pi = INDEX[id];
+      const slot = pi === undefined ? undefined : this.firstDeck[pi];
+      const a = this.decks?.mesh.instanceColor;
+      if (slot === undefined || !a) return null;
+      return { r: a.getX(slot), g: a.getY(slot), b: a.getZ(slot) };
+    };
     G.platforms = PLATFORMS.map(() => ({
       anchor: { x: 0, y: 0, z: 0 },
       moving: false,
@@ -133,6 +158,7 @@ export class CoursePlatformSystem extends createSystem({}) {
             this.posts.add(0, 0, 0, COUNTDOWN.postSize, COUNTDOWN.postIdle, COUNTDOWN.postSize, COLOR.rimSafe),
           );
         }
+        if (this.firstDeck[pi] === undefined) this.firstDeck[pi] = slot.deck;
         this.tiles.push(slot);
       }
       for (const f of fenceLists[pi]) {
@@ -240,7 +266,7 @@ export class CoursePlatformSystem extends createSystem({}) {
     root.add(this.ghostGroup);
   }
 
-  update(): void {
+  update(dt: number): void {
     if (!course.active) return;
     const bar = G.transport.bars;
     const beatPulse = 0.75 + 0.25 * Math.cos(G.transport.barPhase * Math.PI * 8);
@@ -253,9 +279,10 @@ export class CoursePlatformSystem extends createSystem({}) {
       st.departIn = d.departIn;
     }
 
-    // The ground you own counting itself out is the only hazard on the
+    // The ground you own counting itself out is the standing hazard on the
     // circuit, and the void ducks for it (CourseVoidSystem).
     G.groundLeaving = G.platforms[G.tracked]?.departIn <= 1;
+    if (G.slipFlash > 0) G.slipFlash = Math.max(0, G.slipFlash - dt);
 
     // The countdown is audible too: ticks on each beat of the final dwell
     // bar, for the ground you own or the ground you're being invited onto.
@@ -281,11 +308,17 @@ export class CoursePlatformSystem extends createSystem({}) {
 
       const warn = st.departIn <= 1;
       const fill = warn ? 1 - st.departIn : 0;
+      // The burn of a missed step, on the deck that went without you.
+      const burn = G.slipAt === t.platform ? G.slipFlash / SLIP_FLASH : 0;
 
-      if (warn) {
+      if (burn > 0) {
+        this.decks.color(t.deck, COLOR.rimDanger, 0.35 + 0.65 * burn);
+      } else if (warn) {
         this.decks.color(t.deck, COLOR.rimWarn, (0.1 + 0.5 * fill) * (0.7 + 0.45 * beatPulse));
       } else if (st.moving) {
-        this.decks.color(t.deck, COLOR.rimSafe, 0.2);
+        // IN MOTION — the gate refuses it, so stepping on is a miss. It
+        // wears the same red a landing does in a set.
+        this.decks.color(t.deck, COLOR.rimDanger, 0.16);
       } else {
         this.decks.color(t.deck, COLOR.deckTop);
       }
@@ -305,13 +338,15 @@ export class CoursePlatformSystem extends createSystem({}) {
           0.09,
           sz === 1 ? GRID.tile + 0.05 : 0.045,
         );
-        if (warn) {
+        if (burn > 0) {
+          this.rims.color(idx, COLOR.rimDanger, 0.6 + burn);
+        } else if (warn) {
           // One quarter of the rim lights per beat gone — the wrap fills
           // like a clock face.
           const lit = (e + 1) / 4 <= fill + 0.001;
           this.rims.color(idx, lit ? COLOR.rimWarn : COLOR.rimSafe, lit ? 1.2 + beatPulse * 0.4 : 0.35);
         } else if (st.moving) {
-          this.rims.color(idx, COLOR.rimSafe, 0.75 + 0.35 * beatPulse);
+          this.rims.color(idx, COLOR.rimDanger, 0.9 + 0.5 * beatPulse);
         } else if (st.aligned) {
           this.rims.color(idx, COLOR.rimSafe, 0.55 + 0.45 * beatPulse);
         } else {
@@ -335,10 +370,12 @@ export class CoursePlatformSystem extends createSystem({}) {
           h,
           COUNTDOWN.postSize,
         );
-        if (warn) {
+        if (burn > 0) {
+          this.posts.color(t.posts[k], COLOR.rimDanger, 0.5 + burn);
+        } else if (warn) {
           this.posts.color(t.posts[k], COLOR.rimWarn, k < beatsLeft ? 1.35 + 0.5 * beatPulse : 0.08);
         } else if (st.moving) {
-          this.posts.color(t.posts[k], COLOR.rimSafe, 0.4);
+          this.posts.color(t.posts[k], COLOR.rimDanger, 0.5);
         } else if (st.aligned) {
           this.posts.color(t.posts[k], COLOR.rimSafe, 0.5 + 0.3 * beatPulse);
         } else {

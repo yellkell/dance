@@ -22,7 +22,12 @@
  *     riding carries the world past a body that never moved; and a miss is
  *     a SLIP that holds the frame to the micron rather than correcting it.
  *     The way home puts you back outside the doorway.
- *  4. THE BILL — draw calls and triangles on the far side, against the same
+ *  4. THE SIGHT OF IT — ground you may step on is painted safe, ground in
+ *     motion is painted as the hazard it is, and a missed step burns the
+ *     deck that left; all read straight off the live instance buffer.
+ *  5. THE WAY OUT — right Ⓐ raises a card with a button on it, the way
+ *     leaving a set mid-song does, and the button is what leaves.
+ *  6. THE BILL — draw calls and triangles on the far side, against the same
  *     budgets the set is held to (≤ 60 draws, ≤ 100 k triangles).
  *
  * With `--lap` it also rides the WHOLE circuit on autopilot (step onto the
@@ -220,6 +225,24 @@ const out = await page.evaluate(
     const drift = Math.hypot(st().body.x - GRID.pitch, st().body.z);
     ok('and you never moved — the world did', drift < 1e-6, `body drift ${drift.toExponential(1)} m`);
 
+    /* ── THE HAZARD IS VISIBLE ────────────────────────────────────────
+     * Ground in motion cannot be boarded — the gate refuses it — so a
+     * moving deck that looked like a docked one would be a hazard you
+     * can't see. Read the paint straight off the live instance buffer:
+     * docked ground is cyan (blue over red), travelling ground is red. */
+    const dockedTint = g.course.deckTint('east-step');
+    const movingTint = g.course.deckTint('runner-out');
+    ok(
+      'ground you may step on is painted safe',
+      dockedTint !== null && dockedTint.b >= dockedTint.r,
+      dockedTint ? `r ${dockedTint.r.toFixed(2)} b ${dockedTint.b.toFixed(2)}` : 'no read',
+    );
+    ok(
+      'ground in motion is painted as the hazard it is',
+      movingTint !== null && movingTint.r > movingTint.b * 1.5,
+      movingTint ? `r ${movingTint.r.toFixed(2)} b ${movingTint.b.toFixed(2)}` : 'no read',
+    );
+
     /* ── THE SLIP — the miss that replaced the slide ──────────────────
      * Ride in to the east landing, step off onto the static deck, then
      * stand back on the runner AFTER it has pulled out. Departing ground
@@ -240,14 +263,43 @@ const out = await page.evaluate(
     while (st().bars < 14.15) await frames(1);
     const held = st().rig;
     g.course.head(GRID.pitch, 0); // stand where it was
-    await sleep(900);
+    for (let i = 0; i < 120 && st().slips === slipsBefore; i++) await frames(1);
+    // Read the burn while it is burning: it decays over half a second, and
+    // the floor is painted before the frame of reference judges, so the
+    // flare lands on the frame AFTER the miss is charged.
+    await frames(2);
+    const burn = g.course.deckTint('runner-out');
+    await sleep(400);
     const after = st();
     ok('ground that has left under you is a slip', after.slips === slipsBefore + 1, `${after.slips} slip(s)`);
     const slid = Math.hypot(after.rig.x - held.x, after.rig.y - held.y, after.rig.z - held.z);
     ok('and a slip slides the world by nothing', slid < 1e-6, `${slid.toExponential(1)} m`);
     ok('the frame stays with the deck you are actually on', after.tracked === 'east-step', after.tracked);
+    // …and the miss is SEEN, not only heard: the deck that went without you
+    // flares far brighter than the steady red it already wears in motion.
+    ok(
+      'a missed step burns the ground that left',
+      burn !== null && burn.r > 0.6 && burn.r > burn.b * 2,
+      burn ? `r ${burn.r.toFixed(2)} b ${burn.b.toFixed(2)}` : 'no read',
+    );
     g.course.head(0, 0); // back onto the route
     await frames(6);
+
+    /* ── THE WAY OUT ──────────────────────────────────────────────────
+     * Not a bare button held for a second — a card with a button on it,
+     * the same posture as leaving a set mid-song. */
+    ok('nothing is up until you ask for it', g.course.buttons().length === 0);
+    g.course.menu();
+    await frames(4);
+    const buttons = g.course.buttons();
+    ok(
+      'right Ⓐ raises a card that offers the way out',
+      buttons.includes('ride') && buttons.includes('quit'),
+      buttons.join(' / ') || 'nothing',
+    );
+    g.course.press('ride');
+    await frames(4);
+    ok('KEEP RIDING puts it away and leaves you on the circuit', g.course.buttons().length === 0 && st().active);
 
     /* ── the whole lap, on autopilot ─────────────────────────────────── */
     let trail = null;
@@ -283,9 +335,18 @@ const out = await page.evaluate(
         `x ${backAt.x.toFixed(2)} z ${backAt.z.toFixed(2)}`,
       );
     } else {
-      g.course.leave();
-      await frames(6);
-      ok('stepping back out gives the club back', clubUp() && !courseUp() && !st().active);
+      g.course.menu();
+      await frames(4);
+      g.course.press('quit');
+      // The card decides, then the black falls and the hall comes back.
+      t0 = performance.now();
+      while (performance.now() - t0 < 12000 && st().phase !== 'off') await sleep(100);
+      ok('LEAVE THE COURSE gives the club back', clubUp() && !courseUp() && !st().active);
+      ok(
+        'and puts you down outside the door you went in by',
+        Math.abs(g.match.headX - S.portalX) < 0.4 && g.match.headZ < S.portalZ - S.reach,
+        `x ${g.match.headX.toFixed(2)} z ${g.match.headZ.toFixed(2)}`,
+      );
     }
 
     return { checks, clubBudget, courseBudget, ridingBudget, trail };

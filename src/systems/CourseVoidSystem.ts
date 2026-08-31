@@ -186,7 +186,7 @@ export class CourseVoidSystem extends createSystem({}) {
         'the circuit goes out, up, across and home',
         'close the lap and the door opens behind you',
       ],
-      small: 'hold Ⓑ to step back out · squeeze to see how the circuit thinks',
+      small: 'right Ⓐ for the way out · squeeze to see how the circuit thinks',
       width: 2.5,
     }).tex;
     this.roomTex = room.tex;
@@ -222,10 +222,13 @@ export class CourseVoidSystem extends createSystem({}) {
     }
 
     // Energy: the world ducks while the ground you own is counting itself
-    // out, and blooms as the ride stays clean.
-    const target = G.groundLeaving
-      ? ENERGY.ducked
-      : Math.min(1, ENERGY.base + G.flow * ENERGY.flowBonus);
+    // out — and harder still for the beat after a missed step, so the whole
+    // void goes with the thud. Danger never competes with scenery.
+    const target = G.slipFlash > 0
+      ? ENERGY.slipped
+      : G.groundLeaving
+        ? ENERGY.ducked
+        : Math.min(1, ENERGY.base + G.flow * ENERGY.flowBonus);
     G.energy += (target - G.energy) * Math.min(1, dt * ENERGY.ease);
     applyDim(G.energy);
 

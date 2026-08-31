@@ -306,20 +306,25 @@ There are **four places**, and where you are is what you're doing:
    step has been failed by the experience rather than by the room. Take your
    first step and the card turns over into the route.
 
-   **Nothing slides.** The world moves only while the ground you are
-   standing on is travelling — no easing, no correction, nothing catching up
-   — and the probe checks that frame by frame across a dwell and a
-   departure. The floor says everything else: ground about to leave washes
-   amber, its rim fills a quarter per beat, and a corner post dies with each
-   one — four dead posts and it's gone. Miss the step and it pulls away
-   without you: a **slip**, which holds the frame to the micron rather than
-   correcting it. The route rides **out** east on a runner, **up** the lift, **across
+   **Nothing slides**, and **nothing is invisible**. The world moves only
+   while the ground you are standing on is travelling — no easing, no
+   correction, nothing catching up. The floor says the rest in the club's
+   own colours: **cyan** is ground you may step on, **amber** is ground
+   counting itself out (the rim fills a quarter per beat, a corner post dies
+   with each one, four dead posts and it's gone), and **red** is ground in
+   motion — which the handover gate refuses, so a moving deck painted like a
+   docked one would be a hazard you couldn't see. Miss the step and the deck
+   that left burns red where it went and the whole void ducks with the thud:
+   a **slip**, which holds the frame to the micron rather than correcting
+   it. The route rides **out** east on a runner, **up** the lift, **across
    THE SKYWALK** at height with the mirror floor a storey and a half below,
    then **down** the drop and home on the west runner. The lap is
    geometrically closed — the last step repays the first — so it ends on the
    exact spot it began, which is where the door is. Close it and you come
-   back out of the frame into the same little room, facing the hall. (Hold
-   right **Ⓑ** to step out early; hold a squeeze for the circuit's own
+   back out of the frame into the same little room, facing the hall. To
+   leave early, right **Ⓐ** raises a card — KEEP RIDING or LEAVE THE COURSE
+   — exactly the way you leave a set mid-song: leaving is a decision on a
+   button, never the button itself. (Hold a squeeze for the circuit's own
    authoring overlay.)
 
    The mechanic is the [`movement`](https://github.com/yellkell/movement)

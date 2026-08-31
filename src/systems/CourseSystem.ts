@@ -25,13 +25,32 @@
  * ClubMirrorSystem, ArcadeSystem) — including the teleport, which is the
  * whole point: out there the only way to move is to step.
  *
+ * THE WAY OUT is the venue's own: right Ⓐ raises a card, the card has a
+ * button on it. It is the same posture as leaving a set mid-song — leaving
+ * is a decision on a button, never the button itself — and for the same
+ * reason: out here your hands are empty and your thumb is resting on
+ * nothing, so a bare button held for a second is a thing you find by
+ * accident and never find on purpose. Nothing stops while the card is up;
+ * ground goes on leaving, which on a circuit costs you a loop and not a
+ * life. The card rides in your PLAY AREA rather than the world, because the
+ * play area is the part of this place that holds still against your body.
+ *
  * This system also owns the body read (head → play-area coordinates) and
  * the transport, because both have to be true before any other course
  * system looks at them.
  */
 
 import { createSystem, InputComponent, VisibilityState } from '@iwsdk/core';
-import { BackSide, Mesh, MeshBasicMaterial, SphereGeometry, Vector3 } from 'three';
+import {
+  BackSide,
+  Mesh,
+  MeshBasicMaterial,
+  Quaternion,
+  Raycaster,
+  SphereGeometry,
+  Vector3,
+  type Intersection,
+} from 'three';
 import * as sfx from '../audio/sfx.js';
 import { CLUB } from '../club/config.js';
 import { stepRefs } from '../club/step.js';
@@ -41,10 +60,16 @@ import { PLATFORMS, validateScore } from '../course/score.js';
 import { course, G, resetRide } from '../course/state.js';
 import { courseRoot } from '../course/world.js';
 import { match } from '../game/state.js';
+import { PointerRay } from '../ui/pointer.js';
+import { Panel, UI } from '../ui/panel.js';
 import { net } from '../net/session.js';
 import { teleportPlayer } from './ClubTeleportSystem.js';
 
 const _head = new Vector3();
+const _fwd = new Vector3();
+const _origin = new Vector3();
+const _dir = new Vector3();
+const _quat = new Quaternion();
 
 /** The lap lands, the bell rings, and THEN the black comes down. */
 const LAP_HOLD = 1.7;
@@ -62,6 +87,17 @@ export const courseView: {
    *  the circle of light on the floor, read back as a number.
    *  (CourseWayfindSystem fills this in.) */
   nextStep?: () => { x: number; z: number } | null;
+  /** What colour a platform's deck is actually painted right now, read
+   *  back off the live instance buffer — the only way to check that a
+   *  hazard is visible without a pair of eyes in the headset.
+   *  (CoursePlatformSystem fills this in.) */
+  deckTint?: (id: string) => { r: number; g: number; b: number } | null;
+  /** Raise or lower THE WAY OUT card; returns whether it is up. */
+  menu?: () => boolean;
+  /** Press one of its buttons by id — no laser exists off-device. */
+  press?: (id: string) => void;
+  /** What is on the card right now. */
+  buttons?: () => string[];
   state?: () => {
     phase: string;
     active: boolean;
@@ -87,8 +123,19 @@ export class CourseSystem extends createSystem({}) {
   private t = 0; // seconds inside the current phase
   private lapsAtEntry = 0;
   private lapHold = -1;
-  private bailHeld = 0;
   private squeezeHeld = 0;
+  /** THE WAY OUT card, and the lasers that press it. */
+  private menu!: Panel;
+  private menuUp = false;
+  /** Where the card sits in PLAY-AREA space, captured when it is raised so
+   *  it holds still against your real room while the world rides past. */
+  private menuAt = { x: 0, y: 1.28, z: -1.05, yaw: 0 };
+  private pointers!: Record<'left' | 'right', PointerRay>;
+  private ray = new Raycaster();
+  private hits: Intersection[] = [];
+  private hover: string | null = null;
+  /** Last painted hover, or null when the card needs a fresh coat. */
+  private menuKey: string | null = null;
   /** The threshold only fires on ENTRY: you have to be outside it first, or
    *  coming back out of the door would post you straight back through it. */
   private armed = false;
@@ -125,6 +172,15 @@ export class CourseSystem extends createSystem({}) {
     this.shade.visible = false;
     this.scene.add(this.shade);
 
+    // THE WAY OUT — the raid's pause card, resized for two buttons.
+    this.menu = new Panel(0.56, 0.36, 560, 360);
+    this.menu.setShown(false, true);
+    root.add(this.menu.group);
+    this.pointers = {
+      left: new PointerRay(this.scene),
+      right: new PointerRay(this.scene),
+    };
+
     courseView.enter = () => this.begin();
     courseView.leave = () => {
       this.end(true);
@@ -133,6 +189,12 @@ export class CourseSystem extends createSystem({}) {
       this.t = 0;
     };
     courseView.head = (x, z, y = 1.7) => this.camera.position.set(x, y, z);
+    courseView.menu = () => {
+      this.setMenu(!this.menuUp);
+      return this.menuUp;
+    };
+    courseView.press = (id) => this.pressed(id);
+    courseView.buttons = () => (this.menuUp ? this.menu.buttonIds() : []);
     courseView.state = () => ({
       phase: course.phase,
       active: course.active,
@@ -312,22 +374,133 @@ export class CourseSystem extends createSystem({}) {
       this.lapHold = 0;
       return;
     }
-    // …or step back out early. Everything else out here is bodies and
-    // floors; this is the one button, and it is deliberately a HOLD.
-    if (this.input.xr.gamepads.right?.getButtonPressed(InputComponent.B_Button)) {
-      this.bailHeld += dt;
-      if (this.bailHeld >= PHASE.bailHold) {
-        course.phase = 'out';
-        this.t = 0;
-      }
-    } else {
-      this.bailHeld = 0;
+    // …or ask for the way out. Right Ⓐ raises the card; the card decides.
+    if (this.input.xr.gamepads.right?.getButtonDown(InputComponent.A_Button)) {
+      sfx.uiClick();
+      this.setMenu(!this.menuUp);
     }
+    this.stepMenu(dt);
+  }
+
+  /* ── THE WAY OUT ──────────────────────────────────────────────────────── */
+
+  private setMenu(on: boolean, snap = false): void {
+    if (on === this.menuUp && !snap) return;
+    this.menuUp = on;
+    // A crossing snaps it away rather than easing: the panel's own tick
+    // stops running the moment the black falls, so a fade left half-played
+    // would still be half-played the next time the door opens.
+    this.menu.setShown(on, snap);
+    this.menuKey = null; // a card just raised has never been painted
+    if (!on) {
+      this.hover = null;
+      this.pointers.left.hide();
+      this.pointers.right.hide();
+      return;
+    }
+    // Plant it where you're looking, in PLAY-AREA space: the card is a thing
+    // in your room, so it rides with your room rather than being left
+    // behind by the first platform that moves.
+    this.camera.getWorldQuaternion(_quat);
+    _fwd.set(0, 0, -1).applyQuaternion(_quat);
+    _fwd.y = 0;
+    if (_fwd.lengthSq() < 1e-4) _fwd.set(0, 0, -1);
+    _fwd.normalize();
+    this.menuAt.x = G.body.x + _fwd.x * 0.9;
+    this.menuAt.z = G.body.z + _fwd.z * 0.9;
+    this.menuAt.y = Math.max(1.0, G.body.y - 0.3);
+    this.menuAt.yaw = Math.atan2(-_fwd.x, -_fwd.z);
+  }
+
+  private stepMenu(dt: number): void {
+    this.menu.tick(dt, 0.5 * Math.max(0, 1 - (G.transport.barPhase * 4) % 1));
+    if (!this.menuUp) return;
+
+    // The card lives in the play area: rig + the offset it was planted at.
+    this.menu.group.position.set(
+      G.rig.x + this.menuAt.x,
+      G.rig.y + this.menuAt.y,
+      G.rig.z + this.menuAt.z,
+    );
+    this.menu.group.rotation.set(-0.18, this.menuAt.yaw, 0);
+
+    let hover: string | null = null;
+    let clicked: string | null = null;
+    for (const hand of ['left', 'right'] as const) {
+      const hit = this.aim(hand, dt);
+      const id = hit?.uv ? this.menu.buttonAt(hit.uv.x, hit.uv.y) : null;
+      if (!id) continue;
+      hover = id;
+      if (this.input.xr.gamepads[hand]?.getButtonDown(InputComponent.Trigger)) {
+        clicked = id;
+        this.pointers[hand].click();
+      }
+    }
+    if (hover !== this.hover) {
+      this.hover = hover;
+      if (hover) sfx.uiHover();
+    }
+
+    const key = this.hover ?? '';
+    if (key !== this.menuKey) {
+      this.menuKey = key;
+      this.menu.paint(
+        '',
+        () => {},
+        [
+          { id: 'ride', label: 'KEEP RIDING', primary: true, x: 24, y: 24, w: 512, h: 148 },
+          {
+            id: 'quit',
+            label: 'LEAVE THE COURSE',
+            tone: UI.danger,
+            x: 24,
+            y: 196,
+            w: 512,
+            h: 140,
+            small: true,
+          },
+        ],
+        this.hover,
+      );
+    }
+    if (clicked) {
+      sfx.uiClick();
+      this.menu.press(clicked);
+      this.pressed(clicked);
+    }
+  }
+
+  private pressed(id: string): void {
+    if (id === 'ride') {
+      this.setMenu(false);
+    } else if (id === 'quit') {
+      this.setMenu(false);
+      course.phase = 'out';
+      this.t = 0;
+    }
+  }
+
+  private aim(hand: 'left' | 'right', dt: number): Intersection | undefined {
+    const p = this.pointers[hand];
+    const rayObj = this.world.playerSpaceEntities?.raySpaces?.[hand]?.object3D;
+    if (!rayObj) {
+      p.hide();
+      return undefined;
+    }
+    rayObj.getWorldPosition(_origin);
+    rayObj.getWorldDirection(_dir).negate();
+    this.ray.set(_origin, _dir);
+    this.hits.length = 0;
+    const hit = this.ray.intersectObjects([this.menu.mesh], false, this.hits)[0];
+    const over = Boolean(hit?.uv && this.menu.buttonAt(hit.uv.x, hit.uv.y));
+    p.update(dt, _origin, hit ? hit.point : null, over);
+    return hit;
   }
 
   /** Under the black: the club goes, the void comes up, the ride resets. */
   private begin(): void {
     const S = CLUB.step;
+    this.setMenu(false, true);
     course.exit.x = S.portalX;
     course.exit.z = S.portalZ - S.reach - 0.5;
     course.exit.yaw = 0; // out of the doorway, facing the hall
@@ -336,7 +509,6 @@ export class CourseSystem extends createSystem({}) {
     courseRoot().visible = true;
     this.lapsAtEntry = course.laps;
     this.lapHold = -1;
-    this.bailHeld = 0;
     resetRide();
     // Yaw never changes out here, and the play area maps to the world the
     // way it does in a set: your real floor's centre is the pad's centre.
@@ -356,6 +528,7 @@ export class CourseSystem extends createSystem({}) {
    */
   private end(toDoor: boolean): void {
     if (!course.active) return;
+    this.setMenu(false, true);
     course.active = false;
     courseRoot().visible = false;
     conductor.stop();

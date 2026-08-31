@@ -30,7 +30,7 @@
  */
 
 import { createSystem } from '@iwsdk/core';
-import { COURSE_ORIGIN, GRID, RIG } from '../course/config.js';
+import { COURSE_ORIGIN, GRID, RIG, SLIP_FLASH } from '../course/config.js';
 import { conductor } from '../course/conductor.js';
 import { anchorAt, PLATFORMS, sqOffset, v3 } from '../course/score.js';
 import { course, G } from '../course/state.js';
@@ -149,6 +149,8 @@ export class CourseFrameSystem extends createSystem({}) {
       this.slipped = owner;
       G.slips++;
       G.flow = 0;
+      G.slipAt = owner;
+      G.slipFlash = SLIP_FLASH;
       conductor.thud();
     }
   }

@@ -40,11 +40,23 @@ export const MUSIC = {
 
 export const COLOR = {
   deckTop: 0x14121e,
+  /** Docked ground you may step on. */
   rimSafe: 0x66d9ff,
+  /** Ground counting itself out — the amber half of the club's own
+   *  amber→red telegraph language. */
   rimWarn: 0xffaa22,
+  /** Ground IN MOTION, and the burn of a missed step. Red means the same
+   *  thing here it means in a set: do not be on this. Ground that is
+   *  travelling cannot be boarded — the handover gate refuses it — so a
+   *  moving deck that looked as safe as a docked one would be a hazard you
+   *  can't see, which is the one thing the floor is never allowed to be. */
+  rimDanger: 0xff2244,
   // Fences whisper; rims speak (research/03 §2.4).
   fence: 0x33304e,
 };
+
+/** How long a missed step burns the deck that left without you. */
+export const SLIP_FLASH = 0.5;
 
 export const ENERGY = {
   // The void ducks while the ground you own is counting itself out, and
@@ -53,6 +65,8 @@ export const ENERGY = {
   // danger is the floor leaving.
   base: 0.8,
   ducked: 0.42,
+  /** A missed step takes the room down with it for the length of the burn. */
+  slipped: 0.18,
   flowBonus: 0.03,
   ease: 2.2, // 1/s toward target
 };
@@ -99,6 +113,4 @@ export const COURSE_ORIGIN = { x: 0, y: -300, z: 0 };
 export const PHASE = {
   fadeOut: 0.42,
   fadeIn: 0.55,
-  /** Hold right Ⓑ this long to step back out mid-ride. */
-  bailHold: 0.8,
 };
