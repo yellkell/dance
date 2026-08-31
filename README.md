@@ -15,16 +15,33 @@ everyone else.
 - Nail a **last-instant dodge** (still in the fire one beat out, clear on the
   drop) → **PERFECT!**, ×1.5.
 - **COMBO**: dance like the groupies — one hand up, one hand down, swapping
-  on the beat. Every rhythmic swap throws **neon sparkles off the
-  glowstick** that went up — four-point lens glints that twinkle, run
-  hotter and denser the deeper the groove, mirror themselves in the
-  floor's polish, and die in the air (nothing ever lies on the floor as
+  on the beat. The judge reads the swap **between your hands**, not
+  against the world's vertical, so a groove carried sideways through a
+  dodge keeps paying: the throw has to stay full-size and one hand still
+  has to ride higher, that's all. Every rhythmic swap throws **neon
+  sparkles off the tip of the glowstick** that went up — four-point lens
+  glints in a real population (dust, grains, the odd big hero catch),
+  each twinkling at its own rate, inheriting the swing that earned them,
+  running hotter and denser the deeper the groove, mirrored in the
+  floor's polish, and dying in the air (nothing ever lies on the floor as
   litter). The HUD's **groove row** keeps the ledger:
   four pips light one per swap as it catches, and once it's running the
-  pips keep dancing — each one hops with a lens-glint sparkle on its turn
-  of the four-beat cycle — with the points that streak has paid beside. Stop, swap off-rhythm, or **get
+  pips keep dancing — every **paid swap** kicks the turn pip into a hop
+  with a lens-glint riding it, so the row moves exactly when you do —
+  with the points that streak has paid beside. Stop, swap off-rhythm, or **get
   clipped** — a hit knocks the rhythm out of your hands — and it lets go,
   row and all.
+- Your glowsticks are **tubes of liquid glow** — SPLASH WARS' Half-Life:
+  Alyx-style clipped-liquid trick, vendored in and thickened to **gel**:
+  the surface stays level in world space however you hold the stick, heaps
+  up when you throw it and **oozes back level** instead of ringing, rolls
+  slow heavy ripples, wears a fat meniscus where it climbs the tube, and
+  every rewarded swap churns a shimmer across it. The stick itself is a
+  clean, symmetric cased capsule — no cap, no glow sprites washing over
+  the black outline; the light is the gel. **Only your own sticks are
+  wet** — the other figures' blades stay bare neon, because nobody can
+  read a meniscus across the ring and 46 more slosh sims would buy
+  nothing but frame time.
 - Get clipped → the chain dies. **There are no lives** — you dance the
   whole record and the night **grades** you at the end: **S / A / B / C /
   F**, off the share of landings you survived, with S reserved for a clean
@@ -43,9 +60,11 @@ everyone else.
   and can't move, so when you lead, **the rest of the show gently sinks**
   (THE RISE), and the longer you hold #1 the further it goes (THE CLIMB),
   until you're looking **down** on the boss.
-- Every other dancer is a **slender humanoid figure** — gloss-black mannequin,
-  neon collar/waist/wrist trim and visor in their seat colour, glowsticks in
-  hand — solved live from just a head and two hands (which is all VR knows).
+- Every other dancer is a **slender humanoid figure** — gloss-black mannequin
+  in lit couture, a wraparound glass visor with a **white-hot scan-slit**,
+  neon collar/waist/wrist trim in their seat colour, and glowstick batons
+  that burn white at the core inside a coloured bloom (the way real neon
+  does) — solved live from just a head and two hands (which is all VR knows).
   **You have no body of your own**: the local player sees only their
   controllers; the figure is for everyone else's view of you.
 - Last dancer standing (or the highest score when the set ends) **owns the
@@ -139,7 +158,7 @@ There's also a debug hook in the console:
 | **NOVA** | everything burns except one wedge — same compass bearing for the whole ring | **stand** in the safe ground, together |
 | **CROSSFIRE** | a laser is loaded on one side rail and a strip fills **across** the deck (late on, a stage lane crosses it) — and from mid-set it can come as **THE TRAP**: both side rails at once, one ahead of you and one behind, landing on the same beat | **step forward or back** off the strip — diagonally, once it's a lattice; against the trap, **squeeze into the band between the rails** |
 | **DONUT** | usually a laser straight down the middle, and a bar later the rim closes fast with chevrons marching **inward** on a tight safe disc | **step off** the middle, then **run back into it** |
-| **DUCK DONUT** | the finale combination, and the rarest thing the show throws — about one an expert night, and one in eight HARD nights: the rim closes **and** the blade hangs at chest height, both on one beat | **get to the middle AND duck** — small and close |
+| **DUCK DONUT** | the finale combination, and the rarest thing the show throws — about one an expert night, and one in eight HARD nights: the rim closes **and** the blade hangs at chest height, both on one beat | **get to the middle AND duck** — small and close, on the expert-tight disc every time |
 | **THE WAVE** | beams marching **1-2-3** across the deck (their staggered fills ARE the count) — sideways, or front-to-back — with the far quarter left dark: the **EXIT**. Every wave **TURNS**: the march wheels at the exit — its first return strike is that very square, a double step plus a whole extra beat late — and sweeps back, new exit on the far side. On **EXPERT** it sometimes wheels a second time and runs the deck again — **THE LONG WAVE**, across and back and across | **travel with the march into the exit**; breathe at the turn, then **ride one square behind the return** all the way home — and on a long wave, turn and do it again |
 | **ROUTINE** | the deck splits into quarters and the boss **teaches** a corner sequence — each marked with its step number, each pointed out in turn — then the marks go out and, on every step, three spinning neon blocks **fall from above** onto the quarters you weren't taught. On some EXPERT charts it comes **SWEPT**: the blade hangs over every blast | **remember it**, and stand in the taught corner on each tick — on a swept routine, **duck there too** |
 
@@ -214,7 +233,7 @@ Empty seats are filled with identical seeded **goo-groupies** on every client.
 npm run server       # room relay on :8788
 ```
 
-There are **three places**, and where you are is what you're doing:
+There are **four places**, and where you are is what you're doing:
 
 1. **THE FOYER** — the menu place, and a piece of THE VOID: a floating
    neon-edged platform in the set's own abstract space, with the board and
@@ -266,8 +285,57 @@ There are **three places**, and where you are is what you're doing:
    still room's), the north corridors, and the backstage walk — the
    perimeter is a loop. Props and the cabinet are local-per-headset for
    now: syncing them across the room needs relay verbs the wire doesn't
-   carry yet.
-3. **THE SET** — the game place, called with **THE BALL**. Anyone sends it
+   carry yet. The fourth corner, back-left by the door, is **THE STEP** —
+   see below.
+3. **THE STEP** — the movement place, and the only door in the building
+   that doesn't lead anywhere in the building. The club's south-west
+   corner — the arcade's opposite number across the way in — is a bare
+   little room with a **portal frame** standing in it and the VOID inside
+   the frame. It carries no sign — the still room and the arcade have
+   nameplates because they are rooms, and a room can be described; this is a
+   door, and the whole invitation is the light coming out of it. Walk into
+   the doorway and the hall is gone.
+
+   You come out on a pad at the heart of the void, on a **parkour circuit**,
+   with **different physics**. There is no arc, no thumbstick, no
+   locomotion of any kind: one platform at a time is *tracked*, which means
+   it holds still relative to your real floor while the world rides past
+   it, and stepping onto the next one hands it over. Walking two metres
+   takes you forty. Stepping is the entire game.
+
+   You arrive facing a card that says **CLEAR 1.8 × 1.8 m — STAND IN THE
+   MIDDLE AND RECENTRE**. It is the only writing in the place: everything
+   else out here is learned by doing, and this one thing can't be — a body
+   that finds a real wall halfway through a step has been failed by the
+   experience rather than by the room. Take your first step and it goes.
+
+   **Nothing slides**, and **nothing is invisible**. The world moves only
+   while the ground you are standing on is travelling — no easing, no
+   correction, nothing catching up. The floor says the rest in the club's
+   own colours: **cyan** is ground you may step on, **amber** is ground
+   counting itself out (the rim fills a quarter per beat, a corner post dies
+   with each one, four dead posts and it's gone), and **red** is ground in
+   motion — which the handover gate refuses, so a moving deck painted like a
+   docked one would be a hazard you couldn't see. Miss the step and the deck
+   that left burns red where it went and the whole void ducks with the thud:
+   a **slip**, which holds the frame to the micron rather than correcting
+   it. The route rides **out** east on a runner, **up** the lift, **across
+   THE SKYWALK** at height with the mirror floor a storey and a half below,
+   then **down** the drop and home on the west runner. The lap is
+   geometrically closed — the last step repays the first — so it ends on the
+   exact spot it began, which is where the door is. Close it and you come
+   back out of the frame into the same little room, facing the hall. To
+   leave early, right **Ⓐ** raises a card — KEEP RIDING or LEAVE THE COURSE
+   — exactly the way you leave a set mid-song: leaving is a decision on a
+   button, never the button itself. (Hold a squeeze for the circuit's own
+   authoring overlay.)
+
+   The mechanic is the [`movement`](https://github.com/yellkell/movement)
+   repo's — *Eye of the Temple*'s frame-of-reference trick on a rhythm grid.
+   The raid's six moves deliberately did **not** come with it: there is no
+   boss out there, and the only thing that speaks is the floor.
+   `node tools/step-door.mjs --lap` walks the door and rides the circuit.
+4. **THE SET** — the game place, called with **THE BALL**. Anyone sends it
    up (from the SOCIAL panel); a mirror ball hangs in front
    of them for **60 seconds** wearing a countdown plate — the song, the
    caller, who's touched in. **Touch the ball** (hand close + trigger) to
@@ -298,8 +366,8 @@ else in the game needs the server: the whole tour is playable solo.
 
 ## The music
 
-Twenty-four real records are in the box (`src/assets/music/`, registry in
-`src/audio/tracks.ts`) — twenty of them raid charts. Every number in that
+Twenty-six real records are in the box (`src/assets/music/`, registry in
+`src/audio/tracks.ts`) — twenty-two of them raid charts. Every number in that
 registry was **measured from the files**, not guessed — the whole game is
 quantized to them, so they had to be:
 
@@ -320,10 +388,12 @@ quantized to them, so they had to be:
 | ASSEMBLE | 125 | 16 phrases | −7.5 LUFS | quick raid · drops on the slam |
 | INFECTION | 138 | 15 phrases | −10.9 LUFS | quick raid |
 | GIVE IT TO ME | 112 | 13 phrases | −14.2 LUFS | tour: after-hours opener |
-| V ONE | 95 | 8 phrases | −10.8 LUFS | quick raid |
+| ORIGINAL | 95 | 8 phrases | −10.8 LUFS | quick raid |
 | FUSION | 122 | 5 phrases | −8.1 LUFS | quick raid |
 | BRAIN EATER | 149.959 | 7 phrases | −9.1 LUFS | quick raid |
-| VFALL | 165.015 | 10 phrases | −9.4 LUFS | quick raid |
+| BREAKCORE V4 | 165.015 | 10 phrases | −9.4 LUFS | quick raid |
+| DEFENSE | 125.996 | 17 phrases | −8.6 LUFS | quick raid · skips a 22 s intro |
+| AWAKENING | 165 | 18 phrases | −17.4 LUFS | quick raid · skips a 30 s riser |
 | FUTURE VIBE | 93.984 | 6 phrases | −14.2 LUFS | quick raid · second on the club rotation |
 | CHILL | 125.001 | — | −8.9 LUFS | the club's house record — opens the rotation |
 | SWAG | 91.974 | — | −15.7 LUFS | foyer rotation |
@@ -337,13 +407,13 @@ minutes of music.)
 - **Tempo** came from an onset-flux autocorrelation phase-locked across each
   whole track, audited by `tools/octave-check` for lattice errors (DISCO
   BALL first arrived as 73.33 — exactly 2/3 of its real 110 grid — and
-  VFALL as a third of its 165). Several land on exact integers (a DAW
+  BREAKCORE V4 as a third of its 165). Several land on exact integers (a DAW
   grid); the rest genuinely sit a hair off — and it matters: locking
   SAKUPENED at a round 134 instead of 133.964 drifts off the kick by the
   last third of the song (grid retention falls from 68% to 35%), so the
   fractions stay.
-- **Loudness** is EBU R128 integrated. The masters span **8.2 dB** — SWAG at
-  −15.7 against ASSEMBLE at −7.5 — so every track is gain-matched to −14 LUFS
+- **Loudness** is EBU R128 integrated. The masters span **9.9 dB** — AWAKENING
+  at −17.4 against ASSEMBLE at −7.5 — so every track is gain-matched to −14 LUFS
   at playback and the mix runs through a limiter. Nothing is re-encoded; it's
   a gain node, and the files ship untouched.
 - **Downbeat** (seconds to bar 1 beat 1) is the one number a human ear might
@@ -353,9 +423,10 @@ minutes of music.)
   quiet riser carries a `startAt`, and the needle goes down *there* — the
   intro never plays and the count-in stays a count-in instead of a minute of
   waiting. It has to sit on the bar grid (`downbeat + n×4 beats`) so the set
-  still lands where the music does. ASSEMBLE is the extreme case: six seconds
+  still lands where the music does. ASSEMBLE is the sharpest case: six seconds
   of near-silence climbing from −55 dB, then an 18 dB transient inside 5 ms,
-  and the set begins **on that slam**.
+  and the set begins **on that slam**. AWAKENING is the longest — half a
+  minute of riser before its pulse is up, all of it skipped.
 
 **Set length follows the record.** A track's playable length becomes the number
 of 8-bar phrases in the match, and the act boundaries are *fractions* of the
@@ -420,7 +491,7 @@ difficulty with their song pick.
 its real-time density used to scale with the record — at act 4 a 91 BPM
 night threw barely half the landings per second of BREAKCORE's 174, and
 its bar grid walked past where the slow shelf's grooves actually live
-(those records ride the eighths; V ONE's onsets sit on a literal 190
+(those records ride the eighths; ORIGINAL's onsets sit on a literal 190
 lattice). So on EXPERT, any record **under 100 BPM runs its chart clock
 at 2×** — the grid rides the eighths, landings hit the real half-bars —
 but the clock doubles for the *grid's* sake only: everything the dancer
@@ -471,12 +542,19 @@ src/
                        the set's environment
   club/                the club: venue + void foyer build, layout,
                        materials, the ball, voice (capture + spatial
-                       playback), mute/block store, static-merge helper
+                       playback), mute/block store, static-merge helper,
+                       THE STEP's portal refs
+  course/              what's behind the west door: THE CIRCUIT's score,
+                       the frame-of-reference tunables, its own transport
+                       and procedural kit, instancing banks + the live
+                       mirror, canvas textures, the energy dimmer
   game/                state, flow, ring math, rng, avatars + their
                        shared pose-motion layer (springy hands)
   systems/             Music, Choreo, Player, Avatar, Rank, Goopliath,
                        Disco, Hud, Menu, Network, Arena,
-                       Club, ClubTeleport, ClubSocial, ClubBall
+                       Club, ClubTeleport, ClubSocial, ClubBall,
+                       Course (the door + the crossing) · CoursePlatform ·
+                       CourseFrame · CourseWayfind · CourseVoid
   net/                 room session + pose stores (ring + club floor)
 server/index.mjs       the room relay (seats/seed/poses + club poses,
                        voice fan-out, THE BALL's clock, rooms that
@@ -490,7 +568,8 @@ tools/                 track analyzer · preview-shot · club-capture ·
                        goop-cohesion (the goop stays ONE PIECE, field-checked
                        through the whole show) · arm-motion (the figures'
                        hand springs, elbow poles and stick grips, checked
-                       live)
+                       live) · step-door (the west door and the circuit
+                       behind it; --lap rides the whole thing)
 avatar-preview.html    dev-only dancer catwalk (never shipped)
 ```
 

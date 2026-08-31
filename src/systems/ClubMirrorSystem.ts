@@ -36,6 +36,7 @@ import { buildCoupe, type CoupeRefs } from '../club/props.js';
 import { buildDancer, type DancerPose, type DancerRig } from '../game/avatars.js';
 import { danceHue } from '../game/profile.js';
 import { match } from '../game/state.js';
+import { course } from '../course/state.js';
 import { memberHue, net } from '../net/session.js';
 import { liveGlasses } from './ClubPropsSystem.js';
 import { clubFloorFigures } from './ClubSocialSystem.js';
@@ -124,7 +125,8 @@ export class ClubMirrorSystem extends createSystem({}) {
 
     const onFloor =
       (match.screen === 'lobby' || match.screen === 'tour') &&
-      (net.phase === 'hosting' || net.phase === 'joined');
+      (net.phase === 'hosting' || net.phase === 'joined') &&
+      !course.active;
 
     // Head → glass distance (to the pane's span, not its centre — a wide
     // mirror wakes for someone at its corner too), with hysteresis so the

@@ -77,21 +77,16 @@ export class HoloBoard {
     this.group.add(this.mesh);
   }
 
-  redraw(title: string, subtitle: string, rows: BoardRow[], accentCss: string): void {
+  redraw(rows: BoardRow[]): void {
     const g = this.canvas.getContext('2d')!;
     g.clearRect(0, 0, W, H);
     g.textBaseline = 'middle';
 
-    // A live board carries NO header — the rows are self-evident and the
-    // words were noise. The podium still gets its moment (title + winner).
-    if (title) {
-      g.shadowColor = accentCss;
-      g.shadowBlur = 18;
-      ink(g, title, W / 2, 64, 64, accentCss, 'center');
-      g.shadowBlur = 0;
-    }
-    if (subtitle) ink(g, subtitle, W / 2, 126, 28, 'rgba(240,243,248,0.95)', 'center', W - 60);
-
+    // The board carries NO header, live or podium — the rows are
+    // self-evident (rank 1 in gold with a letter grade IS the finale) and
+    // the title strip sat exactly where the mirror ball hangs, so anything
+    // written there was half-eclipsed anyway. The canvas top stays empty
+    // on purpose: that zone belongs to the ball.
     const top = 176;
     const rowH = Math.min(68, (H - top - 30) / Math.max(rows.length, 1));
     rows.forEach((row, i) => {

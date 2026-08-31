@@ -417,8 +417,14 @@ function buildLandings(
     // THE COMBINATION: the rim floods AND the blade hangs over the middle
     // — get to the centre and DUCK there. Both zones detonate together;
     // both answers are ones the set already taught.
+    // Its disc is EXPERT's tight one, always — the roomy opener disc made
+    // the rarest move in the game gentler than the plain donut beside it,
+    // and a once-a-night finale shouldn't come with training wheels. It
+    // only ever deals from the top two acts, where the tight middle is
+    // either already the law (expert) or exactly one act away (hard's
+    // back stretch serving donutInnerRLate).
     landings.push({ beat: landBeat, zone: { kind: 'sweep' } });
-    landings.push({ beat: landBeat, zone: { kind: 'donut', innerR: CHOREO.donutInnerR } });
+    landings.push({ beat: landBeat, zone: { kind: 'donut', innerR: CHOREO.donutInnerRExpert } });
   } else if (kind === 'sweep') {
     landings.push({ beat: landBeat, zone: { kind: 'sweep' } });
   } else if (kind === 'gate') {

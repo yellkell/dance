@@ -45,21 +45,15 @@ import { pickRaidTrack, trackById, tracksFor } from '../audio/tracks.js';
 import { platformRoot } from '../arena/arena.js';
 import { ballSpawnPos } from '../club/ball.js';
 import { CLUB_NET } from '../club/config.js';
-import {
-  clubMusicOn,
-  socialBlocked,
-  socialMuted,
-  toggleClubMusic,
-  toggleSocialBlock,
-  toggleSocialMute,
-} from '../club/social.js';
+// MUTE and BLOCK are the safety console's to toggle now (ui/safety.ts owns
+// both homes); the floor's own MUSIC switch stays here, because it belongs
+// to the club and not to the ring.
+import { clubMusicOn, socialBlocked, socialMuted, toggleClubMusic } from '../club/social.js';
 import {
   clearVoiceSpeakers,
   isSpeaking,
   isVoiceCapturing,
-  isVoiceMuted,
   pushVoiceFrame,
-  setVoiceEnabled,
   setVoiceSpeakerMuted,
   setVoiceSpeakerPosition,
   startVoiceCapture,
@@ -71,6 +65,7 @@ import {
 import { buildDancer, type DancerPose, type DancerRig } from '../game/avatars.js';
 import { PoseMotion, type MotionTuning } from '../game/poseMotion.js';
 import { match } from '../game/state.js';
+import { course } from '../course/state.js';
 import { clubPoses, remotePoses, type RemotePose } from '../net/poses.js';
 import {
   callBall,
@@ -86,6 +81,15 @@ import {
 } from '../net/session.js';
 import { font } from '../ui/fonts.js';
 import { Panel, UI, type PanelButton } from '../ui/panel.js';
+import {
+  drawSafetyRows,
+  safetyButtons,
+  safetyClick,
+  safetyKey,
+  safetyRoster,
+  voiceButtons,
+  type SafetyLayout,
+} from '../ui/safety.js';
 import { PointerRay } from '../ui/pointer.js';
 
 const TRACK_KEY = 'gdr-track';
@@ -234,7 +238,9 @@ export class ClubSocialSystem extends createSystem({}) {
   }
 
   update(delta: number): void {
-    const inClub = match.screen === 'lobby' || match.screen === 'tour';
+    // The west door takes you out of the hall entirely: the floor's
+    // figures, its crowd and its panel all belong to a room you aren't in.
+    const inClub = (match.screen === 'lobby' || match.screen === 'tour') && !course.active;
     const inRoom = net.phase === 'hosting' || net.phase === 'joined';
     const liveSet = net.phase === 'live';
 
@@ -291,9 +297,14 @@ export class ClubSocialSystem extends createSystem({}) {
       //
       // The frames still arrive (the relay fans to the whole room); this is
       // a local gate, exactly like mute and block.
+      // THE WEST DOOR is a third place under the same law. Out on the
+      // circuit there is nowhere honest to put a voice from the hall — the
+      // course is a storey of nothing away, and a friend at the bar would
+      // either be silent or arrive out of the floor — so the floor goes
+      // quiet with the record, and comes back with it.
       const ring = seatByIdx.get(p.idx);
       const theyDance = liveSet ? ring !== undefined : net.gamePlayers.has(p.idx);
-      const elsewhere = theyDance !== liveSet;
+      const elsewhere = theyDance !== liveSet || course.active;
       setVoiceSpeakerMuted(String(p.idx), hidden || elsewhere || socialMuted(p.name));
 
       if (liveSet) {
@@ -558,10 +569,10 @@ export class ClubSocialSystem extends createSystem({}) {
       const pick = id.slice(5);
       if (pick !== 'close') this.setTrack(pick === 'shuffle' ? '' : pick);
       this.closeSongs();
-    } else if (id === 'voice') {
-      setVoiceEnabled(!voiceEnabled());
-    } else if (id === 'mic') {
-      toggleVoiceMuted();
+    } else if (safetyClick(id)) {
+      // MUTE, BLOCK, the mic and the voice master switch all belong to the
+      // safety console (ui/safety.ts), which the mid-set card shares. Two
+      // copies of a safety control is one you have to learn twice.
     } else if (id === 'music') {
       // THE MUSIC SWITCH. Local and persisted, like MUTE and BLOCK: the
       // floor keeps dancing to a record the room can still hear, and the
@@ -590,10 +601,6 @@ export class ClubSocialSystem extends createSystem({}) {
       this.panel.setShown(false);
       this.closeSongs();
       leaveRoom();
-    } else if (id.startsWith('mute:')) {
-      toggleSocialMute(id.slice(5));
-    } else if (id.startsWith('block:')) {
-      toggleSocialBlock(id.slice(6));
     }
     this.paintKey = '';
   }
@@ -741,10 +748,7 @@ export class ClubSocialSystem extends createSystem({}) {
   }
 
   private paint(): void {
-    const members = net.members.filter((m) => m.idx !== net.myIdx).slice(0, 8);
-    const more = Math.max(0, net.members.length - 1 - members.length);
-    const on = voiceEnabled();
-    const mic = !isVoiceMuted() && isVoiceCapturing();
+    const { rows: members, more } = safetyRoster(8);
     const music = clubMusicOn();
     const cued = trackById(match.preferredTrack);
     const ballUp = net.ball !== null;
@@ -752,37 +756,15 @@ export class ClubSocialSystem extends createSystem({}) {
     const setOut = net.gamePlayers.size > 0;
     const inRoom = net.phase === 'hosting' || net.phase === 'joined';
     const key =
-      members.map((m) => `${m.name}|${socialMuted(m.name) ? 1 : 0}${socialBlocked(m.name) ? 1 : 0}`).join(';') +
-      `#${this.hover ?? ''}#${on ? 1 : 0}#${mic ? 1 : 0}#${music ? 1 : 0}#${net.phase}#${cued?.id ?? ''}#${ballUp ? (mine ? `B${net.ball!.joins.size}` : 'b') : ''}#${setOut ? net.gamePlayers.size : 0}#${more}#${match.difficulty}#${this.songsOpen ? 1 : 0}#${net.crownIdx ?? ''}`;
+      safetyKey(members, more) +
+      `#${this.hover ?? ''}#${music ? 1 : 0}#${net.phase}#${cued?.id ?? ''}#${ballUp ? (mine ? `B${net.ball!.joins.size}` : 'b') : ''}#${setOut ? net.gamePlayers.size : 0}#${match.difficulty}#${this.songsOpen ? 1 : 0}#${net.crownIdx ?? ''}`;
     if (key === this.paintKey) return;
     this.paintKey = key;
 
-    const buttons: PanelButton[] = [];
     const ROW0 = 172;
     const ROW_H = 58;
-    members.forEach((m, i) => {
-      const y = ROW0 + i * ROW_H;
-      buttons.push({
-        id: `mute:${m.name}`,
-        label: socialMuted(m.name) ? 'MUTED' : 'MUTE',
-        tone: socialMuted(m.name) ? UI.danger : undefined,
-        x: 396,
-        y,
-        w: 136,
-        h: 50,
-        small: true,
-      });
-      buttons.push({
-        id: `block:${m.name}`,
-        label: socialBlocked(m.name) ? 'BLOCKED' : 'BLOCK',
-        tone: socialBlocked(m.name) ? UI.danger : undefined,
-        x: 546,
-        y,
-        w: 136,
-        h: 50,
-        small: true,
-      });
-    });
+    const rowsAt: SafetyLayout = { left: 28, right: 682, y: ROW0, rowH: ROW_H };
+    const buttons: PanelButton[] = safetyButtons(members, rowsAt);
 
     // ── calling a raid: the song pick, the chart, the ball ──────────────
     buttons.push({
@@ -861,42 +843,13 @@ export class ClubSocialSystem extends createSystem({}) {
       });
     }
 
-    buttons.push({
-      id: 'mic',
-      label: mic ? 'MIC LIVE — left Ⓨ mutes' : on ? 'MIC MUTED — left Ⓨ opens it' : 'MIC OFF',
-      tone: mic ? UI.positive : UI.danger,
-      x: 24,
-      y: 896,
-      w: 652,
-      h: 54,
-      small: true,
-    });
-    // The desk's bottom line: the two things you HEAR on this floor, side
-    // by side. Voice and music are one decision made twice — quiet enough
-    // to talk, or loud enough to dance — and reading them as a pair is
-    // what makes "turn the music down so we can chat" a single glance.
-    buttons.push({
-      id: 'voice',
-      label: on ? 'VOICE CHAT: ON' : 'VOICE CHAT: OFF',
-      tone: on ? undefined : UI.danger,
-      x: 24,
-      y: 958,
-      w: 320,
-      h: 60,
-      small: true,
-    });
-    buttons.push({
-      id: 'music',
-      label: music ? 'MUSIC: ON' : 'MUSIC: OFF',
-      // OFF is the LOUD state on this desk — a silenced floor is a thing
-      // you did on purpose and want to see you did.
-      tone: music ? undefined : UI.danger,
-      x: 356,
-      y: 958,
-      w: 320,
-      h: 60,
-      small: true,
-    });
+    // The desk's bottom lines, from the shared console — and on THIS floor
+    // the voice switch is paired with MUSIC. The two things you HEAR here
+    // are one decision made twice (quiet enough to talk, or loud enough to
+    // dance), and reading them side by side is what makes "turn the music
+    // down so we can chat" a single glance. The ring's card gets no music
+    // switch: out there the record is the set's, not the floor's.
+    buttons.push(...voiceButtons(24, 896, 652, { music: clubMusicOn() }));
     if (inRoom) {
       // The board's LEAVE moved in with the desk — the one door out of the
       // room that isn't a set.
@@ -950,59 +903,7 @@ export class ClubSocialSystem extends createSystem({}) {
         }
         g.letterSpacing = '0px';
 
-        members.forEach((m, i) => {
-          const y = ROW0 + i * ROW_H + 25;
-          const hidden = socialBlocked(m.name);
-          const away = net.gamePlayers.has(m.idx);
-          if (i > 0) {
-            g.fillStyle = UI.lineFaint;
-            g.fillRect(28, y - 29, 652 - 8, 1.5);
-          }
-          g.font = font(600, 29);
-          g.letterSpacing = '1px';
-          g.fillStyle = hidden
-            ? UI.faint
-            : `#${hueToColor(memberHue(m), 0.62).toString(16).padStart(6, '0')}`;
-          // The reigning winner's row leads with the crown they're wearing.
-          const label = (net.crownIdx === m.idx ? '👑 ' : '') + m.name.slice(0, 12);
-          g.fillText(label, 28, y);
-          g.letterSpacing = '0px';
-          if (hidden) {
-            const w = g.measureText(label).width;
-            g.strokeStyle = 'rgba(172,182,198,0.6)';
-            g.lineWidth = 2.5;
-            g.beginPath();
-            g.moveTo(28, y);
-            g.lineTo(28 + w, y);
-            g.stroke();
-          }
-          if (away) {
-            g.fillStyle = UI.warn;
-            g.font = font(600, 19);
-            g.letterSpacing = '1.5px';
-            g.fillText('ON THE RING', 246, y);
-            g.letterSpacing = '0px';
-          } else if (isSpeaking(String(m.idx))) {
-            // The presence dot: they're holding the floor right now.
-            g.fillStyle = UI.positive;
-            g.shadowColor = UI.positive;
-            g.shadowBlur = 8;
-            g.beginPath();
-            g.arc(352, y, 6, 0, Math.PI * 2);
-            g.fill();
-            g.shadowBlur = 0;
-          }
-        });
-        if (more > 0) {
-          g.font = font(500, 21);
-          g.fillStyle = UI.dim;
-          g.fillText(`…and ${more} more on the floor`, 28, ROW0 + members.length * ROW_H + 22);
-        }
-        if (!members.length) {
-          g.font = font(500, 24);
-          g.fillStyle = UI.dim;
-          g.fillText('nobody else on the floor right now', 28, ROW0 + 30);
-        }
+        drawSafetyRows(g, members, more, rowsAt, 'nobody else on the floor right now');
 
         // Section seams: the ball's console, the voice desk, the door.
         g.fillStyle = UI.lineFaint;

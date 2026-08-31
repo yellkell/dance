@@ -60,6 +60,7 @@ import {
 import { PALETTE, hueToColor } from '../config.js';
 import { glowTexture } from '../materials/glow.js';
 import { FoyerEnvironment } from '../arena/environment.js';
+import { VOID_BG } from '../arena/voidkit.js';
 import { CLUB, DECOR } from './config.js';
 import {
   blackSteelMat,
@@ -77,6 +78,7 @@ import {
 } from './materials.js';
 import { collapseStatic } from './merge.js';
 import { registerArcade } from './arcade.js';
+import { registerStep } from './step.js';
 import { font, onFontsReady } from '../ui/fonts.js';
 
 export interface ChandelierRing {
@@ -208,6 +210,7 @@ export function buildClub(scene: Scene): ClubRefs {
   buildVestibule(root);
   const stillLampMat = buildStillRoom(root, candleMat);
   buildArcade(root);
+  buildStep(root);
   const inlayMat = buildFloorInlay(root);
   buildLights(root);
 
@@ -372,11 +375,18 @@ function buildWalls(root: Group, W: number, NZ: number, SZ: number, H: number): 
   const coreMat = bronzeMat();
   const reedMat = brassMat(0.3);
   // The hall's wall dressing stops at the side rooms' doors: a pilaster or
-  // a sconce that lands inside the arcade is hall furniture standing in
-  // somebody's room. (Generic, so the rooms can be moved again.)
-  const A = CLUB.arcade;
+  // a sconce that lands inside one of them is hall furniture standing in
+  // somebody's room.
+  //
+  // This claimed to be generic and was not — it only ever tested the
+  // ARCADE, so the moment a second room took the opposite corner it put a
+  // fluted brass pilaster on the south wall INSIDE it, standing directly
+  // over the portal like a keystone nobody designed, and another through
+  // the west wall beside it. It tests every enclosed room now, which is
+  // what it always said it did.
+  const ROOMS = [CLUB.arcade, CLUB.quiet, CLUB.step];
   const inRoom = (x: number, z: number): boolean =>
-    x > A.minX && x < A.maxX && z > A.minZ && z < A.maxZ;
+    ROOMS.some((r) => x > r.minX && x < r.maxX && z > r.minZ && z < r.maxZ);
   const pilaster = (x: number, z: number): void => {
     if (inRoom(x, z)) return;
     const g = new Group();
@@ -692,17 +702,28 @@ function buildStage(root: Group): MeshBasicMaterial {
   // Nothing hangs over the stage: the wall behind the MC is his backdrop,
   // not a billboard. (The moon-phase house mark used to live here.)
 
-  // Footlights along the stage lip: a run of small warm scallops so the
-  // riser face reads and the MC gets his uplight.
+  // Footlights along the stage lip: a run of small warm LENSES so the riser
+  // face reads and the MC gets his uplight.
+  //
+  // Whole circles, not half-shells. They were 180° cylinders, each turned to
+  // face out along the crescent — which is a real fixture, a scallop shade
+  // open to the front, and it read as one from precisely one spot on the
+  // floor. From anywhere else the run was a scatter of crescents all
+  // pointing different ways, and from the terrace it looked like the lamps
+  // were twisting. A full round has no facing to get wrong: it reads as a
+  // lamp from every seat in the room, which is the only thing this row of
+  // seven has to do.
   const footMat = brassGlowMat(1.6);
   for (let i = -3; i <= 3; i++) {
     const a = (i / 8) * Math.PI; // spread across the crescent's front
     const fx = Math.sin(a) * (S.r - 0.12);
     const fz = S.z + Math.cos(a) * (S.r - 0.12);
-    const scallop = new Mesh(new CylinderGeometry(0.05, 0.07, 0.045, 10, 1, false, 0, Math.PI), footMat);
-    scallop.position.set(fx, S.h + 0.02, fz);
-    scallop.rotation.y = Math.PI - a;
-    root.add(scallop);
+    // 16 sides, where the half wanted 10: the same silhouette smoothness
+    // carried round twice the arc. No rotation — a full round is turned
+    // the same way whichever way you turn it.
+    const lens = new Mesh(new CylinderGeometry(0.05, 0.07, 0.045, 16), footMat);
+    lens.position.set(fx, S.h + 0.02, fz);
+    root.add(lens);
   }
 
   return consoleMat;
@@ -1278,9 +1299,11 @@ function buildTerrace(root: Group): void {
   const rail = brassMat(0.26);
 
   for (const side of [-1, 1] as const) {
-    // The east wing stops at the arcade's wall — the back-right corner is
-    // a room now, so that gallery is the shorter of the two.
-    const x0 = side < 0 ? -CLUB.halfW : T.gapHalfW;
+    // Neither wing runs the full width: the arcade has the back-right
+    // corner and THE STEP has the back-left, so each gallery dies into a
+    // room's wall — and, both corners being rooms now, the two wings are
+    // finally the same length as each other.
+    const x0 = side < 0 ? CLUB.step.maxX + 0.12 : T.gapHalfW;
     const x1 = side < 0 ? -T.gapHalfW : CLUB.arcade.minX - 0.12;
     const cx = (x0 + x1) / 2;
     const wdt = x1 - x0;
@@ -1777,6 +1800,263 @@ function buildArcade(root: Group): void {
     boardTex,
     cabinetPos: new Vector3(cx, 0, cz),
   });
+}
+
+/* ── THE STEP: the west corner room, and the door that isn't one ─────────
+ *
+ * The arcade's plan reflected about the way in — same footprint, same low
+ * cap, same north-facing doorway onto the floor — and then, where the
+ * arcade puts a cabinet against its back wall, this room puts a DOORWAY:
+ * three stepped deco frames (the vestibule's own portal, at two-thirds
+ * scale) standing on the south wall with the VOID inside them instead of a
+ * night on the street.
+ *
+ * The room is deliberately bare. There is one thing in it, it is obviously
+ * a door, and the only furniture is the light that tells you where its
+ * threshold is: a brass-edged plate let into the floor, one stride deep,
+ * which is exactly the volume CourseSystem is watching. Nothing here
+ * explains itself in words, because a lit doorway doesn't need to.
+ */
+function buildStep(root: Group): void {
+  const S = CLUB.step;
+  const H = CLUB.roomCeilH;
+  const plaster = new MeshStandardMaterial({ map: plasterTexture([3, 1.4]), roughness: 0.95, metalness: 0.02 });
+
+  // Interior walls (east + NORTH split around the door), lintel, low cap.
+  const eWall = new Mesh(new PlaneGeometry(S.maxZ - S.minZ, H), plaster);
+  eWall.position.set(S.maxX, H / 2, (S.minZ + S.maxZ) / 2);
+  eWall.rotation.y = Math.PI / 2;
+  (eWall.material as MeshStandardMaterial).side = DoubleSide;
+  root.add(eWall);
+  const north = (x0: number, x1: number): void => {
+    const m = new Mesh(new PlaneGeometry(x1 - x0, H), plaster);
+    m.position.set((x0 + x1) / 2, H / 2, S.minZ);
+    (m.material as MeshStandardMaterial).side = DoubleSide;
+    root.add(m);
+  };
+  north(S.minX, S.doorX0);
+  north(S.doorX1, S.maxX);
+  const lintel = new Mesh(new PlaneGeometry(S.doorX1 - S.doorX0, H - 2.05), plaster);
+  lintel.position.set((S.doorX0 + S.doorX1) / 2, (H + 2.05) / 2, S.minZ);
+  (lintel.material as MeshStandardMaterial).side = DoubleSide;
+  root.add(lintel);
+  const cap = new Mesh(
+    new PlaneGeometry(S.maxX - S.minX, S.maxZ - S.minZ),
+    new MeshStandardMaterial({ color: 0x191720, roughness: 0.95 }),
+  );
+  cap.rotation.x = Math.PI / 2;
+  cap.position.set((S.minX + S.maxX) / 2, H, (S.minZ + S.maxZ) / 2);
+  root.add(cap);
+
+  // Door dressing, and NOTHING ELSE. The still room and the arcade wear
+  // nameplates because they are rooms and a room can be described. This is
+  // a door, and a door that has to tell you what it is has already failed:
+  // the whole invitation is the light coming out of it. It is the one
+  // opening in the building with nothing written over it.
+  for (const x of [S.doorX0, S.doorX1]) box(root, bronzeMat(), 0.08, 2.05, 0.1, x, 1.025, S.minZ);
+  box(root, bronzeMat(), S.doorX1 - S.doorX0 + 0.08, 0.09, 0.1, (S.doorX0 + S.doorX1) / 2, 2.05, S.minZ);
+
+  // ── THE FRAME ────────────────────────────────────────────────────────
+  // Three nested heads stepping outward, exactly the vestibule's grammar
+  // (brass inside, bronze, black steel outside) so the two doors of this
+  // building are recognisably the same idea. One leads to the street.
+  const pz = S.portalZ;
+  // The rings are measured from the OPENING outward, not from a width and a
+  // height that happen to be near it. The first cut sized each ring on its
+  // own and left the innermost head 14 cm clear of the top of the void:
+  // the pane stopped short and a band of dark wall showed between it and
+  // the frame, which reads as a picture in a surround rather than as a way
+  // through. Ring 0's inner faces now sit exactly on the pane's edges, and
+  // each ring steps 9 cm out and 7 cm up from the one inside it — so every
+  // reveal is the frame, and none of it is wall. (The step is gentle
+  // because the room caps at CLUB.roomCeilH and a bigger one put the
+  // outermost bar through the ceiling slab.)
+  for (let i = 0; i < 3; i++) {
+    const t = 0.08 - i * 0.018;
+    const inX = S.portalW / 2 + i * 0.09; // this ring's inner face
+    const inY = S.portalH + i * 0.07;
+    const px = inX + t / 2; // …so its bar centres sit half a thickness out
+    const py = inY + t / 2;
+    const mat = i === 0 ? brassMat(0.25) : i === 1 ? bronzeMat() : blackSteelMat();
+    const z = pz + 0.07 + i * 0.045;
+    box(root, mat, t, py, t, S.portalX - px, py / 2, z);
+    box(root, mat, t, py, t, S.portalX + px, py / 2, z);
+    box(root, mat, px * 2 + t, t, t, S.portalX, py, z);
+  }
+
+  // THE VOID IN THE DOORWAY. A pane of the set's own background colour —
+  // not black, the void's black — with a painted depth behind it: a
+  // horizon, a floor grid running away, and the far towers as bars of
+  // light. It reads as a view rather than a wall the moment it moves,
+  // which is CourseSystem's job (the shimmer, and the plate below).
+  const portalMat = new MeshBasicMaterial({
+    map: voidPaneTexture(),
+    toneMapped: false,
+    depthWrite: true,
+  });
+  const portal = new Mesh(new PlaneGeometry(S.portalW, S.portalH), portalMat);
+  portal.name = 'live-step-portal';
+  portal.position.set(S.portalX, S.portalH / 2, pz);
+  portal.rotation.y = Math.PI; // the view faces the room
+  root.add(portal);
+
+  const shimmerMat = new MeshBasicMaterial({
+    map: glowTexture(),
+    color: PALETTE.cyan,
+    transparent: true,
+    opacity: 0.16,
+    blending: AdditiveBlending,
+    depthWrite: false,
+    toneMapped: false,
+  });
+  // The wash is the pane's own size now too — it used to overhang by a few
+  // centimetres, which only ever showed as a bloom smeared on the frame.
+  const shimmer = new Mesh(new PlaneGeometry(S.portalW, S.portalH), shimmerMat);
+  shimmer.name = 'live-step-shimmer';
+  shimmer.position.set(S.portalX, S.portalH / 2, pz - 0.015);
+  shimmer.rotation.y = Math.PI;
+  root.add(shimmer);
+
+  // ── THE THRESHOLD ────────────────────────────────────────────────────
+  // A plate let into the floor, one stride deep, brass-edged. It is the
+  // trigger volume made visible, and it brightens as your head enters it —
+  // the whole instruction, on the floor, where your feet are already
+  // looking. (Same law as the deck wash out on the circuit: the floor is
+  // the telegraph.)
+  const plateMat = new MeshBasicMaterial({
+    color: PALETTE.cyan,
+    transparent: true,
+    opacity: 0.22,
+    depthWrite: false,
+    toneMapped: false,
+  });
+  const sill = new Mesh(new PlaneGeometry(S.portalW, S.reach), plateMat);
+  sill.name = 'live-step-sill';
+  sill.rotation.x = -Math.PI / 2;
+  sill.position.set(S.portalX, 0.012, pz - S.reach / 2);
+  root.add(sill);
+  for (const sx of [-1, 1] as const) {
+    box(root, brassMat(0.3), 0.02, 0.012, S.reach, S.portalX + (sx * S.portalW) / 2, 0.008, pz - S.reach / 2);
+  }
+  box(root, brassMat(0.3), S.portalW + 0.02, 0.012, 0.02, S.portalX, 0.008, pz - S.reach);
+
+  // Two uplights either side of the frame — the room's only fittings, and
+  // the only ones in the building that burn COLD. They wore the venue's
+  // warm brass cove at first and were the brightest thing in the corner:
+  // two amber posts flanking a cold blue doorway, pulling the eye off the
+  // one thing in the room. Brass body, the course's own light in it.
+  const coldGlow = new MeshStandardMaterial({
+    color: DECOR.brass,
+    emissive: PALETTE.cyan,
+    emissiveIntensity: 0.9,
+    metalness: 0.6,
+    roughness: 0.35,
+  });
+  for (const sx of [-1, 1] as const) {
+    const x = S.portalX + sx * (S.portalW / 2 + 0.62);
+    box(root, brassMat(0.3), 0.1, 0.04, 0.16, x, 0.02, pz - 0.22);
+    const bar = new Mesh(new BoxGeometry(0.05, 1.35, 0.02), coldGlow);
+    bar.position.set(x, 0.72, pz - 0.16);
+    root.add(bar);
+  }
+
+  // THE DOORWAY IS THE LAMP. Nothing else in here is lit — the hall's own
+  // fittings stop at the wall and the room has no fixture of its own — so
+  // the light in the corner is the light coming THROUGH, cold against a
+  // building that is warm everywhere else. Without it the room read as a
+  // black slot from the floor and nobody would ever have found the door.
+  const through = new PointLight(PALETTE.cyan, 1.5, 6.5, 1.5);
+  through.position.set(S.portalX, 1.35, pz - 0.5);
+  root.add(through);
+  // A second, weaker one just inside the opening — enough that the bronze
+  // jamb reads as a doorway from across the floor, and no more. It used to
+  // be twice this and was really lighting a nameplate.
+  const doorway = new PointLight(0x9fd8ff, 0.35, 3.4, 1.7);
+  doorway.position.set((S.doorX0 + S.doorX1) / 2, 1.4, S.minZ + 0.7);
+  root.add(doorway);
+
+  // The room's only light comes OUT OF THE DOOR — cool, low, and short
+  // enough that it dies before the hall (the arcade next door is lit by
+  // its own cabinet the same way). A corner with a hole in the world in
+  // it should not also have a lamp.
+  const spill = new PointLight(PALETTE.cyan, 1.1, 4.2, 1.7);
+  spill.position.set(S.portalX, S.portalH * 0.55, pz - 0.5);
+  root.add(spill);
+
+  registerStep({ portal, portalMat, shimmerMat, plateMat });
+}
+
+/**
+ * The picture inside the frame: the void, painted once. A horizon with no
+ * land under it, a floor grid running away below it, and the far skyline as
+ * bars of light — the same four ideas the real environment is built from
+ * (arena/voidkit.ts), flattened to a canvas so a doorway can hold them for
+ * one draw call.
+ */
+function voidPaneTexture(): CanvasTexture {
+  const W = 512;
+  const Hh = 768;
+  const c = document.createElement('canvas');
+  c.width = W;
+  c.height = Hh;
+  const g = c.getContext('2d')!;
+  g.fillStyle = css(VOID_BG);
+  g.fillRect(0, 0, W, Hh);
+
+  // THE HORIZON SITS AT EYE HEIGHT. The pane stands on the floor and runs
+  // to 2.1 m, so a horizon drawn down the middle of the canvas lands around
+  // a metre off the ground and the whole view reads as a picture hung low
+  // rather than as somewhere you could walk into. Put it where a real one
+  // would be — level with the eyes of whoever is standing in front of it —
+  // and most of the pane is the floor running away, which is exactly what
+  // you see through a door.
+  const horizon = Hh * 0.22;
+  // The floor grid, converging on the horizon — the deep half of the view.
+  g.strokeStyle = 'rgba(79,183,255,0.22)';
+  g.lineWidth = 1.6;
+  for (let i = -9; i <= 9; i++) {
+    g.beginPath();
+    g.moveTo(W / 2 + i * (W / 4), Hh);
+    g.lineTo(W / 2 + i * 7, horizon);
+    g.stroke();
+  }
+  for (let i = 1; i <= 14; i++) {
+    const t = i / 14;
+    const y = horizon + (Hh - horizon) * t * t * t;
+    g.globalAlpha = 0.55 - t * 0.4;
+    g.beginPath();
+    g.moveTo(0, y);
+    g.lineTo(W, y);
+    g.stroke();
+  }
+  g.globalAlpha = 1;
+
+  // The far skyline: bars of light standing on the horizon, deterministic.
+  let seed = 0x2f;
+  const rnd = (): number => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
+  for (let i = 0; i < 26; i++) {
+    const x = rnd() * W;
+    const h = 14 + rnd() * (horizon - 24);
+    const w = 5 + rnd() * 16;
+    g.fillStyle = 'rgba(12,10,20,0.95)';
+    g.fillRect(x, horizon - h, w, h);
+    g.fillStyle = i % 3 === 0 ? 'rgba(255,42,213,0.5)' : 'rgba(79,183,255,0.42)';
+    g.fillRect(x, horizon - h, w, 2.5);
+  }
+
+  // The horizon band itself — the brightest line in the picture, because a
+  // void with no horizon is just a dark room.
+  const band = g.createLinearGradient(0, horizon - 60, 0, horizon + 16);
+  band.addColorStop(0, 'rgba(176,107,255,0)');
+  band.addColorStop(0.78, 'rgba(176,107,255,0.42)');
+  band.addColorStop(1, 'rgba(255,42,213,0.12)');
+  g.fillStyle = band;
+  g.fillRect(0, horizon - 60, W, 76);
+
+  const tex = new CanvasTexture(c);
+  tex.colorSpace = SRGBColorSpace;
+  tex.anisotropy = 4;
+  return tex;
 }
 
 /* ═════════════════════════════ THE FOYER ═════════════════════════════════

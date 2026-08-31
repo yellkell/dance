@@ -90,7 +90,10 @@ learnable:
 
 - **The donut's safe disc** is a flat **0.30 m** from the first bar to
   the last — the tightest in the game. Everywhere else it still tightens
-  with the acts (0.42, and 0.34 on hard's back stretch). Expert is the
+  with the acts (0.42, and 0.34 on hard's back stretch) — except inside
+  **the duck donut**, which wears the expert 0.30 wherever the
+  combination deals: the once-a-night finale never opens a roomier
+  middle than the plain donut it out-ranks. Expert is the
   difficulty where the donut is *run back into*: the opening laser drives
   you off the exact ground the rim is about to demand, so you return on
   memory rather than on the read.
@@ -286,14 +289,14 @@ sweep's blade) finally reads in the sticks themselves, not just the reach.
 overshoot that settles, tracking with zero bounce, the yaw wrap, the elbow
 tuck, and the stick's three grips.
 
-## THE CLUB, THE VOID, and the three places
+## THE CLUB, THE VOID, and the four places
 
 FIRE FIGHT's pub proved a third thing worth stealing whole: **a social room
 on the same socket** — teleport-only movement, spatial PCM voice fanned out
 by the relay, and local-only mute/block. Carried forward, and dressed up.
 (The club has no name. The sign over the stage is a moon, not a word.)
 
-The law of the land is **three places — where you are is what you're doing**:
+The law of the land is **four places — where you are is what you're doing**:
 
 1. **THE FOYER** (menu place): a piece of THE VOID — a floating platform
    hanging seven metres above a lit plain, with towers rising off that
@@ -315,7 +318,11 @@ The law of the land is **three places — where you are is what you're doing**:
    music switch is a LOCAL hush, like MUTE and BLOCK: it closes your
    fader, never the club's — the record plays on, so the eclipse, the ball
    and every dancer keep the beat the rest of the room can still hear.
-3. **THE SET** (game place): the raid, wrapped in THE VOID — an actual
+3. **THE STEP** (movement place): a door in the club's south-west corner
+   that leads out of the building entirely — the parkour circuit, on the
+   frame-of-reference mechanic, with the club's teleport switched off. Its
+   own section below.
+4. **THE SET** (game place): the raid, wrapped in THE VOID — an actual
    environment sharing the foyer's language at arena scale. Both interiors
    pack away; the rig drops every club offset back to identity, so "my
    platform IS the world origin" stays true no matter where you teleported
@@ -324,6 +331,153 @@ The law of the land is **three places — where you are is what you're doing**:
    space's `reset` event, is how you choose a new one). The void ducks with
    the light rig while a telegraph owns your deck — danger never competes
    with scenery.
+
+### THE STEP — the fourth place, and the second physics
+
+Every locomotion scheme answers one question: **who owns the transform
+between the player's real floor and the virtual world, and when may it
+change?** The club barely moves it (a teleport jumps it and hands it
+straight back, and your platform never moves house because you visited the
+bar). The raid refuses to move it at all — *my platform IS the world
+origin*. There is a third answer, the one *Eye of the Temple* found:
+**re-anchor it to whatever you are standing on.** One platform at a time is
+TRACKED; while it is tracked it holds still relative to your real floor, and
+the slice of virtual space your play area maps to rides with it. You walk
+two metres and travel forty, with no stick, no arc and nothing to learn.
+
+That can't go in the raid — a dodge game needs a floor that holds still —
+and it isn't a thing to put on the board. So it got a **door**, and the
+door is the design:
+
+- **Where.** The south-west corner, the arcade mirrored about the way in.
+  Both back corners are rooms now, which also finally gives the two terrace
+  wings the same length as each other.
+- **What's in it.** Nothing but the doorway. Three stepped deco frames — the
+  vestibule's own grammar at two-thirds scale, so the building's two doors
+  are recognisably one idea — measured OUTWARD FROM THE OPENING so the void
+  runs right up to the underside of the head (sized ring by ring instead,
+  the innermost one sat 14 cm clear of the top of the pane and a band of
+  dark wall showed between them, which reads as a picture in a surround
+  rather than as a way through). Then a brass-edged plate
+  let into the floor one stride deep (the trigger volume, made visible,
+  brightening as you close on it), and two uplights that are the only cold
+  light in a building which is warm everywhere else.
+- **And NO SIGN.** The still room and the arcade wear nameplates because
+  they are rooms, and a room can be described. This is a door, and a door
+  that has to tell you what it is has already failed — the whole invitation
+  is the light coming out of it. So the one opening in the building with
+  nothing written over it is the one that leads out of the building. (The
+  lamp in the opening dropped to a third of its first setting at the same
+  time: it turned out to be lighting a nameplate rather than a doorway.)
+- **The swap.** Standing in the threshold drops a head-locked black, and
+  under it the hall packs away exactly the way it does when a set books the
+  floor. `course.active` is the one flag every club system reads to stand
+  down: teleport, crowd, SOCIAL panel, drinks, the ball, the mirror, the
+  cabinet — and the floor's voices, because a friend at the bar has nowhere
+  honest to sing from when you are a storey of nothing away. (That last one
+  is not a new law; it is the same one that already silences the club from
+  the ring.) The record goes to zero rather than to a murmur: through that
+  door there is no wall left for it to come through.
+- **The way home is the geometry, not a second portal.** Every traversal on
+  the circuit is a pair of opposed real steps netting to zero, so the lap's
+  ledger closes at centre: the last step east repays the first, and the ride
+  ends on the exact spot it began. That is why the door can simply be
+  waiting there when you finish — there was never anything to place.
+- **The room check is the only writing out there.** One card, dead ahead of
+  the pad because that is the way you arrive facing:
+
+      CLEAR 1.8 × 1.8 m
+      STAND IN THE MIDDLE AND RECENTRE
+
+  It shows on arrival, goes on your first step — by then you demonstrably
+  have the floor — and comes back for the next crossing, because that is a
+  fresh start and the room may be a different room.
+
+  Everything else is learned by doing and is therefore not written down: the
+  floor's colours are the instruction, the invitation is a circle of light
+  on the ground, and stepping is a thing a body already knows how to do.
+  This one thing cannot be learned by doing — a body that finds a real wall
+  halfway through a step has been failed by the experience rather than by
+  the room — so it is said once, in as few words as it can be said in.
+
+  A second card used to take over on that first step and explain the route
+  in four lines, and a third line under the room check named a controller
+  button. Both are gone. A manual for a game with no controls is an
+  admission that the game failed to be legible, in a place whose whole
+  argument is that it doesn't need one.
+
+  1.8 m is the floor you must be able to STAND on, not the span of the decks
+  (1.92 m): every step lands you on a tile centre, and the outermost of
+  those are at ±0.66.
+- **Nothing slides.** The law, stated so it can be checked: the world moves
+  ONLY on frames where the ground under you is travelling. There is no
+  easing term, no correction, nothing catching up — the rig is
+  `anchor(tracked)` and has no history at all. `tools/step-door.mjs` walks a
+  whole dwell and a departure frame by frame and fails on any frame where a
+  parked deck moved the world.
+- **Nothing is invisible either.** With no landings out here the floor is
+  the only thing that ever speaks, so it speaks in the club's own colours:
+  CYAN is ground you may step on, AMBER is ground counting itself out, RED
+  is ground in motion. That last one is load-bearing, not decoration — a
+  travelling deck CANNOT be boarded (the handover gate refuses it, and
+  standing on it as it goes is the slip), so one painted like a docked deck
+  would be a hazard you can't see, which is the one thing a floor is never
+  allowed to be. A missed step then flares that deck red for half a second
+  and takes the whole void down with it, so the thud has a picture: the
+  earlier build's only answer to a miss was a sound, and a sound alone
+  cannot tell you WHICH ground went. The probe reads all three straight off
+  the live instance buffer rather than trusting the code that wrote it.
+- **The way out is a card, not a button.** Right Ⓐ raises KEEP RIDING /
+  LEAVE THE COURSE, which is exactly how you leave a set mid-song: leaving
+  is a decision on a button, never the button itself. A bare button held for
+  a second — which is what this was first — is a thing you find by accident
+  and never find on purpose, and out here your hands are empty and your
+  thumb is resting on nothing. Nothing stops while the card is up; ground
+  goes on leaving, which on a circuit costs you a loop and not a life. The
+  card rides in your PLAY AREA rather than the world, because the play area
+  is the one part of this place that holds still against your body — a
+  world-locked card would be left behind by the first platform that moved.
+- **The slip, not the slide.** Handover is gated and CLEAN ONLY: tracking
+  passes to a platform exactly when its anchor already agrees with the live
+  rig, so the instant of the switch moves nothing at all. The earlier build
+  in the `movement` repo also carried the forced switch — ground already
+  leaving takes the frame, and a correction drains over a second, visibly
+  sliding the platform back under your feet. That slide is the one moment
+  the world moves on its own, and it reads as the game correcting you. Here
+  the score authors every legal step onto aligned ground, so the only way to
+  be on departing ground is to have missed the step — and a miss should read
+  as a miss. The ground pulls away, the frame holds, the flow dies, the thud
+  lands. The rig has one source of truth and no history.
+
+  Telling *incoming* ground from *leaving* ground has to look a quarter bar
+  ahead at BOTH ends of the gap, which the ported build didn't. It moved the
+  candidate forward and left the rig where it was — fine for a machine
+  pulling out from under you, wrong for a STATIC landing deck, whose anchor
+  never changes: `soon` came out identical to `now`, the gate fell through,
+  and a body stepping onto the deck it was riding INTO — a step taken a beat
+  early, which is a step a player should be allowed — was charged a slip for
+  it. The rig follows the tracked platform, so the closing is measured
+  against where the rig *will be*.
+- **No moves out there.** The `movement` repo's consolidation threw six of
+  the GOOPLIATH's moves at the decks mid-ride, and they were the first thing
+  cut on the way across. They are a boss's vocabulary, thrown by a boss on a
+  stage; a course that also throws them is a second raid rather than a second
+  game. What's left is the floor talking — deck wash, wrapping rims, dying
+  corner posts, audible ticks — and the energy law they used to trigger now
+  reads off the only hazard there is: the ground you own, counting itself
+  out. The void ducks for it, exactly as it ducks for a telegraph on your
+  deck in a set.
+- **The bill.** 60 draw calls at the start line (the room-check card is up)
+  and 59 mid-ride, ~29 k triangles, against the same budgets the set is held
+  to
+  (≤ 60, ≤ 100 k). The circuit's decks share their reflection's instance
+  buffers, so the route hangs over its own image the whole way round for one
+  extra draw per bank; and the berth brackets go dark rather than parking
+  their instances off-world, because a bank with nothing to show still costs
+  its draw call.
+
+`node tools/step-door.mjs` walks the room and the crossing; `--lap` rides the
+entire circuit on autopilot and waits for the ledger to close.
 
 ### Building the void (what actually buys fidelity)
 

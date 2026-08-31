@@ -33,6 +33,7 @@ import {
 } from '../club/arcade.js';
 import { profileName } from '../game/profile.js';
 import { match } from '../game/state.js';
+import { course } from '../course/state.js';
 import { refreshWorldBoard, scores, submitWorldScore, worldBoard } from '../net/scores.js';
 import { net } from '../net/session.js';
 import { font } from '../ui/fonts.js';
@@ -95,7 +96,8 @@ export class ArcadeSystem extends createSystem({}) {
     if (!refs) return;
     const inClub =
       (match.screen === 'lobby' || match.screen === 'tour') &&
-      (net.phase === 'hosting' || net.phase === 'joined');
+      (net.phase === 'hosting' || net.phase === 'joined') &&
+      !course.active;
     if (!inClub) {
       // The club packed away mid-game (a set booked the floor): the run
       // ends quietly and the score still counts — you danced, it happened.

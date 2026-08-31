@@ -34,16 +34,25 @@
 
 import { createSystem, Vector3 } from '@iwsdk/core';
 import {
+  AdditiveBlending,
+  BufferAttribute,
+  BufferGeometry,
   CanvasTexture,
+  Color,
   DoubleSide,
+  DynamicDrawUsage,
   Mesh,
   MeshBasicMaterial,
   PlaneGeometry,
+  Points,
+  Sprite,
+  SpriteMaterial,
 } from 'three';
 import { GRADE, SCORE, TOUR } from '../config.js';
 import { trackById } from '../audio/tracks.js';
 import { danceHue } from '../game/profile.js';
 import { dodgeRate, type Flair, gradeOf, match, me, showBeat } from '../game/state.js';
+import { glintTexture, pipTexture, sizedPointsMaterial } from '../materials/glow.js';
 import { font } from '../ui/fonts.js';
 
 const SET_COLORS = ['#8cff70', '#ff6ee0', '#ffd24a'];
@@ -57,12 +66,44 @@ const SH = 288;
 /** The groove's own colour — electric ice, never the seat's, so the two
  *  never blur. Turquoise, per the boss. */
 const GROOVE_CSS = '#1cf5c9';
+const GROOVE_HEX = 0x1cf5c9;
+/** An unlit pip: cold slate, an invitation. */
+const PIP_COLD_HEX = 0x424b59;
+
+/* THE GROOVE ROW's pips live OFF the canvas, as four points and a glint
+ * sprite riding the wedge plane (drawGroove below holds the why). These
+ * map the canvas layout into the plane's local metres so the sprite row
+ * and the canvas tally keep lining up. */
+const PIPS = 4;
+const PIP_ROW_Y = 202; // canvas px, same line the tally is inked on
+const METER_W = 150;
+const TALLY_W = 96;
+const PX_X = 0.5 / SW; // the wedge plane is 0.5×0.28 m for 512×288 px
+const PX_Y = 0.28 / SH;
+/** Point size (m) sized so the texture's disc lands at the old 22 px. */
+const PIP_WU = 0.05;
+/** The hop: a jump and a small rebound, measured in the RECORD's beats
+ *  (the pips dance to the song like everything else on the show side). */
+const HOP_ARC = 0.5;
+const HOP_REB = 0.3;
+
+/** The hop's height (0..1) at `tb` show-beats after the swap that threw
+ *  it: up-and-over inside half a beat, then a little rebound — a dot
+ *  landing, not a dot on a sine wave. Exported for tools. */
+export function pipHop(tb: number): number {
+  if (tb < 0) return 0;
+  if (tb < HOP_ARC) return Math.sin((tb / HOP_ARC) * Math.PI);
+  if (tb < HOP_ARC + HOP_REB) return 0.24 * Math.sin(((tb - HOP_ARC) / HOP_REB) * Math.PI);
+  return 0;
+}
 /** THE ALARM: getting clipped. One red, shared by the HIT pop and the
  *  chain marks so the two always read as the same event — and a deep,
  *  full-chroma one: the old coral sat too light to alarm anybody. */
 const ALARM_CSS = '#ff0033';
 
 const _head = new Vector3();
+const _pipC = new Color();
+const _pipWhite = new Color(0xffffff);
 
 /** Heavy club lettering: a thick near-black casing, then the colour. */
 function ink(
@@ -156,6 +197,18 @@ export class HudSystem extends createSystem({}) {
   private flairTex!: CanvasTexture;
   private flairAge = 9;
   private lastKey = '';
+  /** The groove pips — points on the wedge, not ink (see drawGroove). */
+  private pips!: Points;
+  private pipPos = new Float32Array(PIPS * 3);
+  private pipCol = new Float32Array(PIPS * 3);
+  private pipSize = new Float32Array(PIPS);
+  private pipPosAttr!: BufferAttribute;
+  private pipColAttr!: BufferAttribute;
+  private pipSizeAttr!: BufferAttribute;
+  private pipGlint!: Sprite;
+  /** Seconds since the last paid swap answered on the row. */
+  private hopAge = 9;
+  private lastStreak = 0;
 
   init(): void {
     this.cardCanvas.width = CW;
@@ -185,6 +238,47 @@ export class HudSystem extends createSystem({}) {
     // the wedge itself, which is how the first pass hid its own numbers.
     this.strip.position.set(-0.52, 1.2, -0.9);
     this.scene.add(this.strip);
+
+    // THE PIPS ride the strip as four real points plus one glint sprite,
+    // just proud of the plane so they draw over it. Children of the strip,
+    // so its look-at and visibility carry them for free.
+    const pipGeo = new BufferGeometry();
+    this.pipPosAttr = new BufferAttribute(this.pipPos, 3).setUsage(DynamicDrawUsage);
+    this.pipColAttr = new BufferAttribute(this.pipCol, 3).setUsage(DynamicDrawUsage);
+    this.pipSizeAttr = new BufferAttribute(this.pipSize, 1).setUsage(DynamicDrawUsage);
+    this.pipSize.fill(1);
+    pipGeo.setAttribute('position', this.pipPosAttr);
+    pipGeo.setAttribute('color', this.pipColAttr);
+    pipGeo.setAttribute('aSize', this.pipSizeAttr);
+    this.pips = new Points(
+      pipGeo,
+      sizedPointsMaterial({
+        size: PIP_WU,
+        map: pipTexture(),
+        vertexColors: true,
+        transparent: true,
+        depthWrite: false,
+      }),
+    );
+    this.pips.name = 'groove-pips'; // headless probes read the row by name
+    this.pips.frustumCulled = false;
+    this.pips.renderOrder = 31;
+    this.pips.position.z = 0.004;
+    this.strip.add(this.pips);
+    this.pipGlint = new Sprite(
+      new SpriteMaterial({
+        map: glintTexture(),
+        color: 0xeafffb,
+        transparent: true,
+        blending: AdditiveBlending,
+        depthWrite: false,
+        opacity: 0,
+      }),
+    );
+    this.pipGlint.name = 'groove-glint';
+    this.pipGlint.renderOrder = 32;
+    this.pipGlint.visible = false;
+    this.strip.add(this.pipGlint);
 
     this.flairCanvas.width = 512;
     this.flairCanvas.height = 160;
@@ -235,6 +329,7 @@ export class HudSystem extends createSystem({}) {
     this.card.visible = cardUp;
     this.strip.visible = inSet && !cardUp;
     if (this.strip.visible) this.strip.lookAt(_head);
+    this.groovePips(delta);
     if (cardUp) {
       // The count-in and the grade are MOMENTS — hang them at eye line,
       // big, facing you. Nothing else is happening; nothing is blocked.
@@ -266,10 +361,9 @@ export class HudSystem extends createSystem({}) {
       d?.alive,
       match.grooveStreak,
       match.grooveScore,
-      // The RUNNING groove animates (the turn pip hops on every swap), so
-      // while it runs the strip repaints on a sub-beat clock — ten frames
-      // a beat — and not at all when the row is cold or winding up.
-      match.grooveStreak > 4 ? Math.floor((showBeat() % 1) * 10) : -1,
+      // (The groove pips animate OFF the canvas — see groovePips — so the
+      // strip repaints only when a number on it actually changes. The old
+      // row repainted this whole texture ten times a beat to move one dot.)
     ].join(':');
     if (key !== this.lastKey) {
       this.lastKey = key;
@@ -418,103 +512,94 @@ export class HudSystem extends createSystem({}) {
   /**
    * THE GROOVE ROW — the combo catching, then running.
    *
-   * Cold: four hollow pips, an invitation. Winding up: one fills per
-   * rhythmic swap, so the very first paid swap is visible. Running (past
-   * the fourth): the pips stay on the floor and keep dancing — the cycle
-   * walks 1-2-3-4 with every paid swap, and the pip whose turn it is
-   * grows a touch and HOPS, a four-point lens glint riding it and dying
-   * out through the beat, with the streak's earnings beside. (This
-   * replaced a fill bar that crept toward the pay ceiling: the tally
-   * already says what the groove is worth, and a meter filling under the
-   * row said it twice — while four dots dancing your own one-up-one-down
-   * back at you says the thing the sticks are saying.) It all vanishes
-   * when the groove drops — you always know whether you're on or off.
+   * Cold: four hollow pips, an invitation. Winding up: one lights per
+   * rhythmic swap — popping as it catches — so the very first paid swap
+   * is visible. Running (past the fourth): the pips stay on the floor and
+   * keep dancing — the cycle walks 1-2-3-4 with every paid swap, and the
+   * pip whose turn it is HOPS, a four-point lens glint riding it, with
+   * the streak's earnings beside. It all vanishes when the groove drops —
+   * you always know whether you're on or off.
+   *
+   * Only the TALLY is canvas ink now. The pips are four real points and a
+   * glint sprite riding the plane (groovePips below): the old row
+   * repainted and re-uploaded this whole 512×288 texture ten times a beat
+   * to move one dot — and the dot still stepped. The two halves share the
+   * same layout constants, so the row stays one centred [meter][tally]
+   * pair whether the tally is there or not.
    */
   private drawGroove(g: CanvasRenderingContext2D, cx: number): void {
-    const streak = match.grooveStreak;
-    const PIPS = 4;
-    const y = 202;
-    // The row is [meter][tally], centred as a pair — so it stays balanced
-    // whether the tally is there or not.
-    const meterW = 150;
-    const tally = match.grooveScore > 0 ? `+${match.grooveScore}` : '';
-    const tallyW = tally ? 96 : 0;
-    const left = cx - (meterW + tallyW) / 2;
-
-    if (streak <= PIPS) {
-      const gap = meterW / PIPS;
-      for (let i = 0; i < PIPS; i++) {
-        g.beginPath();
-        g.arc(left + gap / 2 + i * gap, y, 11, 0, Math.PI * 2);
-        g.lineWidth = 6;
-        g.strokeStyle = 'rgba(0,2,6,0.96)';
-        g.stroke();
-        if (i < streak) {
-          g.shadowColor = GROOVE_CSS;
-          g.shadowBlur = 14;
-          g.fillStyle = GROOVE_CSS;
-        } else {
-          g.fillStyle = 'rgba(58,66,82,0.8)';
-        }
-        g.fill();
-        g.shadowBlur = 0;
-      }
-    } else {
-      // RUNNING: whose turn it is walks the row with every paid swap, and
-      // the hop rides the front of the beat — up and home again before the
-      // next swap is due.
-      const gap = meterW / PIPS;
-      const turn = (streak - 1) % PIPS;
-      const phase = Math.min(1, Math.max(0, showBeat() % 1));
-      const hop = phase < 0.6 ? Math.sin((phase / 0.6) * Math.PI) : 0;
-      let sx = 0;
-      let sy = 0;
-      for (let i = 0; i < PIPS; i++) {
-        const active = i === turn;
-        const px = left + gap / 2 + i * gap;
-        const py = y - (active ? hop * 7 : 0);
-        g.beginPath();
-        g.arc(px, py, 11 + (active ? hop * 3 : 0), 0, Math.PI * 2);
-        g.lineWidth = 6;
-        g.strokeStyle = 'rgba(0,2,6,0.96)';
-        g.stroke();
-        g.shadowColor = GROOVE_CSS;
-        g.shadowBlur = active ? 14 + hop * 12 : 12;
-        g.fillStyle = GROOVE_CSS;
-        g.fill();
-        g.shadowBlur = 0;
-        if (active) {
-          sx = px;
-          sy = py;
-        }
-      }
-      // The sparkle: a four-point lens glint (the glowsticks' own language)
-      // flaring off the hopping pip and dying out through the beat.
-      if (hop > 0.04) {
-        const arm = 12 + hop * 9;
-        const w2 = 2.4;
-        g.globalAlpha = Math.min(1, hop * 1.4);
-        g.shadowColor = GROOVE_CSS;
-        g.shadowBlur = 10;
-        g.fillStyle = '#eafffb';
-        g.beginPath();
-        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
-          g.moveTo(sx + dx * arm, sy + dy * arm);
-          g.lineTo(sx + dy * w2, sy - dx * w2);
-          g.lineTo(sx - dy * w2, sy + dx * w2);
-          g.closePath();
-        }
-        g.fill();
-        g.globalAlpha = 1;
-        g.shadowBlur = 0;
-      }
-    }
-
+    if (match.grooveScore <= 0) return;
+    const left = cx - (METER_W + TALLY_W) / 2;
+    g.textAlign = 'left';
     // What the streak has paid — the combo's own ledger, dying with it.
-    if (tally) {
-      g.textAlign = 'left';
-      neon(g, tally, left + meterW + 14, y, 40, GROOVE_CSS);
+    neon(g, `+${match.grooveScore}`, left + METER_W + 14, PIP_ROW_Y, 40, GROOVE_CSS);
+  }
+
+  /**
+   * THE PIPS, per frame — four points and a glint on the wedge plane, a
+   * 160-byte buffer write a frame, so the row moves at headset rate
+   * instead of stepping at the canvas clock's ten frames a beat.
+   *
+   * And the hop is thrown by the SWAP now, not by the beat clock: the row
+   * is the dance's ledger, and a ledger that kept bouncing after the
+   * hands stopped was flattering nobody. Every paid swap kicks the turn
+   * pip up-and-over with a small rebound on landing (pipHop), the glint
+   * riding it; each wind-up pip pops as it lights; stop dancing and the
+   * row stands still until the streak lets go. This is the same trigger
+   * the stick pulse and the spark burst fire on, so all three answers —
+   * loud, felt, ledger — land as one beat-shaped event.
+   */
+  private groovePips(delta: number): void {
+    this.hopAge += delta;
+    const streak = match.grooveStreak;
+    if (streak !== this.lastStreak) {
+      // A paid swap throws the hop; a streak dying cancels it.
+      this.hopAge = streak > this.lastStreak ? 0 : 9;
+      this.lastStreak = streak;
     }
+    const on = this.strip.visible && me()?.alive !== false;
+    this.pips.visible = on;
+    if (!on) {
+      this.pipGlint.visible = false;
+      return;
+    }
+
+    // The hop clock runs in the record's beats, like the rest of the show.
+    const bpm = Number.isFinite(match.bpm) && match.bpm > 0 ? match.bpm : 120;
+    const spb = 60 / (match.doubleTime ? bpm / 2 : bpm);
+    const hop = pipHop(this.hopAge / spb);
+
+    const running = streak > PIPS;
+    const turn = running ? (streak - 1) % PIPS : -1;
+    // The canvas tally's own layout: [meter][tally], centred as a pair.
+    const left = SW / 2 - (METER_W + (match.grooveScore > 0 ? TALLY_W : 0)) / 2;
+    const gap = METER_W / PIPS;
+    let glintOn = false;
+    for (let i = 0; i < PIPS; i++) {
+      const lit = running || i < streak;
+      const active = i === turn;
+      const justLit = !running && i === streak - 1;
+      const px = left + gap / 2 + i * gap;
+      const py = PIP_ROW_Y - (active ? hop * 8 : 0);
+      this.pipPos[i * 3] = (px - SW / 2) * PX_X;
+      this.pipPos[i * 3 + 1] = (SH / 2 - py) * PX_Y;
+      this.pipSize[i] = active ? 1 + hop * 0.3 : justLit ? 1 + hop * 0.45 : 1;
+      _pipC.setHex(lit ? GROOVE_HEX : PIP_COLD_HEX);
+      if ((active || justLit) && hop > 0) _pipC.lerp(_pipWhite, hop * 0.45);
+      this.pipCol[i * 3] = _pipC.r;
+      this.pipCol[i * 3 + 1] = _pipC.g;
+      this.pipCol[i * 3 + 2] = _pipC.b;
+      if (active && hop > 0.04) {
+        glintOn = true;
+        this.pipGlint.position.set(this.pipPos[i * 3], this.pipPos[i * 3 + 1], 0.006);
+        this.pipGlint.scale.setScalar(0.034 + hop * 0.03);
+        (this.pipGlint.material as SpriteMaterial).opacity = Math.min(1, hop * 1.5);
+      }
+    }
+    this.pipGlint.visible = glintOn;
+    this.pipPosAttr.needsUpdate = true;
+    this.pipColAttr.needsUpdate = true;
+    this.pipSizeAttr.needsUpdate = true;
   }
 
   private drawFlair(text: string, tone: Flair['tone']): void {

@@ -19,6 +19,7 @@ import * as sfx from '../audio/sfx.js';
 import { BALL_TOUCH_RADIUS, ballAnchor, buildBallVisual, type BallVisual } from '../club/ball.js';
 import { seatHue } from '../config.js';
 import { match } from '../game/state.js';
+import { course } from '../course/state.js';
 import { cancelBall, joinBall, memberHue, net } from '../net/session.js';
 
 const _hand = new Vector3();
@@ -67,7 +68,8 @@ export class ClubBallSystem extends createSystem({}) {
   update(delta: number): void {
     const inClub =
       (match.screen === 'lobby' || match.screen === 'tour') &&
-      (net.phase === 'hosting' || net.phase === 'joined');
+      (net.phase === 'hosting' || net.phase === 'joined') &&
+      !course.active;
     const ballUp = inClub && net.ball !== null;
 
     // A resolving ball (called off, or fired without me) is HOISTED back

@@ -108,10 +108,14 @@ export class RankSystem extends createSystem({}) {
         handle.pedestal.scale.y = span;
         handle.pedestal.position.y = -PLATFORM.thickness - span;
       }
-      // Elimination dims the deck's neon.
-      const rimTarget = d && !d.alive ? 0.12 : 0.9;
+      // Elimination dims the deck's neon — halo and tube core together
+      // (the core is the solid fixture; a dead deck's tube goes cold too).
+      const out = d && !d.alive;
+      const rimTarget = out ? 0.12 : 0.9;
       handle.rimMat.opacity += (rimTarget - handle.rimMat.opacity) * Math.min(1, delta * 3);
-      handle.nameMat.opacity = d && !d.alive ? 0.25 : 1;
+      const coreTarget = out ? 0.2 : 1;
+      handle.rimCoreMat.opacity += (coreTarget - handle.rimCoreMat.opacity) * Math.min(1, delta * 3);
+      handle.nameMat.opacity = out ? 0.25 : 1;
 
       // Name tags YAW toward the viewer but never roll or pitch — a tilted
       // head must never tilt the room's text. World yaw minus the seat's
@@ -160,10 +164,10 @@ export class RankSystem extends createSystem({}) {
     for (const d of top) rows.push(this.row(d, podium));
     if (me && !top.includes(me)) rows.push(this.row(me, podium));
 
-    // No subtitle: the winner is already rank 1 in gold at the top of the
-    // board, and "OWNS THE NIGHT" spoke in campaign language on a board
-    // that shows up for solo sets and club raids too.
-    this.board.redraw(podium ? '🏆 FINAL' : '', '', rows, podium ? '#ffd75e' : '#ff2ad5');
+    // No header at all — no "🏆 FINAL", no subtitle. The winner is already
+    // rank 1 in gold wearing the night's letter, and the title strip sat
+    // right where the mirror ball hangs.
+    this.board.redraw(rows);
   }
 
   private row(d: Dancer, podium: boolean): BoardRow {

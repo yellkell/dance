@@ -58,6 +58,7 @@ import {
   type CoupeRefs,
 } from '../club/props.js';
 import { match } from '../game/state.js';
+import { course } from '../course/state.js';
 import {
   net,
   onProp,
@@ -314,7 +315,9 @@ export class ClubPropsSystem extends createSystem({}) {
       return;
     }
     this.hadRoom = true;
-    const onFloor = match.screen === 'lobby' || match.screen === 'tour';
+    // Not while the west door has you: a pint left standing on the bar
+    // does not follow you out onto a moving platform.
+    const onFloor = (match.screen === 'lobby' || match.screen === 'tour') && !course.active;
     if (this.group.visible !== onFloor) this.group.visible = onFloor;
 
     this.clock += delta;

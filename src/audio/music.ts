@@ -130,8 +130,10 @@ function chain(c: AudioContext): GainNode {
   bus = c.createGain();
   bus.gain.value = musicVol;
   limiter = c.createDynamicsCompressor();
-  // A brick-ish safety limiter: the masters here span 7.6 dB and a couple
+  // A brick-ish safety limiter: the masters here span 9.9 dB and a couple
   // of them already clip their own true peak, so the mix gets a net.
+  // AWAKENING is the reason the spread is that wide — at −17.4 LUFS the
+  // gain match lifts it +3.4 dB, which puts its peak over on a full slider.
   limiter.threshold.value = -6;
   limiter.knee.value = 0;
   limiter.ratio.value = 20;
@@ -141,6 +143,20 @@ function chain(c: AudioContext): GainNode {
   const out = sfxOut();
   limiter.connect(out ? out.context.destination : c.destination);
   return bus;
+}
+
+/**
+ * THE MUSIC BUS itself — the user's music fader, ahead of the limiter.
+ *
+ * The course's kit (course/conductor.ts) is SYNTHESISED live rather than
+ * played off a file, so it has nowhere to plug in through startSet; it hangs
+ * here instead, which puts it behind the same slider as every record and
+ * under the same safety limiter. Builds the chain on first ask, like the
+ * decks do.
+ */
+export function musicBus(): GainNode | null {
+  const c = ctx();
+  return c ? chain(c) : null;
 }
 
 /** Fetch + decode a track (cached). Returns null if it can't be decoded. */

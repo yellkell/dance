@@ -1,13 +1,21 @@
 /**
  * The other dancers — couture rave mannequins, one per occupied platform.
- * One dark suit in the seat's colour — bodice and trousers cut from the
- * same cloth, so the figure reads as an outfit rather than a black vest
- * over glowing tights — with LIT sleeves and a lit midriff, dark gloss
- * accessories (helm, gauntlets, heeled boots) and hot neon trim at every
- * seam. The body is shaped, not stacked: a cinched waist under a broad
+ * One dark suit — TRUE near-black patent, not cloth dyed in the seat's
+ * colour — with LIT sleeves and a lit midriff, dark gloss accessories
+ * (helm, gauntlets, heeled boots) and hot neon trim at every seam. The
+ * neon is real neon: the hottest elements (the scan-slit, the stick
+ * blades, the soles, the jewellery) run WHITE at the core and hand their
+ * hue to the halos and the lit cloth around them, the way a lit tube
+ * actually reads — a white filament in a coloured bloom. The figure's
+ * colour identity lives in what it WEARS and what it CARRIES, against a
+ * body that stays black; colour-flooding the whole silhouette made every
+ * dancer a one-hue toy, and the hierarchy (hot blades over lit jewellery
+ * over glowing cloth over black leather) flattened into mud.
+ * The body is shaped, not stacked: a cinched waist under a broad
  * shoulder yoke, hips that flow into the thighs, an elliptical
  * cross-section so the torso has a front, and a sculpted mannequin head —
- * tapered chin, full cranium, a goggle bezel framing a hot scan-slit. Four
+ * tapered chin, full cranium, a wraparound glass visor carrying a hot
+ * scan-slit. Four
  * style variants of neon hair (mohawk / twin blades / horn / twin spikes)
  * derive deterministically from the hue so a full ring isn't 24 clones.
  *
@@ -35,7 +43,9 @@
 import {
   BoxGeometry,
   BufferGeometry,
+  CapsuleGeometry,
   CircleGeometry,
+  Color,
   CylinderGeometry,
   Group,
   LatheGeometry,
@@ -95,6 +105,38 @@ export interface DancerAccent {
    *  turns the headliner into a different dancer mid-wind-up, which is not
    *  what "he is charging something" should look like. */
   neon: boolean;
+  /** How hard this accent's CORE pulls toward white, 0..1. Real neon is a
+   *  white filament in a coloured bloom: the hottest tiers (scan-slit,
+   *  blades, soles, jewellery) whiten so they read as light SOURCES, and
+   *  the hue survives in the halos and the lit cloth around them. Driving
+   *  every tier at the pure seat colour is what made the old figure a
+   *  one-hue toy — saturated-on-saturated has nowhere brighter to go.
+   *  Repaints route through accentHex() so the hierarchy survives flash
+   *  red and warn amber too. */
+  hot: number;
+}
+
+const _tintC = new Color();
+const _whiteC = new Color(0xffffff);
+/** `base` pulled toward white by `hot` — the working half of accentHex. */
+function hotHex(base: number, hot: number): number {
+  return _tintC.setHex(base).lerp(_whiteC, hot).getHex();
+}
+
+/** Perceived luminance of a colour, straight off the hex channels. */
+function lumaOf(hex: number): number {
+  return (0.2126 * ((hex >> 16) & 0xff) + 0.7152 * ((hex >> 8) & 0xff) + 0.0722 * (hex & 0xff)) / 255;
+}
+
+/**
+ * The colour an accent actually wears when a system drives it to `base`.
+ * Every runtime repaint (seat colour, hit-flash red, the MC's warn amber)
+ * goes through here instead of writing `base` raw, so a white-cored blade
+ * stays white-cored in every state instead of collapsing back into the
+ * flat tint the whitening exists to escape.
+ */
+export function accentHex(a: DancerAccent, base: number): number {
+  return a.hot > 0 ? hotHex(base, a.hot) : base;
 }
 
 export interface DancerRig {
@@ -180,22 +222,32 @@ const TORSO_Z = 0.8;
  *  Exported so a caller holding some accents at rest (the MC's warn, which
  *  lights the glowing parts only) puts the cloth back where it started. */
 export const ACCENT_REST = 1.1;
-/** The suit is DARK — gloss cloth carrying only a sheen of the seat colour,
- *  the same near-black as the helm. Bodice and trousers are cut from it, so
- *  the top and the legs finally match instead of reading as a black vest
- *  over glowing tights. */
-const SUIT_GAIN = 0.2;
-/** Helm, gauntlets and boots, a hair darker still — glossier leather next
- *  to the suit's cloth. */
-const SHELL_GAIN = 0.18;
+/** The suit is DARK — actually dark. It used to carry a fifth of the seat
+ *  colour in its weave and under any real light that read as a figure DYED
+ *  head to toe, not a black suit wearing neon: the whole contrast budget
+ *  spent before the trim got a turn. Now it holds only a whisper of the
+ *  hue — enough to stay a surface in a dark room — and the seat colour
+ *  lives where it should: the lit panels, the trim, the blades. Bodice
+ *  and trousers are still cut from this one cloth. */
+const SUIT_GAIN = 0.09;
+/** Helm, gauntlets and boots — black glass next to the suit's patent. */
+const SHELL_GAIN = 0.07;
 /** …and the LIT panels: sleeves, midriff, hair. A figure in head-to-toe
  *  black is a hole in a dark room, and a near-black arm with a glowing
  *  stick on the end of it reads as a DETACHED hand. Lighting exactly the
  *  sleeves, the waist and the crest keeps every stick visibly attached to
  *  the body swinging it, crowns the silhouette, and puts a bright band at
  *  the figure's own centre of motion — the part that sells a dance across
- *  thirty metres of arena. */
-const LIT_GAIN = 0.62;
+ *  thirty metres of arena. Nudged up now that the cloth around them is
+ *  honestly black — the panels are the hue's home. */
+const LIT_GAIN = 0.7;
+/** The whitening tiers (see DancerAccent.hot). Jewellery warms toward
+ *  white just enough to read lit; the flat cores — scan-slit, blades,
+ *  soles, the horn's pip — run properly white-hot, and the halo sprites
+ *  stay PURE hue (they are the bloom; whiten those and the figure's
+ *  colour identity dies with them). */
+const TRIM_HOT = 0.22;
+const CORE_HOT = 0.58;
 
 const UP = new Vector3(0, 1, 0);
 const SIDES = [-1, 1] as const;
@@ -233,8 +285,11 @@ function cached(key: string, make: () => BufferGeometry): BufferGeometry {
   }
   return g;
 }
-/** Unit-height cylinder authored base-at-origin along +Y (for align()). */
-function segGeo(rTop: number, rBottom: number, sides = 8): BufferGeometry {
+/** Unit-height cylinder authored base-at-origin along +Y (for align()).
+ *  Twelve sides by default: at eight, every limb wore visible flats — and
+ *  the MC wears this figure at 2.1×, where a flat is a plank. The
+ *  geometry is module-shared, so the whole ring pays the difference once. */
+function segGeo(rTop: number, rBottom: number, sides = 12): BufferGeometry {
   return cached(`seg:${rTop}:${rBottom}:${sides}`, () => {
     const g = new CylinderGeometry(rTop, rBottom, 1, sides);
     g.translate(0, 0.5, 0);
@@ -248,7 +303,7 @@ function boxGeo(): BufferGeometry {
   return cached('box', () => new BoxGeometry(1, 1, 1));
 }
 function torusGeo(r: number, tube: number): BufferGeometry {
-  return cached(`tor:${r}:${tube}`, () => new TorusGeometry(r, tube, 8, 20));
+  return cached(`tor:${r}:${tube}`, () => new TorusGeometry(r, tube, 10, 28));
 }
 function discGeo(): BufferGeometry {
   return cached('disc', () => new CircleGeometry(1, 24));
@@ -256,9 +311,31 @@ function discGeo(): BufferGeometry {
 function hexGeo(): BufferGeometry {
   return cached('hex', () => new CylinderGeometry(0.5, 0.5, 1, 6));
 }
-/** Unit-height lathe (base at y=0, top at y=1) from (radius, height) pairs. */
+/** Unit-height lathe (base at y=0, top at y=1) from (radius, height) pairs.
+ *  Thirty-two segments: the lathes ARE the silhouette — skull, chest,
+ *  hips — and sixteen put a hard crease down the middle of every one of
+ *  them, which is most of why the old figure read as moulded plastic. */
 function latheGeo(key: string, profile: number[][]): BufferGeometry {
-  return cached(key, () => new LatheGeometry(profile.map(([r, y]) => new Vector2(r, y)), 16));
+  return cached(key, () => new LatheGeometry(profile.map(([r, y]) => new Vector2(r, y)), 32));
+}
+/** A curved band off a unit sphere — the visor glass and its slit.
+ *  Authored spanning the +Z hemisphere (rotate π about Y to wear it on
+ *  the face, which looks down −Z); scaled per-mesh to hug the skull. */
+function visorGeo(key: string, phiLen: number, thetaStart: number, thetaLen: number): BufferGeometry {
+  return cached(`visor:${key}`, () => {
+    const g = new SphereGeometry(1, 28, 10, (Math.PI - phiLen) / 2, phiLen, thetaStart, thetaLen);
+    return g;
+  });
+}
+/** The glowstick blade: a rounded-tip baton, base at origin along +Y — a
+ *  tube of light with body, where the old tapered spike read as a pencil
+ *  line from three platforms away. */
+function bladeGeo(): BufferGeometry {
+  return cached('blade', () => {
+    const g = new CapsuleGeometry(0.0115, 0.235, 4, 12);
+    g.translate(0, 0.235 / 2 + 0.0115, 0);
+    return g;
+  });
 }
 
 /* The couture torso, two stacked lathes meeting at a cinched waist.
@@ -397,9 +474,27 @@ export function buildDancer(hue: number): DancerRig {
   const root = new Group();
   const color = hueToColor(hue, 0.6);
   const variant = styleVariant(hue);
+  /* EQUAL CLOTH FOR EVERY SEAT. hueToColor hands every hue the same HSL
+   * lightness, but the eye doesn't meter in HSL: a cyan or green suit at
+   * the same emissive gain burned about four times the luminance of a red
+   * or violet one — half the ring dressed in floodlights, the other half
+   * in embers. The CLOTH gains normalise softly toward a reference
+   * luminance (a soft exponent, so hue character survives while the
+   * floodlighting doesn't). The neon tiers are exempt: their cores whiten,
+   * which levels them already, and the halos must keep the pure hue at
+   * full send or the figure's colour identity dies with them. */
+  const dim = Math.min(1, Math.pow(0.34 / Math.max(0.05, lumaOf(color)), 0.65));
+  const suitGain = SUIT_GAIN * dim;
+  const shellGain = SHELL_GAIN * dim;
+  const litGain = LIT_GAIN * dim;
   const accents: DancerAccent[] = [];
-  const accent = <T extends MeshStandardMaterial | MeshBasicMaterial>(mat: T, gain: number, neon = false): T => {
-    accents.push({ mat, gain, neon });
+  const accent = <T extends MeshStandardMaterial | MeshBasicMaterial>(
+    mat: T,
+    gain: number,
+    neon = false,
+    hot = 0,
+  ): T => {
+    accents.push({ mat, gain, neon, hot });
     return mat;
   };
 
@@ -407,59 +502,68 @@ export function buildDancer(hue: number): DancerRig {
    * The costume is CUT, not patchworked: bodice and trousers share one dark
    * cloth (that match is the whole point — a black top over glowing legs
    * reads as two different outfits), and the light lives in the sleeves and
-   * the midriff, where the dancing is. */
+   * the midriff, where the dancing is. The darks are authored a step darker
+   * and glossier than they used to be — patent leather and black glass that
+   * CATCH the room's light instead of soaking in the seat colour — because
+   * every candela the body doesn't spend is contrast the neon gets to keep. */
   const suit = accent(
     new MeshStandardMaterial({
-      color: 0x1b1f28,
+      color: 0x14161d,
       emissive: color,
-      emissiveIntensity: ACCENT_REST * SUIT_GAIN,
-      metalness: 0.6,
-      roughness: 0.32,
+      emissiveIntensity: ACCENT_REST * suitGain,
+      metalness: 0.68,
+      roughness: 0.34,
     }),
-    SUIT_GAIN,
+    suitGain,
   );
   // Sleeves and midriff — the same cloth, lit.
   const lit = accent(
     new MeshStandardMaterial({
-      color: 0x20242e,
+      color: 0x1c202a,
       emissive: color,
-      emissiveIntensity: ACCENT_REST * LIT_GAIN,
+      emissiveIntensity: ACCENT_REST * litGain,
       metalness: 0.6,
       roughness: 0.32,
     }),
-    LIT_GAIN,
+    litGain,
     true,
   );
-  // The accessories: helm, gauntlets, boots, sculpted hair — gloss near-black
-  // with just enough of the seat colour in it to stay a surface rather than
-  // a silhouette-shaped hole.
+  // The accessories: helm, gauntlets, boots, sculpted hair, visor glass —
+  // black gloss with just enough of the seat colour in it to stay a
+  // surface rather than a silhouette-shaped hole.
   const shell = accent(
     new MeshStandardMaterial({
-      color: 0x171a21,
+      color: 0x0f1117,
       emissive: color,
-      emissiveIntensity: ACCENT_REST * SHELL_GAIN,
-      metalness: 0.85,
-      roughness: 0.24,
+      emissiveIntensity: ACCENT_REST * shellGain,
+      metalness: 0.92,
+      roughness: 0.18,
     }),
-    SHELL_GAIN,
+    shellGain,
   );
   // Neon trim, two temperatures: standard (lit jewellery — collar, choker,
-  // belt, cuffs, seams) and flat (the hottest slits and blades).
+  // belt, cuffs, seams) warms a step toward white; flat (the scan-slit,
+  // the blades, the soles) runs white at the core. Both authored already
+  // whitened so a rig nobody repaints (the mirror, the club floor, the
+  // dev catwalk) wears the same light as the ring.
   const neonStd = accent(
     new MeshStandardMaterial({
       color: 0x101218,
-      emissive: color,
+      emissive: hotHex(color, TRIM_HOT),
       emissiveIntensity: ACCENT_REST,
       metalness: 0.35,
       roughness: 0.4,
     }),
     1,
     true,
+    TRIM_HOT,
   );
-  const neonFlat = accent(new MeshBasicMaterial({ color }), 1, true);
+  const neonFlat = accent(new MeshBasicMaterial({ color: hotHex(color, CORE_HOT) }), 1, true, CORE_HOT);
   // Halo sprites join the accent list too (structurally a color-only
   // material), so eliminated dancers' glows die with them and hit flashes
-  // tint the halos red.
+  // tint the halos red. They stay PURE hue — the halo is the coloured
+  // bloom the white cores live inside; it is where the figure's colour
+  // identity survives the whitening.
   const glow = (size: number, opacity: number) => {
     const s = glowSprite(color, size, opacity);
     accent(s.material as unknown as MeshBasicMaterial, 1, true);
@@ -490,21 +594,26 @@ export function buildDancer(hue: number): DancerRig {
   skull.scale.set(0.92, HEAD_H, 1.04);
   skull.position.y = -HEAD_H / 2;
   head.add(skull);
-  // Visor: a structured goggle ACROSS THE FACE — a gloss bezel framing the
-  // hot scan-slit, both proud of the skull. (A lit band wrapping the whole
-  // head got tried and cut: it read as a blindfold, not eyewear.) The bezel
-  // is sized so its back corners bury into the cheeks of the NEW narrower
-  // skull instead of poking out at the temples the way the original did.
-  const visorShell = detail(M(boxGeo(), shell));
-  visorShell.scale.set(0.105, 0.044, 0.05);
-  visorShell.position.set(0, 0.014, -0.054);
-  head.add(visorShell);
-  const visorSlit = M(boxGeo(), neonFlat);
-  visorSlit.scale.set(0.088, 0.011, 0.02);
-  visorSlit.position.set(0, 0.014, -0.074);
+  // Visor: WRAPAROUND GLASS — a curved band hugging the skull ear to ear
+  // (a sphere patch scaled to the skull's own ellipse, edges buried in the
+  // temples so there is no floating rim), carrying the hot scan-slit as a
+  // narrower curved ribbon a whisker proud of the glass. The old goggle
+  // was two BOXES — a brick wearing a bar — and at the MC's 2.1× the flat
+  // faces read as cardboard taped to the head. (A LIT band wrapping the
+  // whole head was tried long ago and cut as a blindfold; this band is
+  // dark glass, and only the slit burns.)
+  const goggle = detail(M(visorGeo('goggle', Math.PI, Math.PI / 2 - 0.62, 1.08), shell));
+  goggle.scale.set(0.064, 0.055, 0.072);
+  goggle.position.y = 0.006;
+  goggle.rotation.y = Math.PI; // authored facing +Z — turn to the face
+  head.add(goggle);
+  const visorSlit = M(visorGeo('slit', Math.PI * 0.6, Math.PI / 2 - 0.075, 0.165), neonFlat);
+  visorSlit.scale.set(0.066, 0.055, 0.0735);
+  visorSlit.position.y = 0.012;
+  visorSlit.rotation.y = Math.PI;
   head.add(visorSlit);
-  // Ear pips — the little jewellery that catches at close range,
-  // half-buried beads riding the skull at the temples.
+  // Ear pips — the little jewellery that catches at close range: beads
+  // riding the visor band at the temples, the goggle's own rivets.
   for (const side of [-1, 1]) {
     const pip = detail(M(sphereGeo(8), neonStd));
     pip.scale.setScalar(0.012);
@@ -572,7 +681,7 @@ export function buildDancer(hue: number): DancerRig {
       head.add(spike);
     }
   }
-  head.add(glow(0.3, 0.3));
+  head.add(glow(0.34, 0.34));
   root.add(head);
 
   /* ── torso: neck → bodice → basque, one sculpted line ──
@@ -598,6 +707,15 @@ export function buildDancer(hue: number): DancerRig {
   sternum.scale.set(0.013, 0.34, 0.012);
   sternum.position.set(0, 0.6, -0.075);
   bodice.add(sternum);
+  // …and the SPINE SEAM down the back — the same garment line, other side.
+  // Around a ring everyone faces the stage, so half the room only ever
+  // sees this figure from behind, and a back that is one unbroken black
+  // panel reads as the unfinished side of a prop. One seam makes the rear
+  // view tailoring too.
+  const spine = detail(M(boxGeo(), neonStd));
+  spine.scale.set(0.013, 0.3, 0.012);
+  spine.position.set(0, 0.58, 0.075);
+  bodice.add(spine);
   const collar = M(torusGeo(0.062, 0.009), neonStd);
   const choker = detail(M(torusGeo(0.033, 0.005), neonStd));
   const belt = M(torusGeo(0.04, 0.007), neonStd);
@@ -622,10 +740,10 @@ export function buildDancer(hue: number): DancerRig {
   const clavL = detail(seg(0.014, 0.016, suit));
   const clavR = detail(seg(0.014, 0.016, suit));
   root.add(clavL, clavR);
-  const capL = M(sphereGeo(8), lit);
-  const capR = M(sphereGeo(8), lit);
-  capL.scale.set(0.046, 0.042, 0.046);
-  capR.scale.set(0.046, 0.042, 0.046);
+  const capL = M(sphereGeo(16), lit);
+  const capR = M(sphereGeo(16), lit);
+  capL.scale.set(0.043, 0.036, 0.047);
+  capR.scale.set(0.043, 0.036, 0.047);
   root.add(capL, capR);
 
   /* ── arms: shoulder → elbow → hand, solved each pose — LIT sleeves ── */
@@ -634,8 +752,8 @@ export function buildDancer(hue: number): DancerRig {
   const foreL = seg(0.024, 0.018, lit);
   const foreR = seg(0.024, 0.018, lit);
   root.add(upperL, upperR, foreL, foreR);
-  const elbowL = detail(M(sphereGeo(8), lit));
-  const elbowR = detail(M(sphereGeo(8), lit));
+  const elbowL = detail(M(sphereGeo(16), lit));
+  const elbowR = detail(M(sphereGeo(16), lit));
   elbowL.scale.setScalar(0.024);
   elbowR.scale.setScalar(0.024);
   // Named so headless probes (tools/arm-motion.mjs) can read the solve.
@@ -664,12 +782,19 @@ export function buildDancer(hue: number): DancerRig {
     cuff.rotation.x = Math.PI / 2;
     cuff.position.set(0, 0.008, -0.008);
     hand.add(cuff);
-    // The glowstick: a tapered blade rising out of the fist to a near-point.
-    const blade = M(segGeo(0.006, 0.0125, 7), neonFlat);
-    blade.scale.y = 0.3;
-    blade.position.y = 0.015;
+    // The glowstick: a rounded BATON of light rising out of the fist —
+    // white-hot core, hue in the halo — with a short black collar where it
+    // leaves the grip, so the stick reads held rather than impaled. (The
+    // old blade was a tapered spike: a pencil line from three platforms
+    // away, and a needle has no body for the light to live in.)
+    const hilt = detail(M(segGeo(0.0135, 0.015), shell));
+    hilt.scale.y = 0.055;
+    hilt.position.y = -0.006;
+    hand.add(hilt);
+    const blade = M(bladeGeo(), neonFlat);
+    blade.position.y = 0.012;
     hand.add(blade);
-    hand.add(glow(0.26, 0.5));
+    hand.add(glow(0.3, 0.55));
     root.add(hand);
     return hand;
   };
@@ -686,7 +811,7 @@ export function buildDancer(hue: number): DancerRig {
   const mkLeg = (): { thigh: Mesh; shin: Mesh; knee: Mesh } => {
     const thigh = seg(0.045, 0.034, suit); // full at the hip, narrow at the knee
     const shin = seg(0.031, 0.018, suit); // calf at the knee, slim at the ankle
-    const knee = detail(M(sphereGeo(8), suit));
+    const knee = detail(M(sphereGeo(16), suit));
     knee.scale.set(0.032, 0.03, 0.032);
     const pipe = detail(M(segGeo(0.0055, 0.0055, 5), neonStd));
     pipe.position.set(0, 0.06, -0.021);
@@ -704,8 +829,8 @@ export function buildDancer(hue: number): DancerRig {
   // doing, and its upper-inner quarter merges into the basque flare so
   // skirt -> hip -> thigh is one continuous line. Suit-coloured like the
   // knee: it belongs to the leg chain, not the lit midriff.
-  const hipCapL = M(sphereGeo(8), suit);
-  const hipCapR = M(sphereGeo(8), suit);
+  const hipCapL = M(sphereGeo(16), suit);
+  const hipCapR = M(sphereGeo(16), suit);
   hipCapL.scale.set(0.052, 0.046, 0.052);
   hipCapR.scale.set(0.052, 0.046, 0.052);
   root.add(hipCapL, hipCapR);

@@ -195,6 +195,12 @@ export class Panel {
     return this.canvas.getContext('2d')!;
   }
 
+  /** The ids currently painted on this panel — headless probes read it to
+   *  ask what a card is offering without matching pixels. */
+  buttonIds(): string[] {
+    return this.buttons.map((b) => b.id);
+  }
+
   /** Repaint: frame + title, then the caller's body, then the button set.
    *  Also the hover hand-off: eased highlights start/retarget here. */
   paint(

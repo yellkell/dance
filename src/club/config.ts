@@ -27,8 +27,12 @@
  *          │  booths  │      DANCE FLOOR         │ counter │
  *          │ (velvet) │     (eclipse above)      │ stools  │
  *          │          │      ⊙ you spawn         │         │
- *          │─ terrace ─╨──── vestibule portal ───╨─ terrace │
+ *          │ THE STEP │─ terrace ╨ vestibule ╨ ─│ ARCADE  │
  *          z = +5 ──────────────────────────────────────────
+ *
+ * Both back corners are rooms now, one either side of the way in: the
+ * ARCADE on the east, and on the west THE STEP — a bare little room with a
+ * doorway standing in it that doesn't lead anywhere in this building.
  */
 
 export const CLUB = {
@@ -127,6 +131,35 @@ export const CLUB = {
   // hall over the top of its low ceiling.
   arcade: { minX: 4.9, maxX: 9, minZ: 2.05, maxZ: 5, doorX0: 5.4, doorX1: 6.6 },
 
+  /** THE STEP — the arcade's opposite number across the way in, and the odd
+   *  one out in the whole venue: the other three corners are rooms, and this
+   *  one is a DOOR. Same footprint as the arcade mirrored about the
+   *  vestibule, same low ceiling, its own door facing north onto the floor —
+   *  and standing against its back wall, a portal frame with the VOID in it.
+   *  Step into the frame and the hall is gone: you come out on a platform in
+   *  the middle of RAVE RAID's own abstract space, on ground that moves, with
+   *  none of the club's teleport under your thumb. Ride the circuit and it
+   *  hands you back through the same doorway.
+   *
+   *  `portal*` is the frame's world footprint — build.ts stands it up,
+   *  CourseSystem watches the threshold in front of it, and both have to
+   *  agree to the centimetre or you get a door that looks shut and isn't. */
+  step: {
+    minX: -9,
+    maxX: -4.9,
+    minZ: 2.05,
+    maxZ: 5,
+    doorX0: -6.6,
+    doorX1: -5.4,
+    /** The frame: centred in the room, standing on its south wall. */
+    portalX: -6.95,
+    portalZ: 4.72,
+    portalW: 1.5,
+    portalH: 2.1,
+    /** How far out from the glass the threshold reaches — one stride. */
+    reach: 0.62,
+  },
+
   /** The eclipse chandelier: ring radii + counter-rotation speeds (rad/s).
    *  Hangs over the dance floor centre at `y`. */
   chandelier: {
@@ -192,6 +225,7 @@ export interface FloorArea {
 const Q = CLUB.quiet;
 const T = CLUB.terrace;
 const A = CLUB.arcade;
+const S = CLUB.step;
 
 /** Booth marble tabletop height (top.y 0.745 + half its 0.035 slab). */
 const BOOTH_TABLE_Y = 0.763;
@@ -244,9 +278,10 @@ export const TELEPORT_AREAS: FloorArea[] = [
   // Behind the bar — the keeper's aisle is open to anyone who fancies
   // playing host (enter round the counter's south end).
   { minX: CLUB.bar.x + CLUB.bar.depth + 0.25, maxX: 8.45, minZ: CLUB.bar.z0 + 0.15, maxZ: CLUB.bar.z1 + 0.9, y: 0 },
-  // Terrace wings (raised) either side of the vestibule. The east wing
-  // stops at the arcade's wall — that corner is a room now.
-  { minX: -8.55, maxX: -T.gapHalfW - 0.15, minZ: T.z0 + 0.12, maxZ: T.z1 - 0.1, y: T.h },
+  // Terrace wings (raised) either side of the vestibule. Neither wing runs
+  // the whole way any more — the arcade took the east corner and THE STEP
+  // has the west, so the two galleries are the same length again.
+  { minX: S.maxX + 0.15, maxX: -T.gapHalfW - 0.15, minZ: T.z0 + 0.12, maxZ: T.z1 - 0.1, y: T.h },
   { minX: T.gapHalfW + 0.15, maxX: A.minX - 0.15, minZ: T.z0 + 0.12, maxZ: T.z1 - 0.1, y: T.h },
   // The vestibule landing between the wings, floor level.
   { minX: -T.gapHalfW + 0.1, maxX: T.gapHalfW - 0.1, minZ: T.z0, maxZ: 4.8, y: 0 },
@@ -258,6 +293,13 @@ export const TELEPORT_AREAS: FloorArea[] = [
   // the strip runs back toward the floor rather than up toward the stage.
   { minX: A.minX + 0.25, maxX: A.maxX - 0.25, minZ: A.minZ + 0.2, maxZ: A.maxZ - 0.25, y: 0 },
   { minX: A.doorX0 + 0.05, maxX: A.doorX1 - 0.05, minZ: A.minZ - 0.75, maxZ: A.minZ + 0.05, y: 0 },
+  // THE STEP, and its doorway strip — the arcade's mirror image about the
+  // vestibule, and the same north-facing door. The threshold in front of
+  // the frame is ordinary floor and takes an arc like anywhere else: you
+  // reach the far door the way you reach every other door in the building,
+  // and a 2 × 2 m room is not asked to find a stride it hasn't got.
+  { minX: S.minX + 0.25, maxX: S.maxX - 0.25, minZ: S.minZ + 0.2, maxZ: S.portalZ - 0.18, y: 0 },
+  { minX: S.doorX0 + 0.05, maxX: S.doorX1 - 0.05, minZ: S.minZ - 0.75, maxZ: S.minZ + 0.05, y: 0 },
   // THE NORTH-EAST CORNER — the arcade's old plot. When the arcade moved
   // to the back-right by the door it left this whole corner behind the
   // stage's east side standing empty, and nobody had given the floor back:
@@ -312,6 +354,11 @@ export const WALL_SEGMENTS: WallSegment[] = [
   [A.minX, A.minZ, A.minX, A.maxZ],
   [A.minX, A.minZ, A.doorX0, A.minZ],
   [A.doorX1, A.minZ, A.maxX, A.minZ],
+  // THE STEP: its EAST wall, and the north wall split around its doorway —
+  // the arcade's plan reflected, because the room is.
+  [S.maxX, S.minZ, S.maxX, S.maxZ],
+  [S.minX, S.minZ, S.doorX0, S.minZ],
+  [S.doorX1, S.minZ, S.maxX, S.minZ],
   // The stage face, silled at the deck like the bar counter: step UP onto
   // the stage and back down, but a hop at floor level still can't use it as
   // a shortcut to the backstage walk behind.
