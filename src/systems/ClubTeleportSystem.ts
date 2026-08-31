@@ -52,6 +52,7 @@ import { octagonSlab } from '../arena/octagon.js';
 import * as sfx from '../audio/sfx.js';
 import { DECOR, TELEPORT, TELEPORT_AREAS, crossesWall, floorYAt, type FloorArea } from '../club/config.js';
 import { match } from '../game/state.js';
+import { course } from '../course/state.js';
 import { net } from '../net/session.js';
 
 const _origin = new Vector3();
@@ -218,8 +219,12 @@ export class ClubTeleportSystem extends createSystem({}) {
     // Movement belongs to the SOCIAL place only: the club floor, which is
     // open while a room is (hosting/joined) on a menu screen. The foyer is
     // a front desk, and the raid is your real feet.
+    // …and NOT while the west door has you. Out on the course the rig
+    // belongs to whatever platform you're standing on, and an arc would be
+    // an answer to a question that experience refuses to ask.
     const menuRoom = match.screen === 'lobby' || match.screen === 'tour';
-    const inClub = menuRoom && (net.phase === 'hosting' || net.phase === 'joined');
+    const inClub =
+      menuRoom && (net.phase === 'hosting' || net.phase === 'joined') && !course.active;
 
     // A recentre moved the reference-space origin under our feet. In the
     // club, re-plant the rig on the banked pose so you stay exactly where

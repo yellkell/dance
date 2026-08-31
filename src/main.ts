@@ -26,6 +26,11 @@ import { ClubPropsSystem } from './systems/ClubPropsSystem.js';
 import { ClubSocialSystem } from './systems/ClubSocialSystem.js';
 import { ClubSystem } from './systems/ClubSystem.js';
 import { ClubTeleportSystem } from './systems/ClubTeleportSystem.js';
+import { CourseFrameSystem } from './systems/CourseFrameSystem.js';
+import { CoursePlatformSystem } from './systems/CoursePlatformSystem.js';
+import { CourseSystem } from './systems/CourseSystem.js';
+import { CourseVoidSystem } from './systems/CourseVoidSystem.js';
+import { CourseWayfindSystem } from './systems/CourseWayfindSystem.js';
 import { DiscoSystem } from './systems/DiscoSystem.js';
 import { GoopliathSystem } from './systems/GoopliathSystem.js';
 import { HudSystem } from './systems/HudSystem.js';
@@ -92,6 +97,15 @@ World.create(container, {
   // already re-planted at the spawn on the frame a set books the floor.
   world.registerSystem(ClubSystem);
   world.registerSystem(ClubTeleportSystem);
+  // THE WEST DOOR and what's behind it. Registered AFTER the teleport so
+  // that on the frame the crossing happens the course's frame of reference
+  // has the last word on the rig — the teleport drops every club offset on
+  // its way out, and the circuit plants the rig where the pad is.
+  world.registerSystem(CourseSystem);
+  world.registerSystem(CoursePlatformSystem);
+  world.registerSystem(CourseFrameSystem);
+  world.registerSystem(CourseWayfindSystem);
+  world.registerSystem(CourseVoidSystem);
   world.registerSystem(ClubSocialSystem);
   world.registerSystem(ClubMirrorSystem);
   world.registerSystem(ClubBallSystem);
@@ -156,6 +170,7 @@ import { menuView } from './systems/MenuSystem.js';
 import { socialView } from './systems/ClubSocialSystem.js';
 import { propsView } from './systems/ClubPropsSystem.js';
 import { teleportView } from './systems/ClubTeleportSystem.js';
+import { courseView } from './systems/CourseSystem.js';
 import { grooveView } from './systems/PlayerSystem.js';
 import {
   callBall,
@@ -225,6 +240,9 @@ declare global {
       ambientMuted: typeof ambientMuted;
       /** The club moves that resolve without an arc (step back, snap turn). */
       move: typeof teleportView;
+      /** THE STEP: cross into the course and back without a doorway, and
+       *  read the ride's ledger (tracked platform, laps, slips, handovers). */
+      course: typeof courseView;
     };
   }
 }
@@ -259,6 +277,7 @@ window.__gdr = {
   ambient: ambientTrackId,
   ambientMuted,
   move: teleportView,
+  course: courseView,
   props: propsView,
   menu: new Proxy({} as typeof menuView & typeof socialView, {
     // The views are populated in each system's init — resolve lazily.

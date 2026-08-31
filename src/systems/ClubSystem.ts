@@ -39,6 +39,8 @@ import { setAmbientDuck } from '../audio/music.js';
 import { VOID_BG } from '../arena/voidkit.js';
 import { buildClub, buildFoyer, type ClubRefs, type FoyerRefs } from '../club/build.js';
 import { CLUB } from '../club/config.js';
+import { stepRefs } from '../club/step.js';
+import { course } from '../course/state.js';
 import { match } from '../game/state.js';
 import { net } from '../net/session.js';
 
@@ -67,7 +69,10 @@ export class ClubSystem extends createSystem({}) {
     // `holdFoyer`: the room is open but its host is still reading their
     // code off the board. The doors stay shut until they walk through.
     const social = (net.phase === 'hosting' || net.phase === 'joined') && !match.holdFoyer;
-    const wantClub = menuRoom && social;
+    // THE WEST DOOR is a fourth place, and it takes the whole hall with it:
+    // through THE STEP the club is not a room you can see from, so it packs
+    // away exactly the way it does when a set books the floor.
+    const wantClub = menuRoom && social && !course.active;
     const wantFoyer = menuRoom && !social;
 
     if (club.root.visible !== wantClub) club.root.visible = wantClub;
@@ -85,11 +90,16 @@ export class ClubSystem extends createSystem({}) {
       }
       this.fogOwned = want;
     }
-    if (!wantClub && this.duckTarget !== 1) {
-      // Leaving the floor (set booked, room left): the hush lifts.
-      this.duckTarget = 1;
-      setAmbientDuck(1);
+    // The room loop keeps spinning (everything on the floor pulses to it),
+    // but out on the course you should hear the course: the hall's record
+    // goes to nothing rather than to a murmur, because through that door
+    // there is no wall left for it to come through.
+    const duck = course.active ? 0 : 1;
+    if (!wantClub && this.duckTarget !== duck) {
+      this.duckTarget = duck;
+      setAmbientDuck(duck);
     }
+
     if (!wantClub && !wantFoyer) return;
 
     this.clock += delta;
@@ -132,6 +142,18 @@ export class ClubSystem extends createSystem({}) {
 
       // ── the still room's resting pulse ────────────────────────────────
       club.stillLampMat.emissiveIntensity = 1.0 + Math.sin(t * 0.9) * 0.22;
+
+      // ── THE STEP's door, breathing ────────────────────────────────────
+      // The one thing in the west corner is awake whether or not you're
+      // near it: the pane swells slowly and sits a few millimetres in and
+      // out of its frame, so the void behind it reads as depth rather than
+      // as a picture. CourseSystem takes the levels over as you approach.
+      const step = stepRefs();
+      if (step) {
+        const swell = 0.5 + 0.5 * Math.sin(t * 0.7);
+        step.portalMat.color.setScalar(0.72 + swell * 0.28);
+        step.portal.position.z = CLUB.step.portalZ + Math.sin(t * 0.45) * 0.004;
+      }
 
       // ── THE STILL ROOM's hush ─────────────────────────────────────────
       const Q = CLUB.quiet;

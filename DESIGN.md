@@ -289,14 +289,14 @@ sweep's blade) finally reads in the sticks themselves, not just the reach.
 overshoot that settles, tracking with zero bounce, the yaw wrap, the elbow
 tuck, and the stick's three grips.
 
-## THE CLUB, THE VOID, and the three places
+## THE CLUB, THE VOID, and the four places
 
 FIRE FIGHT's pub proved a third thing worth stealing whole: **a social room
 on the same socket** — teleport-only movement, spatial PCM voice fanned out
 by the relay, and local-only mute/block. Carried forward, and dressed up.
 (The club has no name. The sign over the stage is a moon, not a word.)
 
-The law of the land is **three places — where you are is what you're doing**:
+The law of the land is **four places — where you are is what you're doing**:
 
 1. **THE FOYER** (menu place): a piece of THE VOID — a floating platform
    hanging seven metres above a lit plain, with towers rising off that
@@ -318,7 +318,11 @@ The law of the land is **three places — where you are is what you're doing**:
    music switch is a LOCAL hush, like MUTE and BLOCK: it closes your
    fader, never the club's — the record plays on, so the eclipse, the ball
    and every dancer keep the beat the rest of the room can still hear.
-3. **THE SET** (game place): the raid, wrapped in THE VOID — an actual
+3. **THE STEP** (movement place): a door in the club's south-west corner
+   that leads out of the building entirely — the parkour circuit, on the
+   frame-of-reference mechanic, with the club's teleport switched off. Its
+   own section below.
+4. **THE SET** (game place): the raid, wrapped in THE VOID — an actual
    environment sharing the foyer's language at arena scale. Both interiors
    pack away; the rig drops every club offset back to identity, so "my
    platform IS the world origin" stays true no matter where you teleported
@@ -327,6 +331,74 @@ The law of the land is **three places — where you are is what you're doing**:
    space's `reset` event, is how you choose a new one). The void ducks with
    the light rig while a telegraph owns your deck — danger never competes
    with scenery.
+
+### THE STEP — the fourth place, and the second physics
+
+Every locomotion scheme answers one question: **who owns the transform
+between the player's real floor and the virtual world, and when may it
+change?** The club barely moves it (a teleport jumps it and hands it
+straight back, and your platform never moves house because you visited the
+bar). The raid refuses to move it at all — *my platform IS the world
+origin*. There is a third answer, the one *Eye of the Temple* found:
+**re-anchor it to whatever you are standing on.** One platform at a time is
+TRACKED; while it is tracked it holds still relative to your real floor, and
+the slice of virtual space your play area maps to rides with it. You walk
+two metres and travel forty, with no stick, no arc and nothing to learn.
+
+That can't go in the raid — a dodge game needs a floor that holds still —
+and it isn't a thing to put on the board. So it got a **door**, and the
+door is the design:
+
+- **Where.** The south-west corner, the arcade mirrored about the way in.
+  Both back corners are rooms now, which also finally gives the two terrace
+  wings the same length as each other.
+- **What's in it.** Nothing but the doorway. Three stepped deco frames — the
+  vestibule's own grammar at two-thirds scale, so the building's two doors
+  are recognisably one idea — with the void inside them, and a brass-edged
+  plate let into the floor one stride deep. The plate IS the trigger volume,
+  made visible, and it brightens as you close on it. Nothing is written
+  anywhere: a lit doorway doesn't need a sign.
+- **The swap.** Standing in the threshold drops a head-locked black, and
+  under it the hall packs away exactly the way it does when a set books the
+  floor. `course.active` is the one flag every club system reads to stand
+  down: teleport, crowd, SOCIAL panel, drinks, the ball, the mirror, the
+  cabinet — and the floor's voices, because a friend at the bar has nowhere
+  honest to sing from when you are a storey of nothing away. (That last one
+  is not a new law; it is the same one that already silences the club from
+  the ring.) The record goes to zero rather than to a murmur: through that
+  door there is no wall left for it to come through.
+- **The way home is the geometry, not a second portal.** Every traversal on
+  the circuit is a pair of opposed real steps netting to zero, so the lap's
+  ledger closes at centre: the last step east repays the first, and the ride
+  ends on the exact spot it began. That is why the door can simply be
+  waiting there when you finish — there was never anything to place.
+- **The slip, not the slide.** Handover is gated and CLEAN ONLY: tracking
+  passes to a platform exactly when its anchor already agrees with the live
+  rig, so the instant of the switch moves nothing at all. The earlier build
+  in the `movement` repo also carried the forced switch — ground already
+  leaving takes the frame, and a correction drains over a second, visibly
+  sliding the platform back under your feet. That slide is the one moment
+  the world moves on its own, and it reads as the game correcting you. Here
+  the score authors every legal step onto aligned ground, so the only way to
+  be on departing ground is to have missed the step — and a miss should read
+  as a miss. The ground pulls away, the frame holds, the flow dies, the thud
+  lands. The rig has one source of truth and no history.
+- **No moves out there.** The `movement` repo's consolidation threw six of
+  the GOOPLIATH's moves at the decks mid-ride, and they were the first thing
+  cut on the way across. They are a boss's vocabulary, thrown by a boss on a
+  stage; a course that also throws them is a second raid rather than a second
+  game. What's left is the floor talking — deck wash, wrapping rims, dying
+  corner posts, audible ticks — and the energy law they used to trigger now
+  reads off the only hazard there is: the ground you own, counting itself
+  out. The void ducks for it, exactly as it ducks for a telegraph on your
+  deck in a set.
+- **The bill.** 59 draw calls and ~30 k triangles for the whole far side,
+  against the same budgets the set is held to (≤ 60, ≤ 100 k) — the circuit's
+  decks share their reflection's instance buffers, so the route hangs over
+  its own image the whole way round for one extra draw per bank.
+
+`node tools/step-door.mjs` walks the room and the crossing; `--lap` rides the
+entire circuit on autopilot and waits for the ledger to close.
 
 ### Building the void (what actually buys fidelity)
 

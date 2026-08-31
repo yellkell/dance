@@ -65,6 +65,7 @@ import {
 import { buildDancer, type DancerPose, type DancerRig } from '../game/avatars.js';
 import { PoseMotion, type MotionTuning } from '../game/poseMotion.js';
 import { match } from '../game/state.js';
+import { course } from '../course/state.js';
 import { clubPoses, remotePoses, type RemotePose } from '../net/poses.js';
 import {
   callBall,
@@ -237,7 +238,9 @@ export class ClubSocialSystem extends createSystem({}) {
   }
 
   update(delta: number): void {
-    const inClub = match.screen === 'lobby' || match.screen === 'tour';
+    // The west door takes you out of the hall entirely: the floor's
+    // figures, its crowd and its panel all belong to a room you aren't in.
+    const inClub = (match.screen === 'lobby' || match.screen === 'tour') && !course.active;
     const inRoom = net.phase === 'hosting' || net.phase === 'joined';
     const liveSet = net.phase === 'live';
 
@@ -294,9 +297,14 @@ export class ClubSocialSystem extends createSystem({}) {
       //
       // The frames still arrive (the relay fans to the whole room); this is
       // a local gate, exactly like mute and block.
+      // THE WEST DOOR is a third place under the same law. Out on the
+      // circuit there is nowhere honest to put a voice from the hall — the
+      // course is a storey of nothing away, and a friend at the bar would
+      // either be silent or arrive out of the floor — so the floor goes
+      // quiet with the record, and comes back with it.
       const ring = seatByIdx.get(p.idx);
       const theyDance = liveSet ? ring !== undefined : net.gamePlayers.has(p.idx);
-      const elsewhere = theyDance !== liveSet;
+      const elsewhere = theyDance !== liveSet || course.active;
       setVoiceSpeakerMuted(String(p.idx), hidden || elsewhere || socialMuted(p.name));
 
       if (liveSet) {

@@ -233,7 +233,7 @@ Empty seats are filled with identical seeded **goo-groupies** on every client.
 npm run server       # room relay on :8788
 ```
 
-There are **three places**, and where you are is what you're doing:
+There are **four places**, and where you are is what you're doing:
 
 1. **THE FOYER** — the menu place, and a piece of THE VOID: a floating
    neon-edged platform in the set's own abstract space, with the board and
@@ -285,8 +285,40 @@ There are **three places**, and where you are is what you're doing:
    still room's), the north corridors, and the backstage walk — the
    perimeter is a loop. Props and the cabinet are local-per-headset for
    now: syncing them across the room needs relay verbs the wire doesn't
-   carry yet.
-3. **THE SET** — the game place, called with **THE BALL**. Anyone sends it
+   carry yet. The fourth corner, back-left by the door, is **THE STEP** —
+   see below.
+3. **THE STEP** — the movement place, and the only door in the building
+   that doesn't lead anywhere in the building. The club's south-west
+   corner — the arcade's opposite number across the way in — is a bare
+   little room with a **portal frame** standing in it and the VOID inside
+   the frame. Walk into the doorway and the hall is gone.
+
+   You come out on a pad at the heart of the void, on a **parkour circuit**,
+   with **different physics**. There is no arc, no thumbstick, no
+   locomotion of any kind: one platform at a time is *tracked*, which means
+   it holds still relative to your real floor while the world rides past
+   it, and stepping onto the next one hands it over. Walking two metres
+   takes you forty. Stepping is the entire game.
+
+   The floor says everything. Ground about to leave washes amber, its rim
+   fills a quarter per beat, and a corner post dies with each one — four
+   dead posts and it's gone. Miss the step and it pulls away without you: a
+   **slip**, never a slide, because out here the world never moves on its
+   own. The route rides **out** east on a runner, **up** the lift, **across
+   THE SKYWALK** at height with the mirror floor a storey and a half below,
+   then **down** the drop and home on the west runner. The lap is
+   geometrically closed — the last step repays the first — so it ends on the
+   exact spot it began, which is where the door is. Close it and you come
+   back out of the frame into the same little room, facing the hall. (Hold
+   right **Ⓑ** to step out early; hold a squeeze for the circuit's own
+   authoring overlay.)
+
+   The mechanic is the [`movement`](https://github.com/yellkell/movement)
+   repo's — *Eye of the Temple*'s frame-of-reference trick on a rhythm grid.
+   The raid's six moves deliberately did **not** come with it: there is no
+   boss out there, and the only thing that speaks is the floor.
+   `node tools/step-door.mjs --lap` walks the door and rides the circuit.
+4. **THE SET** — the game place, called with **THE BALL**. Anyone sends it
    up (from the SOCIAL panel); a mirror ball hangs in front
    of them for **60 seconds** wearing a countdown plate — the song, the
    caller, who's touched in. **Touch the ball** (hand close + trigger) to
@@ -493,12 +525,19 @@ src/
                        the set's environment
   club/                the club: venue + void foyer build, layout,
                        materials, the ball, voice (capture + spatial
-                       playback), mute/block store, static-merge helper
+                       playback), mute/block store, static-merge helper,
+                       THE STEP's portal refs
+  course/              what's behind the west door: THE CIRCUIT's score,
+                       the frame-of-reference tunables, its own transport
+                       and procedural kit, instancing banks + the live
+                       mirror, canvas textures, the energy dimmer
   game/                state, flow, ring math, rng, avatars + their
                        shared pose-motion layer (springy hands)
   systems/             Music, Choreo, Player, Avatar, Rank, Goopliath,
                        Disco, Hud, Menu, Network, Arena,
-                       Club, ClubTeleport, ClubSocial, ClubBall
+                       Club, ClubTeleport, ClubSocial, ClubBall,
+                       Course (the door + the crossing) · CoursePlatform ·
+                       CourseFrame · CourseWayfind · CourseVoid
   net/                 room session + pose stores (ring + club floor)
 server/index.mjs       the room relay (seats/seed/poses + club poses,
                        voice fan-out, THE BALL's clock, rooms that
@@ -512,7 +551,8 @@ tools/                 track analyzer · preview-shot · club-capture ·
                        goop-cohesion (the goop stays ONE PIECE, field-checked
                        through the whole show) · arm-motion (the figures'
                        hand springs, elbow poles and stick grips, checked
-                       live)
+                       live) · step-door (the west door and the circuit
+                       behind it; --lap rides the whole thing)
 avatar-preview.html    dev-only dancer catwalk (never shipped)
 ```
 

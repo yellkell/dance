@@ -1,0 +1,98 @@
+/**
+ * THE COURSE — every tunable for VOIDSTEP, the movement course behind the
+ * club's west door.
+ *
+ * The grammar is the `movement` repo's (stepwell's Eye-of-the-Temple frame
+ * of reference on a rhythm grid, simplified so nothing ever slides under
+ * your feet). What did NOT come across is the attack vocabulary: the moves
+ * are RAVE RAID's, they belong to the raid, and a course that throws beams
+ * at you is a second raid rather than a second GAME. Out there the floor
+ * is the only thing trying anything, and the only verb is the step.
+ *
+ * Numbers with a research pedigree cite their source note in the movement
+ * repo's `research/`.
+ */
+
+export const GRID = {
+  // Eye of the Temple's 3×3 grid over a 2×2 m play area (research/03 §2.2).
+  pitch: 0.66,
+  tile: 0.6, // deck tile edge; the 6 cm gap is the visual seam between squares
+};
+
+export const RIG = {
+  // Handover is gated, not immediate (research/03 §2.3): a platform may take
+  // tracking only when its anchor sits within alignEps of the live rig.
+  // That is the WHOLE law. Ground already leaving never forces a switch and
+  // never drags the world back into place under you — standing on departing
+  // un-tracked ground is a SLIP, and a miss reads as a miss.
+  alignEps: 0.025,
+  alignEpsY: 0.04,
+  // A tile owns the head only when the head is clearly inside it; the tracked
+  // tile keeps a wider skirt so ownership can't flicker on the border.
+  tileInset: 0.05,
+  trackedOutset: 0.09,
+};
+
+export const MUSIC = {
+  bpm: 122, // a rave tempo — the club's 110–117 shelf, pushed one notch up
+  beatsPerBar: 4,
+};
+
+export const COLOR = {
+  deckTop: 0x14121e,
+  rimSafe: 0x66d9ff,
+  rimWarn: 0xffaa22,
+  // Fences whisper; rims speak (research/03 §2.4).
+  fence: 0x33304e,
+};
+
+export const ENERGY = {
+  // The void ducks while the ground you own is counting itself out, and
+  // blooms as the ride stays clean. Danger never competes with scenery
+  // (research/02 §6) — the club's own energy law, and out here the only
+  // danger is the floor leaving.
+  base: 0.8,
+  ducked: 0.42,
+  flowBonus: 0.03,
+  ease: 2.2, // 1/s toward target
+};
+
+export const PLAY_AREA = {
+  // Fixed minimum, never adapted (research/03 §1, §8.4).
+  requiredWidth: 2.0,
+  requiredDepth: 2.0,
+};
+
+export const COUNTDOWN = {
+  postIdle: 0.05,
+  postWarn: 0.34,
+  postSize: 0.05,
+};
+
+export const WAYFIND = {
+  breathBars: 1,
+  berthPulse: 0.35,
+};
+
+/** The circuit's ceiling — how high the skywalk rides. The drone root climbs
+ *  +7 semitones over this span (research/01 §6, inverse locomotion's audio
+ *  cousin, played the other way up). */
+export const CLIMB = {
+  top: 3.8,
+};
+
+/**
+ * WHERE THE COURSE IS. The club and the void are both built in world space
+ * and they would sit inside one another; a whole storey of nothing between
+ * them costs no draw calls and buys the two places their own air. The door
+ * is not a trick of the light — it really is somewhere else.
+ */
+export const COURSE_ORIGIN = { x: 0, y: -300, z: 0 };
+
+/** How long the black holds while you cross (seconds each way). */
+export const PHASE = {
+  fadeOut: 0.42,
+  fadeIn: 0.55,
+  /** Hold right Ⓑ this long to step back out mid-ride. */
+  bailHold: 0.8,
+};

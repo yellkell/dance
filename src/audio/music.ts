@@ -145,6 +145,20 @@ function chain(c: AudioContext): GainNode {
   return bus;
 }
 
+/**
+ * THE MUSIC BUS itself — the user's music fader, ahead of the limiter.
+ *
+ * The course's kit (course/conductor.ts) is SYNTHESISED live rather than
+ * played off a file, so it has nowhere to plug in through startSet; it hangs
+ * here instead, which puts it behind the same slider as every record and
+ * under the same safety limiter. Builds the chain on first ask, like the
+ * decks do.
+ */
+export function musicBus(): GainNode | null {
+  const c = ctx();
+  return c ? chain(c) : null;
+}
+
 /** Fetch + decode a track (cached). Returns null if it can't be decoded. */
 export function loadTrack(track: Track): Promise<AudioBuffer | null> {
   const hit = buffers.get(track.id);
