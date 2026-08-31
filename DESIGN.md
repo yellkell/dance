@@ -354,10 +354,17 @@ door is the design:
   wings the same length as each other.
 - **What's in it.** Nothing but the doorway. Three stepped deco frames — the
   vestibule's own grammar at two-thirds scale, so the building's two doors
-  are recognisably one idea — with the void inside them, and a brass-edged
-  plate let into the floor one stride deep. The plate IS the trigger volume,
-  made visible, and it brightens as you close on it. Nothing is written
-  anywhere: a lit doorway doesn't need a sign.
+  are recognisably one idea — with the void inside them, a brass-edged plate
+  let into the floor one stride deep (the trigger volume, made visible,
+  brightening as you close on it), and two uplights that are the only cold
+  light in a building which is warm everywhere else.
+- **And NO SIGN.** The still room and the arcade wear nameplates because
+  they are rooms, and a room can be described. This is a door, and a door
+  that has to tell you what it is has already failed — the whole invitation
+  is the light coming out of it. So the one opening in the building with
+  nothing written over it is the one that leads out of the building. (The
+  lamp in the opening dropped to a third of its first setting at the same
+  time: it turned out to be lighting a nameplate rather than a doorway.)
 - **The swap.** Standing in the threshold drops a head-locked black, and
   under it the hall packs away exactly the way it does when a set books the
   floor. `course.active` is the one flag every club system reads to stand
@@ -372,16 +379,32 @@ door is the design:
   ledger closes at centre: the last step east repays the first, and the ride
   ends on the exact spot it began. That is why the door can simply be
   waiting there when you finish — there was never anything to place.
-- **The room check, first and loudest.** One card, dead ahead of the pad
-  because that is the way you arrive facing: CLEAR 1.8 × 1.8 m — STAND IN
-  THE MIDDLE AND RECENTRE. Everything else out here is learned by doing;
-  this can't be. 1.8 m is the floor you must be able to STAND on, not the
-  span of the decks (1.92 m): every step the circuit asks for lands you on
-  a tile centre, and the outermost of those are at ±0.66. The card turns
-  over into the route on your first step — by then you demonstrably have the
-  floor, and a safety notice that keeps shouting through a whole ride is
-  scenery. One mesh, two paintings: two cards facing you at once would be
-  two draw calls and one too many things to read while ground is leaving.
+- **The room check is the only writing out there.** One card, dead ahead of
+  the pad because that is the way you arrive facing:
+
+      CLEAR 1.8 × 1.8 m
+      STAND IN THE MIDDLE AND RECENTRE
+
+  It shows on arrival, goes on your first step — by then you demonstrably
+  have the floor — and comes back for the next crossing, because that is a
+  fresh start and the room may be a different room.
+
+  Everything else is learned by doing and is therefore not written down: the
+  floor's colours are the instruction, the invitation is a circle of light
+  on the ground, and stepping is a thing a body already knows how to do.
+  This one thing cannot be learned by doing — a body that finds a real wall
+  halfway through a step has been failed by the experience rather than by
+  the room — so it is said once, in as few words as it can be said in.
+
+  A second card used to take over on that first step and explain the route
+  in four lines, and a third line under the room check named a controller
+  button. Both are gone. A manual for a game with no controls is an
+  admission that the game failed to be legible, in a place whose whole
+  argument is that it doesn't need one.
+
+  1.8 m is the floor you must be able to STAND on, not the span of the decks
+  (1.92 m): every step lands you on a tile centre, and the outermost of
+  those are at ±0.66.
 - **Nothing slides.** The law, stated so it can be checked: the world moves
   ONLY on frames where the ground under you is travelling. There is no
   easing term, no correction, nothing catching up — the rig is
